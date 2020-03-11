@@ -41,7 +41,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 require('../css/styles.css');
 
-var pluginName = 'Phenotype-Prediction';
+var pluginName = 'PhenotypePrediction';
 var pluginVersion = '0.9.0'; //const fileURL = 'http://localhost:8000/';
 
 var fileURL = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/';
