@@ -32,9 +32,9 @@ require("core-js/modules/web.dom-collections.for-each");
 require('../css/styles.css');
 
 var pluginName = 'AIR-Exploration';
-var pluginVersion = '0.9.0';
-var fileURL = 'http://localhost:3000/'; //const fileURL = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/';
+var pluginVersion = '0.9.0'; //const fileURL = 'http://localhost:3000/';
 
+var fileURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/DataFiles/';
 var minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 var github = {
   phenotypeNames: [],
