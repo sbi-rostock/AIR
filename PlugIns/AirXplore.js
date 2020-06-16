@@ -49,8 +49,8 @@ require('../css/styles.css');
 var pluginName = 'AirXplore';
 var pluginVersion = '0.9.0';
 var fileURL = '';
-var filetesting = false;
-var testing = false;
+var filetesting = true;
+var testing = true;
 var minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 var centralities = ["Betweenness", "Closeness", "Degree", "Indegree", "Outdegree"];
 var AIR = {
@@ -1337,12 +1337,7 @@ function PredictTargets() {
 
         positiveCount++;
       } else {
-        if (SP_abs === 0) {
-          negativeSum++;
-        } else {
-          negativeSum += 1 - SP_abs;
-        }
-
+        negativeSum += 1 - 1 / SP_abs;
         negativeCount++;
       }
     }
