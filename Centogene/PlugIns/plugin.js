@@ -4,8 +4,8 @@ var Chart = require('chart.js');
 const pluginName = 'Centogene';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
-let testing = true;
-let filetesting = true;
+let testing = false;
+let filetesting = false;
 let ScriptPaths = [];
 let CssFiles = [];
 let $ = window.$;
@@ -87,7 +87,7 @@ function initMainPageStructure() {
     CssFiles = [filepath + "AirOmicsStyle.css", filepath + "AirXploreStyle.css"];
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   } else {
-    let filepath = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/Centogene/PlugIns/";
+    let filepath = "https://raw.githack.com/sbi-rostock/AIR/master/Centogene/PlugIns/";
     CssFiles = [filepath + "AirOmicsStyle.css", filepath + "AirXploreStyle.css"];
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   }
