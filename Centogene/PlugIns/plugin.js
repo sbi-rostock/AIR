@@ -87,7 +87,7 @@ function initMainPageStructure() {
     CssFiles = [filepath + "AirOmicsStyle.css", filepath + "AirXploreStyle.css"];
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   } else {
-    let filepath = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/Centogene/PlugIns/";
+    let filepath = "https://cdn.jsdelivr.net/gh/sbi-rostock/AIR@master/Centogene/PlugIns/";
     CssFiles = [filepath + "AirOmicsStyle.css", filepath + "AirXploreStyle.css"];
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   }
