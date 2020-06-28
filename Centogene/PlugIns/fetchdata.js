@@ -10,6 +10,7 @@ const AIR = {
     MoleculeData: {},
     Phenotypes: {},
     Molecules: {},
+    MoleculeNames: {},
     Interactions: {},
     ElementNames: {
 
@@ -33,6 +34,7 @@ const AIR = {
     MIMSpecies: [],
     MIMSpeciesLowerCase: [],
     allBioEntities: [],
+    MapElements: {},
 }
 
 const globals = {
@@ -162,8 +164,10 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
                 AIR.allBioEntities = bioEntities;
                 bioEntities.forEach(e => {
                     if (e.constructor.name === 'Alias') {
-                        AIR.MIMSpeciesLowerCase.push(e.getName().toLowerCase());
+                        let namelower = e.getName().toLowerCase();
+                        AIR.MIMSpeciesLowerCase.push(namelower);
                         AIR.MIMSpecies.push(e.getName());
+                        AIR.MapElements[namelower] = e;
                     }
                 });
                 testing = _testing;
@@ -569,24 +573,13 @@ function getElementType(name)
 
 function selectElementonMap(element, external)
 {
-    
+    let namelower = element.toLowerCase();
     globals.selected = [];
 
-    let exists = false;
-
-    AIR.allBioEntities.forEach(e => {
-        if (e.constructor.name === 'Alias') {
-            if (element.toLowerCase() === e.getName().toLowerCase()) {
-                globals.selected.push(e);
-                exists = true;
-            }
-        }
-
-    });
-
-    if(exists)
+    if(AIR.MapElements.hasOwnProperty(namelower))
     {
-        focusOnSelected();                            
+        globals.selected.push(AIR.MapElements[namelower]);
+        focusOnSelected();   
     }
     else if(external)
     {
@@ -595,8 +588,7 @@ function selectElementonMap(element, external)
         if(link)
         {
             window.open(link, "_blank");
-        }
-        
+        }     
     }
 }
 
@@ -625,7 +617,17 @@ function getLink(name) {
 }
 
 function getLinkIconHTML(element) {
-    output = '<a href="#" class="elementlink">' + element + '</a>';
+
+    let namelower = element.toLowerCase();
+    let output = "";
+    if(AIR.MapElements.hasOwnProperty(namelower))
+    {
+        output += '<a href="#" class="elementlink">' + element + '</a>';
+    }
+    else
+    {
+        output += '<span>' + element + '</span>';
+    }
 
     let link = getLink(element);
 

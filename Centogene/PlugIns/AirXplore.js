@@ -1263,12 +1263,7 @@ function createCentralityTable(phenotype) {
 
     globals.centraliytable.columns.adjust().draw(); 
 
-    $('a.elementlink').click(function() {
-            selectElementonMap(this.innerHTML, false);
-        });
-    
-        /*
-    globals.centraliytable.on('click', 'a', function () {
-        selectElement(this.innerHTML, false);
-    } );*/
+    globals.centraliytable.on('click', 'a.elementlink', function () {
+        selectElementonMap(this.innerHTML, false);
+    } );
 }
