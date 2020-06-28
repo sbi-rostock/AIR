@@ -1670,10 +1670,14 @@ function normalizePhenotypeValues() {
             }
 
             for (let sample in globals.samples) {
+                if (allmax <= 1)
+                {
+                    AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / allmax) + Number.EPSILON) * 100) / 100;
+                }
                 if (typevalue == 2) {
                     max = samplemaxvalues[sample]
                 }
-                if (max > 1 && allmax <= 1) {
+                if (max > 1) {
                     AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / max) + Number.EPSILON) * 100) / 100;
                 }
                 else {
