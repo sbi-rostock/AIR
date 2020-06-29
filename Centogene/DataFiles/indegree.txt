@@ -1,6 +1,10 @@
 ﻿Element	gaucher's disease	keratinocyte differentiation	krabbe disease	neutrophil degranulation	niemann-pick disease	regulation of programmed nerotic cell death
+m809	0	0	0	0	0	0
+m1096	0	0	0	0	0	0
 m1690	0	0	0	0	0	0
 m1691	0	0	0	0	0	0
+m317	0	0	0	0	0	0
+m2536	1	1	1	1	1	1
 m2880	7	7	7	7	7	7
 m2901	2	2	2	2	2	2
 m2872	0	0	0	0	0	0
@@ -12,13 +16,14 @@ m2863	0	0	0	0	0	0
 m2865	0	0	0	0	0	0
 m2890	2	2	2	2	2	2
 m2889	2	2	2	2	2	2
-m1096	0	0	0	0	0	0
-m2536	0	0	0	0	0	0
 m2879	2	2	2	2	2	2
 m2894	2	2	2	2	2	2
-m2891	1	1	1	1	1	1
-m2896	1	1	1	1	1	1
+m2891	2	2	2	2	2	2
+m2896	2	2	2	2	2	2
 m2897	2	2	2	2	2	2
 m2898	2	2	2	2	2	2
 m2899	2	2	2	2	2	2
-m2888	1	1	1	1	1	1
+m2888	2	2	2	2	2	2
+m209	0	0	0	0	0	0
+m294	0	0	0	0	0	0
+m198	0	0	0	0	0	0
