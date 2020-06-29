@@ -1135,6 +1135,7 @@ function loadfile() {
             globals.samplesResults = [];
             globals.ExpressionValues = {};
             globals.numberofuserprobes = 0;
+            globals.om_targetchart.data.datasets = [];
             
             var datamapped = false;
             var textFromFileLoaded = fileLoadedEvent.target.result;
@@ -1717,6 +1718,8 @@ function calculateTargets() {
         (resolve, reject) => {
         var targets = [];
         var promises = [];
+        let transcriptomics = document.getElementById("om_transcriptomics").checked;
+
         for (let e in AIR.Molecules) {
 
             let {name:_name, type:_type, phenotypes:_sp} = AIR.Molecules[e];
@@ -1770,8 +1773,6 @@ function calculateTargets() {
                         let value = globals.ExpressionValues[p].nonnormalized[sample];
                         let SP = 0;
 
-                        let transcriptomics = document.getElementById("om_transcriptomics").checked;
-
                         if(data.hasOwnProperty(p))
                         {
                             if (transcriptomics)
@@ -1801,7 +1802,9 @@ function calculateTargets() {
 
                             else {
                                 if(SP_abs < 1)
-                                negativeSum += (1 - SP_abs);
+                                {
+                                    negativeSum += (1 - SP_abs);
+                                }
 
                             }
                             negativeCount++;
@@ -1811,8 +1814,8 @@ function calculateTargets() {
                     let positiveSensitivity = 0;
                     let negativeSensitivity = 0;
                     if (positiveCount > 0) {
-                        positiveSensitivity = Math.round(((positiveSum / positiveCount) + Number.EPSILON) * 100) / 100;
-                        negativeSensitivity = Math.round(((positiveinhibitorySum / positiveCount) + Number.EPSILON) * 100) / 100;
+                        positiveSensitivity = positiveSum / positiveCount; //Math.round(((positiveSum / positiveCount) + Number.EPSILON) * 100) / 100;
+                        negativeSensitivity = positiveinhibitorySum / positiveCount; // Math.round(((positiveinhibitorySum / positiveCount) + Number.EPSILON) * 100) / 100;
                     }
                     if (positiveSensitivity <= 0 && negativeSensitivity <= 0)
                         return;
@@ -1856,11 +1859,12 @@ function calculateTargets() {
                         pointStyle: pstyle,
                     }
                     targets.push(result);
+                    /*
                     if(globals.Targets.hasOwnProperty(e) == false)
                     {
                         globals.Targets[e] = {};
                     }
-                    globals.Targets[e][sample] = result;
+                    globals.Targets[e][sample] = result;*/
                 }));
             }
         }
