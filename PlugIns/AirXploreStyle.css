@@ -5,7 +5,24 @@
   font-weight: bold;
 }
 
-.AirPlugins-container {
+.air_dl {
+  display: none; 
+  margin-bottom: 0px;
+}
+
+.air_key {
+  float: left; 
+  padding-right: 5px;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.air_value {
+  text-transform: capitalize;
+  margin-bottom: 0px;
+}
+
+.Centogene-container {
   padding: 5px;
   background-color: #ffffff;
   overflow-x: hidden;

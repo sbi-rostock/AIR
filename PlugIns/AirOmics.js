@@ -319,46 +319,9 @@ function AirOmics(){
             var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
 
             if (activePoint !== undefined) {
-
-                globals.selected = [];
-
-                var exists = false;
-
-                AIR.allBioEntities.forEach(e => {
-                    if (e.constructor.name === 'Alias') {
-                        if (globals.om_targetchart.data.datasets[activePoint._datasetIndex].label === e.getName()) {
-                            globals.selected.push(e);
-                            exists = true;
-                        }
-                    }
-
-                });
-
-                if(exists === false)
-                {                            
-                    for(let e in AIR.Molecules)
-                    {
-                        let {name:_name, ids:_ids} = AIR.Molecules[e];
-                        
-                        if(_name.toLowerCase() === globals.om_targetchart.data.datasets[activePoint._datasetIndex].label.toLowerCase())
-                        {
-                            for(let id in _ids)
-                            {
-                                if(id != "name")
-                                {
-                                    window.open('http://identifiers.org/' + id + "/" + _ids[id] ,'_blank');
-                                    return;
-                                }
-                            }
-
-                        }
-                    }
-
-                }
-                else
-                {
-                    focusOnSelected();
-                }
+                let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                selectElementonMap(name, true);
+                setSelectedElement(name);
             }
 
             // Calling update now animates element from oldValue to newValue.
@@ -419,18 +382,6 @@ function Start() {
             }   
             readExpressionValues().then(function (re) {
                 normalizeExpressionValues().then(function (ne) {
-                        minerva.ServerConnector.getModels().then(models => {
-                            models.forEach((model, ix) => {
-
-                                if (model.getName().toString() === '_MIM')
-                                    globals.fullMapID = model.getId();
-                                if (model.getName().toString() === '_Complexes')
-                                    globals.complexMapID = model.getId();
-                                if (model.getName().toString() === 'Phenotypes')
-                                    globals.phenotypeMapID = model.getId();
-                                if (model.getName().toString() === 'PhenotypeMap')
-                                    globals.phenotypeImageMapID = model.getId();
-                            });
 
                             alert(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes could be mapped.");
 
@@ -514,7 +465,6 @@ function Start() {
                             globals.Targets = {};
                             globals.targetsanalyzed = false;
                             enablebtn();
-                        });
 
                 }).catch(function (error) {
                     alert('Failed to normalize the expression values.');
@@ -551,15 +501,7 @@ $(document).on('click', '.clickPhenotypeinTable', function () {
     var sid = $(this).attr('data');
     globals.selected = [];
 
-    AIR.allBioEntities.forEach(e => {
-        if (e.constructor.name === 'Alias') {
-            if (AIR.Phenotypes[sid].name.toLowerCase() === e.getName().toLowerCase()) {
-                globals.selected.push(e)
-            }
-        }
-
-    });
-    focusOnSelected();
+    selectElementonMap(AIR.Phenotypes[sid].name, false);
 });
 
 $(document).on('change', '.clickCBinTable',function () {
@@ -679,11 +621,11 @@ function createTable() {
     for (let phenotype in AIR.Phenotypes)
     {
         var result_row = tbl.insertRow(tbl.rows.length);
+        var pname = AIR.Phenotypes[phenotype].name;
 
-
-        globals.downloadtext += `\n${AIR.Phenotypes[phenotype].name}`;
-        checkBoxCell(result_row, 'th', AIR.Phenotypes[phenotype].name, phenotype, 'center');
-        createButtonCell(result_row, 'th', AIR.Phenotypes[phenotype].name, phenotype, 'center');
+        globals.downloadtext += `\n${pname}`;
+        checkBoxCell(result_row, 'th', pname, phenotype, 'center');
+        let phenocell = createButtonCell(result_row, 'th', pname, phenotype, 'center');
 
         for (let sample in globals.samples) {
             globals.downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
@@ -1193,6 +1135,7 @@ function loadfile() {
             globals.samplesResults = [];
             globals.ExpressionValues = {};
             globals.numberofuserprobes = 0;
+            globals.om_targetchart.data.datasets = [];
             
             var datamapped = false;
             var textFromFileLoaded = fileLoadedEvent.target.result;
@@ -1728,6 +1671,10 @@ function normalizePhenotypeValues() {
             }
 
             for (let sample in globals.samples) {
+                if (allmax <= 1)
+                {
+                    AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / allmax) + Number.EPSILON) * 100) / 100;
+                }
                 if (typevalue == 2) {
                     max = samplemaxvalues[sample]
                 }
@@ -1771,6 +1718,8 @@ function calculateTargets() {
         (resolve, reject) => {
         var targets = [];
         var promises = [];
+        let transcriptomics = document.getElementById("om_transcriptomics").checked;
+
         for (let e in AIR.Molecules) {
 
             let {name:_name, type:_type, phenotypes:_sp} = AIR.Molecules[e];
@@ -1826,21 +1775,23 @@ function calculateTargets() {
 
                         if(data.hasOwnProperty(p))
                         {
-                            if (document.getElementById("om_transcriptomics").checked === true)
+                            if (transcriptomics)
                             {
                                 SP = data[p].tInfluence;
                             }
                             else
                             {
-                                SP = data[p].SP * data[p].Type;
+                                SP = 1 / (data[p].SP * data[p].Type);
                             }
                         }
+
+                        let SP_abs = Math.abs(SP);
 
                         if (value != 0) {
 
                             if (SP != 0) {
-                                positiveSum += value / SP;
-                                positiveinhibitorySum -= value / SP;
+                                positiveSum += value * SP;
+                                positiveinhibitorySum -= value * SP;
                             }
                             positiveCount += Math.abs(value);
                         }
@@ -1850,7 +1801,11 @@ function calculateTargets() {
                             }
 
                             else {
-                                negativeSum += (1 - (1 / Math.abs(SP)));
+                                if(SP_abs < 1)
+                                {
+                                    negativeSum += (1 - SP_abs);
+                                }
+
                             }
                             negativeCount++;
                         }
@@ -1859,8 +1814,8 @@ function calculateTargets() {
                     let positiveSensitivity = 0;
                     let negativeSensitivity = 0;
                     if (positiveCount > 0) {
-                        positiveSensitivity = Math.round(((positiveSum / positiveCount) + Number.EPSILON) * 100) / 100;
-                        negativeSensitivity = Math.round(((positiveinhibitorySum / positiveCount) + Number.EPSILON) * 100) / 100;
+                        positiveSensitivity = positiveSum / positiveCount; //Math.round(((positiveSum / positiveCount) + Number.EPSILON) * 100) / 100;
+                        negativeSensitivity = positiveinhibitorySum / positiveCount; // Math.round(((positiveinhibitorySum / positiveCount) + Number.EPSILON) * 100) / 100;
                     }
                     if (positiveSensitivity <= 0 && negativeSensitivity <= 0)
                         return;
@@ -1904,11 +1859,12 @@ function calculateTargets() {
                         pointStyle: pstyle,
                     }
                     targets.push(result);
+                    /*
                     if(globals.Targets.hasOwnProperty(e) == false)
                     {
                         globals.Targets[e] = {};
                     }
-                    globals.Targets[e][sample] = result;
+                    globals.Targets[e][sample] = result;*/
                 }));
             }
         }

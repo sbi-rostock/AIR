@@ -86,13 +86,20 @@ function getInteractionPanel()
         globals.interactionpanel.append(`
         <div class="panel panel-default card xp_panel mt-4 mb-4">
             <div class="xp_panel_heading card-header">Selected Element</div>
-            <input class="xp_elementinput form-control" type="text" placeholder="Select or type-in an element">           
+                <input class="xp_elementinput form-control mb-2" type="text" placeholder="Select or type-in an element">           
+                <div>
+                    <dl id="xp_dl" class="air_dl">
+                        <dt class="air_key">Type: </dt>
+                        <dd class="air_value" id="xp__value_type"></dd>
+                    </dl>
+                </div>
             </div>
         </div>
         `);
 
         $(".xp_elementinput").on('input',function(e){
-            getData(false).catch(error => {
+
+            getData().catch(error => {
                 alert(error);
             });
         });
@@ -249,7 +256,7 @@ function getInteractionPanel()
 
 
         $("#xp_select_interaction_type").change(function(){
-            getData(true).catch(error => {
+            getData(onlyRegulators = true).catch(error => {
                 alert(error);
             });
         });
@@ -341,22 +348,22 @@ function getTargetPanel() {
         } );
 
         globals.targetphenotypetable.on('click', 'a', function () {
-            selectElement(this.innerHTML);
+            selectElementonMap(this.innerHTML, false);
         } );
 
         globals.targetpanel.append(
         /*html*/`
-        <button type="button" class="btn-reset xp_btn_air btn btn-block mb-2 mt-4">Reset</button>
-        
-        <hr>
+            <button type="button" class="btn-reset xp_btn_air btn btn-block mb-2 mt-4">Reset</button>
+            
+            <hr>
 
-        <select id="xp_select_target_type" class="browser-default xp_select custom-select mb-2 mt-2">
-            <option value="0" selected>All Elements</option>
-            <option value="1">Proteins</option>
-            <option value="2">miRNAs</option>
-            <option value="3">lncRNAs</option>
-            <option value="4">Transcription Factors</option>
-        </select>
+            <select id="xp_select_target_type" class="browser-default xp_select custom-select mb-2 mt-2">
+                <option value="0" selected>All Elements</option>
+                <option value="1">Proteins</option>
+                <option value="2">miRNAs</option>
+                <option value="3">lncRNAs</option>
+                <option value="4">Transcription Factors</option>
+            </select>
 
         `);
         $(".dropdown-toggle").dropdown();
@@ -468,7 +475,9 @@ function getTargetPanel() {
             var activePoint = globals.xp_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
 
             if (activePoint !== undefined) {
-                selectElement(globals.xp_targetchart.data.datasets[activePoint._datasetIndex].label)                
+                let name = globals.xp_targetchart.data.datasets[activePoint._datasetIndex].label;
+                selectElementonMap(name, true);  
+                setSelectedElement(name);          
             }
 
             // Calling update now animates element from oldValue to newValue.
@@ -735,8 +744,9 @@ function getCentralityPanel() {
 
             if (activePoint !== undefined) {
 
-                selectElement(globals.centralitychart.data.datasets[activePoint._datasetIndex].label);
-                
+                let name = globals.centralitychart.data.datasets[activePoint._datasetIndex].label;
+                selectElementonMap(name, true);  
+                setSelectedElement(name);               
             }
 
             // Calling update now animates element from oldValue to newValue.
@@ -856,20 +866,34 @@ function xp_searchListener(entites) {
     if (globals.selected.length > 0) { 
         if(globals.selected[0].constructor.name === 'Alias')
         {
-            $(".xp_elementinput").val(globals.selected[0].getName());
-            getData(false).catch(error => {
-                alert(error);
-            });
+            setSelectedElement(globals.selected[0].getName());
         }
     }
 }
 
+function setSelectedElement(name)
+{
+    $(".xp_elementinput").val(name).trigger('input');;
+}
 
-function getData(onlyRegulators) {
+function getData(onlyRegulators = false) {
+
     return new Promise((resolve, reject) => {
 
         let elementname = $(".xp_elementinput").val().toLowerCase();
         let elementid = null;
+
+        let elementtype = getElementType(elementname)
+        if(elementtype)
+        {
+            $('#xp_dl').show();
+            $('#xp__value_type').html(elementtype.replace(/[^a-zA-Z ]/g, " ").toLowerCase());
+        }
+        else
+        {
+            $('#xp_dl').hide();
+            $('#xp__value_type').html("");
+        }
         for(let element in AIR.Molecules)
         {
             if(AIR.Molecules[element].name.toLowerCase() === elementname)
@@ -880,13 +904,14 @@ function getData(onlyRegulators) {
         }
         if(elementid == null)
         {
+            
+
             globals.regulationtable.clear();
             globals.targettable.clear();
             globals.phenotypetable.clear();
         }
         else
         {
-                    
             globals.regulationtable.clear();
 
             if(onlyRegulators === false)
@@ -923,9 +948,8 @@ function getData(onlyRegulators) {
                     result_row.push(type);               
     
                     result_row.push(Math.abs(SP));
-    
-                    result_row.push('<a href="#">' + pname + '</a>');
-    
+
+                    result_row.push(getLinkIconHTML(pname));
                     globals.phenotypetable.row.add(result_row)            
                 }
     
@@ -965,7 +989,7 @@ function getData(onlyRegulators) {
 
                     var result_row =  [];
 
-                    result_row.push('<a href="#">' + _sourcename + '</a>');
+                    result_row.push(getLinkIconHTML(_sourcename));
 
                     var typehtml = '<font color="green">activation</font>';
                     if(_type == -1)
@@ -1004,7 +1028,7 @@ function getData(onlyRegulators) {
 
                     var result_row =  [];
 
-                    result_row.push('<a href="#">' + _targetname + '</a>');
+                    result_row.push(getLinkIconHTML(_targetname));
 
                     var typehtml = '<font color="green">activation</font>';
                     if(_type == -1)
@@ -1038,31 +1062,33 @@ function getData(onlyRegulators) {
 
 
             }
-
-                    
-            // Add new data
-            globals.regulationtable.columns.adjust().draw(); 
-            globals.targettable.columns.adjust().draw();
-            globals.phenotypetable.columns.adjust().draw(); 
-    
-            globals.regulationtable.on('click', 'a', function () {
-                selectElement(this.innerHTML);
-            } );
-            globals.targettable.on('click', 'a', function () {
-                selectElement(this.innerHTML);
-            } );
-            globals.phenotypetable.on('click', 'a', function () {
-                selectElement(this.innerHTML);
-            } );
-
-            var coll = document.getElementsByClassName("xp_collapsible");
-            var i;
-
-            adjustPanels()
-            
-            resolve(' ');
         }
 
+        // Add new data
+        globals.regulationtable.columns.adjust().draw(); 
+        globals.targettable.columns.adjust().draw();
+        globals.phenotypetable.columns.adjust().draw(); 
+
+        $('a.elementlink').click(function() {
+            selectElementonMap(this.innerHTML, false);
+        });
+
+        /*
+        globals.regulationtable.on('click', 'a', function () {
+            selectElement(this.innerHTML, false);
+        } );
+        globals.targettable.on('click', 'a', function () {
+            selectElement(this.innerHTML, false);
+        } );
+        globals.phenotypetable.on('click', 'a', function () {
+            selectElement(this.innerHTML, false);
+        } ); */
+
+        var coll = document.getElementsByClassName("xp_collapsible");
+        var i;
+
+        adjustPanels()
+        resolve(' ');
     });
 }
 
@@ -1207,7 +1233,7 @@ function createCentralityTable(phenotype) {
         let result_row = [];
         
 
-        result_row.push('<a href="#">' + AIR.Molecules[e].name + '</a>');
+        result_row.push(getLinkIconHTML(AIR.Molecules[e].name));
         //result_row.push(AIR.Molecules[e].name);
         let hasvalue = false;
         for(let c in AIR.Centrality) {
@@ -1237,7 +1263,7 @@ function createCentralityTable(phenotype) {
 
     globals.centraliytable.columns.adjust().draw(); 
 
-    globals.centraliytable.on('click', 'a', function () {
-        selectElement(this.innerHTML);
+    globals.centraliytable.on('click', 'a.elementlink', function () {
+        selectElementonMap(this.innerHTML, false);
     } );
 }
