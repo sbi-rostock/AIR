@@ -1,7 +1,12 @@
 function AirOmics(){    
-
-    globals.container = $('#airomics_tab_content');   
-
+    let t0 = performance.now();
+    globals.om_container = $('#airomics_tab_content');   
+    $(`<div id="om_stat_spinner" style="cursor: wait; height:400px; display: flex; align-items: center;" class="d-flex justify-content-center">
+    <div class="spinner-border" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>
+</div>`).appendTo(globals.om_container);
+    
     minerva.ServerConnector.getLoggedUser().then(function (user) {
         globals.user = user._login.toString().toLowerCase();
         if (globals.defaultusers.includes(globals.user) === true) {
@@ -195,8 +200,8 @@ function AirOmics(){
             globals.selectedmapping = this.value;
         });
 
-        globals.container.find('.om_btn_predicttarget_class').on('click', () => OM_PredictTargets());
-        globals.container.find('.om_btn-initialize').on('click', () => Start());
+        globals.om_container.find('.om_btn_predicttarget_class').on('click', () => OM_PredictTargets());
+        globals.om_container.find('.om_btn-initialize').on('click', () => Start());
 
         var outputCanvas = document.getElementById('om_chart_target').getContext('2d');
 
@@ -327,7 +332,10 @@ function AirOmics(){
             // Calling update now animates element from oldValue to newValue.
         };
             
-
+        document.getElementById("om_stat_spinner").remove();
+        
+        let t1 = performance.now()
+        console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
     });
 }
 
@@ -371,8 +379,8 @@ function download(filename) {
 
 function Start() {
     
-    globals.container.find('.om_btn-initialize')[0].innerHTML = '';
-    globals.container.find('.om_btn-initialize')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-initialize')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-initialize')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     $("#om_plugincontainer").addClass("disabledbutton");
 
@@ -385,14 +393,14 @@ function Start() {
 
                             alert(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes could be mapped.");
 
-                            if (globals.container.find('.resultscontainer').length > 0) {
+                            if (globals.om_container.find('.resultscontainer').length > 0) {
 
-                                var element = globals.container.find('.resultscontainer')[0];
+                                var element = globals.om_container.find('.resultscontainer')[0];
                                 element.parentElement.removeChild(element);
 
                             }
 
-                            if (!(globals.container.find('.startcontainer').length > 0)) {
+                            if (!(globals.om_container.find('.startcontainer').length > 0)) {
 
                                 globals.phenotab.append(
                                     /*html*/`
@@ -449,7 +457,7 @@ function Start() {
                                 $('[data-toggle="popover"]').popover()
                                 $(".dropdown-toggle").dropdown();
 
-                                globals.container.find('.om_btn-file').on('click', () => readUserFile());
+                                globals.om_container.find('.om_btn-file').on('click', () => readUserFile());
                             }
 
                             let sampleSelect = document.getElementById('om_select_sample');
@@ -600,9 +608,9 @@ function createTable() {
         chrt.parentElement.removeChild(chrt);
 
     }
-    if (globals.container.find('.resultscontainer').length > 0) {
+    if (globals.om_container.find('.resultscontainer').length > 0) {
 
-        var element = globals.container.find('.resultscontainer')[0];
+        var element = globals.om_container.find('.resultscontainer')[0];
         element.parentElement.removeChild(element);
 
     }
@@ -653,7 +661,7 @@ function createTable() {
     $acc_cell.tooltip();
 
 
-    if (!(globals.container.find('.resultscontainer').length > 0)) {
+    if (!(globals.om_container.find('.resultscontainer').length > 0)) {
 
 
         globals.phenotab.append(
@@ -704,18 +712,18 @@ function createTable() {
             </div>
         `);
 
-        globals.container.find('.om_btn-showoverlay').on('click', () => showOverlaysClick());
-        globals.container.find('.om_btn-hideoverlay').on('click', () => hideOverlaysClick());
-        globals.container.find('.om_btn-map').on('click', () => showResultsOnMap());
-        globals.container.find('.btn-image').on('click', () => showpicture());
-        globals.container.find('.om_btn-add').on('click', () => AddOverlays());
-        globals.container.find('.om_btn-delete').on('click', () => removeOverlays());
+        globals.om_container.find('.om_btn-showoverlay').on('click', () => showOverlaysClick());
+        globals.om_container.find('.om_btn-hideoverlay').on('click', () => hideOverlaysClick());
+        globals.om_container.find('.om_btn-map').on('click', () => showResultsOnMap());
+        globals.om_container.find('.btn-image').on('click', () => showpicture());
+        globals.om_container.find('.om_btn-add').on('click', () => AddOverlays());
+        globals.om_container.find('.om_btn-delete').on('click', () => removeOverlays());
 
 
         $('[data-toggle="popover"]').popover()
-        globals.container.find('.btn-download').on('click', () => download('PhenotypeActivity.txt'));
+        globals.om_container.find('.btn-download').on('click', () => download('PhenotypeActivity.txt'));
     }
-    globals.resultscontainer = globals.container.find('.resultscontainer')[0];
+    globals.resultscontainer = globals.om_container.find('.resultscontainer')[0];
 
     globals.resultscontainer.appendChild(tbl);
 
@@ -833,13 +841,13 @@ function createTable() {
 
 function showpicture() {
 
-    globals.container.find('.btn-image')[0].innerHTML = '';
-    globals.container.find('.btn-image')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.btn-image')[0].innerHTML = '';
+    globals.om_container.find('.btn-image')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
     $("#om_plugincontainer").addClass("disabledbutton");
 
     getImageSource().then(imglink => {
-        globals.container.find('.image-container')[0].innerHTML = '';
-        globals.container.find('.image-container')[0].insertAdjacentHTML('beforeend', `
+        globals.om_container.find('.image-container')[0].innerHTML = '';
+        globals.om_container.find('.image-container')[0].insertAdjacentHTML('beforeend', `
         <!-- Trigger the Modal -->
         <img id="om_resultsimg" src="${imglink}" alt="Phenotype Results" style="width:100%">
 
@@ -1008,8 +1016,8 @@ function AddOverlays() {
         return;
     }
 
-    globals.container.find('.om_btn-add')[0].innerHTML = '';
-    globals.container.find('.om_btn-add')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-add')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-add')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
     $("#om_plugincontainer").addClass("disabledbutton");
 
 
@@ -1060,8 +1068,8 @@ function AddOverlaysPromise() {
 
 function showResultsOnMap() {
 
-    globals.container.find('.om_btn-map')[0].innerHTML = '';
-    globals.container.find('.om_btn-map')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-map')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-map')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
     $("#om_plugincontainer").addClass("disabledbutton");
 
     function enablebtn() {
@@ -1083,8 +1091,8 @@ function showResultsOnMap() {
 }
 
 function readUserFile() {
-    globals.container.find('.om_btn-file')[0].innerHTML = '';
-    globals.container.find('.om_btn-file')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-file')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-file')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
     $("#om_plugincontainer").addClass("disabledbutton");
     setTimeout(function () {
       analyze().catch(function (error) {
@@ -1329,8 +1337,8 @@ function removeOverlays() {
         return;
     }
 
-    globals.container.find('.om_btn-delete')[0].innerHTML = '';
-    globals.container.find('.om_btn-delete')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-delete')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-delete')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     $("#om_plugincontainer").addClass("disabledbutton");
        
@@ -1378,8 +1386,8 @@ function getOverlaysStrings() {
 
 function hideOverlaysClick() {
 
-    globals.container.find('.om_btn-hideoverlay')[0].innerHTML = '';
-    globals.container.find('.om_btn-hideoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-hideoverlay')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-hideoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     $("#om_plugincontainer").addClass("disabledbutton");
        
@@ -1427,8 +1435,8 @@ function hideOverlays(all) {
 function showOverlaysClick() {
 
     
-    globals.container.find('.om_btn-showoverlay')[0].innerHTML = '';
-    globals.container.find('.om_btn-showoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn-showoverlay')[0].innerHTML = '';
+    globals.om_container.find('.om_btn-showoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     $("#om_plugincontainer").addClass("disabledbutton");
     function enablebtn() {
@@ -1693,8 +1701,8 @@ function normalizePhenotypeValues() {
 
 function OM_PredictTargets() {
 
-    globals.container.find('.om_btn_predicttarget_class')[0].innerHTML = '';
-    globals.container.find('.om_btn_predicttarget_class')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+    globals.om_container.find('.om_btn_predicttarget_class')[0].innerHTML = '';
+    globals.om_container.find('.om_btn_predicttarget_class')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     /*
     var btn = document.getElementById('om_btn_predicttarget');
@@ -1706,7 +1714,7 @@ function OM_PredictTargets() {
     setTimeout(function(){
         calculateTargets().finally(r => {       
             //btn.innerHTML = 'Start';
-            globals.container.find('.om_btn_predicttarget_class')[0].innerHTML = 'Start';
+            globals.om_container.find('.om_btn_predicttarget_class')[0].innerHTML = 'Start';
             $("#om_plugincontainer").removeClass("disabledbutton");
         });
     }, 10);

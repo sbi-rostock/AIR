@@ -3,7 +3,8 @@ let testing;
 let filetesting;
 let Chart;
 
-const localURL = 'http://localhost:3000/SBI_Minerva_Release/Centogene/DataFiles';
+
+const localURL = 'http://localhost:3000/datafiles/Full_MIM';
 const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/DataFiles';
 
 const AIR = {
@@ -115,6 +116,8 @@ const globals = {
     numberofSamples: 0,
 
     container: undefined,
+    om_container: undefined,
+
     phenotab: undefined,
     targettab: undefined,
     resultscontainer: undefined,
@@ -132,6 +135,8 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
 
     return new Promise((resolve, reject) => {
 
+        var t0 =  0;
+        var t1 =  0;
         Chart = _chart;
         minervaProxy = _minerva;
         pluginContainer = $(minervaProxy.element);
@@ -159,7 +164,11 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
                     }
                 }    
             });
+            t0 = performance.now();
             minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
+
+                t1 = performance.now()
+                console.log("Call to getAllBioEntities took " + (t1 - t0) + " milliseconds.")
 
                 AIR.allBioEntities = bioEntities;
                 bioEntities.forEach(e => {
@@ -183,21 +192,35 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
 
                 let typevalue = $('.selectdata').val();
                 //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
+                t0 = performance.now();
                 $.ajax({
                     url: fileURL + '/Interactions.json',
                     success: function (content) {
                         readInteractions(content).then(r => {
+                            t1 = performance.now()
+                            console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
+                            t0 = performance.now();
                             $.ajax({
                                 //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
                                 url: fileURL + '/Molecules.json', 
                                 success: function (moleculecontent) {
+                                    t1 = performance.now()
+                                    console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
                                     readMolecules(moleculecontent).then(s => { 
+                                        t1 = performance.now()
+                                        console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
+                                        t0 = performance.now();
                                         readServerValues().then(r => {
+                                            t1 = performance.now()
+                                            console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
+                                            t0 = performance.now();
                                             let promises = [];
                                             centralities.forEach(c => {
                                                 promises.push(openCentrality(c));
                                             });
                                             Promise.all(promises).then(r => {
+                                                t1 = performance.now()
+                                                console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
                                                 resolve(AIR);
                                             });
                                         });
@@ -313,10 +336,13 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
 
                         if(testing)
                         {
+                            let t0 = performance.now()
                             $.ajax({
                                 url: localURL + "/SP.txt",
                                 success: function (content) {
                                     readFile(content).then(r => {
+                                        let t1 = performance.now()
+                                        console.log("Call to readFile took " + (t1 - t0) + " milliseconds.")
                                         resolve('');
                                     });
                                 },

@@ -1,12 +1,17 @@
 
 function AirXplore(){
+    let t0 = performance.now();
     minervaProxy.project.map.addListener({
         dbOverlayName: "search",
         type: "onSearch",
         callback: xp_searchListener
     });    
-
-    globals.container = $('#airxplore_tab_content');    
+   
+    $(`<div id="xp_stat_spinner" style="cursor: wait; height:400px; display: flex; align-items: center;" class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>`).appendTo($('#airxplore_tab_content'));
 
     Initiate().then(r => {
         var coll = document.getElementsByClassName("xp_collapsible")[0];
@@ -16,6 +21,10 @@ function AirXplore(){
     }).catch(e => {
         alert('Could not initialize Data');
         console.log(e);
+    }).finally(r => {
+        document.getElementById("xp_stat_spinner").remove();
+        let t1 = performance.now()
+        console.log("Call to AirXplore took " + (t1 - t0) + " milliseconds.")
     })
 }
 function adjustPanels() {
@@ -65,19 +74,17 @@ function Initiate() {
         globals.targetpanel = $("#xp_panel_targets");
         globals.centralitypanel = $("#xp_panel_centrality");
 
-        
-        getInteractionPanel().then(r => {
-            getTargetPanel().then(s => {
-                getCentralityPanel().then(r => {
-                    resolve('');
-                });
-            });
-        });   
+        let promises = [
+            getInteractionPanel(),
+            getTargetPanel(),
+            getCentralityPanel()] 
 
-
-    }).catch(error => {            
-        reject(error);
-    });
+        Promise.all(promises).then(r => {
+            resolve('');
+        }).catch(error => {            
+            reject(error);
+        });
+    })
 }
 
 function getInteractionPanel()
