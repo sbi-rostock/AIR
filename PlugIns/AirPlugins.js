@@ -108,7 +108,7 @@ function initMainPageStructure() {
     $("<link/>", {
       rel: "stylesheet",
       type: "text/css",
-      href: "http://ebi-uniprot.github.io/CDN/protvista/css/main.css"
+      href: "https://ebi-uniprot.github.io/CDN/protvista/css/main.css"
     }).appendTo("head");
   });
   let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(pluginContainer);
@@ -160,7 +160,7 @@ function initMainPageStructure() {
   setTimeout(() => {
     $.getScript(ScriptPaths[0]).done(function () {
       readDataFiles(minervaProxy, Chart, filetesting).finally(data => {
-        $.getScript("http://ebi-uniprot.github.io/CDN/protvista/protvista.js").done(function () {
+        $.getScript("https://ebi-uniprot.github.io/CDN/protvista/protvista.js").done(function () {
           $('#air_loading_text').html('Loading ProtVista ...');
           console.log("ProtVista loaded.");
           document.getElementById("stat_spinner").remove();
