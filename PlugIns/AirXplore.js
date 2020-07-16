@@ -6,26 +6,35 @@ function AirXplore(){
         type: "onSearch",
         callback: xp_searchListener
     });    
-   
-    $(`<div id="xp_stat_spinner" style="cursor: wait; height:400px; display: flex; align-items: center;" class="d-flex justify-content-center">
-        <div class="spinner-border" role="status">
-            <span class="sr-only">Loading...</span>
+
+    $(`<div id="xp_stat_spinner" class="mt-5">
+        <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only"></span>
+                    </div>
+        </div>
+        <div class="d-flex justify-content-center mt-2">
+            <span id="xp_loading_text">LOADING...</span>
         </div>
     </div>`).appendTo($('#airxplore_tab_content'));
-
-    Initiate().then(r => {
-        var coll = document.getElementsByClassName("xp_collapsible")[0];
-        coll.classList.toggle("active");
-        var content = coll.nextElementSibling;
-        content.style.maxHeight = content.scrollHeight + "px";    
-    }).catch(e => {
-        alert('Could not initialize Data');
-        console.log(e);
-    }).finally(r => {
-        document.getElementById("xp_stat_spinner").remove();
-        let t1 = performance.now()
-        console.log("Call to AirXplore took " + (t1 - t0) + " milliseconds.")
-    })
+    setTimeout(() => {
+        Initiate().then(r => {
+            $('#xp_stat_spinner').hide();
+            $('#xp_hide_container').show();
+            var coll = document.getElementsByClassName("xp_collapsible")[0];
+            coll.classList.toggle("active");
+            var content = coll.nextElementSibling;
+            content.style.maxHeight = content.scrollHeight + "px";    
+            globals.regulationtable.columns.adjust();
+        }).catch(e => {
+            alert('Could not initialize Data');
+            console.log(e);
+        }).finally(r => {
+            document.getElementById("xp_stat_spinner").remove();
+            let t1 = performance.now();
+            console.log("Call to AirXplore took " + (t1 - t0) + " milliseconds.")
+        })
+    }, 0);
 }
 function adjustPanels() {
     
@@ -40,18 +49,20 @@ function adjustPanels() {
 function Initiate() {
     return new Promise((resolve, reject) => {
         $(`
-        <button class="xp_collapsible mt-2">Interactions</button>
+        <div id="xp_hide_container" style="display: none;">
+        <button class="xp_collapsible mt-4">Interactions</button>
             <div id="xp_panel_interaction" class="xp_content">
 
             </div>
-        <button class="xp_collapsible mt-2">Target Prediction</button>
+        <button class="xp_collapsible mt-2">Regulator Prediction</button>
             <div id="xp_panel_targets" class="xp_content">
 
             </div>
         <button class="xp_collapsible mt-2 mb-4">Centrality</button>
             <div id="xp_panel_centrality" class="xp_content">
 
-            </div>`).appendTo('#airxplore_tab_content');
+            </div>
+        </div>`).appendTo('#airxplore_tab_content');
 
         $('.collapse').collapse();  
 
@@ -74,65 +85,82 @@ function Initiate() {
         globals.targetpanel = $("#xp_panel_targets");
         globals.centralitypanel = $("#xp_panel_centrality");
 
-        let promises = [
-            getInteractionPanel(),
-            getTargetPanel(),
-            getCentralityPanel()] 
-
-        Promise.all(promises).then(r => {
-            resolve('');
-        }).catch(error => {            
-            reject(error);
-        });
-    })
+        
+        let t0 = performance.now();
+        $('#xp_loading_text').html('Generating interaction panel ...')
+        setTimeout(() => {
+            getInteractionPanel().then(r => {
+                $('#xp_loading_text').html('Generating target panel ...')
+                setTimeout(() => {
+                    getTargetPanel().then(s => {
+                        $('#xp_loading_text').html('Generating centrality panel ...')
+                        setTimeout(() => {
+                            getCentralityPanel().then(t => {
+                                resolve('');
+                            }).catch(error => {            
+                                reject(error);
+                            })
+                        }, 0);
+                    }).catch(error => {            
+                        reject(error);
+                    })
+                }, 0);
+            }).catch(error => {            
+                reject(error);
+            })
+        }, 0);
+    });
 }
+
 
 function getInteractionPanel()
 {
     return new Promise((resolve, reject) => {
         globals.interactionpanel.append(`
-        <div class="panel panel-default card xp_panel mt-4 mb-4">
+        <div class="panel panel-default card xp_panel mt-4">
             <div class="xp_panel_heading card-header">Selected Element</div>
-                <input class="xp_elementinput form-control mb-2" type="text" placeholder="Select or type-in an element">           
+                <input id="xp_elementinput" class="form-control mb-2" type="text" placeholder="Select or type in an element">           
                 <div>
                     <dl id="xp_dl" class="air_dl">
                         <dt class="air_key">Type: </dt>
-                        <dd class="air_value" id="xp__value_type"></dd>
+                        <dd class="air_value" id="xp_value_type"></dd>
                     </dl>
                 </div>
             </div>
         </div>
+        <div id="xp_molartimg_modal"></div>
         `);
 
-        $(".xp_elementinput").on('input',function(e){
+        $("#xp_elementinput").on('input',function(e){
 
-            getData().catch(error => {
-                alert(error);
-            });
+            getData();
         });
 
         globals.interactionpanel.append(/*html*/`
 
-        <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active xp_tab" id="xp_tab_inter_regulation" data-toggle="tab" href="#xp_tabcontent_inter_regulation" role="tab" aria-controls="xp_tabcontent_inter_regulation" aria-selected="true">Regulators</a>
+        <ul class="air_nav_tabs nav nav-tabs mt-4" id="xp_interaction_tab" role="tablist">
+            <li class="air_nav_item nav-item" style="width: 25%;">
+                <a class="air_tab air_tab_sub xp_inter_tabs active nav-link" id="xp_tab_inter_regulation" data-toggle="tab" href="#xp_tabcontent_inter_regulation" role="tab" aria-controls="xp_tabcontent_inter_regulation" aria-selected="true">Regulators</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link xp_tab" id="xp_tab_inter_target" data-toggle="tab" href="#xp_tabcontent_inter_target" role="tab" aria-controls="xp_tabcontent_inter_target" aria-selected="false">Targets</a>
+            <li class="air_nav_item nav-item" style="width: 25%;">
+                <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_target" data-toggle="tab" href="#xp_tabcontent_inter_target" role="tab" aria-controls="xp_tabcontent_inter_target" aria-selected="false">Targets</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link xp_tab" id="xp_tab_inter_phenotype" data-toggle="tab" href="#xp_tabcontent_inter_phenotype" role="tab" aria-controls="xp_tabcontent_inter_phenotype" aria-selected="false">Phenotypes</a>
+            <li class="air_nav_item nav-item" style="width: 25%;">
+                <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_phenotype" data-toggle="tab" href="#xp_tabcontent_inter_phenotype" role="tab" aria-controls="xp_tabcontent_inter_phenotype" aria-selected="false">Phenotypes</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 25%;">
+                <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_sequence" data-toggle="tab" href="#xp_tabcontent_inter_sequence" role="tab" aria-controls="xp_tabcontent_inter_sequence" aria-selected="false">Sequence</a>
             </li>
         </ul>
-        <div class="tab-content" id="xp_tab">
-            <div class="tab-pane show active mb-2" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
-                <select id="xp_select_interaction_type" class="browser-default xp_select custom-select mb-4 mt-2">
+        <div class="tab-content air_tab_content" id="xp_tab">
+            <div class="tab-pane air_tab_pane show active" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
+                <select id="xp_select_interaction_type" class="browser-default xp_select custom-select mb-4">
                     <option value="0" selected>All Elements</option>
                     <option value="1">miRNAs</option>
                     <option value="2">lncRNAs</option>
                     <option value="3">Transcription Factors</option>
                 </select>
-                <table style="width:100%" class="table nowrap table-sm" id="xp_table_inter_regulation" cellspacing="0">
+                <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_regulation" cellspacing="0">
                     <thead>
                         <tr>
                             <th style="vertical-align: middle;">Regulator</th>
@@ -143,8 +171,8 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane mb-2" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
-                <table style="width:100%" class="table nowrap table-sm" id="xp_table_inter_target" cellspacing="0">
+            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
+                <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_target" cellspacing="0">
                     <thead>
                         <tr>
                             <th style="vertical-align: middle;">Target</th>
@@ -155,8 +183,8 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane mb-2" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype" >
-                <table style="width:100%" class="table nowrap table-sm" id="xp_table_inter_phenotype" cellspacing="0">
+            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype">
+                <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_phenotype" cellspacing="0">
                     <thead>
                         <tr>
                             <th style="vertical-align: middle;">Regulation</th>
@@ -165,6 +193,9 @@ function getInteractionPanel()
                         </tr>
                     </thead>
                 </table>
+            </div>
+            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_sequence" role="tabpanel" aria-labelledby="xp_tab_inter_sequence">
+                <div id="xp_molart">No information available.</div>
             </div>
         </div>
 
@@ -182,7 +213,7 @@ function getInteractionPanel()
             columnDefs: [
                 {
                     targets: 0,
-                    className: 'dt-right'
+                    className: 'dt-right',
                 },
                 {
                     targets: 1,
@@ -193,7 +224,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        });
+        }).columns.adjust();;
 
         globals.targettable = $('#xp_table_inter_target').DataTable({
             scrollX: true,
@@ -207,7 +238,8 @@ function getInteractionPanel()
             columnDefs: [
                 {
                     targets: 0,
-                    className: 'dt-right'
+                    className: 'dt-right',
+                    'max-width': '20%',
                 },
                 {
                     targets: 1,
@@ -218,7 +250,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        });
+        }).columns.adjust();;
 
         globals.phenotypetable = $('#xp_table_inter_phenotype').DataTable({
             scrollX: true,
@@ -239,12 +271,9 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        });
+        }).columns.adjust();;
 
-        $('#xp_table_inter_target_wrapper').addClass( "mt-4");
-        $('#xp_table_inter_phenotype_wrapper').addClass( "mt-4");
-
-        $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        $('.xp_inter_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
             var target = $(e.target).attr("href") // activated tab
             switch(target) {
                 case "#xp_tabcontent_inter_regulation":
@@ -263,9 +292,7 @@ function getInteractionPanel()
 
 
         $("#xp_select_interaction_type").change(function(){
-            getData(onlyRegulators = true).catch(error => {
-                alert(error);
-            });
+            getData(onlyRegulators = true);
         });
 
         globals.regulationtable.columns.adjust().draw(); 
@@ -279,7 +306,7 @@ function getInteractionPanel()
 
 function getTargetPanel() {
     return new Promise((resolve, reject) => {
-            
+
         globals.targetpanel.append('<div class="mt-4"></div>');
 
         var tbl = undefined;
@@ -292,10 +319,10 @@ function getTargetPanel() {
             tbl.parentElement.removeChild(tbl);
 
         }
-        
+
         tbl = document.createElement("table")
 
-        tbl.setAttribute('class', 'table table-sm mt-4 mb-4');
+        tbl.setAttribute('class', 'air_table table table-sm mt-4 mb-4');
         tbl.setAttribute('style', 'width:100%');
         tbl.setAttribute('id', 'xp_table_target_phenotype');
         tbl.setAttribute('cellspacing', '0');
@@ -305,7 +332,7 @@ function getTargetPanel() {
 
             let pname = AIR.Phenotypes[p].name;
 
-            createLinkCell(row, 'td', pname, 'col', 'right');
+            createCell(row, 'td', getLinkIconHTML(pname), 'col', '', 'right');
             createCell(row, 'td', `<font data-order="1"><b>0<b></font>`, 'col slidervalue', '', 'center').setAttribute('id', 'PSliderValue' + p);
             var slider = createSliderCell(row, 'td', p);
             slider.setAttribute('id', 'PSlider' + p);
@@ -401,8 +428,8 @@ function getTargetPanel() {
         globals.targetpanel.append('<canvas id="xp_chart_target"></canvas>');
         globals.targetpanel.append(/*html*/`
             <div class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Target</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Target</li>
+                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
                     <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>`);
 
@@ -476,6 +503,7 @@ function getTargetPanel() {
             
         });
 
+
         document.getElementById('xp_chart_target').onclick = function (evt) {
 
             // => activePoints is an array of points on the canvas that are at the same position as the click event.
@@ -484,7 +512,7 @@ function getTargetPanel() {
             if (activePoint !== undefined) {
                 let name = globals.xp_targetchart.data.datasets[activePoint._datasetIndex].label;
                 selectElementonMap(name, true);  
-                setSelectedElement(name);          
+                xp_setSelectedElement(name);          
             }
 
             // Calling update now animates element from oldValue to newValue.
@@ -503,17 +531,17 @@ function getCentralityPanel() {
         <div id="xp_select_centrality_phenotype_container" class="row mb-2 mt-2">
             <div class="col-auto">
                 <div class="wrapper">
-                    <button type="button" class="xp_btn_info btn btn-secondary ml-1"
-                            data-html="true" data-toggle="popover" data-placement="top" title="File Specifications"
+                    <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="File Specifications"
                             data-content="Select the Pehnotype for whose subnetwork the centrality will be calculated.">
                         ?
                     </button>
                 </div>
             </div>
-            <div class="col-auto mb-4">
+            <div class="col-auto mb-4 air_select_label" style="width: 17%">
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype:</span>
             </div>
-            <div class="col">
+            <div class="col" style="padding-left: 10px;">
                 <select id="xp_select_centrality_phenotype" class="browser-default xp_select custom-select">
 
                 </select>
@@ -522,7 +550,7 @@ function getCentralityPanel() {
 
 
         let html =
-        `<table style="width:100%" class="table nowrap table-sm" id="xp_table_centrality" cellspacing="0">
+        `<table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_centrality" cellspacing="0">
             <thead>
                 <tr>
                     <th style="vertical-align: middle;">Element</th>`;
@@ -587,19 +615,19 @@ function getCentralityPanel() {
         <div class="panel panel-default card xp_panel mt-4 mb-2">
             <div class="xp_panel_heading card-header">X-Axis</div>
             <div class="row mt-2 mb-2">
-                <div class="col-2">
+                <div class="col-2 air_select_label">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype:</span>
                 </div>
-                <div class="col" style="width: 80%;">
+                <div class="col" style="width: 80%; padding-left: 8px">
                     <select id="xp_select_centrality_x_phenotype" class="browser-default xp_select custom-select">
                     </select>
                 </div>
             </div>
             <div class="row mb-2">
-                <div class="col-2">
+                <div class="col-2 air_select_label">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Centrality:</span>
                 </div>
-                <div class="col">
+                <div class="col" style="width: 80%; padding-left: 8px">
                     <select id="xp_select_centrality_x_centrality" class="browser-default xp_select custom-select">
                     </select>
                 </div>
@@ -608,19 +636,19 @@ function getCentralityPanel() {
         <div class="panel panel-default card xp_panel mt-2 mb-2">
             <div class="xp_panel_heading card-header">Y-Axis</div>
             <div class="row mt-2 mb-2">
-                <div class="col-2">
+                <div class="col-2 air_select_label">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype:</span>
                 </div>
-                <div class="col">
+                <div class="col" style="width: 80%; padding-left: 8px">
                     <select id="xp_select_centrality_y_phenotype" class="browser-default xp_select custom-select">
                     </select>
                 </div>
             </div>
             <div class="row mb-2">
-                <div class="col-2">
+                <div class="col-2 air_select_label">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Centrality:</span>
                 </div>
-                <div class="col">
+                <div class="col" style="width: 80%; padding-left: 8px">
                     <select id="xp_select_centrality_y_centrality" class="browser-default xp_select custom-select">
                     </select>
                 </div>
@@ -753,7 +781,7 @@ function getCentralityPanel() {
 
                 let name = globals.centralitychart.data.datasets[activePoint._datasetIndex].label;
                 selectElementonMap(name, true);  
-                setSelectedElement(name);               
+                xp_setSelectedElement(name);               
             }
 
             // Calling update now animates element from oldValue to newValue.
@@ -783,6 +811,7 @@ function getCentralityPanel() {
 
 
         function createCentralityGraph() {
+            let t0 = performance.now();
             let xphenotype = xphenotypeSelect.options[xphenotypeSelect.selectedIndex].text;
             let yphenotype = yphenotypeSelect.options[yphenotypeSelect.selectedIndex].text;
 
@@ -862,6 +891,8 @@ function getCentralityPanel() {
 
             globals.centralitychart.data.datasets = targets;
             globals.centralitychart.update();
+            let t1 = performance.now();
+            console.log("Centrality Graph took " + (t1 - t0) + " milliseconds.")
         }
 
         resolve('');
@@ -873,34 +904,142 @@ function xp_searchListener(entites) {
     if (globals.selected.length > 0) { 
         if(globals.selected[0].constructor.name === 'Alias')
         {
-            setSelectedElement(globals.selected[0].getName());
+            xp_setSelectedElement(globals.selected[0].name);
         }
     }
 }
 
-function setSelectedElement(name)
+function xp_setSelectedElement(name)
 {
-    $(".xp_elementinput").val(name).trigger('input');;
+    $("#xp_elementinput").val(name);
+    getData(false);
 }
 
-function getData(onlyRegulators = false) {
-
+async function getUniprotID(element, pdb = false) {
     return new Promise((resolve, reject) => {
+        $.ajax({
+            url: 'https://www.uniprot.org/uniprot/?query=' + element.toLowerCase() + '+AND+organism%3A"Homo+sapiens+%28Human%29+%5B9606%5D"&sort=score&format=tab&columns=id,reviewed,genes,database(PDB)',
+            success: function (content) {
+                content.toString().split('\n').forEach(line => {
+                    entry = line.split('\t');
+                    if(entry[1] == "reviewed" && (entry[2].toLowerCase() == element.toLowerCase() || entry[2].substr(0,entry[2].indexOf(' ')).toLowerCase() == element.toLowerCase()))
+                    {
+                        if(pdb)
+                        {
+                            if(entry[3].includes(';'))
+                            {
+                                resolve(entry[3].substr(0,entry[3].indexOf(';')).toLowerCase());
+                            }
+                            else
+                            {
+                                resolve(entry[3]);
+                            }
+                            
+                        }
+                        else
+                            resolve(entry[0]);
+                    }
+                });
+                resolve('');
+            },
+            error: function (content) {
+                resolve('');
+            }
+        });
+    });
+}
 
-        let elementname = $(".xp_elementinput").val().toLowerCase();
+async function getPubChemID(element, chebiid) {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/name/' + element.replace('/', '.') + '/JSON',
+            success: function (content) {
+                var response = content;
+
+                if(response.hasOwnProperty("PC_Substances"))
+                {
+                    for(let c in response.PC_Substances)
+                    {
+                        if(chebiid != "" && checkNested(response.PC_Substances[c], "source", "db" ))
+                        {
+                            if(response.PC_Substances[c].source.db.hasOwnProperty("name") && response.PC_Substances[c].source.db.name == "ChEBI")
+                            {
+                                if(chebiid != "" && checkNested(response.PC_Substances[c].source.db, "source_id", "str"))
+                                {
+                                    if(chebiid == response.PC_Substances[c].source.db.source_id.str)
+                                    {
+                                        resolve(getCID(c));
+                                    }
+                                }
+                            }
+
+                        }
+                        else if(chebiid == "")
+                        {
+                            resolve(getCID(c));
+                        }
+                    }
+                }
+
+                async function getCID(c) {
+                    if(response.PC_Substances[c].hasOwnProperty("compound"))
+                    {
+                        for(let i in response.PC_Substances[c].compound)
+                        {
+                            if(checkNested(response.PC_Substances[c].compound[i], "id", "id", "cid"))
+                            {
+                                let id = response.PC_Substances[c].compound[i].id.id.cid;
+
+                                return await requestPubChem(id)
+                            }
+                        }
+                    }
+                    return '';
+                }
+
+                async function requestPubChem(id)
+                {
+                    return new Promise((resolve) => {
+                        $.ajax({
+                            url: "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/" + id + "/SDF?record_type=3d", 
+                            error: function(XMLHttpRequest, textStatus, errorThrown){
+                                resolve('');
+                            },
+                            success: function(data){
+                                resolve(id);
+                            }
+                        });
+                    })
+
+                }
+
+                resolve('');
+            },
+            error: function (content) {
+                resolve('');
+            }
+        });
+    });
+}
+
+async function getData(onlyRegulators = false) {
+
+    let elementname = $("#xp_elementinput").val().toLowerCase();
+
+    if(elementname.trim() == "")
+    {
+        $('#xp_dl').hide();
+        $('#xp_value_type').html("");
+        $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
+        $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
+        globals.regulationtable.clear();
+        globals.targettable.clear();
+        globals.phenotypetable.clear();
+    }
+    else
+    {
         let elementid = null;
 
-        let elementtype = getElementType(elementname)
-        if(elementtype)
-        {
-            $('#xp_dl').show();
-            $('#xp__value_type').html(elementtype.replace(/[^a-zA-Z ]/g, " ").toLowerCase());
-        }
-        else
-        {
-            $('#xp_dl').hide();
-            $('#xp__value_type').html("");
-        }
         for(let element in AIR.Molecules)
         {
             if(AIR.Molecules[element].name.toLowerCase() === elementname)
@@ -909,9 +1048,44 @@ function getData(onlyRegulators = false) {
                 break;
             }
         }
+        let elementtype = getElementType(elementname)
+        if(elementtype)
+        {
+            switch(elementtype)
+            {
+                case "TF":
+                    elementtype = "Transcription Factor";
+                    break;
+                case "miRNA":
+                case "lncRNA":
+                    break;
+                default:
+                    elementtype = elementtype.toLowerCase().replace(/[^a-zA-Z ]/g, " ")
+                    .split(' ')
+                    .map((s) => s.charAt(0).toUpperCase() + s.substring(1))
+                    .join(' ');
+                    break;
+            }
+            $('#xp_dl').show();
+            $('#xp_value_type').html(elementtype);
+        }
+        else
+        {
+            $('#xp_dl').hide();
+            $('#xp_value_type').html("");
+        }
+
+        $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
+        $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
+        
+        let resizeObserver = new ResizeObserver(() => { 
+            adjustPanels();
+        });           
+        resizeObserver.observe($("#xp_molart")[0]); 
+        resizeObserver.observe($("#xp_molartimg_modal")[0]); 
+
         if(elementid == null)
         {
-            
 
             globals.regulationtable.clear();
             globals.targettable.clear();
@@ -923,9 +1097,9 @@ function getData(onlyRegulators = false) {
 
             if(onlyRegulators === false)
             {
+                globals.phenotypetable.clear();                    
                 globals.targettable.clear();
-                globals.phenotypetable.clear();
-
+                
                 for(let p in AIR.Phenotypes)
                 {       
                     if(AIR.Phenotypes[p].SPs.hasOwnProperty(elementid) == false)
@@ -1017,6 +1191,13 @@ function getData(onlyRegulators = false) {
                     _pubmed.forEach(p =>
                     {
                         p = p.trim();
+                        var ptext = p.replace('pubmed:','');
+
+                        if(isNaN(ptext))
+                        {
+                            return;
+                        }
+
                         if(p.includes(":") === false)
                         {
                             p = "pubmed:" + p;
@@ -1031,6 +1212,7 @@ function getData(onlyRegulators = false) {
 
                 if(_source == elementid && onlyRegulators === false)
                 {
+
                     let {type: _targettype, name:_targetname, ids:_targetids} = AIR.Molecules[_target];
 
                     var result_row =  [];
@@ -1055,11 +1237,17 @@ function getData(onlyRegulators = false) {
                     _pubmed.forEach(p =>
                         {
                             p = p.trim();
+                            var ptext = p.replace('pubmed:','');
+
+                            if(isNaN(ptext))
+                            {
+                                return;
+                            }
                             if(p.includes(":") === false)
                             {
                                 p = "pubmed:" + p;
                             }
-                            var ptext = p.replace('pubmed:','');
+
                             pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
                         });
 
@@ -1071,32 +1259,136 @@ function getData(onlyRegulators = false) {
             }
         }
 
-        // Add new data
-        globals.regulationtable.columns.adjust().draw(); 
-        globals.targettable.columns.adjust().draw();
-        globals.phenotypetable.columns.adjust().draw(); 
+            
+        if(onlyRegulators === false)
+        {
+            setTimeout(async function() {
 
-        $('a.elementlink').click(function() {
-            selectElementonMap(this.innerHTML, false);
-        });
+                if(elementid == null || isProtein(elementid))
+                {
 
-        /*
-        globals.regulationtable.on('click', 'a', function () {
-            selectElement(this.innerHTML, false);
-        } );
-        globals.targettable.on('click', 'a', function () {
-            selectElement(this.innerHTML, false);
-        } );
-        globals.phenotypetable.on('click', 'a', function () {
-            selectElement(this.innerHTML, false);
-        } ); */
+                    let uniportID = await getUniprotID(elementname);
 
-        var coll = document.getElementsByClassName("xp_collapsible");
-        var i;
+                    if(uniportID != "")
+                    {
+                        try {
+                            
+                            var ProtVista = require('ProtVista');
+                            var instance = new ProtVista({
+                                el: document.getElementById('xp_molart'),
+                                uniprotacc: uniportID   
+                            });
+                            /*
+                            let molart = new MolArt({
+                                uniprotId: uniportID,
+                                containerId: 'xp_molart'
+                            });
+                            */
+                        }
+                        catch(err)
+                        {
+                            console.log(err.message);
+                        }
 
-        adjustPanels()
-        resolve(' ');
-    });
+                    }
+                }
+    
+            }, 0);
+
+            setTimeout(async function() {
+                
+                let idstring = '';
+                if(elementid != null)
+                {
+                    if(isProtein(elementid))
+                    {
+                        let id = await getUniprotID(elementname, true);
+                        if(id != '')
+                            idstring = "pdb='" + id + "'";
+                    }
+                    else if(AIR.Molecules[elementid].ids.hasOwnProperty("chebi"))
+                    {
+                        let id = await getPubChemID(elementname, AIR.Molecules[elementid].ids.chebi)
+                        if(id != '')
+                            idstring = "cid='" + id + "'";
+                    }
+                }
+
+                if(idstring != "")
+                {
+                    $('#xp_value_type').html(elementtype + ' (<a href="#" id="xp_img_link">view structure</a>)');
+                    
+                    document.getElementById("xp_img_link").onclick = async function(){
+
+                        var $temp = $; 
+                        var jQuerytemp = jQuery;
+                        var tag = document.createElement('script');
+                        tag.src = "https://3Dmol.csb.pitt.edu/build/3Dmol-min.js";
+                        tag.setAttribute('asnyc','');
+                        
+                        document.getElementsByTagName('head')[0].appendChild(tag);
+
+                        $("#xp_molartimg_modal").replaceWith(`                        
+                            <div id="xp_molartimg_modal" class="air_modal">
+                                <span id="xp_img_close" class="air_close_white">&times;</span>
+                                <div style="height: 500px; width: 500px; position: relative;" id="xp_molartimg_full" class='mol_modal_content viewer_3Dmoljs' data-${idstring} data-backgroundcolor='0xffffff' data-style='stick'></div>
+                                <div id="xp_molartimg_caption" class="air_img_caption"></div>
+                            </div>`);
+            
+                        // Get the modal
+                        var modal = document.getElementById("xp_molartimg_modal");
+                
+                        // Get the image and insert it inside the modal - use its "alt" text as a caption
+                        var img = document.getElementById("xp_molartimg");
+                        var modalImg = document.getElementById("xp_molartimg_full");
+                        var captionText = document.getElementById("xp_molartimg_caption");
+
+                        modal.style.display = "block";
+                        captionText.innerHTML = AIR.Molecules[elementid].name;
+
+                                    // Get the <span> element that closes the modal
+                        var span = document.getElementById("xp_img_close");
+                
+                        // When the user clicks on <span> (x), close the modal
+                        span.onclick = function() {
+                            modal.style.display = "none";
+                            $(document).find('script[src="https://3Dmol.csb.pitt.edu/build/3Dmol-min.js"]').remove();
+                            $ = $temp; jQuery = jQuerytemp;
+                        }
+                        //});
+                        
+                    }
+                }
+            }, 0);
+        }
+    }
+    // Add new data
+    globals.regulationtable.columns.adjust().draw(); 
+    globals.targettable.columns.adjust().draw();
+    globals.phenotypetable.columns.adjust().draw(); 
+
+    adjustPanels();
+
+}
+
+$(document).on('click', '.air_elementlink', function () {
+    selectElementonMap($(this).html(), false);
+});
+
+
+function isProtein(elementid)
+{
+    if(elementid == null)
+    {
+        return false;
+    }
+    else if(AIR.Molecules[elementid].type == "PROTEIN" || AIR.Molecules[elementid].type == "TF" || AIR.Molecules[elementid].type == "miRNA" || AIR.Molecules[elementid].type == "lncRNA")
+    {
+        return true
+    }
+    else {
+        return false;
+    }
 }
 
 function XP_PredictTargets() {
@@ -1233,14 +1525,13 @@ function XP_PredictTargets() {
 
 
 function createCentralityTable(phenotype) {
+    let t0 = performance.now();
     globals.centraliytable.clear();
 
     for(let e in AIR.Molecules)
     {
         let result_row = [];
-        
 
-        result_row.push(getLinkIconHTML(AIR.Molecules[e].name));
         //result_row.push(AIR.Molecules[e].name);
         let hasvalue = false;
         for(let c in AIR.Centrality) {
@@ -1262,7 +1553,8 @@ function createCentralityTable(phenotype) {
 
         }
         if(hasvalue)
-        {
+        {                
+           result_row.unshift(getLinkIconHTML(AIR.Molecules[e].name));
            globals.centraliytable.row.add(result_row); 
         }
         
@@ -1270,7 +1562,6 @@ function createCentralityTable(phenotype) {
 
     globals.centraliytable.columns.adjust().draw(); 
 
-    globals.centraliytable.on('click', 'a.elementlink', function () {
-        selectElementonMap(this.innerHTML, false);
-    } );
+    let t1 = performance.now();
+    console.log("Centrality Table took " + (t1 - t0) + " milliseconds.")
 }

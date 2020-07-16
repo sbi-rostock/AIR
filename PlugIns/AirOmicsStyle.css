@@ -1,5 +1,7 @@
+.air_table tbody tr {
+  background-color: transparent !important;
+}
 
-  
   .om_panel {
     background: #FF8C8C;
     color: white;
@@ -12,15 +14,7 @@
   
   .om_elementinput {
     border-color: #FF8C8C; }
-  
-  .om_tab.active {
-    background: #FF8C8C !important;
-    color: white !important; }
-  
-  .om_tab {
-    color: lightgrey;
-    font-weight: bold; }
-  
+
   .clickCBinTable {
     padding-left: 5px;
     padding-right: 5px;
@@ -32,32 +26,7 @@
     width: 20px;
     height: 20px;
     cursor: pointer; }
-  
-  .legendli {
-    display: inline-block;
-    width: auto;
-    list-style-type: none; }
-  
-  .triangle {
-    width: 0;
-    height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 10px solid;
-    display: inline-block;
-    position: relative;
-    vertical-align: middle;
-    background-color: white;
-    margin-right: 10px; }
-  
-  .legendspan {
-    display: inline-block;
-    height: 15px;
-    width: 15px;
-    margin-right: 10px;
-    border-radius: 25px;
-    vertical-align: middle; }
-  
+
   .om_popover {
     max-width: 100%; }
   
@@ -75,12 +44,6 @@
     left: 50%;
     top: 50%; }
   
-  .om_checkbox {
-    margin: 5px 0px 0px 0px;
-    text-align: center !important;
-    color: #6d6d6d;
-    cursor: pointer; }
-  
   .om_select {
     cursor: pointer; }
   
@@ -95,7 +58,6 @@
   
   .om_inputfile {
     background-color: #FFFFFF !important;
-    margin: 6px 0px 0px 0px;
     cursor: pointer; }
   
   .om_inputfile {
@@ -104,40 +66,29 @@
     color: black;
     display: inline-block; }
   
-  .btn-download {
+  .om_btn_download {
     border: none;
     padding: 12px 30px;
     font-size: 20px;
-    background-color: white;
+    background-color: transparent;
     color: black; }
   
   .btn-group {
     width: 100%; }
   
-  .om_btn_info {
-    width: 20px;
-    height: 20px;
-    font-size: 0.8em;
-    position: absolute;
-    top: 25%;
-    text-align: center !important;
-    padding: 0;
-    background-color: dimgrey; }
-  
   .wrapper {
     text-align: center; }
+
   
-  input[type=checkbox] .cbcontainer {
-    margin-left: 0; }
-  
-  .om_checkbox, input[type=checkbox] {
-    vertical-align: middle; }
-  
+
   .om_btn_air {
-    background-color: #FF8C8C;
-    border-color: #FF8C8C;
-    font-weight: bold;
-    color: white; }
+      background-color: #FF8C8C;
+      border-color: #FF8C8C;
+      font-weight: bold;
+      color: white; 
+      padding: 0;
+      height: 32.5px;
+    }
   
   .om_btn_air:focus {
     outline: none !important;
@@ -191,9 +142,8 @@
     margin-left: 0;
     border-radius: 25px; }
   
-  .disabledbutton {
-    pointer-events: none;
-    opacity: 0.4; }
+.phenotypelegend ul.legend-labels{
+  margin-bottom: 0px !important; }
   
   .ppslider {
     -webkit-appearance: none;
@@ -230,17 +180,17 @@
   label {
     display: inline-block; }
   
-  #resultsimg {
+.air_image {
     cursor: pointer;
     transition: 0.3s; }
   
-  #resultsimg:hover {
+.air_image:hover {
     opacity: 0.7; }
   
-  .modal {
+.air_modal {
     display: none;
     position: fixed;
-    z-index: 1;
+    z-index: 999;
     padding-top: 100px;
     left: 0;
     top: 0;
@@ -250,15 +200,16 @@
     background-color: black;
     background-color: rgba(0, 0, 0, 0.9); }
   
-  .modal-content {
+.air_modal_content {
     margin: auto;
     display: block;
-    width: 80%; }
+    width: 30%; 
+  }
   
-  #om_resultsimg {
+.air_image {
     cursor: pointer; }
   
-  #img-caption {
+  .air_img_caption {
     margin: auto;
     display: block;
     width: 80%;
@@ -267,7 +218,7 @@
     padding: 10px 0;
     height: 150px; }
   
-  .modal-content, #img-caption {
+.air_modal_content, .air_img_caption {
     animation-name: zoom;
     animation-duration: 0.6s; }
   
@@ -277,22 +228,41 @@
     to {
       transform: scale(1); } }
   
-  .close {
+  .air_close_white {
     position: absolute;
     top: 15px;
     right: 35px;
     color: #f1f1f1;
     font-size: 40px;
     font-weight: bold;
-    transition: 0.3s; }
+    transition: 0.3s; 
+  }
   
-  .close:hover,
-  .close:focus {
+  .air_close_white:hover,
+  .air_close_white:focus {
     color: #bbb;
     text-decoration: none;
     cursor: pointer; }
   
   @media only screen and (max-width: 700px) {
-    .modal-content {
+    .air_modal_content {
       width: 100%; } }
   
+.air_progress {
+    color: white;
+    background-color: #FF8C8C;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+.air_progress_value {
+  background-color: #ff5959;
+  height: 100%;
+}
+
+.air_progress_label {
+  height:100%;
+  top: 4.5px;
+  font-size: 1rem;
+  font-weight: bold;
+}

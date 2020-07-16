@@ -1,5 +1,4 @@
 .air_nav_item {
-  width:50% !important;
   text-align: center; 
   font-size: 15px;
   font-weight: bold;
@@ -18,11 +17,10 @@
 }
 
 .air_value {
-  text-transform: capitalize;
   margin-bottom: 0px;
 }
 
-.Centogene-container {
+.AirPlugins-container {
   padding: 5px;
   background-color: #ffffff;
   overflow-x: hidden;
@@ -40,14 +38,16 @@
 .triangle {
   width: 0;
   height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-bottom: 10px solid;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 13px solid;
   display: inline-block;
   position: relative;
   vertical-align: middle;
   background-color: white;
-  margin-right: 10px; }
+  margin-right: 10px; 
+  margin-bottom: 3px;
+}
 
 .legendspan {
   display: inline-block;
@@ -60,6 +60,7 @@
 .xp_panel {
   border: none !important; }
 
+
 .xp_collapsible {
   background-color: #6E6EC8;
   color: white;
@@ -69,13 +70,14 @@
   border: 1px solid white;
   border-radius: 16px;
   text-align: left;
-  outline: none;
+  outline: none !important;
   font-size: 15px;
   font-weight: bold;
   padding-left: 25px; }
 
 .xp_collapsible.active, .xp_collapsible:hover {
-  background-color: #6E6EC8; }
+  background-color: #6E6EC8; 
+}
 
 .xp_collapsible:after {
   content: '\002B';
@@ -116,12 +118,13 @@
   cursor: pointer; }
 
 .xp_content {
-  padding-left: 10px;
-  padding-right: 10px;
+  padding: 0px 10px;
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.2s ease-out;
+  margin-bottom: 10px;
   background-color: white; }
+
 
 .xp_panel_heading {
   background-color: #FF8C8C;
@@ -136,13 +139,13 @@
 .xp_elementinput {
   border-color: #FF8C8C; }
 
-.xp_tab.active {
-  background: #FF8C8C !important;
-  color: white !important; }
+.air_tab.active {
+  color: #495057 !important; }
 
-.xp_tab {
-  color: lightgrey;
-  font-weight: bold; }
+.air_tab {
+  color: #337ab7;
+  font-weight: bold;
+}
 
 .btn-group {
   width: 100%; }
@@ -164,11 +167,11 @@
   background-color: #ff5959;
   border-color: #ff5959; }
 
-.disabledbutton {
+.air_disabledbutton {
   pointer-events: none;
-  opacity: 0.4; }
+  opacity: 0.7; }
 
-.xp_btn_info {
+.air_btn_info {
   width: 20px;
   height: 20px;
   font-size: 0.8em;
@@ -176,6 +179,99 @@
   top: 15%;
   text-align: center !important;
   padding: 0;
-  background-color: dimgrey; }
+  background-color: dimgrey; 
+  margin-left: 3px;
+  z-index: 2;
+}
+
+.air_btn_info:focus {
+  box-shadow: none !important;
+  outline: none !important; 
+}
+  .air_close {
+    position: absolute;
+    top: 15px;
+    right: 5px;
+    color: black;
+    font-size: 25px;
+    font-weight: bold;
+    transition: 0.3s;
+    margin-left: 5px;
+}
+
+.air_alert {
+  padding-right: 30px;
+}
+
+.popover{
+  max-width: 100px; /* Max Width of the popover (depending on the container!) */
+}
+
+.air_checkbox {
+  margin: 2px 0px 0px 0px;
+  text-align: center !important;
+  color: #6d6d6d;
+  cursor: pointer; }
+
+.air_checkbox, input[type=checkbox] {
+  vertical-align: middle; }
+  
+input[type=checkbox] .cbcontainer {
+  margin-left: 0; }
+
+.air_label {
+  margin: 0;
+}
+
+
+.air_nav_tabs, .air_tab {
+    border: 0px solid transparent;
+    border-bottom: 1px solid darkgray !important;
+    border-top-left-radius: 1rem !important;
+    border-top-right-radius: 1rem !important;
+}
+
+.air_tab.active {
+border-color: darkgray darkgray #fff !important;
+}
+
+.air_tab_sub.active {
+  background-color: #fafafa !important;
+}
+
+.air_tab_content {
+  border: 1px solid darkgray;
+  border-top: none;
+}
+
+
+.air_nav_tabs {
+  margin-bottom: 0 !important;
+}
+
+.air_tab_pane {
+  padding-top: 20px;
+  padding-right: 10px;
+  padding-bottom: 10px;
+  padding-left: 10px;
+  background-color: #fafafa;
+}
+
+.xp_molartContainer {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
+}
 
   
+.mol_modal_content {
+  margin: auto;
+  display: block;
+  width: 30%; }
+
+  .air_select_label {
+    padding-top: 4px !important;
+    padding: 0;
+    text-align: right;
+    margin-left: 5px;
+  }

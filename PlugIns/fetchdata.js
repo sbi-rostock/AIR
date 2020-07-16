@@ -1,5 +1,5 @@
 let fileURL = '';
-let testing;
+let testing = false;
 let filetesting;
 let Chart;
 
@@ -10,6 +10,7 @@ const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/Data
 const AIR = {
     MoleculeData: {},
     Phenotypes: {},
+    Hypoth_Phenotypes: {},
     Molecules: {},
     MoleculeNames: {},
     Interactions: {},
@@ -131,7 +132,7 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 
-function readDataFiles(_minerva, _chart, _testing, _filetesting) {
+function readDataFiles(_minerva, _chart, _filetesting) {
 
     return new Promise((resolve, reject) => {
 
@@ -165,286 +166,305 @@ function readDataFiles(_minerva, _chart, _testing, _filetesting) {
                 }    
             });
             t0 = performance.now();
-            minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
+            $('#air_loading_text').html('Reading elements ...')
+            setTimeout(() => {
+                minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
 
-                t1 = performance.now()
-                console.log("Call to getAllBioEntities took " + (t1 - t0) + " milliseconds.")
+                    t1 = performance.now()
+                    console.log("Call to getAllBioEntities took " + (t1 - t0) + " milliseconds.")
 
-                AIR.allBioEntities = bioEntities;
-                bioEntities.forEach(e => {
-                    if (e.constructor.name === 'Alias') {
-                        let namelower = e.getName().toLowerCase();
-                        AIR.MIMSpeciesLowerCase.push(namelower);
-                        AIR.MIMSpecies.push(e.getName());
-                        AIR.MapElements[namelower] = e;
-                    }
-                });
-                testing = _testing;
-                filetesting = _filetesting;
-            
+                    AIR.allBioEntities = bioEntities;
+                    bioEntities.forEach(e => {
+                        if (e.constructor.name === 'Alias') {
+                            let namelower = e.getName().toLowerCase();
+                            AIR.MIMSpeciesLowerCase.push(namelower);
+                            AIR.MIMSpecies.push(e.getName());
+                            AIR.MapElements[namelower] = e;
+                        }
+                    });
+                    //testing = _testing;
+                    filetesting = _filetesting;
                 
-                if(filetesting){
-                    fileURL = localURL;
-                }
-                else {
-                    fileURL = githubURL;
-                }
+                    
+                    if(filetesting){
+                        fileURL = localURL;
+                    }
+                    else {
+                        fileURL = githubURL;
+                    }
 
-                let typevalue = $('.selectdata').val();
-                //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
-                t0 = performance.now();
-                $.ajax({
-                    url: fileURL + '/Interactions.json',
-                    success: function (content) {
-                        readInteractions(content).then(r => {
-                            t1 = performance.now()
-                            console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
-                            t0 = performance.now();
+                    let typevalue = $('.selectdata').val();
+                    //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
+                    t0 = performance.now();
+                    $.ajax({
+                        url: fileURL + '/Interactions.json',
+                        success: function (content) {
+                            readInteractions(content).then(r => {
+                                t1 = performance.now()
+                                console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
+                                t0 = performance.now();
+                                $('#air_loading_text').html('Fetching data ...')
+                                setTimeout(() => {
+                                    $.ajax({
+                                        //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
+                                        url: fileURL + '/Molecules.json', 
+                                        success: function (moleculecontent) {
+                                            t1 = performance.now()
+                                            console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
+                                            readMolecules(moleculecontent).then(s => { 
+                                                t1 = performance.now()
+                                                console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
+                                                t0 = performance.now();
+                                                readServerValues().then(r => {
+                                                    t1 = performance.now()
+                                                    console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
+                                                    t0 = performance.now();
+                                                    let promises = [];
+                                                    centralities.forEach(c => {
+                                                        promises.push(openCentrality(c));
+                                                    });
+                                                    Promise.all(promises).then(r => {
+                                                        t1 = performance.now()
+                                                        console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
+                                                        resolve(AIR);
+                                                    });
+                                                });
+                                            });
+                                        },
+                                        error: function () {
+                                            reject(AIR);
+                                        }
+                                    });
+                                }, 0);
+                            });;
+                        },
+                        error: function (content) {
+                            alert(content);
+                            reject(AIR);
+                        }
+                    });
+                    function openCentrality(centrality)
+                    {
+                        return new Promise((resolve, reject) => {
                             $.ajax({
                                 //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                url: fileURL + '/Molecules.json', 
-                                success: function (moleculecontent) {
-                                    t1 = performance.now()
-                                    console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
-                                    readMolecules(moleculecontent).then(s => { 
-                                        t1 = performance.now()
-                                        console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
-                                        t0 = performance.now();
-                                        readServerValues().then(r => {
-                                            t1 = performance.now()
-                                            console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
-                                            t0 = performance.now();
-                                            let promises = [];
-                                            centralities.forEach(c => {
-                                                promises.push(openCentrality(c));
-                                            });
-                                            Promise.all(promises).then(r => {
-                                                t1 = performance.now()
-                                                console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
-                                                resolve(AIR);
-                                            });
-                                        });
-                                    });
+                                url: fileURL + '/' + centrality.toLowerCase() + ".txt", 
+                                success: function (info) {
+                                    readCentrality(info, centrality).then(s => resolve('')).catch(e => {
+                                        console.log(e);
+                                        reject(e);
+                                    })
                                 },
-                                error: function () {
-                                    reject(AIR);
-                                }
                             });
-                        });;
-                    },
-                    error: function (content) {
-                        alert(content);
-                        reject(AIR);
+                        });
                     }
-                });
-                function openCentrality(centrality)
-                {
-                    return new Promise((resolve, reject) => {
-                        $.ajax({
-                            //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                            url: fileURL + '/' + centrality.toLowerCase() + ".txt", 
-                            success: function (info) {
-                                readCentrality(info, centrality).then(s => resolve('')).catch(e => {
-                                    console.log(e);
-                                    reject(e);
-                                })
-                            },
-                        });
-                    });
-                }
-                function readServerValues() {
-                    return new Promise((resolve, reject) => {
-                        let promises = [];
-                        for (let p in AIR.Phenotypes) 
-                        {
-                            promises.push(
-                                getMoleculeData(p).then(
-                                    data => {
-                                        let sum = 0;
-                                        if(data.hasOwnProperty("Influences"))
-                                        {
-                                            for (let m in data.Influences)
-                                            {
-                                                let value = data.Influences[m];
-                                                if(value != 0 && AIR.Molecules.hasOwnProperty(m))
-                                                {
-                                                    AIR.Phenotypes[p].values[m] = value;
-                                                    sum += Math.abs(value);
-                                                }
-                                                
-                                            }
-                                        }
-                                        if(data.hasOwnProperty("SPs"))
-                                        {
-                                            for (let m in data.SPs)
-                                            {
-                                                let value = data.SPs[m];
-                                                if(value != 0 && AIR.Molecules.hasOwnProperty(m))
-                                                {
-                                                    AIR.Phenotypes[p].SPs[m] = value;
-                                                }
-                                                
-                                            }
-                                        }
-                                        AIR.Phenotypes[p]["sumSP"] = sum;
-                                }).catch(e => {
-                                    console.log("Could not read phenotype " + p + " from server.");
-                                })
-                            )
-                        };
-                        Promise.all(promises).then(r =>    
-                        {
-                            resolve('');       
-                        }).catch(e => {
-                            console.log(error + " errors in fetching data.");
-                            reject(error);
-                        });
-                    });
-                }
-                function readMolecules(content) {
-                    return new Promise((resolve, reject) => {
-
-                        if(filetesting)
-                        {
-                            AIR.Molecules = content;
-                        }
-                        else{
-                            AIR.Molecules = JSON.parse(content);
-                        }
-
-                        for(let element in AIR.Molecules)
-                        {
-                            if(AIR.Molecules[element].complex === false)
+                    function readServerValues() {
+                        return new Promise((resolve, reject) => {
+                            let promises = [];
+                            for (let p in AIR.Phenotypes) 
                             {
-                                for(let id in AIR.Molecules[element].ids)
-                                {
-                                    AIR.ElementNames[id.replace('.','')][AIR.Molecules[element].ids[id]] = element
-                                }
-                            }
-                            if(AIR.Molecules[element].type === "PHENOTYPE")
+                                promises.push(
+                                    getMoleculeData(p).then(
+                                        data => {
+                                            let sum = 0;
+                                            if(data.hasOwnProperty("Influences"))
+                                            {
+                                                for (let m in data.Influences)
+                                                {
+                                                    let value = data.Influences[m];
+                                                    if(value != 0 && AIR.Molecules.hasOwnProperty(m))
+                                                    {
+                                                        AIR.Phenotypes[p].values[m] = value;
+                                                        sum += Math.abs(value);
+                                                    }
+                                                    
+                                                }
+                                            }
+                                            if(data.hasOwnProperty("SPs"))
+                                            {
+                                                for (let m in data.SPs)
+                                                {
+                                                    let value = data.SPs[m];
+                                                    if(value != 0 && AIR.Molecules.hasOwnProperty(m))
+                                                    {
+                                                        AIR.Phenotypes[p].SPs[m] = value;
+                                                    }
+                                                    
+                                                }
+                                            }
+                                            AIR.Phenotypes[p]["sumSP"] = sum;
+                                    }).catch(e => {
+                                        console.log("Could not read phenotype " + p + " from server.");
+                                    })
+                                )
+                            };
+                            Promise.all(promises).then(r =>    
                             {
-                                AIR.Phenotypes[element] = {};
-                                AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
-                                AIR.Phenotypes[element]["accuracy"] = 0;
-                                AIR.Phenotypes[element]["results"] = {};
-                                AIR.Phenotypes[element]["norm_results"] = {};
-                                AIR.Phenotypes[element]["values"] = {};
-                                AIR.Phenotypes[element]["value"] = 0;
-                                AIR.Phenotypes[element]["SPs"] = {};
-                            }
-                        }
-
-                        if(testing)
-                        {
-                            let t0 = performance.now()
-                            $.ajax({
-                                url: localURL + "/SP.txt",
-                                success: function (content) {
-                                    readFile(content).then(r => {
-                                        let t1 = performance.now()
-                                        console.log("Call to readFile took " + (t1 - t0) + " milliseconds.")
-                                        resolve('');
-                                    });
-                                },
-                                error: function () {
-                                }
+                                resolve('');       
+                            }).catch(e => {
+                                console.log(error + " errors in fetching data.");
+                                reject(error);
                             });
-                        }
-                        else
-                            resolve('');
-                    });
-                }
-                function readCentrality(content, centrality) {
-                    return new Promise((resolve, reject) => {
-                        let firstline = true;
-                        let header = [];
-                        content.toString().split('\n').forEach(line => {
-                                if (firstline === true) {
-
-                                    firstline = false;
-
-                                    var column = 0;
-
-                                    line.split('\t').forEach(s => {
-                                        header.push(s);
-                                        if (column > 0) {
-                                            AIR.centralityheader.add(s);
-                                        }
-                                        else
-                                        {
-                                            column++;
-                                        }
-                                    });
-                                }
-                                else {
-                                    let id = "";
-                                    let column = 0;
-                                    let breakflag = false;
-
-                                    line.split('\t').forEach(element => {
-
-                                        if (column === 0) {
-                                            if (element === "")
-                                                breakflag = true;
-                                            else {
-                                                id = element;
-                                                if(AIR.Centrality[centrality].hasOwnProperty(id) == false) {
-                                                    AIR.Centrality[centrality][id] = {};
-                                                }
-                                            }
-                                        }
-                                        else if (breakflag === false) {
-                                            let pname = header[column];
-                                            let value = parseFloat(element)
-
-                                            if(isNaN(value) == false){
-
-                                                AIR.Centrality[centrality][id][pname] = Math.round((value + Number.EPSILON) * 100) / 100 ;
-                                            }
-                                        }
-
-                                        column++;
-                                    });
-                                }
                         });
-                        resolve('');
-                    });
-                }
-                function readInteractions(content) {
-                    return new Promise((resolve, reject) => {
-                        if(filetesting)
-                        {
-                            AIR.Interactions = content;
-                        }
-                        else{
-                            AIR.Interactions = JSON.parse(content);
-                        }
-                        resolve('');
-                    });
-                }
-                function readFile(content) {
-                    return new Promise((resolve, reject) => {
-                        content.toString().split('\n').forEach(line => {
-                            let first = true;
-                            let id = "";
-                            line.split('\t').forEach(element => {
-                                if(first)
+                    }
+                    function readMolecules(content) {
+                        return new Promise((resolve, reject) => {
+
+                            if(filetesting)
+                            {
+                                AIR.Molecules = content;
+                            }
+                            else{
+                                AIR.Molecules = JSON.parse(content);
+                            }
+
+                            for(let element in AIR.Molecules)
+                            {
+                                if(AIR.Molecules[element].complex === false)
                                 {
-                                    id = element;
-                                    first = false;
-                                }
-                                else {
-                                    if(element != "")
+                                    for(let id in AIR.Molecules[element].ids)
                                     {
-                                        AIR.MoleculeData[id] = JSON.parse(element)
+                                        AIR.ElementNames[id.replace('.','')][AIR.Molecules[element].ids[id]] = element
                                     }
                                 }
-                            });
+                                if(AIR.Molecules[element].type === "PHENOTYPE")
+                                {
+                                    AIR.Phenotypes[element] = {};
+                                    AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
+                                    AIR.Phenotypes[element]["accuracy"] = 0;
+                                    AIR.Phenotypes[element]["results"] = {};
+                                    AIR.Phenotypes[element]["norm_results"] = {};
+                                    AIR.Phenotypes[element]["values"] = {};
+                                    AIR.Phenotypes[element]["value"] = 0;
+                                    AIR.Phenotypes[element]["SPs"] = {};
+                                }
+                                if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
+                                {
+                                    AIR.Hypoth_Phenotypes[element] = {};
+                                    AIR.Hypoth_Phenotypes[element]["name"] = AIR.Molecules[element].name;
+                                    AIR.Hypoth_Phenotypes[element]["accuracy"] = 0;
+                                    AIR.Hypoth_Phenotypes[element]["results"] = {};
+                                    AIR.Hypoth_Phenotypes[element]["norm_results"] = {};
+                                    AIR.Hypoth_Phenotypes[element]["values"] = {};
+                                    AIR.Hypoth_Phenotypes[element]["value"] = 0;
+                                    AIR.Hypoth_Phenotypes[element]["SPs"] = {};
+                                }
+                            }
+
+                            if(testing)
+                            {
+                                let t0 = performance.now()
+                                $.ajax({
+                                    url: localURL + "/SP.txt",
+                                    success: function (content) {
+                                        let t1 = performance.now()
+                                        console.log("Call to get File took " + (t1 - t0) + " milliseconds.")
+                                        readFile(content).then(r => {
+                                            let t1 = performance.now()
+                                            console.log("Call to readFile took " + (t1 - t0) + " milliseconds.")
+                                            resolve('');
+                                        });
+                                    },
+                                    error: function () {
+                                    }
+                                });
+                            }
+                            else
+                                resolve('');
                         });
-                        resolve('');
-                    });
-                }
-            });
+                    }
+                    function readCentrality(content, centrality) {
+                        return new Promise((resolve, reject) => {
+                            let firstline = true;
+                            let header = [];
+                            content.toString().split('\n').forEach(line => {
+                                    if (firstline === true) {
+
+                                        firstline = false;
+
+                                        var column = 0;
+
+                                        line.split('\t').forEach(s => {
+                                            header.push(s);
+                                            if (column > 0) {
+                                                AIR.centralityheader.add(s);
+                                            }
+                                            else
+                                            {
+                                                column++;
+                                            }
+                                        });
+                                    }
+                                    else {
+                                        let id = "";
+                                        let column = 0;
+                                        let breakflag = false;
+
+                                        line.split('\t').forEach(element => {
+
+                                            if (column === 0) {
+                                                if (element === "")
+                                                    breakflag = true;
+                                                else {
+                                                    id = element;
+                                                    if(AIR.Centrality[centrality].hasOwnProperty(id) == false) {
+                                                        AIR.Centrality[centrality][id] = {};
+                                                    }
+                                                }
+                                            }
+                                            else if (breakflag === false) {
+                                                let pname = header[column];
+                                                let value = parseFloat(element)
+
+                                                if(isNaN(value) == false){
+
+                                                    AIR.Centrality[centrality][id][pname] = Math.round((value + Number.EPSILON) * 100) / 100 ;
+                                                }
+                                            }
+
+                                            column++;
+                                        });
+                                    }
+                            });
+                            resolve('');
+                        });
+                    }
+                    function readInteractions(content) {
+                        return new Promise((resolve, reject) => {
+                            if(filetesting)
+                            {
+                                AIR.Interactions = content;
+                            }
+                            else{
+                                AIR.Interactions = JSON.parse(content);
+                            }
+                            resolve('');
+                        });
+                    }
+                    function readFile(content) {
+                        return new Promise((resolve, reject) => {
+                            content.toString().split('\n').forEach(line => {
+                                let first = true;
+                                let id = "";
+                                line.split('\t').forEach(element => {
+                                    if(first)
+                                    {
+                                        id = element;
+                                        first = false;
+                                    }
+                                    else {
+                                        if(element != "")
+                                        {
+                                            AIR.MoleculeData[id] = JSON.parse(element)
+                                        }
+                                    }
+                                });
+                            });
+                            resolve('');
+                        });
+                    }
+                });
+            }, 0);
         })
     });
 }
@@ -487,13 +507,20 @@ function getMoleculeData(key)
                 resolve(data);
             }
             else {
-                getValue(key).then(response => {
-                    let data = JSON.parse(response);
-                    AIR.MoleculeData[key] = data;
-                    resolve(data);
-                }).catch(e => {
+                if(AIR.Molecules.hasOwnProperty(key) && AIR.Molecules[key].emptySP == true)
+                {
                     resolve({});
-                });
+                }
+                else
+                {
+                    getValue(key).then(response => {
+                        let data = JSON.parse(response);
+                        AIR.MoleculeData[key] = data;
+                        resolve(data);
+                    }).catch(e => {
+                        resolve({});
+                    });
+                }
             }
         });
 
@@ -648,7 +675,7 @@ function getLinkIconHTML(element) {
     let output = "";
     if(AIR.MapElements.hasOwnProperty(namelower))
     {
-        output += '<a href="#" class="elementlink">' + element + '</a>';
+        output += '<a href="#" class="air_elementlink">' + element + '</a>';
     }
     else
     {
@@ -659,7 +686,7 @@ function getLinkIconHTML(element) {
 
     if(link)
     {
-        output += '<a target="_blank" href="' + link + '"><span class="fa fa-external-link ml-2"></span></a>';
+        output += '<a target="_blank" href="' + link + '"><span class="fa fa-external-link-alt ml-2"></span></a>';
     }
 
     return output;
@@ -737,3 +764,40 @@ function createSliderCell(row, type, data) {
 
     return button;
 }
+
+async function disablebutton(id) {
+    var promise = new Promise(function(resolve, reject) {
+        setTimeout(() => {
+            var $btn = $('#'+id);
+            let text = $btn.html();
+            $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');      
+            $("#air_plugincontainer").addClass("air_disabledbutton");
+            resolve(text);
+        }, 0);
+    });
+    return promise;
+}
+
+async function enablebtn(id, text) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            var $btn = $('#'+id);
+            $btn.html(text);
+            $("#air_plugincontainer").removeClass("air_disabledbutton");
+            resolve('');
+        }, 0);
+    });
+}
+
+function checkNested(obj /*, level1, level2, ... levelN*/) {
+    var args = Array.prototype.slice.call(arguments, 1);
+  
+    for (var i = 0; i < args.length; i++) {
+      if (!obj || !obj.hasOwnProperty(args[i])) {
+        return false;
+      }
+      obj = obj[args[i]];
+    }
+    return true;
+  }
+  

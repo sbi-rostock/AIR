@@ -1,11 +1,16 @@
-function AirOmics(){    
+async function AirOmics(){    
     let t0 = performance.now();
     globals.om_container = $('#airomics_tab_content');   
-    $(`<div id="om_stat_spinner" style="cursor: wait; height:400px; display: flex; align-items: center;" class="d-flex justify-content-center">
-    <div class="spinner-border" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>
-</div>`).appendTo(globals.om_container);
+    $(`<div id="om_stat_spinner" class="mt-5">
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="sr-only"></span>
+            </div>
+        </div>
+        <div class="d-flex justify-content-center">
+            <span id="om_loading_text">LOADING...</span>
+        </div>
+    </div>`).appendTo(globals.om_container);
     
     minerva.ServerConnector.getLoggedUser().then(function (user) {
         globals.user = user._login.toString().toLowerCase();
@@ -22,13 +27,20 @@ function AirOmics(){
             /*<div class="text-center">
                 <img src="https://www.sbi.uni-rostock.de/files/Projects/AIR/AIR3D_croped.png" class="img-fluid" width="100%">
             </div>*/
-            /*html*/`                              
-            <div class="row mb-2">
+            /*html*/`
+            <div class="air_alert alert alert-info mt-2">
+                <span>Plugins are executed on the client side. None of your data is uploaded or stored.</span>
+                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>                                
+            <div class="row mb-2 mt-4">
                 <div class="col-auto">
                     <div class="wrapper">
-                        <button type="button" class="om_btn_info btn btn-secondary ml-1"
-                                data-html="true" data-toggle="popover" data-placement="top" title="File Specifications"
-                                data-content="A tab-seperated .txt file of log2 fold change values.<br/>First Row contains the sample names.<br/>First Column contains the official gene/molecule symbols/names">
+                        <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="File Specifications"
+                                data-content="A tab-delimited .txt file with log2 fold change values.<br/>
+                                One column must contain the official probe names or IDs.">
                             ?
                         </button>
                     </div>
@@ -38,8 +50,8 @@ function AirOmics(){
                 </div>
             </div>
 
-            <div id="om_columnSelect-container" class="disabledbutton row mb-2 mt-4">
-                <div class="col-auto" style="padding:0; width: 30%; text-align: right;">
+            <div id="om_columnSelect-container" class="air_disabledbutton row mb-2 mt-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Mapping column:</span>
                 </div>
                 <div class="col">
@@ -49,8 +61,8 @@ function AirOmics(){
                 </div>
             </div>
 
-            <div id="om_mappingselect-container" class="disabledbutton row mb-2">
-                <div class="col-auto" style="padding:0; width: 30%; text-align: right; ">
+            <div id="om_mappingselect-container" class="air_disabledbutton row mb-2">
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Mapping by:</span>
                 </div>
                 <div class="col">
@@ -67,72 +79,76 @@ function AirOmics(){
                 </div>
             </div>
             
-            <button type="button" id="om_initializebtn" class="om_btn-initialize om_btn_air btn btn-block disabledbutton mt-4 mb-4">Initialize</button>
+            <button type="button" id="om_initializebtn" class="om_btn_air btn btn-block air_disabledbutton mt-4 mb-4">Analyze Data File</button>
             
-            <div class="disabledbutton" id="om_maintab" >
-                <ul class="nav nav-tabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active om_tab" id="om_regulation-tab" data-toggle="tab" href="#om_regulation" role="tab" aria-controls="om_regulation" aria-selected="true">Phenotype Estimation</a>
+            <div class="air_disabledbutton" id="om_maintab" >
+                <ul class="air_nav_tabs nav nav-tabs" role="tablist">
+                    <li class="air_nav_item nav-item" style="width: 50%;">
+                        <a class="air_tab air_tab_sub active nav-link" id="om_regulation-tab" data-toggle="tab" href="#om_regulation" role="tab" aria-controls="om_regulation" aria-selected="true">Phenotype Estimation</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link om_tab" id="om_target-tab" data-toggle="tab" href="#om_target" role="tab" aria-controls="om_target" aria-selected="false">Target Prediction</a>
+                    <li class="air_nav_item nav-item" style="width: 50%;">
+                        <a class="air_tab air_tab_sub nav-link" id="om_target-tab" data-toggle="tab" href="#om_target" role="tab" aria-controls="om_target" aria-selected="false">Key Regulator Prediction</a>
                     </li>
                 </ul>
-                <div class="disabledbutton tab-content" id="om_tab">
+                <div class="tab-content air_tab_content" id="om_tab">
 
                 </div>
             </div>
         `).appendTo('#airomics_tab_content');
         
-        globals.phenotab = $('<div class="tab-pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab"></div>').appendTo('#om_tab');
-        globals.targettab = $(`<div class="tab-pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
-        
-            <div class="row mt-4 mb-2">
+        globals.phenotab = $(`
+        <div class="tab-pane air_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
+            <div id="startcontainer"></div>
+            <div id="resultscontainer"></div>
+        </div>
+        `
+        ).appendTo('#om_tab');
+        globals.targettab = $(`<div class="tab-pane air_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
+            <div class="air_alert alert alert-warning mb-2">
+                <span>This requires more extensive calculations. We recommend having at least 1 GB of RAM available.</span>
+                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>  
+            <hr>
+            <div class="row mt-1 mb-1">
                 <div class="col-auto">
                     <div class="wrapper">
-                        <button type="button" class="om_btn_info btn btn-secondary"
-                                data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
-                                data-content="Transcriptomics data allows for more accurate results as shortest paths to elements pass through their transcriptional regulations.">
+                        <button type="button" class="air_btn_info btn btn-secondary"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
+                                data-content="Transcriptomics data allow more accurate results because information on transcription factors is included.<br/>For other data types this should definitely be deactivated.">
                             ?
                         </button>
                     </div>
                 </div>
                 <div class="col">
                     <div class="cbcontainer">
-                        <input type="checkbox" class="om_checkbox" id="om_transcriptomics" checked>
-                        <label class="om_checkbox" for="om_transcriptomics">Transcriptomics Data</label>
+                        <input type="checkbox" class="air_checkbox" id="om_transcriptomics">
+                        <label class="air_checkbox" for="om_transcriptomics">Transcriptomics Data</label>
                     </div>
                 </div>
             </div>    
-
-            <select id="om_select_mapping" class="browser-default om_select custom-select mb-2 mt-2">
+            <hr>
+            <label class="air_label mt-1">Sample:</label>
+            <select id="om_select_sample" class="browser-default om_select custom-select mb-1">
+            </select>
+            <hr>
+            <label class="air_label mt-1">Regulator Type Filter:</label>
+            <select id="om_select_mapping" class="browser-default om_select custom-select mb-1">
                 <option value="0" selected>All Elements</option>
                 <option value="1">Proteins</option>
                 <option value="2">miRNAs</option>
                 <option value="3">lncRNAs</option>
                 <option value="4">Transcription Factors</option>
             </select>
-            <select id="om_select_sample" class="browser-default om_select custom-select mb-2 mt-2">
-            </select>
-            <button type="button" id="om_btn_predicttarget" class="om_btn_air btn btn-block om_btn_predicttarget_class mt-4 mb-4">Start</button>
-            <canvas id="om_chart_target"></canvas>
-            <div class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Target</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Target</li>
-                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-            </div>
+            <hr>
+            <button type="button" id="om_btn_predicttarget" class="om_btn_air btn btn-block mt-1 mb-1">Predict Regulators</button>
+            <hr>
+            <canvas id="om_chart_target" style="display: none;"></canvas>
+            <div id="om_legend_target" style="display: none;"></div>
         </div>`).appendTo('#om_tab');
 
-        /*
-        $('#om_select_mapping').change(function() {
-            OM_PredictTargets();
-        });
-        $('#om_select_sample').change(function() {
-            OM_PredictTargets();
-        });*/
-
-
-        $(".dropdown-toggle").dropdown();
+        $('.air_btn_info[data-toggle="popover"]').popover()
         $('#om_inputId').on('change', function() {
             var fileToLoad = document.getElementById("om_inputId").files[0];
     
@@ -178,17 +194,17 @@ function AirOmics(){
                     return stopfile('Could not read Headers');                          
                 }
                                             
-                $("#om_mappingselect-container").removeClass("disabledbutton");
-                $("#om_columnSelect-container").removeClass("disabledbutton");
-                $("#om_initializebtn").removeClass("disabledbutton");
+                $("#om_mappingselect-container").removeClass("air_disabledbutton");
+                $("#om_columnSelect-container").removeClass("air_disabledbutton");
+                $("#om_initializebtn").removeClass("air_disabledbutton");
                 success = true;
 
                 function stopfile(alerttext)
                 {
                     alert(alerttext);
-                    $("#om_mappingselect-container").addClass("disabledbutton");
-                    $("#om_columnSelect-container").addClass("disabledbutton");
-                    $("#om_initializebtn").addClass("disabledbutton");
+                    $("#om_mappingselect-container").addClass("air_disabledbutton");
+                    $("#om_columnSelect-container").addClass("air_disabledbutton");
+                    $("#om_initializebtn").addClass("air_disabledbutton");
                     success = false;
                     return false;
                 }
@@ -200,139 +216,14 @@ function AirOmics(){
             globals.selectedmapping = this.value;
         });
 
-        globals.om_container.find('.om_btn_predicttarget_class').on('click', () => OM_PredictTargets());
-        globals.om_container.find('.om_btn-initialize').on('click', () => Start());
-
-        var outputCanvas = document.getElementById('om_chart_target').getContext('2d');
-
-        globals.om_targetchart = new Chart(outputCanvas, {
-            type: 'bubble',        
-            data: {
-                datasets: []
-            },
-            options: {
-                pan: {
-                    enabled: true,
-                    mode: 'x',
-                    speed: 1
-                },
-                zoom: {
-                    enabled: true,                      
-                    mode: 'x',
-                },
-                /*                          
-                plugins: {
-                    zoom: {
-                        pan: {
-                            enabled: true,
-                            mode: 'xy',
-                
-                            rangeMin: {
-                                x: null,
-                                y: null
-                            },
-                            rangeMax: {
-                                x: null,
-                                y: null
-                            },
-                            speed: 20,
-                            threshold: 10,
-                        },
-                        zoom: {
-                            enabled: true,
-                            drag: true,
-                            mode: 'xy',
-                
-                            rangeMin: {
-                                x: null,
-                                y: null
-                            },
-                            rangeMax: {
-                                x: null,
-                                y: null
-                            },
-                            speed: 0.1,
-                            threshold: 2,
-                            sensitivity: 3,
-                        }
-                    }
-                },*/
-                hover: {
-                    onHover: function(e) {
-                    var point = this.getElementAtEvent(e);
-                    if (point.length) e.target.style.cursor = 'pointer';
-                    else e.target.style.cursor = 'default';
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                layout: {
-                    padding: {
-                    top: 15
-                    }
-                },
-                title: {
-                    display: false,
-                    text: 'Predicted Targets',
-                    fontFamily: 'Helvetica',
-                    fontColor: '#6E6EC8',
-                    fontStyle: 'bold'
-                },
-                scales: {
-                    yAxes: [{
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Sensitivity'
-                        },
-                        ticks: {
-                            beginAtZero: true,
-                        }
-                    }],
-                    xAxes: [{
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Specificity'
-                        },
-                        ticks: {
-                            //beginAtZero: false,
-                        }
-                    }]
-                },
-                tooltips: {
-                    callbacks: {
-                        label: function (tooltipItem, data) {
-                            var label = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                            if (label) {
-                                label += ': ';
-                            }
-                            label += tooltipItem.xLabel;
-                            label += "; ";
-                            label += tooltipItem.yLabel;
-                            return label;
-                        }
-                    }
-                }
-            }
-            
+        $("#om_btn_predicttarget").on('click', function() {            
+            OM_PredictTargets();
+        });
+        $('#om_initializebtn').on('click', function() {
+            Start();
         });
 
-        document.getElementById('om_chart_target').onclick = function (evt) {
-
-            // => activePoints is an array of points on the canvas that are at the same position as the click event.
-            var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-
-            if (activePoint !== undefined) {
-                let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
-                selectElementonMap(name, true);
-                setSelectedElement(name);
-            }
-
-            // Calling update now animates element from oldValue to newValue.
-        };
-            
-        document.getElementById("om_stat_spinner").remove();
+        $("#om_stat_spinner").remove();
         
         let t1 = performance.now()
         console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
@@ -377,111 +268,102 @@ function download(filename) {
     document.body.removeChild(element);
 }
 
-function Start() {
+async function Start() {
     
-    globals.om_container.find('.om_btn-initialize')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-initialize')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-
-    $("#om_plugincontainer").addClass("disabledbutton");
+    let text = await disablebutton("om_initializebtn");
 
         loadfile().then(function (lf) {
             if (lf != "") {
               alert(lf);
-            }   
+            }               
+            alert(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes could be mapped.");
             readExpressionValues().then(function (re) {
                 normalizeExpressionValues().then(function (ne) {
+                    $("#resultscontainer").replaceWith('<div id="resultscontainer"></div>');
+                    $("#startcontainer").replaceWith(
+                        /*html*/`
+                        <div id="startcontainer">
+                            <div class="row mb-1">
+                                <div class="col-auto">
+                                    <div class="wrapper">
+                                        <button type="button" class="air_btn_info btn btn-secondary om_popover"
+                                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalization"
+                                                data-content="We recommend to normalize the results for each phenotype individually because different values between them cannot be directly associated to a different activity.<br/>However, If using absolute values, no normalization may be the best way to go.">
+                                            ?
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <select id="om_select_normalize" class="om_select browser-default custom-select mb-1 mt-1">
+                                        <option value="0">No normalization</option>
+                                        <option value="1" selected>Normalize each phenotype (recommended)</option>
+                                        <option value="2">Normalize each sample</option>
+                                    </select>
+                                </div>
+                            </div>
 
-                            alert(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes could be mapped.");
+                            <hr>
 
-                            if (globals.om_container.find('.resultscontainer').length > 0) {
+                            <div class="row mt-1 mb-1">
+                                <div class="col-auto">
+                                    <div class="wrapper">
+                                        <button type="button" class="air_btn_info btn btn-secondary"
+                                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                                data-content="If checked, the absolute value of fold change will be considered for the phenotype assessement.<br/>">
+                                            ?
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="cbcontainer">
+                                        <input type="checkbox" class="air_checkbox" id="om_checkbox_absolute">
+                                        <label class="air_checkbox" for="om_checkbox_absolute">Absolute effect?</label>
+                                    </div>
+                                </div>
+                            </div>
 
-                                var element = globals.om_container.find('.resultscontainer')[0];
-                                element.parentElement.removeChild(element);
+                            <hr>  
 
-                            }
+                            <button type="button" id="om_banalyzebtn" class="om_btn_air btn btn-block mt-2">Estimate Phenotype Levels</button>
 
-                            if (!(globals.om_container.find('.startcontainer').length > 0)) {
+                        </div>                                   
+                    `);
 
-                                globals.phenotab.append(
-                                    /*html*/`
-                                    <div class="startcontainer">
+                    $("#om_chart_target").replaceWith('<canvas id="om_chart_target" style="display: none;"></canvas>');
+                    $("#om_legend_target").replaceWith('<div id="om_legend_target" style="display: none;"></div>');
+                    $('.air_btn_info[data-toggle="popover"]').popover();
+                    $('#om_banalyzebtn').on('click', async function() {
+                        let text = await disablebutton("om_banalyzebtn");
+                        analyze().catch(function (error) {
+                            alert(error);
+                        }).finally(function (r) {
+                            enablebtn("om_banalyzebtn", text);
+                        });
+                    });
 
-                                        <hr>
-                                        <div class="row mt-1 mb-1">
-                                            <div class="col-auto">
-                                                <div class="wrapper">
-                                                    <button type="button" class="om_btn_info btn btn-secondary om_popover"
-                                                            data-html="true" data-toggle="popover" data-placement="top" title="Normalization"
-                                                            data-content="We recommend to normalize the results for each phenotype individually because different values between them cannot be directly associated to a different activity.<br/>However, If using absolute values, no normalization may be the best way to go.">
-                                                        ?
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="col">
-                                                <select id="om_select_normalize" class="om_select browser-default om_select custom-select mb-1 mt-1">
-                                                    <option value="0">No normalization</option>
-                                                    <option value="1" selected>Normalize each phenotype (recommended)</option>
-                                                    <option value="2">Normalize each sample</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                    let sampleSelect = document.getElementById('om_select_sample');
 
-                                        <hr>
+                    for (let i = sampleSelect.options.length-1; i >= 0; i--) {
+                        sampleSelect.options[i] = null;
+                    };
 
-                                        <div class="row mt-1 mb-1">
-                                            <div class="col-auto">
-                                                <div class="wrapper">
-                                                    <button type="button" class="om_btn_info btn btn-secondary"
-                                                            data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
-                                                            data-content="If checked, the absolute value of fold change will be considered for the phenotype assessement.<br/>">
-                                                        ?
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="col">
-                                                <div class="cbcontainer">
-                                                    <input type="checkbox" class="om_checkbox" id="om_checkbox_absolute">
-                                                    <label class="om_checkbox" for="om_checkbox_absolute">Absolute effect?</label>
-                                                </div>
-                                            </div>
-                                        </div>
+                    for(let i = 0; i < globals.samples.length; i++) {
+                        sampleSelect.options[sampleSelect.options.length] = new Option(globals.samples[i], i); 
+                    };
 
-                                        <hr>  
-
-                                        <button type="button" id="om_banalyzebtn" class="om_btn-file om_btn_air btn btn-block mt-2">Analyze</button>
-
-                                    </div>                                   
-                                `);
-
-                                $('#example').tooltip();
-                                $('[data-toggle="popover"]').popover()
-                                $(".dropdown-toggle").dropdown();
-
-                                globals.om_container.find('.om_btn-file').on('click', () => readUserFile());
-                            }
-
-                            let sampleSelect = document.getElementById('om_select_sample');
-
-                            for (let i = sampleSelect.options.length-1; i >= 0; i--) {
-                                sampleSelect.options[i] = null;
-                            };
-
-                            for(let i = 0; i < globals.samples.length; i++) {
-                                sampleSelect.options[sampleSelect.options.length] = new Option(globals.samples[i], i); 
-                            };
-
-                            globals.Targets = {};
-                            globals.targetsanalyzed = false;
-                            enablebtn();
+                    globals.Targets = {};
+                    globals.targetsanalyzed = false;
+                    enablebtn("om_initializebtn", text);
+                    $("#om_maintab").removeClass("air_disabledbutton");
 
                 }).catch(function (error) {
                     alert('Failed to normalize the expression values.');
-                    enablebtn();
+                    enablebtn("om_initializebtn", text);
                 });
 
             }).catch(function (error) {
                 alert('Failed to calculate complex expression values.');
-                enablebtn();
+                enablebtn("om_initializebtn", text);
             });
             
         }).catch(function (error) {
@@ -490,19 +372,8 @@ function Start() {
             } else {
                 alert('Could not read the file.');
             }
-            enablebtn();
+            enablebtn("om_initializebtn", text);
         });
-
-    function enablebtn() {
-        var btn = document.getElementById("om_initializebtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Initialize';
-
-        $("#om_plugincontainer").removeClass("disabledbutton");
-        $("#om_tab").removeClass("disabledbutton");
-        $("#om_maintab").removeClass("disabledbutton");
-    }
 }
 
 $(document).on('click', '.clickPhenotypeinTable', function () {
@@ -588,43 +459,63 @@ function createTable() {
     
     return new Promise((resolve, reject) => {
 
+        
+    $("#resultscontainer").replaceWith(
+        /*html*/`
+        <div id="resultscontainer">
+            <hr>
+            <div class="row mb-3">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-content="Include values of the user data file in the overlays and color mapped nodes in the network.<br/>This may decrease the performance significantly">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="checkbox_submap">
+                        <label class="air_checkbox" for="checkbox_submap">Include values from the datafile?</label>
+                    </div>
+                </div>
+            </div>
 
-    if (document.getElementById('om_resultstable')) {
+            <button type="button" id="om_addoverlaybtn"  class="om_btn_air btn btn-block mb-2 mt-2">Create Overlays</button>
 
-        $('#om_resultstable').DataTable().destroy();
+            <button type="button" id="om_showonmapbtn"  class="om_btn_air btn btn-block mb-2">Show On Phenotype Submap</button>
+
+            <div class="btn-group btn-group-justified">
+                <div class="btn-group">
+                    <button type="button" id="om_showoverlaybtn" class="om_btn_air btn mr-1">Show Overlays</button>
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="om_hideoverlaybtn" class="om_btn_air btn ml-1">Hide Overlays</button>
+                </div>
+            </div>
+            <button type="button" id="om_removeoverlaybtn"  class="om_btn_air btn btn-block mb-2 mt-2">Remove Overlays</button>
+
+            <hr>
+
+            <button type="button" id="om_addimagebtn"  class="btn-image om_btn_air btn btn-block mb-2 mt-2">Generate Image</button>
+
+            <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+
+            <hr>
+
+            <button id="om_btn_download" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+
+            <table class="air_table order-column hover" style="width:100%" id="om_resultstable" cellspacing=0></table>
+            <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
+            <div id="om_legend" class="chart-legend"></div>
+        </div>
+    `);
 
 
-        var table = document.getElementById('om_resultstable');
-
-        table.parentElement.removeChild(table);
-    }
-    
     globals.pickedcolors = [];
 
-    if (document.getElementById('om_plevelchart')) {
-
-        var chrt = document.getElementById('om_plevelchart');
-
-        chrt.parentElement.removeChild(chrt);
-
-    }
-    if (globals.om_container.find('.resultscontainer').length > 0) {
-
-        var element = globals.om_container.find('.resultscontainer')[0];
-        element.parentElement.removeChild(element);
-
-    }
-
-    if (pluginContainer.find('.panel-results .panel-body').length > 0)
-        pluginContainer.find('.panel-results .panel-body').html('');
-
-    var tbl = document.createElement("table")
-
-    tbl.setAttribute('class', 'order-column hover');
-    tbl.setAttribute('style', 'width:100%');
-    tbl.setAttribute('id', 'om_resultstable');
-    tbl.setAttribute('cellspacing', '0');
-
+    var tbl = document.getElementById('om_resultstable');
 
     for (let phenotype in AIR.Phenotypes)
     {
@@ -655,79 +546,101 @@ function createTable() {
         createCell(headerrow, 'th', globals.samples[sample], 'col-3', 'col', 'center');
     }
 
-    var $acc_cell = $(createCell(headerrow, 'th', 'avg Accuracy (%)', 'col-3', 'col', 'center'));
+    var $acc_cell = $(createCell(headerrow, 'th', 'Accuracy (%)', 'col-3', 'col', 'center'));
     $acc_cell.attr("title", "Accuracy represents the percentage of regulating elements (in proportion to their influence), for which a value was supplied by the data.");
     $acc_cell.attr("data-toggle", "tooltip");
     $acc_cell.tooltip();
 
 
-    if (!(globals.om_container.find('.resultscontainer').length > 0)) {
+    $('#om_showoverlaybtn').on('click', async function() {
+        let text = await disablebutton('om_showoverlaybtn');
+        showOverlays(globals.samplesResults).finally(rs => {
+            enablebtn('om_showoverlaybtn',text);    
+        })
+    });
+    $('#om_hideoverlaybtn').on('click', async function() {
+        let text = await disablebutton('om_hideoverlaybtn');
+        hideOverlays(globals.samplesResults).finally(rs => {
+            enablebtn('om_hideoverlaybtn',text); 
+        }) 
+    });
+    $('#om_showonmapbtn').on('click', async function() {
+        let text = await disablebutton('om_showonmapbtn');
+        hideOverlays([], true).then(r => {
+            showOverlays(globals.samplesResults).then(s => {
+                minervaProxy.project.map.openMap({ id: globals.phenotypeMapID });
+                setTimeout(
+                    enablebtn('om_showonmapbtn',text)
+                    , 1000);
+            }).catch(error => enablebtn('om_showonmapbtn',text));
+        }).catch(error => enablebtn('om_showonmapbtn',text));
+    });
+    $('#om_addimagebtn').on('click', async  function() {
+        let text = await disablebutton('om_addimagebtn');
+        getImageSource().then(imglink => {
+
+            $("#om_img_container").html(`
+            <!-- Trigger the Modal -->
+            <img id="om_resultsimg" class="air_image" src="${imglink}" alt="Phenotype Results" style="width:100%">
+    
+            <!-- The Modal -->
+            <div id="om_om_resultsimg-modal" class="air_modal">
+    
+            <!-- The Close Button -->
+            <span id="om_img_close" class="air_close_white">&times;</span>
+    
+            <!-- Modal Content (The Image) -->
+            <img class="air_modal_content" id="om_img">
+    
+            <!-- Modal Caption (Image Text) -->
+            <div id="om_img-caption" class="air_img_caption"></div>
+            </div>`);
+
+            // Get the modal
+            var modal = document.getElementById("om_om_resultsimg-modal");
+    
+            // Get the image and insert it inside the modal - use its "alt" text as a caption
+            var img = document.getElementById("om_resultsimg");
+            var modalImg = document.getElementById("om_img");
+            var captionText = document.getElementById("om_img-caption");
+            img.onclick = function(){
+                modal.style.display = "block";
+                modalImg.src = this.src;
+                captionText.innerHTML = this.alt;
+            }
+    
+            // Get the <span> element that closes the modal
+            var span = document.getElementById("om_img_close");
+    
+            // When the user clicks on <span> (x), close the modal
+            span.onclick = function() {
+                modal.style.display = "none";
+            }
+            
+        }).catch(error => alert(error)).finally(r => {
+            enablebtn('om_addimagebtn',text);
+        });
+    });
+    $('#om_addoverlaybtn').on('click', async function() {
+        let text = await disablebutton('om_addoverlaybtn');
+        AddOverlaysPromise(globals.samplesResults).finally(ao => {
+            $('.minerva-overlay-tab-link').click();
+            enablebtn('om_addoverlaybtn',text);
+        });
+    });
+    $('#om_removeoverlaybtn').on('click', async function() {
+        let text = await disablebutton('om_removeoverlaybtn');
+        removeOverlays(globals.samplesResults).finally(r => {
+            enablebtn('om_removeoverlaybtn',text); 
+        });
+    });
 
 
-        globals.phenotab.append(
-            /*html*/`
-            <div class="resultscontainer">
-                <hr>
-                <div class="row mb-3">
-                    <div class="col-auto">
-                        <div class="wrapper">
-                            <button type="button" class="om_btn_info btn btn-secondary mb-4 ml-1"
-                                    data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
-                                    data-content="Include values of the user data file in the overlays and color mapped nodes in the network.<br/>This may decrease the performance significantly">
-                                ?
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="cbcontainer">
-                            <input type="checkbox" class="om_checkbox" id="checkbox_submap">
-                            <label class="om_checkbox" for="checkbox_submap">Include values from the datafile?</label>
-                        </div>
-                    </div>
-                </div>
+    $('.air_btn_info[data-toggle="popover"]').popover()
+    $('#om_btn_download').on('click', function() {
+        download('PhenotypeActivity.txt')
+    });
 
-                <button type="button" id="om_addoverlaybtn"  class="om_btn-add om_btn_air btn btn-block mb-2 mt-2">Create Overlays</button>
-
-                <button type="button" id="om_showonmapbtn"  class="om_btn-map om_btn_air btn btn-block mb-2">Show On Map</button>
-
-                <div class="btn-group btn-group-justified">
-                    <div class="btn-group">
-                        <button type="button" id="om_showoverlaybtn" class="om_btn-showoverlay om_btn_air btn mr-1">Show Overlays</button>
-                    </div>
-                    <div class="btn-group">
-                        <button type="button" id="om_hideoverlaybtn" class="om_btn-hideoverlay om_btn_air btn ml-1">Hide Overlays</button>
-                    </div>
-                </div>
-                <button type="button" id="om_removeoverlaybtn"  class="om_btn-delete om_btn_air btn btn-block mb-2 mt-2">Remove Overlays</button>
-
-                <hr>
-
-                <button type="button" id="om_addimagebtn"  class="btn-image om_btn_air btn btn-block mb-2 mt-2">Generate Image</button>
-
-                <div class="image-container mb-2" style="width: 100%; margin: 0 auto"></div>
-
-                <hr>
-
-                <button class="btn-download btn mt-2 mb-2" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
-            </div>
-        `);
-
-        globals.om_container.find('.om_btn-showoverlay').on('click', () => showOverlaysClick());
-        globals.om_container.find('.om_btn-hideoverlay').on('click', () => hideOverlaysClick());
-        globals.om_container.find('.om_btn-map').on('click', () => showResultsOnMap());
-        globals.om_container.find('.btn-image').on('click', () => showpicture());
-        globals.om_container.find('.om_btn-add').on('click', () => AddOverlays());
-        globals.om_container.find('.om_btn-delete').on('click', () => removeOverlays());
-
-
-        $('[data-toggle="popover"]').popover()
-        globals.om_container.find('.btn-download').on('click', () => download('PhenotypeActivity.txt'));
-    }
-    globals.resultscontainer = globals.om_container.find('.resultscontainer')[0];
-
-    globals.resultscontainer.appendChild(tbl);
-
-    globals.resultscontainer.insertAdjacentHTML('beforeend', '<canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>');
 
     //var colorschemes = require('chartjs-plugin-colorschemes');
     var outputCanvas = document.getElementById('om_plevelchart').getContext('2d');
@@ -817,7 +730,6 @@ function createTable() {
     }
 
     globals.plevelchart = new Chart(outputCanvas, globals.plevelchart_config);
-    globals.resultscontainer.insertAdjacentHTML('beforeend', '<div id="om_legend" class="chart-legend"></div>');
 
     /*
     $("#om_legend > ul > li").on("click", function (e) {
@@ -837,62 +749,6 @@ function createTable() {
 
     resolve(' ');
 });
-}
-
-function showpicture() {
-
-    globals.om_container.find('.btn-image')[0].innerHTML = '';
-    globals.om_container.find('.btn-image')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-    $("#om_plugincontainer").addClass("disabledbutton");
-
-    getImageSource().then(imglink => {
-        globals.om_container.find('.image-container')[0].innerHTML = '';
-        globals.om_container.find('.image-container')[0].insertAdjacentHTML('beforeend', `
-        <!-- Trigger the Modal -->
-        <img id="om_resultsimg" src="${imglink}" alt="Phenotype Results" style="width:100%">
-
-        <!-- The Modal -->
-        <div id="om_om_resultsimg-modal" class="modal">
-
-        <!-- The Close Button -->
-        <span class="close">&times;</span>
-
-        <!-- Modal Content (The Image) -->
-        <img class="modal-content" id="om_img">
-
-        <!-- Modal Caption (Image Text) -->
-        <div id="om_img-caption"></div>
-        </div>`);
-        
-        
-        // Get the modal
-        var modal = document.getElementById("om_om_resultsimg-modal");
-
-        // Get the image and insert it inside the modal - use its "alt" text as a caption
-        var img = document.getElementById("om_resultsimg");
-        var modalImg = document.getElementById("om_img");
-        var captionText = document.getElementById("om_img-caption");
-        img.onclick = function(){
-            modal.style.display = "block";
-            modalImg.src = this.src;
-            captionText.innerHTML = this.alt;
-        }
-
-        // Get the <span> element that closes the modal
-        var span = document.getElementsByClassName("close")[0];
-
-        // When the user clicks on <span> (x), close the modal
-        span.onclick = function() {
-            modal.style.display = "none";
-        }
-        
-    }).catch(error => alert(error)).finally(r => {
-        var btn = document.getElementById("om_addimagebtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Generate Image';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-    });
 }
 
 function getImageSource() {
@@ -1010,46 +866,23 @@ function PhenotypeSP() {
     });
 }
 
-function AddOverlays() {
-    if(loggedin() === false)
-    {
-        return;
-    }
-
-    globals.om_container.find('.om_btn-add')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-add')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-    $("#om_plugincontainer").addClass("disabledbutton");
-
-
-    AddOverlaysPromise().then(r => {
-        $("[name='refreshOverlays']").click();
-    }).finally(r => {
-        var btn = document.getElementById("om_addoverlaybtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Create Overlays';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-    });
-
-}
-
-function AddOverlaysPromise() {
+function AddOverlaysPromise(samples = globals.samples) {
     return new Promise((resolve, reject) => {
         function ajaxPostQuery(count) {
             return new Promise((resolve, reject) => {
-                if (count < globals.numberofSamples) {
+                if (count <= samples.length) {
                     $.ajax({
                         method: 'POST',
                         url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-                        data: `content=name%09color${contentString(count)}&description=PhenotypeActivity&filename=${globals.samplesResults[count]}.txt&name=${globals.samplesResults[count]}&googleLicenseConsent=true`,
+                        data: `content=name%09color${contentString(count)}&description=PhenotypeActivity&filename=${samples[count - 1]}.txt&name=${samples[count - 1]}&googleLicenseConsent=true`,
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
                             ajaxPostQuery(count + 1).then(r =>
-                                resolve(response)).catch(error => { reject(error);});;
+                                resolve(response));
                         },
                         error: (response) => {
-                            reject(response);
+                            reject();
                         }
                     })
                 }
@@ -1058,53 +891,17 @@ function AddOverlaysPromise() {
                 }
             });
         }
-        ajaxPostQuery(0).then(pr => {
-            resolve('');
+        ajaxPostQuery(1).then(pr => {
             $("[name='refreshOverlays']").click();
-
-        }).catch(error => { reject(error);});
+            setTimeout(() => {
+                resolve('');
+            }, 400);
+        }).catch(error => {
+            reject('');
+        })
     });
 }
 
-function showResultsOnMap() {
-
-    globals.om_container.find('.om_btn-map')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-map')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-    $("#om_plugincontainer").addClass("disabledbutton");
-
-    function enablebtn() {
-        var btn = document.getElementById("om_showonmapbtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Show On Map';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-    }
-
-    hideOverlays(true).then(r => {
-        showOverlays(false).then(s => {
-            minervaProxy.project.map.openMap({ id: globals.phenotypeMapID });
-            setTimeout(
-                enablebtn()
-                , 1000);
-        }).catch(error => enablebtn());
-    }).catch(error => enablebtn());
-}
-
-function readUserFile() {
-    globals.om_container.find('.om_btn-file')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-file')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-    $("#om_plugincontainer").addClass("disabledbutton");
-    setTimeout(function () {
-      analyze().catch(function (error) {
-        alert(error);
-      }).finally(function (r) {
-        var btn = document.getElementById("om_banalyzebtn");
-        if (btn.childNodes.length > 0) btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Analyze';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-      });
-    }, 200);
-  }
   
 function analyze() {
   return new Promise(function (resolve, reject) {    
@@ -1143,7 +940,6 @@ function loadfile() {
             globals.samplesResults = [];
             globals.ExpressionValues = {};
             globals.numberofuserprobes = 0;
-            globals.om_targetchart.data.datasets = [];
             
             var datamapped = false;
             var textFromFileLoaded = fileLoadedEvent.target.result;
@@ -1330,45 +1126,24 @@ function contentString(ID) {
     return output;
 }
 
-function removeOverlays() {
-
-    if(loggedin() === false)
-    {
-        return;
-    }
-
-    globals.om_container.find('.om_btn-delete')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-delete')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-
-    $("#om_plugincontainer").addClass("disabledbutton");
-       
-    function enablebtn() {
-        var btn = document.getElementById("om_removeoverlaybtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Remove Overlays';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-    }
-
-    removeOverlaysPromise().then(r => {
-        $("[name='refreshOverlays']").click();
-        enablebtn();
-    }).catch(error => {
-        alert('Failed to remove overlays')
-        enablebtn();
-    });
-
-}
-
-function getDataOverlays(overlays, legend) {
+function getDataOverlays(samples, all = false) {
     return new Promise((resolve, reject) => {
-        let olarray = [];
-        for (let olCount = 0; olCount < overlays.length; olCount++) {
-            if (globals.samplesResults.includes(overlays[olCount].name) === true || (legend === true && overlays[olCount].name == "OverlayLegend")) {
-                olarray.push(overlays[olCount])
-            }
+        var overlays = minervaProxy.project.data.getDataOverlays();
+
+        if(all)
+        {
+            resolve(overlays);
         }
-        resolve(olarray);
+        else
+        {
+            let olarray = [];
+            for (let olCount = 0; olCount < overlays.length; olCount++) {
+                if (samples.includes(overlays[olCount].name) === true) {
+                    olarray.push(overlays[olCount])
+                }
+            }
+            resolve(olarray);
+        }
     });
 }
 
@@ -1384,28 +1159,7 @@ function getOverlaysStrings() {
     return output;
 }
 
-function hideOverlaysClick() {
-
-    globals.om_container.find('.om_btn-hideoverlay')[0].innerHTML = '';
-    globals.om_container.find('.om_btn-hideoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-
-    $("#om_plugincontainer").addClass("disabledbutton");
-       
-    function enablebtn() {
-        var btn = document.getElementById("om_hideoverlaybtn");
-        if (btn.childNodes.length > 0)
-            btn.removeChild(btn.childNodes[0]);
-        btn.innerHTML = 'Hide Overlays';
-        $("#om_plugincontainer").removeClass("disabledbutton");
-    }
-
-    hideOverlays(false).then(rs => {
-        enablebtn();
-    }).catch(error => enablebtn());
-
-}
-
-function hideOverlays(all) {
+function hideOverlays(samples = [], all = false) {
     return new Promise((resolve, reject) => {
         var overlays = minervaProxy.project.data.getDataOverlays();
         function hideOverlay(ols) {
@@ -1423,10 +1177,12 @@ function hideOverlays(all) {
                 }
             });
         }
-        getDataOverlays(overlays, false).then(ol => {
-            hideOverlay(all ? overlays : ol).then(rs => {
+        getDataOverlays(samples, all).then(ol => {
+            hideOverlay(ol).then(rs => {
                 $("[name='refreshOverlays']").click();
-                resolve('');
+                setTimeout(() => {
+                    resolve('');
+                }, 400);
             });
         });
     });
@@ -1438,22 +1194,21 @@ function showOverlaysClick() {
     globals.om_container.find('.om_btn-showoverlay')[0].innerHTML = '';
     globals.om_container.find('.om_btn-showoverlay')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
-    $("#om_plugincontainer").addClass("disabledbutton");
+    $("#airomics_tab_content").addClass("air_disabledbutton");
     function enablebtn() {
         var btn = document.getElementById("om_showoverlaybtn");
         if (btn.childNodes.length > 0)
             btn.removeChild(btn.childNodes[0]);
         btn.innerHTML = 'Show Overlays';
-        $("#om_plugincontainer").removeClass("disabledbutton");
+        $("#airomics_tab_content").removeClass("air_disabledbutton");
     }
     showOverlays(false).finally(rs => {
         enablebtn();    
     })
 }
 
-function showOverlays(all) {
+function showOverlays(samples) {
     return new Promise((resolve, reject) => {
-       var overlays = minervaProxy.project.data.getDataOverlays();
         function showOverlay(ols) {
             return new Promise((resolve, reject) => {
                 if (ols.length > 0) {
@@ -1470,18 +1225,19 @@ function showOverlays(all) {
             });
         }
 
-        getDataOverlays(overlays, true).then(ol => {
-            showOverlay(all ? overlays : ol).then(rs => {
+        getDataOverlays(samples).then(ol => {
+            showOverlay(ol).then(rs => {
                 $("[name='refreshOverlays']").click();
-                resolve('');
+                setTimeout(() => {
+                    resolve('');
+                }, 400);
             });
         });
     });
 }
 
-function removeOverlaysPromise() {
+function removeOverlays(samples) {
     return new Promise((resolve, reject) => {
-        var overlays = minervaProxy.project.data.getDataOverlays();
         function ajaxDeleteQuery(count) {
             return new Promise((resolve, reject) => {
                 if (count.length > 0) {
@@ -1502,12 +1258,14 @@ function removeOverlaysPromise() {
             });
         }
 
-        hideOverlays(false).then(rs => {
+        hideOverlays(samples = samples).then(rs => {
             setTimeout(
-                getDataOverlays(overlays, false).then(ols => {
+                getDataOverlays(samples).then(ols => {
                     ajaxDeleteQuery(ols).then(dr => {
-                        $("[name='refreshOverlays']").click();
-                        resolve('');
+                        $("[name='refreshOverlays']").click();            
+                        setTimeout(() => {
+                            resolve('');
+                        }, 400);
                         //Overlay POST function
                     });
                 }), 200);
@@ -1515,6 +1273,7 @@ function removeOverlaysPromise() {
         });
     });
 }
+
 
 function readExpressionValues() {
 
@@ -1580,7 +1339,7 @@ function readExpressionValues() {
 
 function normalizeExpressionValues() {
     return new Promise((resolve, reject) => {
-        let typevalue = $('.om_select').val();
+        let typevalue = $('#om_select_normalize').val();
 
         let allmax = 0.0;
         let alreadyincluded = [];
@@ -1641,7 +1400,7 @@ function normalizeExpressionValues() {
 
 function normalizePhenotypeValues() {
     return new Promise((resolve, reject) => {
-        let typevalue = $('.om_select').val();
+        let typevalue = $('#om_select_normalize').val();
 
         let allmax = 0.0;
         let alreadyincluded = [];
@@ -1699,37 +1458,168 @@ function normalizePhenotypeValues() {
     });
 }
 
-function OM_PredictTargets() {
+async function OM_PredictTargets() {
 
-    globals.om_container.find('.om_btn_predicttarget_class')[0].innerHTML = '';
-    globals.om_container.find('.om_btn_predicttarget_class')[0].insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 
     /*
     var btn = document.getElementById('om_btn_predicttarget');
     btn.innerHTML = '';
     btn.insertAdjacentHTML('beforeend', '<span class="loadingspinner spinner-border spinner-border-sm"></span>');
 */
-    $("#om_plugincontainer").addClass("disabledbutton");
+    $("#om_btn_predicttarget").empty().append($(`
+        <div class="air_progress position-relative">
+            <div id="om_progress" id="myBar" class="air_progress_value"></div>
+            <span id="om_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
+        </div>  
+    `));
     
-    setTimeout(function(){
-        calculateTargets().finally(r => {       
-            //btn.innerHTML = 'Start';
-            globals.om_container.find('.om_btn_predicttarget_class')[0].innerHTML = 'Start';
-            $("#om_plugincontainer").removeClass("disabledbutton");
-        });
-    }, 10);
+    $("#airomics_tab_content").addClass("air_disabledbutton");
+    $("#om_progress").attr("aria-valuemax", Object.keys(AIR.Molecules).length);
+    $("#om_chart_target").replaceWith('<canvas id="om_chart_target"></canvas>');
+          
+
+    document.getElementById('om_chart_target').onclick = function (evt) {
+
+        if(globals.om_targetchart)
+        {
+            // => activePoints is an array of points on the canvas that are at the same position as the click event.
+            var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
+
+            if (activePoint !== undefined) {
+                let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                selectElementonMap(name, true);
+                xp_setSelectedElement(name);
+            }
+        }
+        // Calling update now animates element from oldValue to newValue.
+    };
+
+    await calculateTargets();
+    setTimeout(() => {
+        globals.om_targetchart.update();
+    }, 200);
 }
 
+async function updateProgress(value, max) {
+    return new Promise(resolve => {
+        setTimeout(function(){
+            let percentage = Math.round(value * 100 / max);
+            $("#om_progress").width(percentage + "%");
+            $("#om_progress_label").html(percentage + " %");
+            resolve('');
+        }, 0);
+    });
+  }
 
-function calculateTargets() {
-    return new Promise(
-        (resolve, reject) => {
-        var targets = [];
+async function calculateTargets() {
+
+    var outputCanvas = document.getElementById('om_chart_target');
+
+    var chartOptions = {
+        onAnimationComplete: function() {
+            globals.om_targetchart.update();
+        },
+        type: 'bubble',        
+        data: {
+            datasets: [],
+        },
+        options: {
+            hover: {
+                onHover: function(e) {
+                var point = this.getElementAtEvent(e);
+                if (point.length) e.target.style.cursor = 'pointer';
+                else e.target.style.cursor = 'default';
+                }
+            },
+            legend: {
+                display: false
+            },
+            layout: {
+                padding: {
+                top: 15
+                }
+            },
+            title: {
+                display: false,
+                text: 'Predicted Targets',
+                fontFamily: 'Helvetica',
+                fontColor: '#6E6EC8',
+                fontStyle: 'bold'
+            },
+            scales: {
+                yAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Sensitivity'
+                    },
+                    ticks: {
+                        beginAtZero: true,
+                    }
+                }],
+                xAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Specificity'
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var label = data.datasets[tooltipItem.datasetIndex].label || '';
+
+                        if (label) {
+                            label += ': ';
+                        }
+                        label += tooltipItem.xLabel;
+                        label += "; ";
+                        label += tooltipItem.yLabel;
+                        return label;
+                    }
+                }
+            }
+        }
+        
+    }; 
+
+    globals.om_targetchart = new Chart(outputCanvas, chartOptions);
+
+    let targetdata = await dataset();
+    globals.om_targetchart.data.datasets = targetdata;
+
+    
+    $("#om_legend_target").replaceWith(
+        `<div id="om_legend_target" class="d-flex justify-content-center mt-2">
+            <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+            <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
+            <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+        </div>`);
+    $("#om_progress").hide();
+    $("#om_btn_predicttarget").html('Predict Regulators');
+    $("#airomics_tab_content").removeClass("air_disabledbutton");
+
+    async function dataset()
+    {
+
+        targets = [];
+
         var promises = [];
         let transcriptomics = document.getElementById("om_transcriptomics").checked;
-
+        let molLength = Object.keys(AIR.Molecules).length;
+        let iterations = molLength;
+        let count = 0;
+        
         for (let e in AIR.Molecules) {
 
+            if((++count) % 70 == 0)
+            {
+                await updateProgress(count, molLength);
+            }
+
+            let last = !--iterations;
             let {name:_name, type:_type, phenotypes:_sp} = AIR.Molecules[e];
 
             if (_type.toLowerCase() === "phenotype") {
@@ -1760,13 +1650,7 @@ function calculateTargets() {
                 
             let sample = $('#om_select_sample').val();  
 
-            if(globals.Targets.hasOwnProperty(e) && globals.Targets[e].hasOwnProperty(sample))
-            {
-                targets.push(globals.Targets[e][sample]);
-            }
-            else
-            {
-                promises.push(
+            promises.push(
                 getMoleculeData(e).then(data => new function() {
 
                     let positiveSum = 0;
@@ -1775,7 +1659,7 @@ function calculateTargets() {
 
                     let negativeSum = 0;
                     let negativeCount = 0;
-         
+            
                     for (let p in globals.ExpressionValues) 
                     {
                         let value = globals.ExpressionValues[p].nonnormalized[sample];
@@ -1867,22 +1751,19 @@ function calculateTargets() {
                         pointStyle: pstyle,
                     }
                     targets.push(result);
-                    /*
-                    if(globals.Targets.hasOwnProperty(e) == false)
-                    {
-                        globals.Targets[e] = {};
-                    }
-                    globals.Targets[e][sample] = result;*/
-                }));
+                })
+            );
+
+            if (last || promises.length >= 50)
+            {
+                await Promise.allSettled(promises).catch(e => {
+                    console.log(e);
+                }).finally(r => {
+                    promises = [];
+                });
             }
         }
 
-        Promise.all(promises).catch(e => {
-                console.log(e);
-            }).finally(r => {
-                globals.om_targetchart.data.datasets = targets;
-                globals.om_targetchart.update(); 
-                resolve('');
-            });
-    });
+        return targets;
+    }
 }
