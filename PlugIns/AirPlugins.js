@@ -4,7 +4,6 @@ var Chart = require('chart.js');
 const pluginName = 'AirPlugins';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
-let testing = false;
 let filetesting = false;
 let ScriptPaths = [];
 let CssFiles = [];
@@ -43,10 +42,8 @@ const register = function (_minerva) {
 
 const unregister = function () {
   console.log('unregistering ' + pluginName + ' plugin');
+  removeScripts();
   unregisterListeners();
-  $('[data-toggle="popover"]').each(function () {
-    $(this).popover('dispose');
-  });
   return deHighlightAll();
 };
 
@@ -70,6 +67,7 @@ minervaDefine(function () {
 });
 
 function initPlugin() {
+  registerListeners();
   initMainPageStructure();
 }
 
@@ -77,13 +75,20 @@ function unregisterListeners() {
   minervaProxy.project.map.removeAllListeners();
 }
 
+function registerListeners() {}
+
 function deHighlightAll() {
   return minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => minervaProxy.project.map.hideBioEntity(highlighted));
 }
 
+function removeScripts() {
+  $(document).find('link[href^="http"]').remove();
+  $(document).find('script[src^="http"]').remove();
+}
+
 function initMainPageStructure() {
   if (filetesting) {
-    let filepath = "http://localhost:3000/SBI_Minerva_Release/AIR/PlugIns/";
+    let filepath = "http://localhost:3000/PlugIns/";
     CssFiles = [filepath + "AirOmicsStyle.css", filepath + "AirXploreStyle.css"];
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   } else {
@@ -92,30 +97,47 @@ function initMainPageStructure() {
     ScriptPaths = [filepath + "fetchdata.js", filepath + "AirXplore.js", filepath + "AirOmics.js"];
   }
 
-  let container = $('<div class="' + pluginName + '-container" id="re_plugincontainer"></div>').appendTo(pluginContainer);
-  $(`<div id="stat-spinner" style="cursor: wait; height:400px; display: flex; align-items: center;" class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
-        </div>`).appendTo(container);
+  CssFiles.forEach(s => {
+    $("<link/>", {
+      rel: "stylesheet",
+      type: "text/css",
+      href: s
+    }).appendTo("head");
+  });
+  CssFiles.forEach(s => {
+    $("<link/>", {
+      rel: "stylesheet",
+      type: "text/css",
+      href: "http://ebi-uniprot.github.io/CDN/protvista/css/main.css"
+    }).appendTo("head");
+  });
+  let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(pluginContainer);
+  $(`<div id="stat_spinner" class="mt-5">
+        <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only"></span>
+                    </div>
+        </div>
+        <div class="d-flex justify-content-center mt-2">
+            <span id="air_loading_text">LOADING ...</span>
+        </div>
+    </div>`).appendTo(container);
   container.append(
   /*html*/
   `
 
-    <ul class="nav nav-tabs air_nav_tabs mt-2" id="Air_Tab" role="tablist" hidden>
-        <li class="nav-item air_nav_item">
-            <a class="nav-link active air_tab" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
+    <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
+        <li class="air_nav_item nav-item"  style="width: 50%;">
+            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
         </li>
-        <li class="nav-item air_nav_item">
-            <a class="nav-link air_tab" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
+        <li class="air_nav_item nav-item" style="width: 50%;">
+            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
         </li>
     </ul>
-    <div class="tab-content air_tab_content" id="air_tab">
-        <div class="tab-pane air_tab_item show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
-
+    <div class="tab-content" id="air_tab">
+        <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
         </div>
-        <div class="tab-pane air_tab_item" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
-
+        <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
         </div>
     </div>
 
@@ -135,26 +157,27 @@ function initMainPageStructure() {
     return deferred.promise();
   }
 
-  $.getScript(ScriptPaths[0]).done(function () {
-    readDataFiles(minervaProxy, Chart, testing, filetesting).finally(data => {
-      $.getScript(ScriptPaths[1]).done(function () {
-        AirXplore();
-        $.getScript(ScriptPaths[2]).done(function () {
-          AirOmics();
+  setTimeout(() => {
+    $.getScript(ScriptPaths[0]).done(function () {
+      readDataFiles(minervaProxy, Chart, filetesting).finally(data => {
+        $.getScript("http://ebi-uniprot.github.io/CDN/protvista/protvista.js").done(function () {
+          $('#air_loading_text').html('Loading ProtVista ...');
+          console.log("ProtVista loaded.");
+          document.getElementById("stat_spinner").remove();
+          let p = document.getElementById('Air_Tab');
+          p.removeAttribute("hidden");
+          setTimeout(() => {
+            $.getScript(ScriptPaths[1]).done(function () {
+              AirXplore();
+            });
+            $.getScript(ScriptPaths[2]).done(function () {
+              AirOmics();
+            });
+          }, 0);
         });
       });
-      let p = document.getElementById('Air_Tab');
-      p.removeAttribute("hidden");
-      document.getElementById("stat-spinner").remove();
     });
-    CssFiles.forEach(s => {
-      $("<link/>", {
-        rel: "stylesheet",
-        type: "text/css",
-        href: s
-      }).appendTo("head");
-    });
-  });
+  }, 0);
 }
 },{"chart.js":2}],2:[function(require,module,exports){
 /*!
