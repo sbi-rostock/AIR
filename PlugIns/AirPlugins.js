@@ -104,13 +104,17 @@ function initMainPageStructure() {
       href: s
     }).appendTo("head");
   });
-  CssFiles.forEach(s => {
+
+  try {
     $("<link/>", {
       rel: "stylesheet",
       type: "text/css",
       href: "https://ebi-uniprot.github.io/CDN/protvista/css/main.css"
     }).appendTo("head");
-  });
+  } catch (err) {
+    console.log(error);
+  }
+
   let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(pluginContainer);
   $(`<div id="stat_spinner" class="mt-5">
         <div class="d-flex justify-content-center">
@@ -160,21 +164,23 @@ function initMainPageStructure() {
   setTimeout(() => {
     $.getScript(ScriptPaths[0]).done(function () {
       readDataFiles(minervaProxy, Chart, filetesting).finally(data => {
-        $.getScript("https://ebi-uniprot.github.io/CDN/protvista/protvista.js").done(function () {
-          $('#air_loading_text').html('Loading ProtVista ...');
-          console.log("ProtVista loaded.");
-          document.getElementById("stat_spinner").remove();
-          let p = document.getElementById('Air_Tab');
-          p.removeAttribute("hidden");
-          setTimeout(() => {
-            $.getScript(ScriptPaths[1]).done(function () {
-              AirXplore();
-            });
-            $.getScript(ScriptPaths[2]).done(function () {
-              AirOmics();
-            });
-          }, 0);
-        });
+        try {
+          $.getScript("https://ebi-uniprot.github.io/CDN/protvista/protvista.js");
+        } catch (err) {
+          console.log(error);
+        }
+
+        document.getElementById("stat_spinner").remove();
+        let p = document.getElementById('Air_Tab');
+        p.removeAttribute("hidden");
+        setTimeout(() => {
+          $.getScript(ScriptPaths[1]).done(function () {
+            AirXplore();
+          });
+          $.getScript(ScriptPaths[2]).done(function () {
+            AirOmics();
+          });
+        }, 0);
       });
     });
   }, 0);
