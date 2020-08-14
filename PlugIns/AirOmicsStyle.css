@@ -103,11 +103,16 @@
     color: white; }
   
   .clickPhenotypeinTable, .clickPhenotypeinTable:active {
-    background-color: transparent;
-    border-color: transparent;
     display: inline-block;
     white-space: nowrap; }
   
+  .air_invisiblebtn, .air_invisiblebtn:active, .air_invisiblebtn:focus
+  {
+    background-color: transparent;
+    border-color: transparent;
+    outline: none;
+  }
+
   .clickPhenotypeinTable body {
     text-align: center; }
   

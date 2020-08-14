@@ -79,8 +79,8 @@ async function AirOmics(){
                 </div>
             </div>
             
-            <button type="button" id="om_initializebtn" class="om_btn_air btn btn-block air_disabledbutton mt-4 mb-4">Analyze Data File</button>
-            
+            <button type="button" id="om_initializebtn" class="om_btn_air btn btn-block air_disabledbutton mt-4 mb-2">Read Data File</button>
+            <p class="ml-2" id="elementsreadinfile"></p>
             <div class="air_disabledbutton" id="om_maintab" >
                 <ul class="air_nav_tabs nav nav-tabs" role="tablist">
                     <li class="air_nav_item nav-item" style="width: 50%;">
@@ -104,19 +104,18 @@ async function AirOmics(){
         `
         ).appendTo('#om_tab');
         globals.targettab = $(`<div class="tab-pane air_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
-            <div class="air_alert alert alert-warning mb-2">
-                <span>This requires more extensive calculations. We recommend having at least 1 GB of RAM available.</span>
+            <div class="air_alert alert alert-warning mb-4">
+                <span>This requires much more computationally intensive calculations that need to fetch a larger amount of data. The calculation speed mainly depends on your internet bandwidth.<br/>We also recommend having at least 1 GB of RAM available.</span>
                 <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>  
-            <hr>
             <div class="row mt-1 mb-1">
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
                                 data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
-                                data-content="Transcriptomics data allow more accurate results because information on transcription factors is included.<br/>For other data types this should definitely be deactivated.">
+                                data-content="Transcriptomics data allow more accurate results by including information on transcription factor interactions.<br/>For other data types this should definitely be deactivated.">
                             ?
                         </button>
                     </div>
@@ -276,7 +275,7 @@ async function Start() {
             if (lf != "") {
               alert(lf);
             }               
-            alert(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes could be mapped.");
+            $('#elementsreadinfile').html(Object.keys(globals.ExpressionValues).length + " out of " + globals.numberofuserprobes + " probes were mapped.");
             readExpressionValues().then(function (re) {
                 normalizeExpressionValues().then(function (ne) {
                     $("#resultscontainer").replaceWith('<div id="resultscontainer"></div>');
@@ -454,6 +453,219 @@ function getRandomColor() {
     return color;
 }
 
+function createPopupCell(row, type, text, style, sample, phenotype, align) {
+    var cell = document.createElement(type); // create text node                  // append text node to the DIV
+    cell.setAttribute('class', style);
+    cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
+    
+
+    var button = document.createElement('button'); // create text node
+    button.innerHTML = text;
+    button.setAttribute('type', 'button');
+    button.setAttribute('class', 'air_invisiblebtn');
+    button.setAttribute('style', 'cursor: pointer;');
+    button.onclick = function() {
+        var $target = $('#om_chart_popover');
+        var $btn = $(button);
+
+        if($target)
+        {
+            
+            
+            $('#clickedpopupcell').css('background-color', 'white');
+            $('#clickedpopupcell').removeAttr('id');
+
+            if($target.siblings().is($btn))
+            {
+                $target.remove();
+                return;
+            }   
+            $target.remove();
+
+        }
+
+        $(button).attr('id', 'clickedpopupcell');
+        $(button).css('background-color', 'lightgray');
+
+        $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 40px;">
+                        <div class="arrow" style="left: 9.375%;"></div>
+                        <div id="om_chart_popover_content" class="popover-content">
+                            <canvas class="popup_chart" id="om_popup_chart"></canvas>
+                            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                    <span class="legendspan_small" style="background-color:#009933"></span>
+                                    Activates Phenotype</li>
+                                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                    <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                    Represses Phenotype</li>
+                                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                    <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                    Not diff. expressed</li>
+                                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                    <span class="triangle_small"></span>
+                                    External Link</li>
+                            </div>
+                        </div>
+                    </div>`);
+
+        $btn.after($target);
+        
+        let targets = []
+            
+        for (let element in AIR.Phenotypes[phenotype].values) {
+
+
+            let SP = AIR.Phenotypes[phenotype].values[element];
+            if (isNaN(SP))
+            {
+                continue;
+            }
+
+            let hex = "#009933";
+            let rad = 4;
+            let FC = 0
+
+            if(globals.ExpressionValues.hasOwnProperty(element))
+            {
+                FC = globals.ExpressionValues[element].nonnormalized[sample];
+
+                if(isNaN(FC))
+                {
+                    FC = 0;
+                    hex = "#cccccc"
+                    rad = 2;
+                }               
+                else if((SP * FC) < 0)
+                {
+                    hex = "#ffcccc";
+                }
+                else if((SP * FC) === 0)
+                {
+                    FC = 0;
+                    hex = "#cccccc"
+                    rad = 2;
+                }
+            }
+            else
+            {
+                FC = 0;
+                hex = "#cccccc"
+                rad = 2;
+            }
+
+            var pstyle = 'circle';
+            if(AIR.MIMSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false)
+            {
+                pstyle = 'triangle'
+            }
+
+
+            targets.push(
+                {
+                    label: AIR.Molecules[element].name,
+                    data: [{
+                        x: FC,
+                        y: SP,
+                        r: rad
+                    }],
+                    pointStyle: pstyle,
+                    backgroundColor: hex,
+                    hoverBackgroundColor: hex,
+                }
+            );
+        }
+
+
+        var outputCanvas = document.getElementById('om_popup_chart');
+
+        var chartOptions = {
+            type: 'bubble',        
+            data: {
+                datasets: targets,
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                hover: {
+                    onHover: function(e) {
+                    var point = this.getElementAtEvent(e);
+                    if (point.length) e.target.style.cursor = 'pointer';
+                    else e.target.style.cursor = 'default';
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                layout: {
+                    padding: {
+                    top: 0
+                    }
+                },
+                title: {
+                    display: true,
+                    text: "Regulators for '" +AIR.Phenotypes[phenotype].name + "'",
+                    fontFamily: 'Helvetica',
+                },
+                scales: {
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Influence on Phenotype'
+                        },
+                        ticks: {
+                            beginAtZero: true,
+                        }
+                    }],
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Fold Change in Data'
+                        },
+                        ticks: {
+                            //beginAtZero: false,
+                        }
+                    }]
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function (tooltipItem, data) {
+                            var label = data.datasets[tooltipItem.datasetIndex].label || '';
+    
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += tooltipItem.xLabel;
+                            label += "; ";
+                            label += tooltipItem.yLabel;
+                            return label;
+                        }
+                    }
+                }
+            }
+            
+        }; 
+
+        let popupchart = new Chart(outputCanvas, chartOptions);
+        document.getElementById('om_popup_chart').onclick = function (evt) {
+                var activePoint = popupchart.lastActive[0];
+                if (activePoint !== undefined) {
+                    let name = popupchart.data.datasets[activePoint._datasetIndex].label;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+        };
+        $target.show();
+    };
+
+    cell.appendChild(button);
+
+    $(cell).append();
+
+
+    row.appendChild(cell);
+
+    return cell;
+}
 
 function createTable() {
     
@@ -528,10 +740,45 @@ function createTable() {
 
         for (let sample in globals.samples) {
             globals.downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
-            createCell(result_row, 'td', AIR.Phenotypes[phenotype].norm_results[sample], 'col-3', '', 'center');
+            createPopupCell(result_row, 'td', AIR.Phenotypes[phenotype].norm_results[sample], 'col-3', sample, phenotype, 'center');
         }
 
         createCell(result_row, 'td', Math.round((AIR.Phenotypes[phenotype].accuracy + Number.EPSILON) * 10000) / 100, 'col-3', '', 'center');
+
+        let genenumber = [];
+        for(let sample in  AIR.Phenotypes[phenotype].GeneNumber)
+        {
+            genenumber.push(AIR.Phenotypes[phenotype].GeneNumber[sample]);
+        }
+
+        let numberofgenes = Object.keys(AIR.Phenotypes[phenotype].values).length;
+        createCell(result_row, 'td', mean(genenumber) + "[" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-3', '', 'center', true);
+
+        let topgenes = "";
+
+        var items = Object.keys(AIR.Phenotypes[phenotype].MainRegulators).map(function(key) {
+            return [key, AIR.Phenotypes[phenotype].MainRegulators[key]];
+          });
+
+        items.sort(function(first, second) {
+            return second[1] - first[1];
+        });
+
+        let c = items.length;
+        if(c > 5)
+            c = 5;
+
+        for (i = 0; i < c; i++) 
+        {
+            topgenes += items[i][0];
+            if(i < c-1)
+            {
+                topgenes += ", ";
+            }
+        }
+
+        createCell(result_row, 'td', topgenes, 'col-3', '', 'center', true);
+
     }
 
     let header = tbl.createTHead();
@@ -550,6 +797,14 @@ function createTable() {
     $acc_cell.attr("title", "Accuracy represents the percentage of regulating elements (in proportion to their influence), for which a value was supplied by the data.");
     $acc_cell.attr("data-toggle", "tooltip");
     $acc_cell.tooltip();
+
+    var $reg_cell = $(createCell(headerrow, 'th', '#Regulators', 'col-3', 'col', 'center'));
+    $reg_cell.attr("title", "Number of regulators with fold change value in the data [+ std. dev.] compared to the total number of the phenotype regulators.");
+    $reg_cell.attr("data-toggle", "tooltip");
+    $reg_cell.tooltip();
+
+    createCell(headerrow, 'th', 'Top 5 Regulators', 'col-3', 'col', 'center')
+
 
 
     $('#om_showoverlaybtn').on('click', async function() {
@@ -764,7 +1019,7 @@ function getImageSource() {
         {  
             output += '&overlayIds=' + getOverlaysStrings();
         }
-        output += '&zoomLevel=5';    
+        output += '&zoomLevel=7';    
         resolve (output);
     });
 }
@@ -778,7 +1033,8 @@ function PhenotypeSP() {
             AIR.Phenotypes[phenotype].results = {};
             AIR.Phenotypes[phenotype].norm_results = {};
             AIR.Phenotypes[phenotype].accuracy = 0;
-
+            AIR.Phenotypes[phenotype].MainRegulators = {};
+            AIR.Phenotypes[phenotype].GeneNumber = {};
             for (let element in AIR.Phenotypes[phenotype].values) {
                 let SP = AIR.Phenotypes[phenotype].values[element];
 
@@ -798,7 +1054,7 @@ function PhenotypeSP() {
             for (let sample in globals.samples) {
                 let activity = 0.0;
                 var accuracy = 0;
-
+                AIR.Phenotypes[phenotype].GeneNumber[sample] = 0;
                 for (let element in AIR.Phenotypes[phenotype].values) {
 
                     if(!globals.ExpressionValues.hasOwnProperty(element))
@@ -834,6 +1090,19 @@ function PhenotypeSP() {
                     activity += FC * SP; 
                     
                     accuracy += Math.abs(SP);
+                    AIR.Phenotypes[phenotype].GeneNumber[sample] += 1;
+                    
+                    if(AIR.Molecules.hasOwnProperty(element))
+                    {
+                        if(AIR.Phenotypes[phenotype].MainRegulators.hasOwnProperty(AIR.Molecules[element].name))
+                        {
+                            AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] += Math.abs(activity);
+                        }
+                        else
+                        {
+                            AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] = Math.abs(activity);
+                        }
+                    }
                 }
 
 
@@ -841,6 +1110,8 @@ function PhenotypeSP() {
                     max = Math.abs(activity);
 
                 AIR.Phenotypes[phenotype].results[sample] = activity;
+
+                
                 
                 accuracyvalues.push(accuracy);
             }
@@ -875,7 +1146,7 @@ function AddOverlaysPromise(samples = globals.samples) {
                         method: 'POST',
                         url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-                        data: `content=name%09color${contentString(count - 1)}&description=PhenotypeActivity&filename=${samples[count - 1]}.txt&name=${samples[count - 1]}&googleLicenseConsent=true`,
+                        data: `content=name%09color${contentString(count)}&description=PhenotypeActivity&filename=${samples[count - 1]}.txt&name=${samples[count - 1]}&googleLicenseConsent=true`,
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
                             ajaxPostQuery(count + 1).then(r =>
@@ -1619,6 +1890,11 @@ async function calculateTargets() {
                 await updateProgress(count, molLength);
             }
 
+            if(AIR.Molecules[e].emptySP == true)
+            {
+                continue;
+            }
+
             let last = !--iterations;
             let {name:_name, type:_type, phenotypes:_sp} = AIR.Molecules[e];
 
@@ -1669,11 +1945,11 @@ async function calculateTargets() {
                         {
                             if (transcriptomics)
                             {
-                                SP = data[p].tInfluence;
+                                SP = data[p].i;
                             }
                             else
                             {
-                                SP = 1 / (data[p].SP * data[p].Type);
+                                SP = 1 / (data[p].s * data[p].t);
                             }
                         }
 

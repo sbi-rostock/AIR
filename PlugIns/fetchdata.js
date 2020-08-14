@@ -264,14 +264,14 @@ function readDataFiles(_minerva, _chart, _filetesting) {
                             for (let p in AIR.Phenotypes) 
                             {
                                 promises.push(
-                                    getMoleculeData(p).then(
+                                    getMoleculeData(p, phenotype=true).then(
                                         data => {
                                             let sum = 0;
-                                            if(data.hasOwnProperty("Influences"))
+                                            if(data.hasOwnProperty("i"))
                                             {
-                                                for (let m in data.Influences)
+                                                for (let m in data.i)
                                                 {
-                                                    let value = data.Influences[m];
+                                                    let value = data.i[m];
                                                     if(value != 0 && AIR.Molecules.hasOwnProperty(m))
                                                     {
                                                         AIR.Phenotypes[p].values[m] = value;
@@ -280,11 +280,11 @@ function readDataFiles(_minerva, _chart, _filetesting) {
                                                     
                                                 }
                                             }
-                                            if(data.hasOwnProperty("SPs"))
+                                            if(data.hasOwnProperty("s"))
                                             {
-                                                for (let m in data.SPs)
+                                                for (let m in data.s)
                                                 {
-                                                    let value = data.SPs[m];
+                                                    let value = data.s[m];
                                                     if(value != 0 && AIR.Molecules.hasOwnProperty(m))
                                                     {
                                                         AIR.Phenotypes[p].SPs[m] = value;
@@ -337,6 +337,8 @@ function readDataFiles(_minerva, _chart, _filetesting) {
                                     AIR.Phenotypes[element]["values"] = {};
                                     AIR.Phenotypes[element]["value"] = 0;
                                     AIR.Phenotypes[element]["SPs"] = {};
+                                    AIR.Phenotypes[element]["MainRegulators"] = {};
+                                    AIR.Phenotypes[element]["GeneNumber"] = {};
                                 }
                                 if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
                                 {
@@ -488,23 +490,33 @@ function getValue(key)
             else {
                 minervaProxy.pluginData.getGlobalParam(key).then(
                     response => {
-                        resolve(JSON.parse(response).value);
+                        let output = JSON.parse(response).value;
+                        output = replaceAll(output, "y", '"},"');
+                        output = replaceAll(output, "x", '":{"');
+                        output = replaceAll(output, "z", '":"');
+                        output = replaceAll(output, "q", '","');
+                        output = replaceAll(output, '"-.', '"-0.');
+                        resolve(output);
                 }).catch(e => {
                     reject(e)
                 });
             }
+
+            function replaceAll(string, search, replace) {
+                return string.split(search).join(replace);
+              }
+
         });
 
 }
 
-function getMoleculeData(key)
+function getMoleculeData(key, phenotype = false)
 {
     return new Promise(
        (resolve, reject) => {
             if(AIR.MoleculeData.hasOwnProperty(key))
             {
                 let data = AIR.MoleculeData[key];
-                resolve(data);
             }
             else {
                 if(AIR.Molecules.hasOwnProperty(key) && AIR.Molecules[key].emptySP == true)
@@ -514,13 +526,49 @@ function getMoleculeData(key)
                 else
                 {
                     getValue(key).then(response => {
-                        let data = JSON.parse(response);
+                        let data = {};
+                        if(phenotype == false)
+                        {
+                            data = fillData(JSON.parse(response));
+                        }
+                        else 
+                        {
+                            data = JSON.parse(response)
+                        }
                         AIR.MoleculeData[key] = data;
                         resolve(data);
                     }).catch(e => {
                         resolve({});
                     });
                 }
+            }
+
+            function fillData(data)
+            {
+                for(let e in data)
+                {
+                    if(data[e].hasOwnProperty("s") == false)
+                    {
+                        data[e]["s"] = 0;
+                    }
+                    if(data[e].hasOwnProperty("t") == false)
+                    {
+                        data[e]["t"] = 1;
+                    }
+                    if(data[e].hasOwnProperty("c") == false)
+                    {
+                        if(data[e].S == 0)
+                            data[e]["c"] = 0;
+                        else
+                            data[e]["ic"] = 1;
+                    }
+                    if(data[e].hasOwnProperty("i") == false)
+                    {
+                        data[e]["i"] = 0;
+                    }
+                }
+
+                return data;
             }
         });
 
@@ -708,13 +756,16 @@ function createLinkCell(row, type, text, style, align) {
 }
 
 
-function createCell(row, type, text, style, scope, align) {
+function createCell(row, type, text, style, scope, align, nowrap = false) {
     var cell = document.createElement(type); // create text node
     cell.innerHTML = text;                    // append text node to the DIV
     cell.setAttribute('class', style);
-    if (scope != '')
+    if(scope != '')
         cell.setAttribute('scope', scope);  // set DIV class attribute // set DIV class attribute for IE (?!)
-    cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
+    if(nowrap)
+        cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;'); 
+    else
+        cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
     row.appendChild(cell);
 
     return cell;
@@ -723,7 +774,7 @@ function createButtonCell(row, type, text, data, align) {
     var button = document.createElement('button'); // create text node
     button.innerHTML = text;
     button.setAttribute('type', 'button');
-    button.setAttribute('class', 'clickPhenotypeinTable');
+    button.setAttribute('class', 'clickPhenotypeinTable air_invisiblebtn');
     button.setAttribute('data', data);
 
     var cell = document.createElement(type); // create text node
@@ -801,3 +852,16 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
     return true;
   }
   
+  function standarddeviation(array) {
+    const n = array.length
+    const mean = array.reduce((a, b) => a + b) / n
+    return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n)
+  }
+
+  function mean(numbers) {
+    var total = 0, i;
+    for (i = 0; i < numbers.length; i += 1) {
+        total += numbers[i];
+    }
+    return total / numbers.length;
+}

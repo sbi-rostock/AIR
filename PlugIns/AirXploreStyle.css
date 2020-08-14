@@ -49,6 +49,25 @@
   margin-bottom: 3px;
 }
 
+.triangle_small {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 11px solid;
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
+  background-color: white;
+  margin-right: 2px; 
+  margin-bottom: 3px;
+}
+
+.popup_chart {
+  width: 450px !important;
+  height:250px !important;
+}
+
 .legendspan {
   display: inline-block;
   height: 15px;
@@ -56,6 +75,16 @@
   margin-right: 10px;
   border-radius: 25px;
   vertical-align: middle; }
+
+.legendspan_small{
+  display: inline-block;
+  height: 12px;
+  width: 12px;
+  margin-right: 2px;
+  border-radius: 25px;
+  vertical-align: middle; 
+  margin-bottom: 3px;
+}
 
 .xp_panel {
   border: none !important; }
@@ -220,7 +249,7 @@ input[type=checkbox] .cbcontainer {
   margin-left: 0; }
 
 .air_label {
-  margin: 0;
+  margin-bottom: 5px;
 }
 
 

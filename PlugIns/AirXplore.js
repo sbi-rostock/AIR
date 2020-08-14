@@ -24,7 +24,7 @@ function AirXplore(){
             var coll = document.getElementsByClassName("xp_collapsible")[0];
             coll.classList.toggle("active");
             var content = coll.nextElementSibling;
-            content.style.maxHeight = content.scrollHeight + "px";    
+            content.style.maxHeight = content.scrollHeight + 1 + "px";    
             globals.regulationtable.columns.adjust();
         }).catch(e => {
             alert('Could not initialize Data');
@@ -42,7 +42,7 @@ function adjustPanels() {
     for (var i = 0; i < coll.length; i++) {
         var content = coll[i].nextElementSibling;
         if (content.style.maxHeight){
-            content.style.maxHeight = content.scrollHeight + "px";
+            content.style.maxHeight = content.scrollHeight + 1 + "px";
         } 
     }
 }
@@ -76,7 +76,7 @@ function Initiate() {
             if (content.style.maxHeight){
             content.style.maxHeight = null;
             } else {
-            content.style.maxHeight = content.scrollHeight + "px";
+            content.style.maxHeight = content.scrollHeight + 1 + "px";
             } 
         });
         }
