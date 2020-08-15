@@ -472,7 +472,7 @@ function createPopupCell(row, type, text, style, sample, phenotype, align) {
         {
             
             
-            $('#clickedpopupcell').css('background-color', 'white');
+            $('#clickedpopupcell').css('background-color', '#fafafa');
             $('#clickedpopupcell').removeAttr('id');
 
             if($target.siblings().is($btn))
