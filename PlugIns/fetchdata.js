@@ -491,6 +491,7 @@ function getValue(key)
                 minervaProxy.pluginData.getGlobalParam(key).then(
                     response => {
                         let output = JSON.parse(response).value;
+                        output = replaceAll(output, ",", ".");
                         output = replaceAll(output, "y", '"},"');
                         output = replaceAll(output, "x", '":{"');
                         output = replaceAll(output, "z", '":"');
