@@ -518,6 +518,7 @@ function getMoleculeData(key, phenotype = false)
             if(AIR.MoleculeData.hasOwnProperty(key))
             {
                 let data = AIR.MoleculeData[key];
+                resolve(data);
             }
             else {
                 if(AIR.Molecules.hasOwnProperty(key) && AIR.Molecules[key].emptySP == true)
