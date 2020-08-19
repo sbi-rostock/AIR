@@ -1746,6 +1746,13 @@ async function OM_PredictTargets() {
     
     $("#airomics_tab_content").addClass("air_disabledbutton");
     $("#om_progress").attr("aria-valuemax", Object.keys(AIR.Molecules).length);
+
+
+    if(globals.om_targetchart)
+    {
+        globals.om_targetchart.destroy()
+    }
+
     $("#om_chart_target").replaceWith('<canvas id="om_chart_target"></canvas>');
           
 
@@ -2002,31 +2009,35 @@ async function calculateTargets() {
                         hex = '#F9766E';
                         sensitivity = negativeSensitivity;
                     }
-                    var radius = ((sensitivity + specificity) / 2) * 8   ;
+
+                    if(sensitivity > 0 && specificity >= 0)
+                    {
+                        var radius = ((sensitivity + specificity) / 2) * 8   ;
 
                     
-                    var pstyle = 'circle';
-                    if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
-                    {
-                        pstyle = 'triangle'
-                    }
-
-                    if(radius < 3)
-                    {
-                        radius = 4;
-                    }
-                    let result = {
-                        label: _name,
-                        data: [{
-                            x: specificity,
-                            y: sensitivity,
-                            r: radius
-                        }],
-                        backgroundColor: hex,
-                        hoverBackgroundColor: hex,
-                        pointStyle: pstyle,
-                    }
-                    targets.push(result);
+                        var pstyle = 'circle';
+                        if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+                        {
+                            pstyle = 'triangle'
+                        }
+    
+                        if(radius < 3)
+                        {
+                            radius = 4;
+                        }
+                        let result = {
+                            label: _name,
+                            data: [{
+                                x: specificity,
+                                y: sensitivity,
+                                r: radius
+                            }],
+                            backgroundColor: hex,
+                            hoverBackgroundColor: hex,
+                            pointStyle: pstyle,
+                        }
+                        targets.push(result);
+                    }                    
                 })
             );
 
