@@ -1748,9 +1748,7 @@ async function OM_PredictTargets() {
     $("#om_progress").attr("aria-valuemax", Object.keys(AIR.Molecules).length);
 
     await calculateTargets();
-    setTimeout(() => {
-        globals.om_targetchart.update();
-    }, 200);
+    globals.om_targetchart.update();
 }
 
 async function updateProgress(value, max) {
@@ -1795,10 +1793,11 @@ async function setupTargetChart() {
                     animation: {
                         duration: 0
                     },
+                    /*
                     hover: {
                         animationDuration: 0
                     },
-                    responsiveAnimationDuration: 0,
+                    responsiveAnimationDuration: 0,*/
                     hover: {
                         onHover: function(e) {
                         var point = this.getElementAtEvent(e);
