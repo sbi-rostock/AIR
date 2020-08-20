@@ -1795,11 +1795,10 @@ async function setupTargetChart() {
                     animation: {
                         duration: 0
                     },
-                    /*
                     hover: {
                         animationDuration: 0
                     },
-                    responsiveAnimationDuration: 0,*/
+                    responsiveAnimationDuration: 0,
                     hover: {
                         onHover: function(e) {
                         var point = this.getElementAtEvent(e);
