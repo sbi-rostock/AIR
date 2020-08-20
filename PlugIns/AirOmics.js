@@ -1769,12 +1769,15 @@ async function setupTargetChart() {
         setTimeout(function(){
 
 
-            globals.targettab.append($(`<canvas id="om_chart_target"></canvas>
+            globals.targettab.append($(`
+            <div style="max-height: 400px;">
+                <canvas id="om_chart_target"></canvas>
+            </div>
             <div id="om_legend_target" class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
-                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-                </div>`));
+                <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+                <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
+                <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+            </div>`));
 
             var outputCanvas = document.getElementById('om_chart_target');
 
@@ -1787,6 +1790,16 @@ async function setupTargetChart() {
                     datasets: [],
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,                    
+                    animation: {
+                        duration: 0
+                    },
+                    /*
+                    hover: {
+                        animationDuration: 0
+                    },
+                    responsiveAnimationDuration: 0,*/
                     hover: {
                         onHover: function(e) {
                         var point = this.getElementAtEvent(e);
