@@ -143,8 +143,6 @@ async function AirOmics(){
             <hr>
             <button type="button" id="om_btn_predicttarget" class="om_btn_air btn btn-block mt-1 mb-1">Predict Regulators</button>
             <hr>
-            <canvas id="om_chart_target" style="display: none;"></canvas>
-            <div id="om_legend_target" style="display: none;"></div>
         </div>`).appendTo('#om_tab');
 
         $('.air_btn_info[data-toggle="popover"]').popover()
@@ -224,6 +222,8 @@ async function AirOmics(){
 
         $("#om_stat_spinner").remove();
         
+
+
         let t1 = performance.now()
         console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
     });
@@ -487,7 +487,7 @@ function createPopupCell(row, type, text, style, sample, phenotype, align) {
         $(button).attr('id', 'clickedpopupcell');
         $(button).css('background-color', 'lightgray');
 
-        $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 40px;">
+        $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 40px; z-index: 2;">
                         <div class="arrow" style="left: 9.375%;"></div>
                         <div id="om_chart_popover_content" class="popover-content">
                             <canvas class="popup_chart" id="om_popup_chart"></canvas>
@@ -603,7 +603,7 @@ function createPopupCell(row, type, text, style, sample, phenotype, align) {
                 },
                 title: {
                     display: true,
-                    text: "Regulators for '" +AIR.Phenotypes[phenotype].name + "'",
+                    text: "Regulators for '" +AIR.Phenotypes[phenotype].name + "' in '" + globals.samples[sample] + "'",
                     fontFamily: 'Helvetica',
                 },
                 scales: {
@@ -752,7 +752,7 @@ function createTable() {
         }
 
         let numberofgenes = Object.keys(AIR.Phenotypes[phenotype].values).length;
-        createCell(result_row, 'td', mean(genenumber) + "[" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-3', '', 'center', true);
+        createCell(result_row, 'td', mean(genenumber) + " [" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-3', '', 'center', true);
 
         let topgenes = "";
 
@@ -799,7 +799,7 @@ function createTable() {
     $acc_cell.tooltip();
 
     var $reg_cell = $(createCell(headerrow, 'th', '#Regulators', 'col-3', 'col', 'center'));
-    $reg_cell.attr("title", "Number of regulators with fold change value in the data [+ std. dev.] compared to the total number of the phenotype regulators.");
+    $reg_cell.attr("title", "Average number of regulators with fold change value in the data [+ std. dev.] compared to the total number of the phenotype's regulators.");
     $reg_cell.attr("data-toggle", "tooltip");
     $reg_cell.tooltip();
 
@@ -1747,31 +1747,6 @@ async function OM_PredictTargets() {
     $("#airomics_tab_content").addClass("air_disabledbutton");
     $("#om_progress").attr("aria-valuemax", Object.keys(AIR.Molecules).length);
 
-
-    if(globals.om_targetchart)
-    {
-        globals.om_targetchart.destroy()
-    }
-
-    $("#om_chart_target").replaceWith('<canvas id="om_chart_target"></canvas>');
-          
-
-    document.getElementById('om_chart_target').onclick = function (evt) {
-
-        if(globals.om_targetchart)
-        {
-            // => activePoints is an array of points on the canvas that are at the same position as the click event.
-            var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-
-            if (activePoint !== undefined) {
-                let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
-                selectElementonMap(name, true);
-                xp_setSelectedElement(name);
-            }
-        }
-        // Calling update now animates element from oldValue to newValue.
-    };
-
     await calculateTargets();
     setTimeout(() => {
         globals.om_targetchart.update();
@@ -1789,96 +1764,137 @@ async function updateProgress(value, max) {
     });
   }
 
+async function setupTargetChart() {
+    return new Promise(resolve => {
+        setTimeout(function(){
+
+
+            globals.targettab.append($(`<canvas id="om_chart_target"></canvas>
+            <div id="om_legend_target" style="display: none;"></div>`));
+
+            var outputCanvas = document.getElementById('om_chart_target');
+
+            var chartOptions = {
+                onAnimationComplete: function() {
+                    globals.om_targetchart.update();
+                },
+                type: 'bubble',        
+                data: {
+                    datasets: [],
+                },
+                options: {
+                    hover: {
+                        onHover: function(e) {
+                        var point = this.getElementAtEvent(e);
+                        if (point.length) e.target.style.cursor = 'pointer';
+                        else e.target.style.cursor = 'default';
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    layout: {
+                        padding: {
+                        top: 15
+                        }
+                    },
+                    title: {
+                        display: false,
+                        text: 'Predicted Targets',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
+                    },
+                    scales: {
+                        yAxes: [{
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Sensitivity'
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                            }
+                        }],
+                        xAxes: [{
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Specificity'
+                            },
+                            ticks: {
+                                //beginAtZero: false,
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function (tooltipItem, data) {
+                                var label = data.datasets[tooltipItem.datasetIndex].label || '';
+    
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += tooltipItem.xLabel;
+                                label += "; ";
+                                label += tooltipItem.yLabel;
+                                return label;
+                            }
+                        }
+                    }
+                }
+                
+            }; 
+        
+            globals.om_targetchart = new Chart(outputCanvas, chartOptions);            
+    
+            outputCanvas.onclick = function (evt) {
+    
+                if(globals.om_targetchart)
+                {
+                    // => activePoints is an array of points on the canvas that are at the same position as the click event.
+                    var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
+    
+                    if (activePoint !== undefined) {
+                        let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                        selectElementonMap(name, true);
+                        xp_setSelectedElement(name);
+                    }
+                }
+                // Calling update now animates element from oldValue to newValue.
+            };
+            
+            $("#om_legend_target").replaceWith(
+                `<div id="om_legend_target" class="d-flex justify-content-center mt-2">
+                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
+                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+                </div>`);
+
+            resolve('');
+        }, 0);
+    });
+}
+
 async function calculateTargets() {
 
-    var outputCanvas = document.getElementById('om_chart_target');
-
-    var chartOptions = {
-        onAnimationComplete: function() {
-            globals.om_targetchart.update();
-        },
-        type: 'bubble',        
-        data: {
-            datasets: [],
-        },
-        options: {
-            hover: {
-                onHover: function(e) {
-                var point = this.getElementAtEvent(e);
-                if (point.length) e.target.style.cursor = 'pointer';
-                else e.target.style.cursor = 'default';
-                }
-            },
-            legend: {
-                display: false
-            },
-            layout: {
-                padding: {
-                top: 15
-                }
-            },
-            title: {
-                display: false,
-                text: 'Predicted Targets',
-                fontFamily: 'Helvetica',
-                fontColor: '#6E6EC8',
-                fontStyle: 'bold'
-            },
-            scales: {
-                yAxes: [{
-                    scaleLabel: {
-                        display: true,
-                        labelString: 'Sensitivity'
-                    },
-                    ticks: {
-                        beginAtZero: true,
-                    }
-                }],
-                xAxes: [{
-                    scaleLabel: {
-                        display: true,
-                        labelString: 'Specificity'
-                    },
-                    ticks: {
-                        //beginAtZero: false,
-                    }
-                }]
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var label = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                        if (label) {
-                            label += ': ';
-                        }
-                        label += tooltipItem.xLabel;
-                        label += "; ";
-                        label += tooltipItem.yLabel;
-                        return label;
-                    }
-                }
-            }
-        }
-        
-    }; 
-
-    globals.om_targetchart = new Chart(outputCanvas, chartOptions);
-
-    let targetdata = await dataset();
-    globals.om_targetchart.data.datasets = targetdata;
+    if(globals.om_targetchart == null)
+    {
+        await setupTargetChart();
+    }
 
     
-    $("#om_legend_target").replaceWith(
-        `<div id="om_legend_target" class="d-flex justify-content-center mt-2">
-            <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
-            <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
-            <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-        </div>`);
-    $("#om_progress").hide();
-    $("#om_btn_predicttarget").html('Predict Regulators');
-    $("#airomics_tab_content").removeClass("air_disabledbutton");
+    globals.om_targetchart.data.datasets = [];
 
+    try 
+    {
+        let targetdata = await dataset();
+        globals.om_targetchart.data.datasets = targetdata;
+    }
+    finally 
+    {
+        $("#om_progress").hide();
+        $("#om_btn_predicttarget").html('Predict Regulators');
+        $("#airomics_tab_content").removeClass("air_disabledbutton");
+    }
     async function dataset()
     {
 
