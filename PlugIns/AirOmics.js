@@ -222,7 +222,113 @@ async function AirOmics(){
 
         $("#om_stat_spinner").remove();
         
+        globals.targettab.append($(`
+            <div style="position: relative; max-height: 400px;">
+                <canvas id="om_chart_target" style="height: 400px;"></canvas>
+            </div>
+            <div id="om_legend_target" class="d-flex justify-content-center mt-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+                <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
+                <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+            </div>`));
 
+            var outputCanvas = document.getElementById('om_chart_target');
+
+            var chartOptions = {
+                type: 'bubble',        
+                data: {
+                    datasets: [],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,                    
+                    animation: {
+                        duration: 0
+                    },
+                    hover: {
+                        animationDuration: 0
+                    },
+                    responsiveAnimationDuration: 0,
+                    hover: {
+                        onHover: function(e) {
+                            var point = this.getElementAtEvent(e);
+                            if (point.length) e.target.style.cursor = 'pointer';
+                            else e.target.style.cursor = 'default';
+                            }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    layout: {
+                        padding: {
+                        top: 15
+                        }
+                    },
+                    title: {
+                        display: false,
+                        text: 'Predicted Targets',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
+                    },
+                    scales: {
+                        yAxes: [{
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Sensitivity'
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                            }
+                        }],
+                        xAxes: [{
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Specificity'
+                            },
+                            ticks: {
+                                //beginAtZero: false,
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function (tooltipItem, data) {
+                                var label = data.datasets[tooltipItem.datasetIndex].label || '';
+    
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += tooltipItem.xLabel;
+                                label += "; ";
+                                label += tooltipItem.yLabel;
+                                return label;
+                            }
+                        }
+                    }
+                }
+                
+            }; 
+        
+            globals.om_targetchart = new Chart(outputCanvas, chartOptions);            
+    
+            outputCanvas.onclick = function (evt) {
+    
+                if(globals.om_targetchart)
+                {
+                    // => activePoints is an array of points on the canvas that are at the same position as the click event.
+                    var activePoint = globals.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
+    
+                    if (activePoint !== undefined) {
+                        let name = globals.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                        selectElementonMap(name, true);
+                        xp_setSelectedElement(name);
+                    }
+                }
+                // Calling update now animates element from oldValue to newValue.
+            };       
+
+            $("#om_chart_target").height(400);
 
         let t1 = performance.now()
         console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
@@ -328,8 +434,6 @@ async function Start() {
                         </div>                                   
                     `);
 
-                    $("#om_chart_target").replaceWith('<canvas id="om_chart_target" style="display: none;"></canvas>');
-                    $("#om_legend_target").replaceWith('<div id="om_legend_target" style="display: none;"></div>');
                     $('.air_btn_info[data-toggle="popover"]').popover();
                     $('#om_banalyzebtn').on('click', async function() {
                         let text = await disablebutton("om_banalyzebtn");
@@ -1748,7 +1852,6 @@ async function OM_PredictTargets() {
     $("#om_progress").attr("aria-valuemax", Object.keys(AIR.Molecules).length);
 
     await calculateTargets();
-    globals.om_targetchart.update();
 }
 
 async function updateProgress(value, max) {
@@ -1768,7 +1871,7 @@ async function setupTargetChart() {
 
 
             globals.targettab.append($(`
-            <div style="max-height: 400px;">
+            <div style="position: relative; max-height: 400px;">
                 <canvas id="om_chart_target"></canvas>
             </div>
             <div id="om_legend_target" class="d-flex justify-content-center mt-2">
@@ -1796,8 +1899,8 @@ async function setupTargetChart() {
                     /*
                     hover: {
                         animationDuration: 0
-                    },
-                    responsiveAnimationDuration: 0,*/
+                    },*/
+                    responsiveAnimationDuration: 0,
                     hover: {
                         onHover: function(e) {
                         var point = this.getElementAtEvent(e);
@@ -1883,22 +1986,17 @@ async function setupTargetChart() {
 }
 
 async function calculateTargets() {
-
-    if(globals.om_targetchart == null)
-    {
-        await setupTargetChart();
-    }
-
     
     globals.om_targetchart.data.datasets = [];
 
     try 
     {
-        let targetdata = await dataset();
-        globals.om_targetchart.data.datasets = targetdata;
+        await dataset();
+        globals.om_targetchart.update();
     }
     finally 
-    {
+    {        
+        $("#om_chart_target").height(400);
         $("#om_progress").hide();
         $("#om_btn_predicttarget").html('Predict Regulators');
         $("#airomics_tab_content").removeClass("air_disabledbutton");
@@ -1958,7 +2056,7 @@ async function calculateTargets() {
             let sample = $('#om_select_sample').val();  
 
             promises.push(
-                getMoleculeData(e).then(data => new function() {
+                getMoleculeData(e).then(async (data) => {
 
                     let positiveSum = 0;
                     let positiveinhibitorySum = 0;
@@ -2060,7 +2158,7 @@ async function calculateTargets() {
                             hoverBackgroundColor: hex,
                             pointStyle: pstyle,
                         }
-                        targets.push(result);
+                        await addValuetoChart(result);
                     }                    
                 })
             );
@@ -2078,3 +2176,13 @@ async function calculateTargets() {
         return targets;
     }
 }
+
+async function addValuetoChart(value) {
+    return new Promise(resolve => {
+        setTimeout(function(){
+            globals.om_targetchart.data.datasets.push(value);
+            globals.om_targetchart.update();
+            resolve('');
+        }, 0);
+    });
+  }
