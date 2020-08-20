@@ -1770,7 +1770,11 @@ async function setupTargetChart() {
 
 
             globals.targettab.append($(`<canvas id="om_chart_target"></canvas>
-            <div id="om_legend_target" style="display: none;"></div>`));
+            <div id="om_legend_target" class="d-flex justify-content-center mt-2">
+                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
+                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
+                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+                </div>`));
 
             var outputCanvas = document.getElementById('om_chart_target');
 
@@ -1860,14 +1864,7 @@ async function setupTargetChart() {
                     }
                 }
                 // Calling update now animates element from oldValue to newValue.
-            };
-            
-            $("#om_legend_target").replaceWith(
-                `<div id="om_legend_target" class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
-                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-                </div>`);
+            };        
 
             resolve('');
         }, 0);
