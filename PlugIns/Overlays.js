@@ -27,7 +27,11 @@ const globals = {
   numberofSamples: 0,
   container: undefined,
   downloadtext: '',
-  ol_table: undefined
+  ol_table: undefined,
+  defaultusers: ['anonymous', 'guest', 'guest user'],
+  specialCharacters: ['+', '#', '*', '~', '%', '&', '$', '§', '"'],
+  guestuser: ['airuser'],
+  user: undefined
 };
 let $ = window.$;
 
@@ -145,187 +149,199 @@ function deHighlightAll() {
 function initMainPageStructure() {
   globals.container = $('<div class="' + pluginName + '-container" id="ol_plugincontainer"></div>').appendTo(pluginContainer);
   $("#ol_plugincontainer").addClass("ol_disabledbutton");
-  minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
-    globals.allBioEntities = bioEntities;
-    bioEntities.forEach(e => {
-      if (e.constructor.name === 'Alias') {
-        globals.MIMSpeciesLowerCase.push(e.getName().toLowerCase());
-        globals.MIMSpecies.push(e.getName());
-      }
-    });
-    globals.alreadycalculated = true;
-    globals.container.append(`
-        <h1>Edit Overlays</h1>
-        <table style="width:100%" class="table nowrap table-sm" id="ol_table" cellspacing="0">
-            <thead>
-                <tr>
-                    <th style="vertical-align: middle;">Select</th>
-                    <th style="vertical-align: middle;">Shown</th>
-                    <th style="vertical-align: middle;">Overlay</th>
-                    <th style="vertical-align: middle;">Creator</th>
-                    <th style="vertical-align: middle;">Description</th>
-                </tr>
-            </thead>
-        </table>
-        <div class="mb-4 mt-2">
-                <button type="button" id="ol_selectallbtn" class="ol_small_btn mr-1">Select All</button >
-                <button type="button" id="ol_deselectallbtn" class="ol_small_btn ml-1">Deselect All</button >
-        </div>
-        <div class="btn-group btn-group-justified">
-            <div class="btn-group">
-                <button type="button" id="ol_showselectedbtn" class="btn btn-primary mr-1">Show Selected Overlays</button >
+  minerva.ServerConnector.getLoggedUser().then(function (user) {
+    globals.user = user._login.toString().toLowerCase();
+
+    if (globals.defaultusers.includes(globals.user) === true) {
+      alert('Waning: You can reate overlays only after sing-in');
+    }
+
+    if (globals.guestuser.includes(globals.user) === true) {
+      alert("Warning: You're logged in through a public account. Overlays you create are visible to other users if not removed.");
+    }
+
+    minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
+      globals.allBioEntities = bioEntities;
+      bioEntities.forEach(e => {
+        if (e.constructor.name === 'Alias') {
+          globals.MIMSpeciesLowerCase.push(e.getName().toLowerCase());
+          globals.MIMSpecies.push(e.getName());
+        }
+      });
+      globals.alreadycalculated = true;
+      globals.container.append(`
+            <h1>Edit Overlays</h1>
+            <table style="width:100%" class="table nowrap table-sm" id="ol_table" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th style="vertical-align: middle;">Select</th>
+                        <th style="vertical-align: middle;">Shown</th>
+                        <th style="vertical-align: middle;">Overlay</th>
+                        <th style="vertical-align: middle;">Creator</th>
+                        <th style="vertical-align: middle;">Description</th>
+                    </tr>
+                </thead>
+            </table>
+            <div class="mb-4 mt-2">
+                    <button type="button" id="ol_selectallbtn" class="ol_small_btn mr-1">Select All</button >
+                    <button type="button" id="ol_deselectallbtn" class="ol_small_btn ml-1">Deselect All</button >
             </div>
-            <div class="btn-group">
-                <button type="button" id="ol_hideselectedbtn" class="btn btn-primary ml-1">Hide Selected Overlays</button >
-            </div>
-        </div>
-        <button type="button" id="ol_removeselectedbtn" class="btn btn-primary btn-default btn-block mb-4 mt-2">Remove Selected Overlays</button> 
-        
-        <hr>
-        <h1>Upload Overlays</h1>
-        `);
-    $('#ol_selectallbtn').click(function () {
-      $(".clickCBinTable").each(function () {
-        $(this).prop('checked', true);
-      });
-    });
-    $('#ol_deselectallbtn').click(function () {
-      $(".clickCBinTable").each(function () {
-        $(this).prop('checked', false);
-      });
-    });
-    $('#ol_showselectedbtn').click(function () {
-      let text = disablebutton('ol_showselectedbtn');
-      showOverlays(getSelectedOVerlays()).finally(rs => {
-        enablebtn('ol_showselectedbtn', text);
-      });
-    });
-    $('#ol_hideselectedbtn').click(function () {
-      let text = disablebutton('ol_hideselectedbtn');
-      hideOverlays(getSelectedOVerlays()).finally(rs => {
-        enablebtn('ol_hideselectedbtn', text);
-      });
-    });
-    $('#ol_removeselectedbtn').click(function () {
-      let text = disablebutton('ol_removeselectedbtn');
-      removeOverlays(getSelectedOVerlays()).finally(r => {
-        enablebtn('ol_removeselectedbtn', text);
-      });
-    });
-    globals.container.append(`<div class="row">
-        <div class="col-auto">
-    <div class="wrapper">
-            <button type="button" class="ol_info-btn btn btn-secondary mb-2 ml-1" 
-    data-html="true" data-toggle="popover" data-placement="top" title="File Specifications"
-    data-content="A tab-seperated .txt file.<br/>First Row contains the sample names.<br/>First Column contains the official gene/molecule symbols/names">
-    ?</button>
-    </div>
-        </div>    
-        <div class="col">
-            <input id="inputId" type="file" class="inputfile mb-2"/>
-        </div>
-    </div>`);
-    globals.container.append(`
-            <select id="TypeSelect" class="selecttype browser-default custom-select mb-2 mt-2">
-            <option value="0" selected>No normalization</option>
-            <option value="1">Normalize each probe</option>
-            <option value="2">Normalize each sample</option>
-            </select>
-            `);
-    $(".dropdown-toggle").dropdown();
-    globals.container.append(
-    /*html*/
-    `
-        <div class="mb-2 mt-2" style="width: 270px; margin: 0 auto;">
-            <p align="right">
-                <label for="positivecolor">Positive (1) Values:</label>
-                <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-positivecolorvalue" value="FF0000">
-                <input type="color" id="ol-positivecolor" value="#ff0000">
-            </p>
-            <p align="right">
-                <label for="neutralcolor">Neutral (0) Values:</label>
-                <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-neutralcolorvalue" value="FFFFFF">
-                <input type="color" id="ol-neutralcolor" value="#ffffff">
-            </p>
-            <p align="right">
-                <label for="negativecolor">Negative (-1) Values:</label>
-                <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-negativecolorvalue" value="0000FF">
-                <input type="color" id="ol-negativecolor" value="#0000ff">
-            </p>
-        </div>`);
-    $('#ol-positivecolor').change(function () {
-      $('#ol-positivecolorvalue').val($(this).val());
-    });
-    $('#ol-neutralcolor').change(function () {
-      $('#ol-neutralcolorvalue').val($(this).val());
-    });
-    $('#ol-negativecolor').change(function () {
-      $('#ol-negativecolorvalue').val($(this).val());
-    });
-    globals.container.append(`
-        <div class="row mt-4 mb-2">
-            <div class="col-auto">
-                <div class="wrapper">
-                    <button type="button" class="ol_info-btn btn btn-secondary"
-                            data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
-                            data-content="If checked, overlays with same name will be ">
-                        ?
-                    </button>
+            <div class="btn-group btn-group-justified">
+                <div class="btn-group">
+                    <button type="button" id="ol_showselectedbtn" class="btn btn-primary mr-1">Show Selected Overlays</button >
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="ol_hideselectedbtn" class="btn btn-primary ml-1">Hide Selected Overlays</button >
                 </div>
             </div>
-            <div class="cbcontainer col-auto">
-                <input type="checkbox" class="ol_checkbox" id="ol_cb_overrideOverlay" checked>
-                <label class="ol_checkbox_label" for="om_transcriptomics">Override Overlays</label>
+            <button type="button" id="ol_removeselectedbtn" class="btn btn-primary btn-default btn-block mb-4 mt-2">Remove Selected Overlays</button> 
+            
+            <hr>
+            <h1>Upload Overlays</h1>
+            `);
+      $('#ol_selectallbtn').click(function () {
+        $(".clickCBinTable").each(function () {
+          $(this).prop('checked', true);
+        });
+      });
+      $('#ol_deselectallbtn').click(function () {
+        $(".clickCBinTable").each(function () {
+          $(this).prop('checked', false);
+        });
+      });
+      $('#ol_showselectedbtn').click(function () {
+        let text = disablebutton('ol_showselectedbtn');
+        showOverlays(getSelectedOVerlays()).finally(rs => {
+          enablebtn('ol_showselectedbtn', text);
+        });
+      });
+      $('#ol_hideselectedbtn').click(function () {
+        let text = disablebutton('ol_hideselectedbtn');
+        hideOverlays(getSelectedOVerlays()).finally(rs => {
+          enablebtn('ol_hideselectedbtn', text);
+        });
+      });
+      $('#ol_removeselectedbtn').click(function () {
+        let text = disablebutton('ol_removeselectedbtn');
+        removeOverlays(getSelectedOVerlays()).finally(r => {
+          enablebtn('ol_removeselectedbtn', text);
+        });
+      });
+      globals.container.append(`<div class="row">
+            <div class="col-auto">
+        <div class="wrapper">
+                <button type="button" class="ol_info-btn btn btn-secondary mb-2 ml-1" 
+        data-html="true" data-toggle="popover" data-placement="top" title="File Specifications"
+        data-content="A tab-seperated .txt file.<br/>First Row contains the sample names.<br/>First Column contains the official gene/molecule symbols/names">
+        ?</button>
+        </div>
+            </div>    
+            <div class="col">
+                <input id="inputId" type="file" class="inputfile mb-2"/>
             </div>
         </div>`);
-    globals.container.append('<button type="button" id="ol_startbtn" class="btn btn-primary btn-default btn-block">Generate Overlays</button>');
-    var $note = $(`<div>Note: This will overwrite existing overlays with the same sample names.</div>`);
-    globals.container.append($note);
-    $("#ol_cb_overrideOverlay").change(function () {
-      if (this.checked) {
-        $note.remove();
-        $("#ol_startbtn").after($note);
-      } else {
-        $note.remove();
-      }
+      globals.container.append(`
+                <select id="TypeSelect" class="selecttype browser-default custom-select mb-2 mt-2">
+                <option value="0" selected>No normalization</option>
+                <option value="1">Normalize each probe</option>
+                <option value="2">Normalize each sample</option>
+                </select>
+                `);
+      $(".dropdown-toggle").dropdown();
+      globals.container.append(
+      /*html*/
+      `
+            <div class="mb-2 mt-2" style="width: 270px; margin: 0 auto;">
+                <p align="right">
+                    <label for="positivecolor">Positive (1) Values:</label>
+                    <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-positivecolorvalue" value="FF0000">
+                    <input type="color" id="ol-positivecolor" value="#ff0000">
+                </p>
+                <p align="right">
+                    <label for="neutralcolor">Neutral (0) Values:</label>
+                    <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-neutralcolorvalue" value="FFFFFF">
+                    <input type="color" id="ol-neutralcolor" value="#ffffff">
+                </p>
+                <p align="right">
+                    <label for="negativecolor">Negative (-1) Values:</label>
+                    <input class="user-colorvalue" style="width:70px; text-align:center" id="ol-negativecolorvalue" value="0000FF">
+                    <input type="color" id="ol-negativecolor" value="#0000ff">
+                </p>
+            </div>`);
+      $('#ol-positivecolor').change(function () {
+        $('#ol-positivecolorvalue').val($(this).val());
+      });
+      $('#ol-neutralcolor').change(function () {
+        $('#ol-neutralcolorvalue').val($(this).val());
+      });
+      $('#ol-negativecolor').change(function () {
+        $('#ol-negativecolorvalue').val($(this).val());
+      });
+      globals.container.append(`
+            <div class="row mt-4 mb-2">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="ol_info-btn btn btn-secondary"
+                                data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-content="If checked, overlays with same name will be ">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="cbcontainer col-auto">
+                    <input type="checkbox" class="ol_checkbox" id="ol_cb_overrideOverlay" checked>
+                    <label class="ol_checkbox_label" for="om_transcriptomics">Override Overlays</label>
+                </div>
+            </div>`);
+      globals.container.append('<button type="button" id="ol_startbtn" class="btn btn-primary btn-default btn-block">Generate Overlays</button>');
+      var $note = $(`<div>Note: This will overwrite existing overlays with the same sample names.</div>`);
+      globals.container.append($note);
+      $("#ol_cb_overrideOverlay").change(function () {
+        if (this.checked) {
+          $note.remove();
+          $("#ol_startbtn").after($note);
+        } else {
+          $note.remove();
+        }
+      });
+      $('#ol_startbtn').click(function () {
+        readUserFile();
+      });
+      $("#ol_plugincontainer").removeClass("ol_disabledbutton");
+      globals.ol_table = $('#ol_table').DataTable({
+        "order": [[2, "asc"]],
+        scrollX: true,
+        autoWidth: true,
+        columns: [{
+          "width": "10%"
+        }, {
+          "width": "10%"
+        }, null, {
+          "width": "15%"
+        }, {
+          "width": "25%"
+        }],
+        columnDefs: [{
+          orderable: false,
+          className: 'dt-center',
+          targets: 0
+        }, {
+          targets: 1,
+          className: 'dt-center'
+        }, {
+          targets: 2,
+          className: 'dt-left'
+        }, {
+          targets: 3,
+          className: 'dt-left'
+        }, {
+          targets: 4,
+          className: 'dt-left'
+        }]
+      });
+      $('[data-toggle="popover"]').popover();
+      createOverlayTable();
     });
-    $('#ol_startbtn').click(function () {
-      readUserFile();
-    });
-    $("#ol_plugincontainer").removeClass("ol_disabledbutton");
-    globals.ol_table = $('#ol_table').DataTable({
-      "order": [[2, "asc"]],
-      scrollX: true,
-      autoWidth: true,
-      columns: [{
-        "width": "10%"
-      }, {
-        "width": "10%"
-      }, null, {
-        "width": "15%"
-      }, {
-        "width": "25%"
-      }],
-      columnDefs: [{
-        orderable: false,
-        className: 'dt-center',
-        targets: 0
-      }, {
-        targets: 1,
-        className: 'dt-center'
-      }, {
-        targets: 2,
-        className: 'dt-left'
-      }, {
-        targets: 3,
-        className: 'dt-left'
-      }, {
-        targets: 4,
-        className: 'dt-left'
-      }]
-    });
-    $('[data-toggle="popover"]').popover();
-    createOverlayTable();
   });
 }
 
