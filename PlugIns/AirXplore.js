@@ -431,7 +431,12 @@ function getTargetPanel() {
                     <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
                     <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
                     <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-            </div>`);
+            </div>
+            <button id="xp_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>`);
+
+        $('#xp_btn_download_target').on('click', function() {
+            om_download('PredictedPhenotypeRegulators.txt', globals.xp_target_downloadtext)
+        });
 
         var outputCanvas = document.getElementById('xp_chart_target').getContext('2d');
         globals.xp_targetchart = new Chart(outputCanvas, {
@@ -1395,6 +1400,15 @@ function XP_PredictTargets() {
     var targets = [];
     let promises = [];
 
+    let filter = $('#xp_select_target_type option:selected').text();
+    globals.xp_target_downloadtext = `Filter: ${filter}\n\nSelected phenotype values:`;
+    
+    for (let p in AIR.Phenotypes) {
+
+        globals.xp_target_downloadtext += `\n${AIR.Phenotypes[p].name}\t${AIR.Phenotypes[p].value}`;
+    }
+    globals.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivit';
+
     for (let e in AIR.Molecules) {
  
         let {name:_name, type:_type} = AIR.Molecules[e];
@@ -1513,7 +1527,8 @@ function XP_PredictTargets() {
             backgroundColor: hex,
             hoverBackgroundColor: hex,
             pointStyle: pstyle,
-        });            
+        });  
+        globals.xp_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}`;          
     }
     
     Promise.all(promises).finally(r => {

@@ -55,7 +55,9 @@ const globals = {
     interactionpanel: undefined,
     targetpanel: undefined,
     centralitypanel: undefined,
-    downloadtext: '',
+    om_phenotype_downloadtext: '',
+    om_target_downloadtext: '',
+    xp_target_downloadtext: '',
 
     regulationtable: undefined,
     targettable: undefined,
@@ -84,7 +86,7 @@ const globals = {
     plevelchart_config: undefined,
     plevelchart: undefined,
 
-    om_targetchart: undefined,
+    om_targetchart: null,
     xp_targetchart: undefined,
 
     spsliderchartconfig: undefined,
@@ -867,3 +869,7 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
     }
     return total / numbers.length;
 }
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }

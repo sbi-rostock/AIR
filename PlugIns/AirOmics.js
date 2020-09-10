@@ -133,7 +133,7 @@ async function AirOmics(){
             </select>
             <hr>
             <label class="air_label mt-1">Regulator Type Filter:</label>
-            <select id="om_select_mapping" class="browser-default om_select custom-select mb-1">
+            <select id="om_target_filter" class="browser-default om_select custom-select mb-1">
                 <option value="0" selected>All Elements</option>
                 <option value="1">Proteins</option>
                 <option value="2">miRNAs</option>
@@ -230,7 +230,13 @@ async function AirOmics(){
                 <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Regulator</li>
                 <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
                 <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
-            </div>`));
+            </div>
+            <button id="om_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+            `));
+
+            $('#om_btn_download_target').on('click', function() {
+                om_download('PredictedKeyRegulators.txt', globals.om_target_downloadtext)
+            });
 
             var outputCanvas = document.getElementById('om_chart_target');
 
@@ -359,10 +365,10 @@ function compare(a, b) {
     return comparison;
 }
 
-function download(filename) {
+function om_download(filename, data) {
 
     var element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(globals.downloadtext));
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data));
     element.setAttribute('download', filename);
 
     element.style.display = 'none';
@@ -820,7 +826,7 @@ function createTable() {
 
             <hr>
 
-            <button id="om_btn_download" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+            <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
 
             <table class="air_table order-column hover" style="width:100%" id="om_resultstable" cellspacing=0></table>
             <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
@@ -838,12 +844,12 @@ function createTable() {
         var result_row = tbl.insertRow(tbl.rows.length);
         var pname = AIR.Phenotypes[phenotype].name;
 
-        globals.downloadtext += `\n${pname}`;
+        globals.om_phenotype_downloadtext += `\n${pname}`;
         checkBoxCell(result_row, 'th', pname, phenotype, 'center');
         let phenocell = createButtonCell(result_row, 'th', pname, phenotype, 'center');
 
         for (let sample in globals.samples) {
-            globals.downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
+            globals.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
             createPopupCell(result_row, 'td', AIR.Phenotypes[phenotype].norm_results[sample], 'col-3', sample, phenotype, 'center');
         }
 
@@ -996,8 +1002,8 @@ function createTable() {
 
 
     $('.air_btn_info[data-toggle="popover"]').popover()
-    $('#om_btn_download').on('click', function() {
-        download('PhenotypeActivity.txt')
+    $('#om_btn_download_phenot').on('click', function() {
+        om_download('PhenotypeActivity.txt', globals.om_phenotype_downloadtext)
     });
 
 
@@ -1986,9 +1992,12 @@ async function setupTargetChart() {
 }
 
 async function calculateTargets() {
-    
-    globals.om_targetchart.data.datasets = [];
 
+    var sample = $('#om_select_sample').val(); 
+
+    globals.om_targetchart.data.datasets = [];
+    let filter = $('#om_target_filter option:selected').text();
+    globals.om_target_downloadtext = `Sample: ${globals.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity`;
     try 
     {
         await dataset();
@@ -2002,8 +2011,7 @@ async function calculateTargets() {
         $("#airomics_tab_content").removeClass("air_disabledbutton");
     }
     async function dataset()
-    {
-
+    {                
         targets = [];
 
         var promises = [];
@@ -2031,7 +2039,7 @@ async function calculateTargets() {
                 continue;
             }
 
-            let typevalue = $('#om_select_mapping').val();
+            let typevalue = $('#om_target_filter').val();
             if (typevalue == 1) {
                 if (_type != "PROTEIN" && _type != "TF") {
                     continue;
@@ -2051,9 +2059,7 @@ async function calculateTargets() {
                 if (_type != "TF") {
                     continue;
                 }
-            }
-                
-            let sample = $('#om_select_sample').val();  
+            } 
 
             promises.push(
                 getMoleculeData(e).then(async (data) => {
@@ -2158,6 +2164,7 @@ async function calculateTargets() {
                             hoverBackgroundColor: hex,
                             pointStyle: pstyle,
                         }
+                        globals.om_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}`;
                         await addValuetoChart(result);
                     }                    
                 })
