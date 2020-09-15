@@ -130,7 +130,7 @@ function getExportPanel()
             <div class="btn-group mt-2 mb-2" role="group">
                 <button id="xp_btn_download_datazip_csv" type="button" class="xp_btn_air btn mr-2"><i class="fa fa-download"></i> CSV</button>
                 <button id="xp_btn_download_datazip_txt" type="button" class="xp_btn_air btn mr-2"><i class="fa fa-download"></i> TSV</button>
-                <button id="xp_btn_download_datazip_json" type="button" class="xp_btn_air btn"><i class="fa fa-download"></i> JSON</button>
+                <button id="xp_btn_download_datazip_json" type="button" class="xp_btn_air btn"><i class="fa fa-download"></i> JSON (raw data)</button>
             </div>
             <button id="xp_btn_download_gmt" class="xp_btn_air btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download phenotype gene sets as GMT</button>
             <h4>Phenotype specific subnetworks:<h4>
