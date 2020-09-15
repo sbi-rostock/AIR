@@ -252,6 +252,7 @@ function getExportPanel()
             }
 
             let elementids = Object.keys(AIR.Phenotypes[phenotype].values)
+            elementids.push(phenotype);
             let elements = {};
             let interactions = {};
             
