@@ -54,6 +54,10 @@ function Initiate() {
             <div id="xp_panel_interaction" class="xp_content">
 
             </div>
+        <button class="xp_collapsible mt-2">Export Data</button>
+            <div id="xp_panel_export" class="xp_content">
+
+            </div>
         <button class="xp_collapsible mt-2">Regulator Prediction</button>
             <div id="xp_panel_targets" class="xp_content">
 
@@ -84,23 +88,29 @@ function Initiate() {
         globals.interactionpanel = $("#xp_panel_interaction");
         globals.targetpanel = $("#xp_panel_targets");
         globals.centralitypanel = $("#xp_panel_centrality");
+        globals.exportpanel = $("#xp_panel_export");
 
-        
-        let t0 = performance.now();
         $('#xp_loading_text').html('Generating interaction panel ...')
         setTimeout(() => {
             getInteractionPanel().then(r => {
-                $('#xp_loading_text').html('Generating target panel ...')
+                $('#xp_loading_text').html('Generating export panel ...')
                 setTimeout(() => {
-                    getTargetPanel().then(s => {
-                        $('#xp_loading_text').html('Generating centrality panel ...')
+                    getExportPanel().then(r => {
+                        $('#xp_loading_text').html('Generating target panel ...')
                         setTimeout(() => {
-                            getCentralityPanel().then(t => {
-                                resolve('');
+                            getTargetPanel().then(s => {
+                                $('#xp_loading_text').html('Generating centrality panel ...')
+                                setTimeout(() => {
+                                    getCentralityPanel().then(t => {
+                                        resolve('');
+                                    }).catch(error => {            
+                                        reject(error);
+                                    })
+                                }, 0);
                             }).catch(error => {            
-                                reject(error);
-                            })
-                        }, 0);
+                                reject(error);;
+                            });
+                        },0);
                     }).catch(error => {            
                         reject(error);
                     })
@@ -110,6 +120,165 @@ function Initiate() {
             })
         }, 0);
     });
+}
+
+function getExportPanel()
+{
+    return new Promise((resolve, reject) => {
+        globals.exportpanel.append(`       
+            <h4 class="mt-4">Full Data:<h4>
+            <div class="btn-group mt-2 mb-2" role="group">
+                <button id="xp_btn_download_datazip_csv" type="button" class="xp_btn_air btn mr-2"><i class="fa fa-download"></i> CSV</button>
+                <button id="xp_btn_download_datazip_txt" type="button" class="xp_btn_air btn mr-2"><i class="fa fa-download"></i> TSV</button>
+                <button id="xp_btn_download_datazip_json" type="button" class="xp_btn_air btn"><i class="fa fa-download"></i> JSON</button>
+            </div>
+            <button id="xp_btn_download_gmt" class="xp_btn_air btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download phenotype gene sets as GMT</button>
+            <h4>Phenotype specific subnetworks:<h4>
+            <select id="xp_select_export_phenotype" class="browser-default xp_select custom-select mt-2"></select>
+            <div class="btn-group mt-2" role="group">
+                <button id="xp_btn_download_phenotypesubnetwork_csv" class="xp_btn_air btn mr-2" style="width:100%"> <i class="fa fa-download"></i> CSV</button>
+                <button id="xp_btn_download_phenotypesubnetwork_tsv" class="xp_btn_air btn" style="width:100%"> <i class="fa fa-download"></i> TSV</button>
+            </div>
+            
+            </select>
+        `);
+            
+        var phenotypeSelect = document.getElementById('xp_select_export_phenotype');
+
+        i = 0;
+        AIR.centralityheader.forEach(p => {
+            phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
+            i++;
+        });
+
+
+        $('#xp_btn_download_gmt').on('click', function() {
+
+            let downloadtext = '';
+            for (let p in AIR.Phenotypes)
+            {
+                downloadtext += AIR.Molecules[p].name + "\t" ;
+                if(AIR.Molecules[p].ids.hasOwnProperty("go"))
+                {
+                    downloadtext += AIR.Molecules[p].ids["go"];
+                }
+                
+                let includedids = [];
+                for(let e in AIR.Phenotypes[p].values)
+                {
+                    if(AIR.Phenotypes[p].values[e] == 0)
+                    {
+                        continue
+                    }
+                    else if (AIR.Molecules[e].subunits.length > 0) {
+                        AIR.Molecules[e].subunits.forEach(function (s, index) {
+                                if(AIR.Molecules[s].type == "PROTEIN" && includedids.includes(s) == false)
+                                {
+                                    downloadtext += "\t" + AIR.Molecules[s].name;
+                                    includedids.push(s);
+                                }
+                          });
+                    }
+                    else if(AIR.Molecules[e].type == "PROTEIN" && includedids.includes(e) == false)
+                    {
+                        downloadtext += "\t" + AIR.Molecules[e].name;
+                        includedids.push(e);
+                    }
+                }
+                downloadtext += "\n";
+            }
+            if(downloadtext != "")
+            {
+                downloadtext = downloadtext.substring(0, downloadtext.length - 2);
+            }
+            om_download('AIR_PhenotypeGeneSets.gmt', downloadtext)
+        });
+        $('#xp_btn_download_datazip_json').on('click', function() {
+
+            var zip = new JSZip();
+            zip.file("Elements.json", JSON.stringify(AIR.Molecules));
+            zip.file("Interactions.json", JSON.stringify(AIR.Interactions));
+            zip.generateAsync({type:"blob"})
+                .then(function(content) {
+                    FileSaver.saveAs(content, "hello.zip");
+                });
+        });
+
+        $('#xp_btn_download_datazip_csv').on('click', function() {
+
+            var zip = new JSZip();
+            zip.file("Elements.csv", getElementContent(AIR.Molecules, ","));
+            zip.file("Interactions.csv", getInterContent(AIR.Interactions, ","));
+            zip.generateAsync({type:"blob"})
+                .then(function(content) {
+                    FileSaver.saveAs(content, "AIR_Data.zip");
+                });
+        });
+        $('#xp_btn_download_datazip_txt').on('click', function() {
+
+            var zip = new JSZip();
+            zip.file("Elements.tsv", getElementContent(AIR.Molecules, "\t"));
+            zip.file("Interactions.tsv", getInterContent(AIR.Interactions, "\t"));
+            zip.generateAsync({type:"blob"})
+                .then(function(content) {
+                    FileSaver.saveAs(content, "AIR_Data.zip");
+                });
+        });
+ 
+        $('#xp_btn_download_phenotypesubnetwork_csv').on('click', function() {
+            phenotypeSubnetwork(",", "csv");
+        });
+        $('#xp_btn_download_phenotypesubnetwork_tsv').on('click', function() {
+            phenotypeSubnetwork("\t", "tsv");
+        });
+
+        function phenotypeSubnetwork(seperator, ending)
+        {
+            
+            let phenotypename = phenotypeSelect.options[phenotypeSelect.selectedIndex].text;
+            let phenotype = "";
+            for(let p in AIR.Phenotypes)
+            {
+                if(AIR.Phenotypes[p].name == phenotypename)
+                {
+                    phenotype = p;
+                    break;
+                }
+            }
+
+            if (phenotype == "")
+            {
+                return;
+            }
+
+            let elementids = Object.keys(AIR.Phenotypes[phenotype].values)
+            let elements = {};
+            let interactions = {};
+            
+            for(let i in AIR.Interactions)
+            {
+                if(elementids.includes(AIR.Interactions[i].source) && elementids.includes(AIR.Interactions[i].target))
+                {
+                    interactions[i] = AIR.Interactions[i];
+                }
+            }
+
+            elementids.forEach(function (e, index) {
+                elements[e] = AIR.Molecules[e];
+            });
+
+            var zip = new JSZip();
+            zip.file("Elements." + ending, getElementContent(elements, seperator));
+            zip.file("Interactions." + ending, getInterContent(interactions, seperator));
+            zip.file("Info.txt", "Selected phenotype: " + phenotypename + "\nNumber of elements: " + Object.keys(elements).length + "\nNumber of interactions: " + Object.keys(interactions).length);
+            zip.generateAsync({type:"blob"})
+                .then(function(content) {
+                    FileSaver.saveAs(content, "AIR_Subnetwork.zip");
+                });
+        }
+        resolve('')
+    });
+
 }
 
 

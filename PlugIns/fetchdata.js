@@ -2,6 +2,8 @@ let fileURL = '';
 let testing = false;
 let filetesting;
 let Chart;
+let JSZip;
+let FileSaver;
 
 
 const localURL = 'http://localhost:3000/datafiles/Full_MIM';
@@ -55,6 +57,8 @@ const globals = {
     interactionpanel: undefined,
     targetpanel: undefined,
     centralitypanel: undefined,
+    exportpanel: undefined,
+
     om_phenotype_downloadtext: '',
     om_target_downloadtext: '',
     xp_target_downloadtext: '',
@@ -134,13 +138,15 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 
-function readDataFiles(_minerva, _chart, _filetesting) {
+function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver) {
 
     return new Promise((resolve, reject) => {
 
         var t0 =  0;
         var t1 =  0;
         Chart = _chart;
+        JSZip = _jszip;
+        FileSaver = _filesaver;
         minervaProxy = _minerva;
         pluginContainer = $(minervaProxy.element);
         pluginContainerId = pluginContainer.attr('id');
@@ -326,7 +332,11 @@ function readDataFiles(_minerva, _chart, _filetesting) {
                                 {
                                     for(let id in AIR.Molecules[element].ids)
                                     {
-                                        AIR.ElementNames[id.replace('.','')][AIR.Molecules[element].ids[id]] = element
+                                        let db_key = id.replace('.','');
+                                        if(AIR.ElementNames.hasOwnProperty(db_key))
+                                        {
+                                            AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = element
+                                        }
                                     }
                                 }
                                 if(AIR.Molecules[element].type === "PHENOTYPE")
@@ -873,3 +883,88 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  
+function om_download(filename, data) {
+
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data));
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+}
+
+function getElementContent(elements, seperator)
+{
+    let element_content = "Name" + seperator + "Type" + seperator + "Subunits" + seperator + "IDs";            
+
+    for (let e in elements)
+    {
+        element_content += "\n";
+        element_content += AIR.Molecules[e].name;
+        element_content += seperator + AIR.Molecules[e].type;
+
+        let subunits = [];
+        for(let s in AIR.Molecules[e].subunits)
+        {
+            subunits.push(AIR.Molecules[AIR.Molecules[e].subunits[s]].name)
+        }
+        element_content += seperator + subunits.join(" | ");
+
+        let ids = [];
+        for(let s in AIR.Molecules[e].ids)
+        {
+            if(s != "name")
+            {
+                ids.push(s + ":" + AIR.Molecules[e].ids[s])
+            }
+        }
+        element_content += seperator + ids.join(" | ");
+    }
+
+    return element_content;
+}
+
+function getInterContent(interactions, seperator, extended = false)
+{   
+    let inter_content; 
+    if(extended)
+    {
+        inter_content = "Source" + seperator + "Type" + seperator + "Interaction" + seperator + "Target" + seperator + "Type" + seperator + "Pubmed";
+    }
+    else
+    {
+        inter_content = "Source" + seperator + "Interaction" + seperator + "Target" + seperator + "Pubmed";
+    } 
+
+    for (let e in interactions)
+    {
+        inter_content += "\n";
+        inter_content += AIR.Molecules[AIR.Interactions[e].source].name;
+        if(extended)
+        {
+            inter_content += AIR.Molecules[AIR.Interactions[e].source].type;
+        }
+        inter_content += seperator + AIR.Interactions[e].typeString;
+        inter_content += seperator + AIR.Molecules[AIR.Interactions[e].target].name;
+        if(extended)
+        {
+            inter_content += AIR.Molecules[AIR.Interactions[e].target].type;
+        }
+
+        let pubmed = [];
+        for(let s in AIR.Interactions[e].pubmed)
+        {
+            pubmed.push(AIR.Interactions[e].pubmed[s].replace("pubmed:", ""))
+        }
+
+        inter_content += seperator + pubmed.join(" | ");
+    }
+
+    return inter_content;
+}
