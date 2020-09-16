@@ -217,8 +217,8 @@ function getExportPanel()
         $('#xp_btn_download_datazip_txt').on('click', function() {
 
             var zip = new JSZip();
-            zip.file("Elements.tsv", getElementContent(AIR.Molecules, "\t"));
-            zip.file("Interactions.tsv", getInterContent(AIR.Interactions, "\t"));
+            zip.file("Elements.txt", getElementContent(AIR.Molecules, "\t"));
+            zip.file("Interactions.txt", getInterContent(AIR.Interactions, "\t"));
             zip.generateAsync({type:"blob"})
                 .then(function(content) {
                     FileSaver.saveAs(content, "AIR_Data.zip");
@@ -229,7 +229,7 @@ function getExportPanel()
             phenotypeSubnetwork(",", "csv");
         });
         $('#xp_btn_download_phenotypesubnetwork_tsv').on('click', function() {
-            phenotypeSubnetwork("\t", "tsv");
+            phenotypeSubnetwork("\t", "txt");
         });
 
         function phenotypeSubnetwork(seperator, ending)
