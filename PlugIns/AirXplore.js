@@ -200,7 +200,7 @@ function getExportPanel()
             zip.file("Interactions.json", JSON.stringify(AIR.Interactions));
             zip.generateAsync({type:"blob"})
                 .then(function(content) {
-                    FileSaver.saveAs(content, "hello.zip");
+                    FileSaver.saveAs(content, "AIR_raw.zip");
                 });
         });
 
