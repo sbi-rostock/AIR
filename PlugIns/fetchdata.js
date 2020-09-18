@@ -906,15 +906,15 @@ function getElementContent(elements, seperator)
     for (let e in elements)
     {
         element_content += "\n";
-        element_content += AIR.Molecules[e].name;
-        element_content += seperator + AIR.Molecules[e].type;
+        element_content += AIR.Molecules[e].name.replace(seperator, "");
+        element_content += seperator + AIR.Molecules[e].type.replace(seperator, "");
 
         let subunits = [];
         for(let s in AIR.Molecules[e].subunits)
         {
             subunits.push(AIR.Molecules[AIR.Molecules[e].subunits[s]].name)
         }
-        element_content += seperator + subunits.join(" | ");
+        element_content += seperator + subunits.join(" | ").replace(seperator, "");
 
         let ids = [];
         for(let s in AIR.Molecules[e].ids)
@@ -924,7 +924,7 @@ function getElementContent(elements, seperator)
                 ids.push(s + ":" + AIR.Molecules[e].ids[s])
             }
         }
-        element_content += seperator + ids.join(" | ");
+        element_content += seperator + ids.join(" | ").replace(seperator, "");
     }
 
     return element_content;
@@ -945,16 +945,16 @@ function getInterContent(interactions, seperator, extended = false)
     for (let e in interactions)
     {
         inter_content += "\n";
-        inter_content += AIR.Molecules[AIR.Interactions[e].source].name;
+        inter_content += AIR.Molecules[AIR.Interactions[e].source].name.replace(seperator, "");
         if(extended)
         {
-            inter_content += AIR.Molecules[AIR.Interactions[e].source].type;
+            inter_content += AIR.Molecules[AIR.Interactions[e].source].type.replace(seperator, "");
         }
-        inter_content += seperator + AIR.Interactions[e].typeString;
-        inter_content += seperator + AIR.Molecules[AIR.Interactions[e].target].name;
+        inter_content += seperator + AIR.Interactions[e].typeString.replace(seperator, "");
+        inter_content += seperator + AIR.Molecules[AIR.Interactions[e].target].name.replace(seperator, "");
         if(extended)
         {
-            inter_content += AIR.Molecules[AIR.Interactions[e].target].type;
+            inter_content += AIR.Molecules[AIR.Interactions[e].target].type.replace(seperator, "");
         }
 
         let pubmed = [];
@@ -963,7 +963,7 @@ function getInterContent(interactions, seperator, extended = false)
             pubmed.push(AIR.Interactions[e].pubmed[s].replace("pubmed:", ""))
         }
 
-        inter_content += seperator + pubmed.join(" | ");
+        inter_content += seperator + pubmed.join(" | ").replace(seperator, "");
     }
 
     return inter_content;
