@@ -67,7 +67,8 @@ const globals = {
     targettable: undefined,
     phenotypetable: undefined,
     centraliytable: undefined,
-
+    hpotable: undefined,
+    
     targetphenotypetable: undefined,
 
     defaultusers: ['anonymous', 'guest', 'guest user'],
