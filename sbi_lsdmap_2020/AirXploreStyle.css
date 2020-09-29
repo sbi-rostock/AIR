@@ -258,6 +258,8 @@ input[type=checkbox] .cbcontainer {
     border-bottom: 1px solid darkgray !important;
     border-top-left-radius: 1rem !important;
     border-top-right-radius: 1rem !important;
+    padding-left: 0px;
+    padding-right: 0px;
 }
 
 .air_tab.active {
