@@ -309,16 +309,19 @@ function getInteractionPanel()
         globals.interactionpanel.append(/*html*/`
 
         <ul class="air_nav_tabs nav nav-tabs mt-4" id="xp_interaction_tab" role="tablist">
-            <li class="air_nav_item nav-item" style="width: 25%;">
+            <li class="air_nav_item nav-item" style="width: 20%;">
                 <a class="air_tab air_tab_sub xp_inter_tabs active nav-link" id="xp_tab_inter_regulation" data-toggle="tab" href="#xp_tabcontent_inter_regulation" role="tab" aria-controls="xp_tabcontent_inter_regulation" aria-selected="true">Regulators</a>
             </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
+            <li class="air_nav_item nav-item" style="width: 20%;">
                 <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_target" data-toggle="tab" href="#xp_tabcontent_inter_target" role="tab" aria-controls="xp_tabcontent_inter_target" aria-selected="false">Targets</a>
             </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
+            <li class="air_nav_item nav-item" style="width: 20%;">
                 <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_phenotype" data-toggle="tab" href="#xp_tabcontent_inter_phenotype" role="tab" aria-controls="xp_tabcontent_inter_phenotype" aria-selected="false">Phenotypes</a>
             </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
+            <li class="air_nav_item nav-item" style="width: 20%;">
+                <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_hpo" data-toggle="tab" href="#xp_tabcontent_inter_hpo" role="tab" aria-controls="xp_tabcontent_inter_hpo" aria-selected="false">HPO</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 20%;">
                 <a class="air_tab air_tab_sub xp_inter_tabs nav-link" id="xp_tab_inter_sequence" data-toggle="tab" href="#xp_tabcontent_inter_sequence" role="tab" aria-controls="xp_tabcontent_inter_sequence" aria-selected="false">Sequence</a>
             </li>
         </ul>
@@ -360,6 +363,23 @@ function getInteractionPanel()
                             <th style="vertical-align: middle;">Regulation</th>
                             <th style="vertical-align: middle;">Distance</th>
                             <th style="vertical-align: middle;">Phenotype</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_hpo" role="tabpanel" aria-labelledby="xp_tab_inter_hpo">
+                <select id="xp_select_interaction_hpo" class="browser-default xp_select custom-select mb-4">
+                    <option value="0" selected>All</option>
+                    <option value="1">Phenotype</option>
+                    <option value="2">Disease</option>
+                </select>
+                <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_hpo" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th style="vertical-align: middle;">ID</th>
+                            <th style="vertical-align: middle;">Name</th>
+                            <th style="vertical-align: middle;">Type</th>
+                            <th style="vertical-align: middle;">Description</th>
                         </tr>
                     </thead>
                 </table>
@@ -422,6 +442,32 @@ function getInteractionPanel()
             ]
         }).columns.adjust();;
 
+        globals.hpotable = $('#xp_table_inter_hpo').DataTable({
+            scrollX: true,
+            autoWidth: true,
+            columns: [
+                { "width": "22%" },
+                { "width": "22%" },
+                { "width": "22%" },
+                null,
+                ],
+            columnDefs: [
+                {
+                    targets: 0,
+                    className: 'dt-right',
+                    'max-width': '20%',
+                },
+                {
+                    targets: 1,
+                    className: 'dt-left'
+                },
+                {
+                    targets: 2,
+                    className: 'dt-center'
+                }
+            ]
+        }).columns.adjust();;
+
         globals.phenotypetable = $('#xp_table_inter_phenotype').DataTable({
             scrollX: true,
             autoWidth: true,
@@ -462,12 +508,17 @@ function getInteractionPanel()
 
 
         $("#xp_select_interaction_type").change(function(){
-            getData(onlyRegulators = true);
+            getData(onlyRegulators = true, onlyHPO = false);
+        });
+
+        $("#xp_select_interaction_hpo").change(function(){
+            getData(onlyRegulators = false, onlyHPO = true);
         });
 
         globals.regulationtable.columns.adjust().draw(); 
         globals.targettable.columns.adjust().draw();
         globals.phenotypetable.columns.adjust().draw(); 
+        globals.hpotable.columns.adjust().draw(); 
 
         resolve('')
     });
@@ -1197,7 +1248,37 @@ async function getPubChemID(element, chebiid) {
     });
 }
 
-async function getData(onlyRegulators = false) {
+async function getHPO(element) {
+    return new Promise((resolve, reject) => {
+
+        if (AIR.Molecules.hasOwnProperty(element) && AIR.Molecules[element].ids.hasOwnProperty("ncbigene"))
+        {
+            $.ajax({
+                url: 'https://hpo.jax.org/api/hpo/gene/' + AIR.Molecules[element].ids.ncbigene,
+                success: function (content) {
+                    resolve(content);
+                },
+                error: function (content) {
+                    resolve({});
+                },
+                statusCode:
+                {
+                    404:function()
+                    {
+                        resolve({});     
+                    }
+                }
+            });
+        }
+        else 
+        {
+            resolve({});
+        }
+
+    });
+}
+
+async function getData(onlyRegulators = false, onlyHPO = false) {
 
     let elementname = $("#xp_elementinput").val().toLowerCase();
 
@@ -1210,6 +1291,8 @@ async function getData(onlyRegulators = false) {
         globals.regulationtable.clear();
         globals.targettable.clear();
         globals.phenotypetable.clear();
+        globals.hpotable.clear();
+        globals.hpotable.columns.adjust().draw();
     }
     else
     {
@@ -1241,175 +1324,136 @@ async function getData(onlyRegulators = false) {
                     .join(' ');
                     break;
             }
-            $('#xp_dl').show();
-            $('#xp_value_type').html(elementtype);
+            if(onlyRegulators === false && onlyHPO == false)
+            {
+                $('#xp_dl').show();
+                $('#xp_value_type').html(elementtype);
+            }
         }
         else
         {
             $('#xp_dl').hide();
             $('#xp_value_type').html("");
         }
-
-        $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
-        $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
-        
-        let resizeObserver = new ResizeObserver(() => { 
-            adjustPanels();
-        });           
-        resizeObserver.observe($("#xp_molart")[0]); 
-        resizeObserver.observe($("#xp_molartimg_modal")[0]); 
-
+        if(onlyRegulators === false && onlyHPO == false)
+        {
+            $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
+            $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
+            
+            let resizeObserver = new ResizeObserver(() => { 
+                adjustPanels();
+            });           
+            resizeObserver.observe($("#xp_molart")[0]); 
+            resizeObserver.observe($("#xp_molartimg_modal")[0]); 
+        }
         if(elementid == null)
         {
 
             globals.regulationtable.clear();
             globals.targettable.clear();
             globals.phenotypetable.clear();
+            globals.hpotable.clear();
+            globals.hpotable.columns.adjust().draw();
         }
         else
         {
-            globals.regulationtable.clear();
-
-            if(onlyRegulators === false)
+            if(onlyHPO == false)
             {
-                globals.phenotypetable.clear();                    
-                globals.targettable.clear();
-                
-                for(let p in AIR.Phenotypes)
-                {       
-                    if(AIR.Phenotypes[p].SPs.hasOwnProperty(elementid) == false)
-                    {
-                        continue;        
+                globals.regulationtable.clear();
+                if(onlyRegulators === false)
+                {
+                    globals.phenotypetable.clear();                    
+                    globals.targettable.clear();
+                    
+                    for(let p in AIR.Phenotypes)
+                    {       
+                        if(AIR.Phenotypes[p].SPs.hasOwnProperty(elementid) == false)
+                        {
+                            continue;        
+                        }
+                        var result_row =  [];
+                        var pname = AIR.Molecules[p].name;
+        
+                        var SP = AIR.Phenotypes[p].SPs[elementid];
+        
+                        if(SP === 0)
+                        {
+                            continue;
+                        }
+        
+                        var type = "";
+                        if(SP < 0)
+                        {
+                            type = '<font color="red">inhibition</font>';
+                        }
+                        if(SP > 0)
+                        {
+                            type = '<font color="green">activation</font>';
+                        }    
+        
+                        result_row.push(type);               
+        
+                        result_row.push(Math.abs(SP));
+
+                        result_row.push(getLinkIconHTML(pname));
+                        globals.phenotypetable.row.add(result_row)            
                     }
-                    var result_row =  [];
-                    var pname = AIR.Molecules[p].name;
-    
-                    var SP = AIR.Phenotypes[p].SPs[elementid];
-    
-                    if(SP === 0)
+        
+                }
+
+                for(let inter in AIR.Interactions)
+                {
+                    let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+
+                    if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
                         continue;
                     }
-    
-                    var type = "";
-                    if(SP < 0)
+                    if(_target == elementid)
                     {
-                        type = '<font color="red">inhibition</font>';
-                    }
-                    if(SP > 0)
-                    {
-                        type = '<font color="green">activation</font>';
-                    }    
-    
-                    result_row.push(type);               
-    
-                    result_row.push(Math.abs(SP));
-
-                    result_row.push(getLinkIconHTML(pname));
-                    globals.phenotypetable.row.add(result_row)            
-                }
-    
-            }
-
-            for(let inter in AIR.Interactions)
-            {
-                let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
-
-                if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
-                {
-                    continue;
-                }
-                if(_target == elementid)
-                {
-                    let {type: _sourcetype, name:_sourcename, ids:_sourceids} = AIR.Molecules[_source];
-                    let typevalue = $("#xp_select_interaction_type").val();
-                    switch(typevalue){
-                        case "1":
-                            if (_sourcetype != "miRNA") {
-                                continue;
-                            }
-                            break;
-                        case "2":
-                            if (_sourcetype != "lncRNA") {
-                                continue;
-                            }
-                            break;
-                        case "3":
-                            if (_sourcetype != "TF") {
-                                continue;
-                            }
-                            break;
-                    }
-
-                    globals.downloadtext = "";
-
-                    var result_row =  [];
-
-                    result_row.push(getLinkIconHTML(_sourcename));
-
-                    var typehtml = '<font color="green">activation</font>';
-                    if(_type == -1)
-                    {
-                        typehtml = '<font color="red">inhibition</font>';
-                    }
-                    else if(_type == 0)
-                    {
-                        typehtml = "unknown";
-                    }
-                    
-
-                    result_row.push(typehtml);
-                    
-                    result_row.push(_sourcetype);
-
-                    var pubmedstring = "";
-                    _pubmed.forEach(p =>
-                    {
-                        p = p.trim();
-                        var ptext = p.replace('pubmed:','');
-
-                        if(isNaN(ptext))
-                        {
-                            return;
+                        let {type: _sourcetype, name:_sourcename, ids:_sourceids} = AIR.Molecules[_source];
+                        let typevalue = $("#xp_select_interaction_type").val();
+                        switch(typevalue){
+                            case "1":
+                                if (_sourcetype != "miRNA") {
+                                    continue;
+                                }
+                                break;
+                            case "2":
+                                if (_sourcetype != "lncRNA") {
+                                    continue;
+                                }
+                                break;
+                            case "3":
+                                if (_sourcetype != "TF") {
+                                    continue;
+                                }
+                                break;
                         }
 
-                        if(p.includes(":") === false)
+                        globals.downloadtext = "";
+
+                        var result_row =  [];
+
+                        result_row.push(getLinkIconHTML(_sourcename));
+
+                        var typehtml = '<font color="green">activation</font>';
+                        if(_type == -1)
                         {
-                            p = "pubmed:" + p;
+                            typehtml = '<font color="red">inhibition</font>';
                         }
-                        var ptext = p.replace('pubmed:','');
-                        pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
-                    });
+                        else if(_type == 0)
+                        {
+                            typehtml = "unknown";
+                        }
+                        
 
-                    result_row.push(pubmedstring.substr(0, pubmedstring.length-2));
-                    globals.regulationtable.row.add(result_row)
-                }
+                        result_row.push(typehtml);
+                        
+                        result_row.push(_sourcetype);
 
-                if(_source == elementid && onlyRegulators === false)
-                {
-
-                    let {type: _targettype, name:_targetname, ids:_targetids} = AIR.Molecules[_target];
-
-                    var result_row =  [];
-
-                    result_row.push(getLinkIconHTML(_targetname));
-
-                    var typehtml = '<font color="green">activation</font>';
-                    if(_type == -1)
-                    {
-                        typehtml = '<font color="red">inhibition</font>';
-                    }
-                    else if(_type == 0)
-                    {
-                        typehtml = "unknown";
-                    }                                 
-                    
-                    result_row.push(_targettype);
-
-                    result_row.push(typehtml);
-
-                    var pubmedstring = "";
-                    _pubmed.forEach(p =>
+                        var pubmedstring = "";
+                        _pubmed.forEach(p =>
                         {
                             p = p.trim();
                             var ptext = p.replace('pubmed:','');
@@ -1418,24 +1462,111 @@ async function getData(onlyRegulators = false) {
                             {
                                 return;
                             }
+
                             if(p.includes(":") === false)
                             {
                                 p = "pubmed:" + p;
                             }
-
+                            var ptext = p.replace('pubmed:','');
                             pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
                         });
 
-                    result_row.push(pubmedstring.substr(0, pubmedstring.length-2));
-                    globals.targettable.row.add(result_row)
+                        result_row.push(pubmedstring.substr(0, pubmedstring.length-2));
+                        globals.regulationtable.row.add(result_row)
+                    }
+
+                    if(_source == elementid && onlyRegulators === false)
+                    {
+
+                        let {type: _targettype, name:_targetname, ids:_targetids} = AIR.Molecules[_target];
+
+                        var result_row =  [];
+
+                        result_row.push(getLinkIconHTML(_targetname));
+
+                        var typehtml = '<font color="green">activation</font>';
+                        if(_type == -1)
+                        {
+                            typehtml = '<font color="red">inhibition</font>';
+                        }
+                        else if(_type == 0)
+                        {
+                            typehtml = "unknown";
+                        }                                 
+                        
+                        result_row.push(_targettype);
+
+                        result_row.push(typehtml);
+
+                        var pubmedstring = "";
+                        _pubmed.forEach(p =>
+                            {
+                                p = p.trim();
+                                var ptext = p.replace('pubmed:','');
+
+                                if(isNaN(ptext))
+                                {
+                                    return;
+                                }
+                                if(p.includes(":") === false)
+                                {
+                                    p = "pubmed:" + p;
+                                }
+
+                                pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
+                            });
+
+                        result_row.push(pubmedstring.substr(0, pubmedstring.length-2));
+                        globals.targettable.row.add(result_row)
+                    }
+
+
                 }
+            }
+            if (onlyRegulators === false) {
 
+                globals.hpotable.clear();
+                let response = await getHPO(elementid)
+                let typevalue = $("#xp_select_interaction_hpo").val();
+                if(response.hasOwnProperty("termAssoc") && typevalue != 2)
+                {
+                    for(let term in response["termAssoc"])
+                    {
+                        var result_row =  [];
+    
+                        result_row.push(`<a target="_blank" href="https://hpo.jax.org/app/browse/term/${response["termAssoc"][term].ontologyId}">${response["termAssoc"][term].ontologyId}</a>`);               
+        
+                        result_row.push(response["termAssoc"][term].name);
+    
+                        result_row.push("Phenotype");
 
+                        result_row.push(response["termAssoc"][term].definition);
+
+                        globals.hpotable.row.add(result_row) 
+                    }
+                }
+                if(response.hasOwnProperty("diseaseAssoc") && typevalue != 1)
+                {
+                    for(let term in response["diseaseAssoc"])
+                    {
+                        var result_row =  [];
+    
+                        result_row.push(`<a target="_blank" href="https://hpo.jax.org/app/browse/disease/${response["diseaseAssoc"][term].diseaseId}">${response["diseaseAssoc"][term].diseaseId}</a>`);               
+        
+                        result_row.push(response["diseaseAssoc"][term].diseaseName);
+    
+                        result_row.push("Disease");
+
+                        result_row.push("");
+
+                        globals.hpotable.row.add(result_row) 
+                    }
+                }
+                globals.hpotable.columns.adjust().draw();
             }
         }
-
-            
-        if(onlyRegulators === false)
+           
+        if(onlyRegulators === false && onlyHPO == false)
         {
             setTimeout(async function() {
 
