@@ -25,7 +25,8 @@
   background-color: #ffffff;
   overflow-x: hidden;
   overflow-y: hidden;
-  font-family: Helvetica Neue,Helvetica,Arial,sans-serif; }
+  font-family: Helvetica Neue,Helvetica,Arial,sans-serif !important;
+}
   
 .xp_select {
   cursor: pointer; }
@@ -244,6 +245,12 @@
 
 .air_checkbox, input[type=checkbox] {
   vertical-align: middle; }
+
+.air_checkbox_label {
+  padding-top: 2.5px;
+  font-family: lato;
+  color: #333
+}
   
 input[type=checkbox] .cbcontainer {
   margin-left: 0; }
@@ -258,6 +265,8 @@ input[type=checkbox] .cbcontainer {
     border-bottom: 1px solid darkgray !important;
     border-top-left-radius: 1rem !important;
     border-top-right-radius: 1rem !important;
+    padding-left: 0px;
+    padding-right: 0px;
 }
 
 .air_tab.active {
