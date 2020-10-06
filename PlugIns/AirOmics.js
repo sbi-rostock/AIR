@@ -237,14 +237,7 @@ async function AirOmics(){
                 {
                     if ((globals.columnheaders.length - 1)%2 != 0)
                         return stopfile('Number of p-value columns is different from the sumber of sample columns!'); 
-                        
-                    globals.numberofSamples = (globals.columnheaders.length - 1) / 2;
                 }
-                else
-                {
-                    globals.numberofSamples = globals.columnheaders.length - 1;
-                }
-
                 let columnSelect = document.getElementById('om_columnSelect');
 
                 for(let i = 0; i < globals.columnheaders.length;i++) {
@@ -1176,7 +1169,7 @@ function createTable() {
     }) */
 
     $('#om_resultstable').DataTable({
-        "order": [[ globals.numberofSamples + 2, "desc" ]],  
+        "order": [[ globals.samples.length + 2, "desc" ]],  
         "scrollX": true
     });
 
@@ -2417,7 +2410,7 @@ async function enrichr() {
         list_elements = []
         for(let e in globals.ExpressionValues)
         {
-            if(globals.ExpressionValues[e]["custom"] == false && Math.abs(globals.ExpressionValues[e]["nonnormalized"][sample]) > fc_threshold && (globals.pvalue == false || globals.ExpressionValues[e]["pvalues"][sample] < pvalue_threshold))
+            if(globals.ExpressionValues[e]["custom"] == false && Math.abs(globals.ExpressionValues[e]["nonnormalized"][sample]) >= fc_threshold && (globals.pvalue == false || globals.ExpressionValues[e]["pvalues"][sample] <= pvalue_threshold))
             {
                 list_elements.push(globals.ExpressionValues[e].name)
             }
@@ -2444,7 +2437,7 @@ async function enrichr() {
 
         enrichrresults_table.clear();
 
-        let _sample = enrichrsampleselect.selectedIndex;
+        let _sample = enrichrsampleselect.selectedIndex - 1;
 
         for(let r in enrichresults)
         {
@@ -2474,27 +2467,44 @@ async function enrichr() {
 }
 async function getEnrichr(elements, selectedenrichr) {
     return new Promise((resolve, reject) => {
+
+        let empty_results = {
+                                selectedenrichr: {}
+                            }
+
+        if(elements.length == 0)
+        {
+            resolve(empty_results)
+            return;
+        }
         var formData = new FormData();
         formData.append('list', elements.join("\n"));
 
         var xhr = new XMLHttpRequest();
         // Add any event handlers here...
         xhr.open('POST', 'https://maayanlab.cloud/Enrichr/addList', true);
-        xhr.send(formData);
         xhr.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                $.ajax({
-                    url: "https://maayanlab.cloud/Enrichr/enrich?userListId="+ JSON.parse(xhr.responseText)["userListId"] + "&backgroundType=" + selectedenrichr,
-                    success: function (content) {
-                        resolve(JSON.parse(content))
-                    },
-                    error: function () {
-                        resolve({selectedenrichr: {}})
-                    }
-                });
+            if (this.readyState == 4)
+            {
+                if(this.status == 200) {
+                    $.ajax({
+                        url: "https://maayanlab.cloud/Enrichr/enrich?userListId="+ JSON.parse(xhr.responseText)["userListId"] + "&backgroundType=" + selectedenrichr,
+                        success: function (content) {
+                            resolve(JSON.parse(content))
+                        },
+                        error: function () {
+                            alert("Failed to fetch results from Enrichr.")
+                            resolve(empty_results)
+                        }
+                    });
+                }
+                else {
+                    alert("Failed to upload the following gene set to Enrichr:\n" + elements.join(", "))
+                    resolve(empty_results)
+                }
             }
-            else
-                resolve({selectedenrichr: {}})
         }
+        xhr.send(formData);
+
     });
 }
