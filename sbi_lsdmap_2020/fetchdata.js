@@ -6,7 +6,7 @@ let JSZip;
 let FileSaver;
 
 
-const localURL = 'http://localhost:3000/';
+const localURL = 'http://localhost:3000/datafiles/Full_MIM';
 const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020';
 
 const AIR = {
@@ -68,7 +68,7 @@ const globals = {
     phenotypetable: undefined,
     centraliytable: undefined,
     hpotable: undefined,
-    
+
     targetphenotypetable: undefined,
 
     defaultusers: ['anonymous', 'guest', 'guest user'],
@@ -115,6 +115,7 @@ const globals = {
     alreadycalculated: false,
     targetsanalyzed: true,
 
+    pvalue: false,
     samples: [],
     samplesResults: [],
     samplestring: '',
@@ -126,6 +127,7 @@ const globals = {
     container: undefined,
     om_container: undefined,
 
+    enrichrtab: undefined,
     phenotab: undefined,
     targettab: undefined,
     resultscontainer: undefined,
@@ -867,13 +869,33 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
     return true;
   }
   
-  function standarddeviation(array) {
+function standarddeviation(_temparray) {
+
+    let array = []
+
+    _temparray.forEach(_e => {
+        if(!isNaN(_e))
+        {
+            array.push(_e)
+        }
+    });
+    
     const n = array.length
     const mean = array.reduce((a, b) => a + b) / n
     return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n)
-  }
+}
 
-  function mean(numbers) {
+function mean(_temparray) {
+
+    let numbers = []
+
+    _temparray.forEach(_e => {
+        if(!isNaN(_e))
+        {
+            numbers.push(_e)
+        }
+    });
+    
     var total = 0, i;
     for (i = 0; i < numbers.length; i += 1) {
         total += numbers[i];
@@ -968,4 +990,50 @@ function getInterContent(interactions, seperator, extended = false)
     }
 
     return inter_content;
+}
+
+function isNumber(evt) {
+    evt = (evt) ? evt : window.event;
+    var charCode = (evt.which) ? evt.which : evt.keyCode;
+    if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 44 && charCode != 46) {
+        return false;
+    }
+    return true;
+}
+
+function indexOfSmallest(_temparray, absolute = false) {
+    let a = []
+
+    _temparray.forEach(_e => {
+        if(!isNaN(_e))
+        {
+            a.push(_e)
+        }
+    });
+
+    var lowest = 0;
+    for (var i = 1; i < a.length; i++) {
+     if ((absolute && Math.abs(a[i]) < Math.abs(a[lowest])) || (!absolute && a[i] < a[lowest]))
+        lowest = i;
+    }
+    return _temparray.indexOf(a[lowest]);
+}
+
+function indexOfLargest(_temparray, absolute = false) {
+
+    let a = []
+
+    _temparray.forEach(_e => {
+        if(!isNaN(_e))
+        {
+            a.push(_e)
+        }
+    });
+    
+    var largest = 0;
+    for (var i = 1; i < a.length; i++) {
+        if ((absolute && Math.abs(a[i]) < Math.abs(a[largest])) || (!absolute && a[i] < a[largest]))
+         largest = i;
+    }
+    return _temparray.indexOf(a[largest]);
 }
