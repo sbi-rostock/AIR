@@ -258,10 +258,11 @@ input[type=checkbox] .cbcontainer {
   margin-bottom: 5px;
 }
 
-
+.air_tab {
+  border-bottom: 1px solid darkgray !important;
+}
 .air_nav_tabs, .air_tab {
     border: 0px solid transparent;
-    border-bottom: 1px solid darkgray !important;
     border-top-left-radius: 1rem !important;
     border-top-right-radius: 1rem !important;
     padding-left: 0px;
@@ -269,7 +270,7 @@ input[type=checkbox] .cbcontainer {
 }
 
 .air_tab.active {
-border-color: darkgray darkgray #fff !important;
+  border-color: darkgray darkgray #fafafa !important;
 }
 
 .air_tab_sub.active {
