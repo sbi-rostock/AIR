@@ -4,10 +4,11 @@ let filetesting;
 let Chart;
 let JSZip;
 let FileSaver;
+let VCF;
 
 
 const localURL = 'http://localhost:3000/datafiles/Full_MIM';
-const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020';
+const githubURL = "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
 
 const AIR = {
     MoleculeData: {},
@@ -126,6 +127,7 @@ const globals = {
 
     container: undefined,
     om_container: undefined,
+    gv_container: undefined,
 
     enrichrtab: undefined,
     phenotab: undefined,
@@ -141,13 +143,14 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 
-function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver) {
+function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf) {
 
     return new Promise((resolve, reject) => {
 
         var t0 =  0;
         var t1 =  0;
         Chart = _chart;
+        VCF = _vcf;
         JSZip = _jszip;
         FileSaver = _filesaver;
         minervaProxy = _minerva;
@@ -517,10 +520,6 @@ function getValue(key)
                     reject(e)
                 });
             }
-
-            function replaceAll(string, search, replace) {
-                return string.split(search).join(replace);
-              }
 
         });
 
@@ -1036,4 +1035,22 @@ function indexOfLargest(_temparray, absolute = false) {
          largest = i;
     }
     return _temparray.indexOf(a[largest]);
+}
+
+
+async function updateProgress(value, max, progressbar, text = "") {
+    return new Promise(resolve => {
+        let percentage = Math.ceil(value * 100 / max);
+        setTimeout(setProgress, 0);
+        function setProgress() {
+            $("#" + progressbar).width(percentage + "%" + text);
+            $("#"+progressbar+"_label").html(percentage + " %" + text);
+            resolve('');
+        }
+    });
+  }
+
+
+function replaceAll(string, search, replace) {
+    return string.split(search).join(replace);
 }

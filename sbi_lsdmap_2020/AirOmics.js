@@ -2098,17 +2098,6 @@ async function OM_PredictTargets() {
     await calculateTargets();
 }
 
-async function updateProgress(value, max, progressbar) {
-    return new Promise(resolve => {
-        setTimeout(function(){
-            let percentage = Math.round(value * 100 / max);
-            $("#" + progressbar).width(percentage + "%");
-            $("#"+progressbar+"_label").html(percentage + " %");
-            resolve('');
-        }, 0);
-    });
-  }
-
 async function setupTargetChart() {
     return new Promise(resolve => {
         setTimeout(function(){

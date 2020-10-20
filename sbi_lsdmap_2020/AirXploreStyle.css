@@ -3,6 +3,9 @@
   font-size: 15px;
   font-weight: bold;
 }
+.gv_table_expand, .gv_table_sub_expand {
+  cursor: pointer;
+}
 
 .air_dl {
   display: none; 
@@ -20,7 +23,7 @@
   margin-bottom: 0px;
 }
 
-.Centogene-container {
+.AirPlugins-container {
   padding: 5px;
   background-color: #ffffff;
   overflow-x: hidden;
