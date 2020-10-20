@@ -8,7 +8,7 @@ let VCF;
 
 
 const localURL = 'http://localhost:3000/datafiles/Full_MIM';
-const githubURL = "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
+const githubURL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
 
 const AIR = {
     MoleculeData: {},
