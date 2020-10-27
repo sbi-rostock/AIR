@@ -603,7 +603,7 @@ $(document).on('click', '.clickPhenotypeinTable', function () {
     selectElementonMap(AIR.Phenotypes[sid].name, false);
 });
 
-$(document).on('change', '.clickCBinTable',function () {
+$(document).on('change', '.om_clickCBinTable',function () {
 
 
     var id = $(this).attr('data');
@@ -967,7 +967,7 @@ function createTable() {
         var pname = AIR.Phenotypes[phenotype].name;
 
         globals.om_phenotype_downloadtext += `\n${pname}`;
-        checkBoxCell(result_row, 'th', pname, phenotype, 'center');
+        checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
         let phenocell = createButtonCell(result_row, 'th', pname, phenotype, 'center');
 
         for (let sample in globals.samples) {
@@ -1672,14 +1672,6 @@ function loadfile() {
 }
 
 function contentString(ID) {
-
-    var rgbToHex = function (rgb) {
-        var hex = Number(Math.round(rgb)).toString(16);
-        if (hex.length < 2) {
-            hex = "0" + hex;
-        }
-        return hex;
-    };
 
     let addednames = [];
     let output = '';

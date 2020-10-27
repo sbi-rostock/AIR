@@ -1,9 +1,21 @@
+.air_red {
+  background-color: lightcoral !important;
+}
+.air_yellow {
+  background-color: lightyellow !important;
+}
+.air_green {
+  background-color: lightgreen !important;
+}
+.air_gray {
+  background-color: lightgrey !important;
+}
 .air_nav_item {
   text-align: center; 
   font-size: 15px;
   font-weight: bold;
 }
-.gv_table_expand, .gv_table_sub_expand {
+.gv_table_expand, .gv_table_sub_expand, .gv_table_cons_expand, .gv_table_cons_sub_expand {
   cursor: pointer;
 }
 
@@ -23,7 +35,7 @@
   margin-bottom: 0px;
 }
 
-.AirPlugins-container {
+.Centogene-container {
   padding: 5px;
   background-color: #ffffff;
   overflow-x: hidden;

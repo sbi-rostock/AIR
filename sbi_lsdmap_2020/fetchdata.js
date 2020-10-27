@@ -590,43 +590,26 @@ function getMoleculeData(key, phenotype = false)
 
 }
 
-function highlightSelected(pickedRandomly = false) {
+function highlightSelected(elements) {
 
     minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
 
         minervaProxy.project.map.hideBioEntity(highlighted).then(r => {
 
-            const highlightDefs = [];
-
-            if (pickedRandomly) {
-                if (globals.pickedRandomly) {
+            highlightDefs =[]
+            
+            AIR.allBioEntities.forEach(e => {
+                if (e.constructor.name === 'Alias' && elements.includes(e.getName())) {
                     highlightDefs.push({
                         element: {
-                            id: globals.pickedRandomly.id,
-                            modelId: globals.pickedRandomly.getModelId(),
-                            type: globals.pickedRandomly.constructor.name.toUpperCase()
+                            id: e.id,
+                            modelId: e.getModelId(),
+                            type: "ALIAS"
                         },
-                        type: "SURFACE",
-                        options: {
-                            color: '#00FF00',
-                            opacity: 0.2
-                        }
+                        type: "ICON"
                     });
                 }
-            } else {
-                globals.selected.forEach(e => {
-                    if (e.constructor.name === 'Alias') {
-                        highlightDefs.push({
-                            element: {
-                                id: e.id,
-                                modelId: e.getModelId(),
-                                type: "ALIAS"
-                            },
-                            type: "ICON"
-                        });
-                    }
-                });
-            }
+            });
 
             minervaProxy.project.map.showBioEntity(highlightDefs);
         });
@@ -800,11 +783,11 @@ function createButtonCell(row, type, text, data, align) {
 
     return button; // append DIV to the table cell
 }
-function checkBoxCell(row, type, text, data, align) {
+function checkBoxCell(row, type, text, data, align, prefix) {
     var button = document.createElement('input'); // create text node
     button.innerHTML = text;
     button.setAttribute('type', 'checkbox');
-    button.setAttribute('class', 'clickCBinTable');
+    button.setAttribute('class', prefix + 'clickCBinTable');
     button.setAttribute('data', data);
 
     var cell = document.createElement(type); // create text node
@@ -835,6 +818,7 @@ function createSliderCell(row, type, data) {
 async function disablebutton(id) {
     var promise = new Promise(function(resolve, reject) {
         setTimeout(() => {
+            $("#pluginContainerId :button").attr("disabled", true);
             var $btn = $('#'+id);
             let text = $btn.html();
             $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');      
@@ -848,6 +832,7 @@ async function disablebutton(id) {
 async function enablebtn(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
+            $("#pluginContainerId :button").attr("disabled", false);
             var $btn = $('#'+id);
             $btn.html(text);
             $("#air_plugincontainer").removeClass("air_disabledbutton");
@@ -1054,3 +1039,12 @@ async function updateProgress(value, max, progressbar, text = "") {
 function replaceAll(string, search, replace) {
     return string.split(search).join(replace);
 }
+
+
+function rgbToHex(rgb) {
+    var hex = Number(Math.round(rgb)).toString(16);
+    if (hex.length < 2) {
+        hex = "0" + hex;
+    }
+    return hex;
+};
