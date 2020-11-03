@@ -1049,7 +1049,7 @@ async function gv_createTable()
 
         for(var _id in globals.variant.samples)
         {
-            if(tbl_data[m].samples,hasOwnProperty(_id))
+            if(tbl_data[m].samples.hasOwnProperty(_id))
             {
                 createPopupCell(result_row, 'td', Array.from(tbl_data[m].samples[_id]).length, 'col-3', 'center', gv_create_table_popup, {"element": m, "sample": _id});
             }
