@@ -78,29 +78,6 @@
   
   .wrapper {
     text-align: center; }
-
-  
-
-  .om_btn_air {
-      background-color: #FF8C8C;
-      border-color: #FF8C8C;
-      font-weight: bold;
-      color: white; 
-      padding: 0;
-      height: 32.5px;
-    }
-  
-  .om_btn_air:focus {
-    outline: none !important;
-    box-shadow: none !important;
-    background-color: #FF8C8C;
-    border-color: #FF8C8C;
-    color: white; }
-  
-  .om_btn_air:active, .om_btn_air:hover {
-    background-color: #ff5959;
-    border-color: #ff5959;
-    color: white; }
   
   .clickPhenotypeinTable, .clickPhenotypeinTable:active {
     display: inline-block;
@@ -252,22 +229,4 @@
   @media only screen and (max-width: 700px) {
     .air_modal_content {
       width: 100%; } }
-  
-.air_progress {
-    color: white;
-    background-color: #FF8C8C;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-}
-.air_progress_value {
-  background-color: #ff5959;
-  height: 100%;
-}
 
-.air_progress_label {
-  height:100%;
-  top: 4.5px;
-  font-size: 1rem;
-  font-weight: bold;
-}

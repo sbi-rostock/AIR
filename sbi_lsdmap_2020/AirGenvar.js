@@ -1,35 +1,39 @@
-var gv_table = null;
-var selected_elements = new Set();
-var gv_table_cons = null;
-var gv_table_sub = null;
-var gv_table_sub_sub = null;
-var variants = [];
-var transcripts = null;
-var analyzed_genome = "";
-var index_db = {};
-var gv_results = {};
-var mutation_results = {}
-var impacts = ["NONE", "MODIFIER", "LOW", "MODERATE", "HIGH"]
-var impactValues = {
-    "HIGH":4,
-    "MODERATE":3,
-    "LOW":2,
-    "MODIFIER":1,
-    "None": 0
-}
-var transcriptfilter = {
-    0: "transcript",
-    1: "exon",
-    2: "cds",
-    3: "stop_codon",
-    4: "5utr",
-    5: "3utr"
-}
-var selected_ttype = "transcript";
-var negativeStrand = false;
-
-async function AirGenvar(){    
-    let t0 = performance.now();   
+async function AirGenvar(){  
+    globals.variant = {
+        samples: [],
+        gv_table: null,
+        selected_elements: new Set(),
+        gv_table_cons: null,
+        gv_table_sub: null,
+        gv_table_sub_sub: null,
+        variants: [],
+        variants_temp: {},
+        transcripts: null,
+        analyzed_genome: "",
+        index_db: {},
+        gv_results: {},
+        mutation_results: {},
+        impacts: ["NONE", "LOW", "MODIFIER", "MODERATE", "HIGH"],
+        impactValues: {
+            "HIGH":4,
+            "MODERATE":3,
+            "LOW":1,
+            "MODIFIER":2,
+            "None": 0
+        },
+        vep_results: {},
+        transcriptfilter: {
+            0: "transcript",
+            1: "exon",
+            2: "cds",
+            3: "stop_codon",
+            4: "5utr",
+            5: "3utr"
+        },
+        selected_ttype: "transcript",
+        negativeStrand: false
+    }  
+    var t0 = performance.now();   
     globals.gv_container = $("#airgenvar_tab_content")
     $(
         /*<div class="text-center">
@@ -49,7 +53,7 @@ async function AirGenvar(){
                 </div>
             </div>
             <div class="col">
-                <input id="gv_inputId" type="file" accept=".vcf" class="om_inputfile inputfile" />
+                <input id="gv_inputId" type="file"  accept=".vcf" class="om_inputfile inputfile" multiple/>
             </div>
         </div>
 
@@ -70,7 +74,9 @@ async function AirGenvar(){
             <label class="air_checkbox air_checkbox_label" for="gv_checkbox_strand">Include negative strands?</label>
         </div>
 
-        <button type="button" id="var_readfile" class="om_btn_air btn btn-block mt-4 mb-5">Read VCF</button>
+        <button type="button" id="gv_readfile" class="air_btn btn btn-block mt-4 mb-4">Read VCF</button>
+
+        <hr>
 
         <div id="gv_typeselect-container" class="air_disabledbutton row mb-4 mt-4">
             <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
@@ -89,21 +95,11 @@ async function AirGenvar(){
         </div>
         
         <table class="stripe" style="width:100%" id="gv_table" cellspacing=0>
-            <thead>
-                <tr>
-                    <th></th>
-                    <th></th>
-                    <th style="vertical-align: middle;">Gene</th>
-                    <th style="vertical-align: middle;">Chrom.</th>
-                    <th style="vertical-align: middle;">#Transcripts</th>
-                    <th style="vertical-align: middle;">#Variants</th>
-                </tr>
-            </thead>
         </table>
 
-        <button type="button" id="gv_selectmapelements" class="om_btn_air btn btn-block mt-4 mb-2">Select all map elements</button>
+        <button type="button" id="gv_selectmapelements" class="air_btn btn btn-block mt-4 mb-2">Select all map elements</button>
 
-        <button type="button" id="gv_reset" class="om_btn_air btn btn-block mt-2 mb-4">Reset</button>
+        <button type="button" id="gv_reset" class="air_btn btn btn-block mt-2 mb-4">Reset</button>
 
         <hr>
 
@@ -119,16 +115,24 @@ async function AirGenvar(){
                     </button>
                 </div>
             </div>
-            <div class="col">
+            <div class="col" style="padding-right: 0px">
                 <input id="gv_elementfilter" class="form-control" type="text" placeholder="Element names seperated by comma."> 
             </div>
-            <div class="col-auto">
+            <div class="col-auto" style="padding-right: 15px">
                 <p id="gv_elementnumbers">0</p>
             </div>
         </div>
         
+        <div id="gv_frequency-container" class="row mb-2">
+            <div class="col-5 air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;"><a href="https://gnomad.broadinstitute.org/about" target="_blank">gnomAD</a> frequency threshold:</span>
+            </div>
+            <div class="col">
+                <input type="text" class="textfield" value="0.1" id="gv_frequency" onkeypress="return isNumber(event)" />
+            </div>
+        </div>
 
-        <button type="button" id="gv_getConsequences" class="om_btn_air btn btn-block mt-4 mb-5">Predict Variant Consequences</button>
+        <button type="button" id="gv_getConsequences" class="air_btn btn btn-block mt-4 mb-5">Predict Variant Consequences</button>
 
         <div id="gv_impactselect-container" class="air_disabledbutton row mb-4 mt-4">
             <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
@@ -139,24 +143,16 @@ async function AirGenvar(){
                     <option value="0" selected>Any</option>
                     <option value="4">High</option>
                     <option value="3">Moderate</option>
-                    <option value="2">Low</option>
-                    <option value="1">Modifier</option>
+                    <option value="2">Modifier</option>
+                    <option value="1">Low</option>
                 </select>
             </div>
         </div>
         
         <table style="width:100%" id="gv_table_cons" cellspacing=0>
-            <thead>
-                <tr>
-                    <th></th>
-                    <th style="vertical-align: middle;">Gene</th>
-                    <th style="vertical-align: middle;">Impact</th>
-                    <th style="vertical-align: middle;">Most severe consequence</th>
-                    <th style="vertical-align: middle;">#Variants</th>
-                </tr>
-            </thead>
         </table>
-
+        <button type="button" id="gv_resetConsequences" class="air_btn btn btn-block mt-2 mb-2">Reset Outputs</button>
+        <button id="gv_btn_download" class="om_btn_download btn mt-2 mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
         <hr>
 
         <h4 class="mt-4 mb-4">3. Create Overlays</h4> 
@@ -176,101 +172,34 @@ async function AirGenvar(){
 
         <input id="gv_olname" class="form-control mb-4 mt-4" type="text" placeholder="Overlay Name"> 
 
-        <button type="button" id="gv_addoverlay" class="om_btn_air btn btn-block mt-4 mb-5">Create Overlay</button>
+        <button type="button" id="gv_addoverlay" class="air_btn btn btn-block mt-4 mb-5">Create Overlay</button>
 
     `).appendTo(globals.gv_container);
-    gv_table = $('#gv_table').DataTable({
-        "order": [[ 2, "asc" ]], 
-        "scrollX": true,
-        "autoWidth": true,
-        "columns": [
-            {
-                "class":          "gv_table_expand",
-                "orderable":      false,
-                "data":           null,
-                "width": "5%",
-                "defaultContent": '<a class="fa fa-caret-right"></a>'
-            },
-            {
-                "width": "5%",
-                "orderable":false
-            },
-            {"width": "40%"},
-            {"width": "10%"},
-            {"width": "20%"},
-            {"width": "20%"}
-        ],
-        "columnDefs": [
-            {
-                targets: 0,
-                className: 'dt-center',
-            },
-            {
-                targets: 1,
-                className: 'dt-center'
-            },
-            {
-                targets: 2,
-                className: 'dt-center'
-            },
-            {
-                targets: 3,
-                className: 'dt-center'
-            },
-            {
-                targets: 4,
-                className: 'dt-center'
-            },
-            {
-                targets: 5,
-                className: 'dt-center'
-            },
-        ]
-    }).columns.adjust();
 
-    gv_table_cons = $('#gv_table_cons').DataTable({
-        "order": [[ 1, "asc" ]], 
-        "scrollX": true,
-        "autoWidth": true,
-        "columns": [
+    $('#gv_btn_download').on('click', function() {
+
+        var _text = "gene\t" + globals.variant.samples.join("\t") + "\n";
+
+        for(var m in globals.variant.mutation_results)
+        {
+            _text += AIR.Molecules[m].name;
+            for(var sample in globals.variant.samples)
             {
-                "class":          "gv_table_cons_expand",
-                "orderable":      false,
-                "data":           null,
-                "width": "5%",
-                "defaultContent": '<a class="fa fa-caret-right"></a>'
-            },
-            {"width": "20%"},
-            {"width": "15%"},
-            {"width": "40%"},
-            {"width": "15%"}
-        ],
-        "columnDefs": [
-            {
-                targets: 0,
-                className: 'dt-center',
-            },
-            {
-                targets: 1,
-                className: 'dt-center'
-            },
-            {
-                targets: 2,
-                className: 'dt-center'
-            },
-            {
-                targets: 3,
-                className: 'dt-center'
-            },
-            {
-                targets: 4,
-                className: 'dt-center'
-            },
-        ]
-    }).columns.adjust();;
+                switch(globals.variant.impacts.indexOf(globals.variant.mutation_results[m][sample].impact))
+                {
+                    case 4: _text += "\t-1"; break;
+                    case 3: _text += "\t-0.5"; break;
+                    default: _text += "\t0"; break;
+                }
+            }
+            _text += "\n";
+        }
+        air_download('VariantEffectResults.txt', _text)
+    });
+
     $('#gv_typeselect').on('change', async function() {
-        selected_ttype = transcriptfilter[this.value];
-        gv_table.clear();
+        globals.variant.selected_ttype = globals.variant.transcriptfilter[this.value];
+        globals.variant.gv_table.clear();
         await gv_createTable()
     });
 
@@ -278,30 +207,31 @@ async function AirGenvar(){
     
     $('.air_btn_info[data-toggle="popover"]').popover()
 
-    let t1 = performance.now()
+    var t1 = performance.now()
     console.log("Call to AirGenvar took " + (t1 - t0) + " milliseconds.")
-    gv_table_cons.columns.adjust();
-    gv_table.columns.adjust();
     
-    $('#var_readfile').on('click', async function() {
+    $('#gv_readfile').on('click', async function() {
 
-        let _negativeStrand = document.getElementById("gv_checkbox_strand").checked
+        var _negativeStrand = document.getElementById("gv_checkbox_strand").checked
         var genome = $('#gv_genomeselect').val()
-        if(analyzed_genome != genome || negativeStrand != _negativeStrand)
-        {
-            transcripts = null;
-            variants = [];
-            index_db = {};
-            analyzed_genome = genome
-            negativeStrand = _negativeStrand
-            mutation_results = {}
+        globals.variant.mutation_results = {}
+        
+        if(globals.variant.analyzed_genome != genome || globals.variant.negativeStrand != _negativeStrand)
+        {            
+            globals.variant.transcripts = null;
+            globals.variant.index_db = {};
+            globals.variant.analyzed_genome = genome
+            globals.variant.negativeStrand = _negativeStrand
+
             $("#gv_elementfilter").val("");
-            gv_table_cons.clear()
-            gv_table_cons.columns.adjust();
         }
-        if(transcripts == null)
+        if(!globals.variant.vep_results.hasOwnProperty(globals.variant.analyzed_genome))
         {
-            $('#var_readfile').empty().append(`<i class="fa fa-spinner fa-spin"></i> Fetching genome data ...`).addClass("air_disabledbutton");
+            globals.variant.vep_results[globals.variant.analyzed_genome] = {};
+        }
+        if(globals.variant.transcripts == null)
+        {
+            var _text = disablebutton("gv_readfile")
             var client = new XMLHttpRequest();
 
             client.open('GET', fileURL + '/' + genome + '_genome.json');
@@ -309,32 +239,27 @@ async function AirGenvar(){
                 if (this.readyState == 4)
                 {
                     if(this.status == 200) {
-                        let output = client.responseText;
+                        var output = client.responseText;
                         output = replaceAll(output, "ß", '"},"');
                         output = replaceAll(output, "ü", '":{"');
                         output = replaceAll(output, "ä", '":"');
                         output = replaceAll(output, "q", '","');
                         output = replaceAll(output, "ö", '"},{"');
-                        let _data = JSON.parse(output)
-                        transcripts = [];
-                        for(let m in _data)
+                        var _data = JSON.parse(output)
+                        globals.variant.transcripts = [];
+                        for(var m in _data)
                         {
-                            for(let _id in _data[m])
+                            for(var _id in _data[m])
                             {
-                                let _temp = _data[m][_id];
-                                if(_temp.p == true || negativeStrand == true)
+                                var _temp = _data[m][_id];
+                                if(_temp.p == true || globals.variant.negativeStrand == true)
                                 {
                                     _temp["m"] = m;
-                                    transcripts.push(_temp)
+                                    globals.variant.transcripts.push(_temp)
                                 }
                             }
                         }
-                        setTimeout(() => {
-                            $('#var_readfile').empty().append(`<div class="air_progress position-relative mb-4">
-                                <div id="gv_progress" class="air_progress_value"></div>
-                                <span id="gv_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
-                            </div>`);
-                        }, 0);              
+                        disablebutton("gv_readfile", progress = true);           
                         await buildIndexDatabase();
                         await analyzevcf();
                         $("#gv_typeselect-container").removeClass("air_disabledbutton");
@@ -349,343 +274,199 @@ async function AirGenvar(){
         }
         async function analyzevcf()
         {
-            $('#var_readfile').empty().append(`<div class="air_progress position-relative mb-4">
-                <div id="gv_progress" class="air_progress_value"></div>
-                <span id="gv_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
-            </div>`);
-            gv_table.clear();
+            disablebutton("gv_readfile", progress = true);    
 
-            var fileToLoad = document.getElementById("gv_inputId").files[0];
+            globals.variant.gv_results = {};
+            globals.variant.samples = [];
 
-            var fileReader = new FileReader();
-            fileReader.readAsText(fileToLoad, "UTF-8");
+            var files = Array.from(document.getElementById("gv_inputId").files);
+            for (const file of files) {
+                await readfile(file, max = files.length)
+            }
 
-            fileReader.onload = async function (fileLoadedEvent) {
-                var textFromFileLoaded = fileLoadedEvent.target.result;
-                let headers = [];
-                var variantLines = [];
-                textFromFileLoaded.split('\n').forEach(function(line) {
-                    if(line.startsWith("#"))
-                    {
-                        headers.push(line)
-                    }
-                    else
-                    {
-                        variantLines.push(line);
-                    }
-                });
-                let headerText = headers.join("\r");
-                const tbiVCFParser = new VCF({ header: headerText })
-                let varlength = variantLines.length - 1;
-                gv_results = {};
-                for(let line in variantLines)
+            enablebtn("gv_readfile", "Read VCF")
+            gv_createTable()   
+        }
+
+    });
+
+    async function readfile(file, max = 1)
+    {        
+        if(!file)
+        {
+            return;  
+        }
+        var tbiVCFParser = null;
+
+        var file_name = file.name;
+        if(file_name.includes("."))
+            file_name = file_name.substr(0, file_name.lastIndexOf("."));
+
+        globals.variant.samples.push(file_name)
+        var number = globals.variant.samples.length - 1;
+
+        var headers = [];
+        var fileSize   = file.size;
+        var chunkSize  = 1048576; // bytes
+        var offset     = 0;
+        var chunkReaderBlock = null;
+
+        var chunkcount = fileSize/chunkSize;
+        var count = 0;
+
+        async function readlines(_text) {
+            if(offset + chunkSize < fileSize)
+            {
+                _text = _text.substr(0, _text.lastIndexOf("\n"));
+            }
+            offset += _text.length; // callback for handling read chunk
+            _text.split('\n').forEach(async function(line) {
+
+                if(line == "")
                 {
+                    return;
+                }
+                if(line.startsWith("#"))
+                {
+                    headers.push(line)
+                }
+                else
+                {
+                    if(tbiVCFParser == null)
+                    {
+                        tbiVCFParser = new VCF({ header: headers.join("\r") })
+                    }
+                    
                     await readvcfline(line);
-                    if(line % 1000 == 0)
-                        await updateProgress(line, varlength, "gv_progress")
-                }  
-                async function readvcfline(line) {
-                    let variant = tbiVCFParser.parseLine(variantLines[line]);
-                    if(!variant)
-                        return;
-                    variants.push(variant);
-                    let results =  await getTranscripts(variant["CHROM"], variant["POS"]);
-                    results.forEach(function(transcriptid) {
-                        if(transcriptid == null)
-                            return;
-                        
-                        let transcript = transcripts[transcriptid]
-                        let molecule = transcript["m"]
-
-                        if(!gv_results.hasOwnProperty(molecule))
-                        {
-                            gv_results[molecule] = {}
-                        }
-                        if(!gv_results[molecule].hasOwnProperty(transcriptid))
-                        {
-                            gv_results[molecule][transcriptid] = []
-                        }
-
-                        gv_results[molecule][transcriptid].push(variants.indexOf(variant));
-
-                    });
-                }    
-
-                $("#var_readfile").html('Read VCF').removeClass("air_disabledbutton");
-                gv_createTable()     
-                
-            }
-        }
-
-    });
-
-    $('#gv_table tbody').on( 'click', 'tr td.gv_table_expand', function () {
-        var tr = $(this).closest('tr');
-        var row = gv_table.row( tr );
-
-        if(row.child.isShown())
-        {
-            if(row.child.child)
-                row.child.child.hide()
-            row.child.hide();
-            $(row.node()).find("td:first").html('<a class="fa fa-caret-right"></a>');
-        }
-        else {
-            var m = $(row.node()).attr("id")
-            $(row.node()).find("td:first").html('<a class="fa fa-caret-down"></a>');
-            row.child(
-                `<table class="stripe ml-4" style="width:100%" id="gv_table_sub_${m}" cellspacing=0>
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th style="vertical-align: middle;">Link</th>
-                            <th style="vertical-align: middle;">Type</th>
-                            <th style="vertical-align: middle;">Start</th>
-                            <th style="vertical-align: middle;">End</th>
-                            <th style="vertical-align: middle;">Strand</th>
-                            <th style="vertical-align: middle;">#Variants</th>
-                        </tr>
-                    </thead>
-                </table>`
-            ).show();
-
-            gv_table_sub = $("#gv_table_sub_" + m).DataTable({
-                "order": [[ 2, "asc" ]], 
-                "paging":   false,
-                "searching": false,
-                "info":     false, 
-                "scrollX": true,
-                "autoWidth": true,
-                "columns": [
-                    {
-                        "class":          "gv_table_sub_expand",
-                        "orderable":      false,
-                        "data":           null,
-                        "width": "5%",
-                        "defaultContent": '<a class="fa fa-caret-right"></a>'
-                    },
-                    {"width": "10%"},
-                    {"width": "15%"},
-                    {"width": "20%"},
-                    {"width": "20%"},
-                    {"width": "10%"},
-                    {"width": "15%"}
-                ],
-                "columnDefs": [
-                    {
-                        targets: 0,
-                        className: 'dt-center',
-                    },
-                    {
-                        targets: 1,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 2,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 3,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 4,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 5,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 6,
-                        className: 'dt-center'
-                    }
-                ]
-            }).columns.adjust();
-
-            for(let t in gv_results[m])
-            {
-                if(validTranscript(t))
-                {
-                    let result_row = [""];
-                    result_row.push(transcripts[t].r != ""? '<a target="_blank" href="https://www.ensembl.org/Homo_sapiens/Transcript/Summary?t=' + transcripts[t].r + '"><span class="fa fa-external-link-alt ml-2"></span></a>' : "");
-                    result_row.push(transcripts[t].t);
-                    result_row.push(transcripts[t].s);
-                    result_row.push(transcripts[t].e);
-                    result_row.push(transcripts[t].p == true? "+":"-");                    
-                    result_row.push(gv_results[m][t].length);
-                
-                    let new_sub_row = gv_table_sub.row.add(result_row).node();
-                    $(new_sub_row).attr("id", t + "_" + m);
                 }
-            }
-            gv_table_sub.columns.adjust().draw();
-
-            $('#gv_table_sub_' + m + ' tbody').on( 'click', 'tr td.gv_table_sub_expand', function () {
-                var sub_tr = $(this).closest('tr');
-                var sub_row = gv_table_sub.row( sub_tr );
-                if(sub_row.child.isShown())
-                {
-                    sub_row.child.hide();
-                    $(sub_row.node()).find("td:first").html('<a class="fa fa-caret-right"></a>');
-                }
-                else {
-                    var _id = $(sub_row.node()).attr("id").split("_")
-                    var _t = _id[0]
-                    var _m = _id[1]
-                    $(sub_row.node()).find("td:first").html('<a class="fa fa-caret-down"></a>');
-                    sub_row.child(
-                        `<table class="stripe ml-5" id="gv_table_sub_${_m}_${_t}" style="width:60%" cellspacing=0>
-                            <thead>
-                                <tr>
-                                    <th style="vertical-align: middle;">Position</th>
-                                    <th style="vertical-align: middle;">Ref</th>
-                                    <th style="vertical-align: middle;">Alt</th>
-                                </tr>
-                            </thead>
-                        </table>`
-                    ).show();
-
-                    gv_table_sub_sub = $("#gv_table_sub_" + _m + "_" + _t).DataTable({
-                        "order": [[ 0, "asc" ]], 
-                        "paging":   false,
-                        "searching": false,
-                        "info":     false,
-                        "columns": [
-                            {"width": "30%"},
-                            {"width": "30%"},
-                            {"width": "30%"},
-                        ],
-                        "columnDefs": [
-                            {
-                                targets: 0,
-                                className: 'dt-center',
-                            },
-                            {
-                                targets: 1,
-                                className: 'dt-center'
-                            },
-                            {
-                                targets: 2,
-                                className: 'dt-center'
-                            },
-                        ]                    
-                    }).columns.adjust();
-        
-                    if(gv_results[_m][_t])
-                    {
-                        gv_results[_m][_t].forEach(v =>
-                        {
-                            let variant = variants[v];
-                            let result_row = [];
-
-                            result_row.push(variant["POS"]);
-                            result_row.push(variant["REF"]);
-                            result_row.push(variant["ALT"]);
-
-                            gv_table_sub_sub.row.add(result_row)
-                        });
-                        gv_table_sub_sub.columns.adjust().draw();
-                    }
-                }
-            });
-        }
-    });
-
-    $('#gv_table_cons tbody').on( 'click', 'tr td.gv_table_cons_expand', function () {
-        var tr = $(this).closest('tr');
-        var row = gv_table_cons.row( tr );
-
-        if(row.child.isShown())
-        {
-            if(row.child.child)
-                row.child.child.hide()
-            row.child.hide();
-            $(row.node()).find("td:first").html('<a class="fa fa-caret-right"></a>');
-        }
-        else {
-            var m = $(row.node()).attr("id")
-            $(row.node()).find("td:first").html('<a class="fa fa-caret-down"></a>');
-            row.child(
-                `<table class="ml-4" style="width:80%" id="gv_table_cons_sub_${m}" cellspacing=0>
-                    <thead>
-                        <tr>
-                            <th style="vertical-align: middle;">Consequence Terms</th>
-                            <th style="vertical-align: middle;">Position</th>
-                            <th style="vertical-align: middle;">Impact</th>
-                            <th style="vertical-align: middle;">Biotype</th>
-                        </tr>
-                    </thead>
-                </table>`
-            ).show();
-
-            let gv_table_cons_sub = $("#gv_table_cons_sub_" + m).DataTable({
-                "createdRow": function( row, data, dataIndex ) {
-                    switch( data[2])
-                    {
-                        case"HIGH": $(row).addClass('air_red'); break;
-                        case "MODERATE": $(row).addClass('air_yellow'); break;
-                        case "LOW": $(row).addClass('air_green'); break;
-                        case "MODIFIER": $(row).addClass('air_gray'); break;
-                        default: break;
-                    }
-                },
-                "order": [[ 2, "asc" ]], 
-                "paging":   false,
-                "searching": false,
-                "info":     false, 
-                "scrollX": true,
-                "autoWidth": true,
-                "columns": [
-                    {"width": "10%"},
-                    {"width": "15%"},
-                    {"width": "20%"},
-                    {"width": "20%"},
-                ],
-                "columnDefs": [
-                    {
-                        targets: 0,
-                        className: 'dt-center',
-                    },
-                    {
-                        targets: 1,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 2,
-                        className: 'dt-center'
-                    },
-                    {
-                        targets: 3,
-                        className: 'dt-center'
-                    }
-                ]
-            }).columns.adjust();
-
-            for(let v in mutation_results[m].variants)
-            {
-                let result_row = [];
-                result_row.push(mutation_results[m].variants[v].consequence_terms.join(', '));
-                result_row.push(mutation_results[m].variants[v].position);
-                result_row.push(mutation_results[m].variants[v].impact);
-                result_row.push(mutation_results[m].variants[v].biotype);      
-                gv_table_cons_sub.row.add(result_row)
-            }
-            gv_table_cons_sub.columns.adjust().draw();
-
+            })
             
+            if (offset >= fileSize) {
+                console.log("Done reading file");
+                return;
+            }
+
+            // of to the next chunk
+            await chunkReaderBlock(offset, chunkSize, file);
         }
-    });
+
+        chunkReaderBlock = async function(_offset, length, _file) {
+            await updateProgress(count++, chunkcount, "gv_readfile", text = " of file " + (number + 1) + "/" + max)
+            var blob = _file.slice(_offset, length + _offset);
+            var _text = await readFileAsync(blob)
+            await readlines(_text);
+        }
+
+        // now var's start the read with the first block
+        await chunkReaderBlock(offset, chunkSize, file);
+
+        function readFileAsync(blob) {
+            return new Promise((resolve, reject) => {
+              var reader = new FileReader();
+          
+              reader.onload = function (evt)  {
+                  
+                if (evt.target.error == null) {
+                    resolve(evt.target.result);
+                }
+                else
+                {
+                    resolve("")
+                }
+              };
+          
+              reader.onerror = reject;
+          
+              reader.readAsText(blob);
+            })
+          }
+
+        async function readvcfline(line) {
+
+            if(tbiVCFParser == null)
+            {
+                return;
+            }
+            var variant = tbiVCFParser.parseLine(line);
+            if(!variant)
+                return;
+            var results =  await getTranscripts(variant["CHROM"], variant["POS"]);
+            if(results.length)
+            {
+                var variantstring = [variant["CHROM"], variant["POS"], variant["ALT"], variant["REF"]].join("$")
+                var variantid = -1;
+                if(globals.variant.variants_temp.hasOwnProperty(variantstring))
+                {
+                    variantid = globals.variant.variants_temp[variantstring];
+                }
+                else
+                {
+                    globals.variant.variants.push(variant);
+                    variantid = globals.variant.variants.indexOf(variant);
+                    globals.variant.variants_temp[variantstring] = variantid
+                }
+                results.forEach(function(transcriptid) {
+                    if(transcriptid == null)
+                        return;
+                    
+                    var transcript = globals.variant.transcripts[transcriptid]
+                    var molecule = transcript["m"]
+
+                    if(!globals.variant.gv_results.hasOwnProperty(number))
+                    {
+                        globals.variant.gv_results[number] = {}
+                    }
+                    if(!globals.variant.gv_results[number].hasOwnProperty(molecule))
+                    {
+                        globals.variant.gv_results[number][molecule] = {}
+                    }
+                    if(!globals.variant.gv_results[number][molecule].hasOwnProperty(transcriptid))
+                    {
+                        globals.variant.gv_results[number][molecule][transcriptid] = []
+                    }
+
+                    globals.variant.gv_results[number][molecule][transcriptid].push(variantid);
+
+                });
+            }
+        }     
+        
+    }
 
     $('#gv_addoverlay').on('click', async function() {
-        gv_addoverlay()
+        
+        var text = await disablebutton("gv_addoverlay"); 
+        var olname = $("#gv_olname").val();
+        globals.specialCharacters.forEach(c => {
+            olname = olname.replaceAll(c, "");
+        })
+    
+        if(olname == "")
+        {
+            alert("Please specify a name for the overlay.");
+            enablebtn("gv_addoverlay", text);
+            return;
+        }
+        for(var sample in globals.variant.samples)
+        {            
+            gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
+        }
     });
 
     $('#gv_getConsequences').on('click', getConsequences);
 
+    $('#gv_resetConsequences').on('click', function() {
+        $("#gv_table_cons").parents(".dataTables_scrollBody").css({
+            minHeight: "0px",
+        });
+        globals.variant.mutation_results = {};
+        globals.variant.gv_table_cons.clear();
+        globals.variant.gv_table_cons.columns.adjust().draw();
+    });
+
     $('#gv_reset').on('click', async function() {
-        selected_elements = new Set()
-        gv_table.rows().every( function () {
+        globals.variant.selected_elements = new Set()
+        globals.variant.gv_table.rows().every( function () {
             var row = this.nodes().to$()
             row.find('.gv_clickCBinTable').prop('checked', false)
         } );
@@ -696,45 +477,80 @@ async function AirGenvar(){
 
     $('#gv_selectmapelements').on('click', async function() {
         
-        selected_elements = new Set()
-        let _ids = []
-        for(let element in gv_results)
+        globals.variant.selected_elements = new Set()
+        var _idset = new Set()
+        for(var sample in globals.variant.samples)
         {
-            if(AIR.MapElements.hasOwnProperty(AIR.Molecules[element].name.toLowerCase()))
+            for(var element in globals.variant.gv_results[sample])
             {
-                selected_elements.add(AIR.Molecules[element].name)
-                _ids.push(element)
+                if(AIR.MapElements.hasOwnProperty(AIR.Molecules[element].name.toLowerCase()))
+                {
+                    globals.variant.selected_elements.add(AIR.Molecules[element].name)
+                    _idset.add(element)
+                }
             }
         }
-
-        gv_table.rows().every( function () {
+        var _ids = Array.from(_idset);
+        globals.variant.gv_table.rows().every( function () {
             var row = this.nodes().to$()
             if(_ids.includes(row.attr("id")))
             {
                 row.find('.gv_clickCBinTable').prop('checked', true)
+            }
+            else
+            {
+                row.find('.gv_clickCBinTable').prop('checked', false)
             }
         } );
 
         updateElementInput();
     });
 
-    
+    $("#gv_elementfilter").on("input", function(){
+        globals.variant.selected_elements = new Set()
+        var _ids = [];
+        if($(this).val().trim() == "")
+        {
+            $("#gv_elementnumbers").html(0);
+        }
+        else
+        {
+            var array = $(this).val().split(",")
+            $("#gv_elementnumbers").html(array.length);
+            var _idset = new Set()
+            for(var element of array)
+            {
+                
+                if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
+                {
+                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
+                    _idset.add(m)
+                    globals.variant.selected_elements.add(AIR.Molecules[m].name)
+                }
+                else 
+                {
+                    globals.variant.selected_elements.add(element.trim())
+                }
+            }
+            _ids = Array.from(_idset);
+        }
+        globals.variant.gv_table.rows().every( function () {
+            var row = this.nodes().to$()
+            if(_ids.includes(row.attr("id")))
+            {
+                row.find('.gv_clickCBinTable').prop('checked', true)
+            }
+            else
+            {
+                row.find('.gv_clickCBinTable').prop('checked', false)
+            }
+        } );
+    });
 }
-async function gv_addoverlay()
+
+async function gv_addoverlay(sample, olname)
 {
-    let text = await disablebutton("gv_addoverlay"); 
-    let olname = $("#gv_olname").val();
-    globals.specialCharacters.forEach(c => {
-        olname = olname.replaceAll(c, "");
-    })
-
-    if(olname == "")
-    {
-        alert("Please specify a name for the overlay.");
-        return;
-    }
-
-    let _content = await gv_contentString() 
+    var _content = await gv_contentString(sample) 
     if(_content != "")
     {
         $.ajax({
@@ -757,20 +573,20 @@ async function gv_addoverlay()
         enablebtn("gv_addoverlay", text);
     }
 
-    function deleteOldOverlay()
+    function devareOldOverlay()
     {
         return new Promise((resolve, reject) =>  
         { 
-            let _found = false;
+            var _found = false;
             var overlays = minervaProxy.project.data.getDataOverlays();
 
-            for (let ol in overlays)
+            for (var ol in overlays)
             {
                 if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
                 {
                     _found = true;
                     $.ajax({
-                        method: 'DELETE',
+                        method: 'DEvarE',
                         url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
@@ -790,15 +606,15 @@ async function gv_addoverlay()
     {
         return new Promise((resolve, reject) =>  
         { 
-            let olfilter = $("#gv_overlayselect").val();
-            let output = '';
+            var olfilter = $("#gv_overlayselect").val();
+            var output = '';
 
             if(olfilter == 2)
             {
-                for (let m in mutation_results)
+                for (var m in globals.variant.mutation_results)
                 {
                     output += `%0A${AIR.Molecules[m].name}`;
-                    switch(mutation_results[m].impact)
+                    switch(globals.variant.mutation_results[m][sample].impact)
                     {
                         case "HIGH": output += '%09%23ff0000'; break;
                         case "LOW": output += '%09%2300ff00'; break;
@@ -811,20 +627,20 @@ async function gv_addoverlay()
 
             else
             {
-                let _values = {};
+                var _values = {};
 
-                for (let m in gv_results)
+                for (var m in globals.variant.gv_results[sample])
                 {            
                     if(olfilter == 0)
                     {
-                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(gv_results[m]).length;
+                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(globals.variant.gv_results[sample][m]).length;
                     }
                     else if (olfilter == 1)
                     {
-                        let _value = new Set();
-                        for (let t in gv_results[m])
+                        var _value = new Set();
+                        for (var t in globals.variant.gv_results[sample][m])
                         { 
-                            gv_results[m][t].forEach(v => {
+                            globals.variant.gv_results[sample][m][t].forEach(v => {
                                 _value.add(v)
                             })
                         }
@@ -833,12 +649,12 @@ async function gv_addoverlay()
                 }
 
 
-                let _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
+                var _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
 
-                for (let m in _values)
+                for (var m in _values)
                 {
-                    let _value = _max != 0? _values[m]/Math.abs(_max) : 0
-                    let hex = rgbToHex((1 - Math.abs(_value)) * 255);
+                    var _value = _max != 0? _values[m]/Math.abs(_max) : 0
+                    var hex = rgbToHex((1 - Math.abs(_value)) * 255);
                     output += `%0A${m}`;
                     if (_value > 0)
                         output += '%09%23ff' + hex + hex;
@@ -855,48 +671,43 @@ async function gv_addoverlay()
 
 $(document).on('change', '.gv_clickCBinTable',function () {
     if ($(this).prop('checked') === true) {
-        $(this).parents("tr").each(function( pindex ) {
-            selected_elements.add(AIR.Molecules[$(gv_table.row(this).node()).attr("id")].name);
-        });
+        globals.variant.selected_elements.add(AIR.Molecules[$(this).attr('data')].name);
     }
     else {
-        $(this).parents("tr").each(function( pindex ) {
-            selected_elements.delete(AIR.Molecules[$(gv_table.row(this).node()).attr("id")].name);
-        });
+        globals.variant.selected_elements.delete(AIR.Molecules[$(this).attr('data')].name);
     }   
     updateElementInput()
 })
 
 function updateElementInput()
 {
-    $("#gv_elementfilter").val(Array.from(selected_elements).join(", "));
-    $("#gv_elementnumbers").html(Array.from(selected_elements).length);
+    $("#gv_elementfilter").val(Array.from(globals.variant.selected_elements).join(", "));
+    $("#gv_elementnumbers").html(Array.from(globals.variant.selected_elements).length);
 }
 
 async function getConsequences()
 {
-    $('#gv_getConsequences').empty().append(`<div class="air_progress position-relative mb-4">
-            <div id="gv_progress" class="air_progress_value"></div>
-            <span id="gv_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
-        </div>`).addClass("air_disabledbutton");
+    var _text = await disablebutton("gv_getConsequences", progress = true)
 
     var count = 0;
     var totallength = 0;
-    let element_promises = [];
-    let input = $("#gv_elementfilter").val().trim();
+    var input = $("#gv_elementfilter").val().trim();
     var _elements = {}
-    var _elementids = []
+    var _elementids = new Set()
+    var frequency_th = parseFloat($("#gv_frequency").val().replace(',', '.'))
 
     if(input == "")
     {
         if (confirm('Are you sure you want to predict consequences for all variants? This will take a long time. Otherwise specify element names in the text box.')) 
         {
-            for(let m in gv_results)
+            for(var m in globals.variant.gv_results[selectedsample()])
             {
-                _elementids.push(m);
+                _elementids.add(m);
             }
 
         } else {
+            $('#gv_impactselect-container').removeClass("air_disabledbutton")
+            enablebtn("gv_getConsequences", _text)
             return;
         }
     }
@@ -904,88 +715,105 @@ async function getConsequences()
     {
         input.split(",").forEach(_e => 
         {
-            let e = _e.trim().toLowerCase();
+            var e = _e.trim().toLowerCase();
             if(AIR.ElementNames.name.hasOwnProperty(e))
             {
-                _elementids.push(AIR.ElementNames[globals.selectedmapping][e])
+                _elementids.add(AIR.ElementNames.name[e])
             }
         });
     }
-    for(let _i in _elementids)
+    for(var e in globals.variant.mutation_results)
     {
-        let _variants = {}
-        let element = _elementids[_i];
-        for(let t in gv_results[element])
+        _elementids.add(e);
+    }
+    for(sample in globals.variant.samples)
+    {
+        for(var element of Array.from(_elementids))
         {
-            if(validTranscript(t))
+            var _variants = {}
+            for(var t in globals.variant.gv_results[sample][element])
             {
-                gv_results[element][t].forEach(v => 
+                if(validTranscript(t))
                 {
-                
-                    if(!_variants.hasOwnProperty(v))
+                    globals.variant.gv_results[sample][element][t].forEach(v => 
                     {
-                        _variants[v] = new Set()
-                    }
-                    _variants[v].add(transcripts[t].r)
+                    
+                        if(!_variants.hasOwnProperty(v))
+                        {
+                            _variants[v] = new Set()
+                        }
+                        _variants[v].add(globals.variant.transcripts[t].r)
+                    });
+                }
+            }
+            totallength += Object.keys(_variants).length;
+            _elements[element] = _variants;
+        }
+        for(var m in _elements)
+        {
+            var element_result = await getMutations(m, sample);
+            if(!globals.variant.mutation_results.hasOwnProperty(m))
+            {
+                globals.variant.mutation_results[m] = {}
+            }
+            globals.variant.mutation_results[m][sample] = {"variants": element_result};     
+        }
+    }
+
+    set_cons_table()
+    $('#gv_impactselect-container').removeClass("air_disabledbutton")
+    $("#gv_getConsequences").html('Predict Variant Consequences').removeClass("air_disabledbutton");
+    enablebtn("gv_getConsequences", _text)
+    async function getMutations(m, sample)
+    {
+        var variant_promises = [];
+        var variant_results = [];
+        var iterations = Object.keys(_elements[m]).length;
+        for(var v in _elements[m])
+        {                    
+            var last = !--iterations;
+            variant_promises.push(getConsequencesFromVariant(v, Array.from(_elements[m][v])).then(r => 
+                {
+                    variant_results = variant_results.concat(r)
+                }).finally(r => {     
+                    updateProgress(count++, totallength, "gv_getConsequences", "  for sample " + (parseFloat(sample) + 1) + "/" + globals.variant.samples.length)
+            }));
+
+            
+            if (last || variant_promises.length >= 20)
+            {
+                await Promise.allSettled(variant_promises).catch(e => {
+                    console.log(e);
+                }).finally(r => {
+                    variant_promises = [];
                 });
             }
         }
-        totallength += Object.keys(_variants).length;
-        _elements[element] = _variants;
-    }
-    for(let m in _elements)
-    {
-        element_promises.push(
-            getMutations(m).then(element_result => 
-            {       
-                mutation_results[m] = {"variants": element_result};            
-            }).catch(e => {
-                reject(e)
-            }));
-    }
-    Promise.allSettled(element_promises).catch(e => {
-        console.log(e);
-    }).finally(r => {
-        set_cons_table()
-        $('#gv_impactselect-container').removeClass("air_disabledbutton")
-        $("#gv_getConsequences").html('Predict Variant Consequences').removeClass("air_disabledbutton");
 
-    });    
-
-    function getMutations(m)
-    {
-        return new Promise((resolve, reject) =>  
-        {          
-            let variant_promises = [];
-            let variant_results = [];
-
-            for(let v in _elements[m])
-            {
-                variant_promises.push(getConsequencesFromVariant(variants[v], Array.from(_elements[m][v])).then(r => 
-                    {
-                        variant_results = variant_results.concat(r)
-                    }).finally(r => {     
-                        updateProgress(count++, totallength, "gv_progress")
-                }));
-            }
-            Promise.allSettled(variant_promises).catch(e => {
-                reject(e)
-            }).then(r => {
-                resolve(variant_results);
-            });
+        return variant_results;
             
-            function getConsequencesFromVariant(variant, tIDs)
-            {
-                return new Promise((resolve, reject) => {
-                    let p = variant["POS"]
-                    let a = variant["ALT"]
-                    let r = variant["REF"]
-                    let c = variant["CHROM"]
-                    let _result = []
+        function getConsequencesFromVariant(v, tIDs)
+        {
+            return new Promise((resolve, reject) => {
 
-                    if(r.length != 1)
+                var variant = globals.variant.variants[v]
+                var p = variant["POS"]
+                var a = variant["ALT"]
+                var r = variant["REF"]
+                var c = variant["CHROM"]
+                var _result = []
+
+                if(r.length != 1)
+                {
+                    resolve([])
+                }
+                else
+                {
+                    var response = {};
+                    if(globals.variant.vep_results[globals.variant.analyzed_genome].hasOwnProperty(v))
                     {
-                        resolve([])
+                        response = globals.variant.vep_results[globals.variant.analyzed_genome][v];
+                        analyzeVEPoutput(response)
                     }
                     else
                     {
@@ -997,28 +825,11 @@ async function getConsequences()
                             if (this.readyState == 4)
                             {
                                 if(this.status == 200) {
-
-                                    let response =  JSON.parse(client.responseText)[0];
-
-                                    if(response.hasOwnProperty("transcript_consequences"))
-                                    {
-                                        for(let _cons in response["transcript_consequences"])
-                                        {
-                                            if(response["transcript_consequences"][_cons].hasOwnProperty("transcript_id"))
-                                            {
-                                                if(tIDs.includes(response["transcript_consequences"][_cons]["transcript_id"]))
-                                                {
-                                                    let _temp = response["transcript_consequences"][_cons]
-                                                    _temp["most_severe_consequence"] = response["most_severe_consequence"]
-                                                    _temp["position"] = p
-                                                    _result.push(_temp);
-                                                }
-                                            }
-                                        }
-
-                                    }
-
-                                    resolve(_result)
+    
+                                    response =  JSON.parse(client.responseText)[0];
+                                    globals.variant.vep_results[globals.variant.analyzed_genome][v] = response;
+                                    analyzeVEPoutput(response)
+    
                                 }
                                 else
                                 {
@@ -1028,106 +839,245 @@ async function getConsequences()
                             }
                         }
                         client.send();
-                    };
-                });
-            }
-        });
+                    }
+                };
+
+                function analyzeVEPoutput(response)
+                {
+                    if(response.hasOwnProperty("transcript_consequences"))
+                    {
+                        for(var _cons in response["transcript_consequences"])
+                        {
+                            var breakflag = false;
+                            if(response["transcript_consequences"][_cons].hasOwnProperty("transcript_id"))
+                            {
+                                if(tIDs.includes(response["transcript_consequences"][_cons]["transcript_id"]))
+                                {
+                                    var _temp = response["transcript_consequences"][_cons]
+                                    _temp["most_severe_consequence"] = response["most_severe_consequence"]
+                                    _temp["position"] = p
+                                    _temp["frequency"] = NaN
+                                    _temp["id"] = ""
+                                    _temp["pubmed"] = []
+                                    if(response.hasOwnProperty("colocated_variants"))
+                                    {
+                                        for(var _variant in response.colocated_variants)
+                                        {
+                                            if(response.colocated_variants[_variant].hasOwnProperty("id"))
+                                            {
+                                                _temp["id"] = response.colocated_variants[_variant].id
+                                            }
+                                            if(response.colocated_variants[_variant].hasOwnProperty("pubmed"))
+                                            {
+                                                _temp["pubmed"] = response.colocated_variants[_variant].pubmed
+                                            }
+                                            if(response.colocated_variants[_variant].hasOwnProperty("start"))
+                                            {
+                                                if(p = response.colocated_variants[_variant].start)
+                                                {
+                                                    if(response.colocated_variants[_variant].hasOwnProperty("frequencies"))
+                                                    {
+                                                        if(response.colocated_variants[_variant].frequencies.hasOwnProperty(a))
+                                                        {
+                                                            if(response.colocated_variants[_variant].frequencies[a].hasOwnProperty("gnomad"))
+                                                            {    
+                                                                if(response.colocated_variants[_variant].frequencies[a].gnomad >= frequency_th)
+                                                                {
+                                                                    breakflag = true;
+                                                                }
+                                                            
+                                                                _temp["frequency"] = response.colocated_variants[_variant].frequencies[a].gnomad
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if(breakflag)
+                                        continue;
+                                    _result.push(_temp);
+
+                                }
+                            }
+                        }
+
+                        resolve(_result)
+
+                    }
+                }
+            });
+        }
     }
 }
 
 function set_cons_table()
 {
-    let selected_impact = $("#gv_impactselect").val()
-    gv_table_cons.clear();
-    gv_table_cons.columns.adjust();
+    var selected_impact = $("#gv_impactselect").val()
+
+    if(globals.variant.gv_table_cons)
+    {
+        globals.variant.gv_table_cons.destroy();
+    }
+    $("#gv_table_cons").empty()
+
+    var tbl = document.getElementById('gv_table_cons');
 
     _elementnames = []
-    for(let m in mutation_results)
+    for(var m in globals.variant.mutation_results)
     {
-        let element_result = mutation_results[m].variants;
-        let result_row = [""];
-        let impact = 0;
-        let consequences = new Set()
+        var result_row = tbl.insertRow(tbl.rows.length);
+        createLinkCell(result_row, 'td', AIR.Molecules[m].name, 'col-3', 'center');
+        var break_flag = true;
 
-        for(let t in element_result)
+        for (var sample in globals.variant.samples)
         {
-            let _impact = impacts.indexOf(element_result[t]["impact"])
-            if(_impact > impact)
+            var element_result = globals.variant.mutation_results[m][sample].variants;
+            var impact = 0;
+            var consequences = new Set()
+
+            for(var t in element_result)
             {
-                impact = _impact
-                consequences = new Set()
-                consequences.add(element_result[t]["most_severe_consequence"])
+
+                var _impact = globals.variant.impacts.indexOf(element_result[t]["impact"])
+                if(_impact > impact)
+                {
+                    impact = _impact
+                    consequences = new Set()
+                    consequences.add(element_result[t]["most_severe_consequence"])
+                }
+                else if (_impact == impact) {
+                    consequences.add(element_result[t]["most_severe_consequence"])
+                }                                    
             }
-            else if (_impact == impact) {
-                consequences.add(element_result[t]["most_severe_consequence"])
+            if(selected_impact == impact || selected_impact == 0)
+            {
+                break_flag = false;
             }
-            
+            globals.variant.mutation_results[m][sample]["impact"] = globals.variant.impacts[impact];
+            globals.variant.mutation_results[m][sample]["consequences"] = Array.from(consequences);
+
+            var cell = createPopupCell(result_row, 'td', globals.variant.impacts[impact], 'col-3', 'center', gv_create_cons_popup, {"element": m, "sample": sample});
+            cell.setAttribute("data-order", impact);
+            switch(impact)
+            {
+                case 4: $(cell).addClass('air_red'); break;
+                case 3: $(cell).addClass('air_yellow'); break;
+                case 1: $(cell).addClass('air_green'); break;
+                case 2: $(cell).addClass('air_gray'); break;
+                default: break;
+            }
+    
         }
 
-        if(selected_impact != impact && selected_impact != 0)
-            continue;
-
-        mutation_results[m]["impact"] = impacts[impact];
-        mutation_results[m]["consequences"] = Array.from(consequences);
-
-        result_row.push(getLinkIconHTML(AIR.Molecules[m].name));
-        result_row.push(impacts[impact]);
-        result_row.push(Array.from(consequences).join(', '));
-        result_row.push(element_result.length);
-    
-        let row = gv_table_cons.row.add(result_row).node()
-        $(row).attr("id", m);
-
-        switch(impact)
+        if(break_flag)
         {
-            case 4: $(row).addClass('air_red'); break;
-            case 3: $(row).addClass('air_yellow'); break;
-            case 2: $(row).addClass('air_green'); break;
-            case 1: $(row).addClass('air_gray'); break;
-            default: break;
+            tbl.devareRow(result_row.parentNode.parentNode.rowIndex);
         }
 
         _elementnames.push(AIR.Molecules[m].name)
     }
+
+    var header = tbl.createTHead();
+    var headerrow = header.insertRow(0);
+ 
+    createCell(headerrow, 'th', 'Gene', 'col-3', 'col', 'center');
+
+    for(var _id in globals.variant.samples)
+    {
+        createCell(headerrow, 'th', globals.variant.samples[_id], 'col-3', 'col', 'center');
+    }
+
+    globals.variant.gv_table_cons = $('#gv_table_cons').DataTable({
+        "order": [[ 0, "asc" ]], 
+        "scrollX": true,
+        "autoWidth": true,
+        "autoHeight": false,
+        "rowHeight" : "37px",
+    }).columns.adjust().draw();
+    
     highlightSelected(_elementnames);
-    gv_table_cons.columns.adjust().draw();
 }
 
-async function gv_createTable(onlyPositive = true) 
+async function gv_createTable() 
 {
-    for(let m in gv_results)
+    if(globals.variant.gv_table)
     {
-        let result_row = [""];
+        globals.variant.gv_table.destroy();
+    }
 
-        let transcript_number = 0;
-        let number_of_variants = new Set();
-        let chromosome = "";
-        for(let t in gv_results[m])
+    $("#gv_table").empty()
+
+    var tbl = document.getElementById('gv_table');
+    var tbl_data = {};
+    for(var sample in globals.variant.samples)
+    {
+        for(var m in globals.variant.gv_results[sample])
         {
-            if(validTranscript(t))
+            if(!tbl_data.hasOwnProperty(m))
             {
-                chromosome = transcripts[t].c
-                transcript_number++;
-                gv_results[m][t].forEach(variant => number_of_variants.add(variant))
+                tbl_data[m] = {
+                    "transcripts": new Set(),
+                    "chromosome": "",
+                    "samples": {}
+                }
+            }
+            tbl_data[m].samples[sample] = new Set()
+
+            for(var t in globals.variant.gv_results[sample][m])
+            {
+                if(validTranscript(t))
+                {
+                    tbl_data[m].chromosome = globals.variant.transcripts[t].c
+                    tbl_data[m].transcripts.add(t);
+                    globals.variant.gv_results[sample][m][t].forEach(variant => tbl_data[m].samples[sample].add(variant))
+                }
             }
         }
-
-        if(transcript_number == 0)
-            continue;
-        result_row.push('<input type="checkbox" class="gv_clickCBinTable">')
-        result_row.push(getLinkIconHTML(AIR.Molecules[m].name));
-        result_row.push(chromosome);
-        result_row.push(transcript_number);
-        result_row.push(number_of_variants.size);
-    
-        let row = gv_table.row.add(result_row).node()
-        $(row).attr("id", m);
     }
-    gv_table.columns.adjust().draw();
+        
+    for(var m in tbl_data)
+    {
+        if(Array.from(tbl_data[m].transcripts).length == 0)
+            continue;
+        var result_row = tbl.insertRow(tbl.rows.length);
+        result_row.setAttribute("id", m);
+        checkBoxCell(result_row, 'th', "", m, 'center', "gv_");
+        createLinkCell(result_row, 'td', AIR.Molecules[m].name, 'col-3', 'center');
+        createCell(result_row, 'td', tbl_data[m].chromosome, 'col-3', '', 'center');
+        createCell(result_row, 'td', Array.from(tbl_data[m].transcripts).length, 'col-3', '', 'center');
+
+        for(var _id in globals.variant.samples)
+        {
+            createPopupCell(result_row, 'td', Array.from(tbl_data[m].samples[_id]).length, 'col-3', 'center', gv_create_table_popup, {"element": m, "sample": _id});
+        }
+    }
+        
+    var header = tbl.createTHead();
+    var headerrow = header.insertRow(0);
+
+    createCell(headerrow, 'th', '', 'col-3', 'col', 'center');  
+    createCell(headerrow, 'th', 'Gene', 'col-3', 'col', 'center');
+    createCell(headerrow, 'th', 'Chrom.', 'col-3', 'col', 'center');
+    createCell(headerrow, 'th', '#Transcripts', 'col-3', 'col', 'center');
+
+    for(var _id in globals.variant.samples)
+    {
+        createCell(headerrow, 'th', globals.variant.samples[_id], 'col-3', 'col', 'center');
+    }
+
+    globals.variant.gv_table = $('#gv_table').DataTable({
+        "order": [[ 1, "asc" ]], 
+        "scrollX": true,
+        "autoWidth": true
+    }).columns.adjust();
+
+
+    globals.variant.gv_table.columns.adjust().draw();
 }
 function validTranscript(t)
 {
-    if(transcripts[t].t == selected_ttype)
+    if(globals.variant.transcripts[t].t == globals.variant.selected_ttype)
     {
         return true;
     }
@@ -1137,41 +1087,41 @@ function validTranscript(t)
 }
 async function buildIndexDatabase() 
 {
-    for(let _id in transcripts)
+    for(var _id in globals.variant.transcripts)
     {
-        let chromosome = transcripts[_id]["c"];
-        let start = transcripts[_id]["s"]
-        let end = transcripts[_id]["e"]
+        var chromosome = globals.variant.transcripts[_id]["c"];
+        var start = globals.variant.transcripts[_id]["s"]
+        var end = globals.variant.transcripts[_id]["e"]
 
-        if(!index_db.hasOwnProperty(chromosome))
+        if(!globals.variant.index_db.hasOwnProperty(chromosome))
         {
-            index_db[chromosome] = {}
-            index_db[chromosome]["largest"] = {}
-            index_db[chromosome]["large"] = {}
-            index_db[chromosome]["long"] = {}
-            index_db[chromosome]["middle"] = {}
-            index_db[chromosome]["short"] = {}
+            globals.variant.index_db[chromosome] = {}
+            globals.variant.index_db[chromosome]["largest"] = {}
+            globals.variant.index_db[chromosome]["large"] = {}
+            globals.variant.index_db[chromosome]["long"] = {}
+            globals.variant.index_db[chromosome]["middle"] = {}
+            globals.variant.index_db[chromosome]["short"] = {}
         }
 
-        let  range = (end - start)
+        var  range = (end - start)
         if(range >= 1000000)
         {
-            createIndexDictionary(index_db[chromosome].largest, start, end, _id, 7, 7)
+            createIndexDictionary(globals.variant.index_db[chromosome].largest, start, end, _id, 7, 7)
         }
         else if(range >= 100000)
         {
-            createIndexDictionary(index_db[chromosome].large, start, end, _id, 7, 6)
+            createIndexDictionary(globals.variant.index_db[chromosome].large, start, end, _id, 7, 6)
         }
         else if(range >= 10000)
         {
-            createIndexDictionary(index_db[chromosome].long, start, end, _id, 7, 5)
+            createIndexDictionary(globals.variant.index_db[chromosome].long, start, end, _id, 7, 5)
         }
         else if (range >= 1000)
         {
-            createIndexDictionary(index_db[chromosome].middle, start, end, _id, 7, 4)
+            createIndexDictionary(globals.variant.index_db[chromosome].middle, start, end, _id, 7, 4)
         }
         else {
-            createIndexDictionary(index_db[chromosome].short, start, end, _id, 7, 3)
+            createIndexDictionary(globals.variant.index_db[chromosome].short, start, end, _id, 7, 3)
         }
 
         function createIndexDictionary(dict, start, end, _id, p, min)
@@ -1193,8 +1143,8 @@ async function buildIndexDatabase()
                 return;
             }
 
-            let factor = Math.pow(10, p)
-            let step = Math.floor(start/ factor) * factor
+            var factor = Math.pow(10, p)
+            var step = Math.floor(start/ factor) * factor
 
             if(!dict.hasOwnProperty(step))
             {
@@ -1204,103 +1154,34 @@ async function buildIndexDatabase()
         }
             
         if(_id % 1000 == 0)
-            await updateProgress(_id, transcripts.length, "gv_progress", " Buiilding index database...")
+            await updateProgress(_id, globals.variant.transcripts.length, "gv_readfile", " Buiilding index database...")
     }
-}
-
-async function getTranscriptsFromPosition(chr, start)
-{
-    return new Promise(resolve => {
-        let results = []
-        if(!index_db.hasOwnProperty(chr))
-            resolve([]);
-        
-        let step_6_array = Object.keys(index_db[chr]).sort();
-        let step_6_temp = step_6_array[0]
-        let lastitem = step_6_array[step_6_array.length - 1]
-        step_6_array.forEach(step_6 => {
-            if((start < step_6 || step_6 == lastitem) && step_6 != step_6_array[0]) 
-            {
-                if(step_6 == lastitem)
-                    step_6_temp = step_6;
-                let step_5_array = Object.keys(index_db[chr][step_6_temp]).sort();
-                let step_5_temp = step_5_array[0]
-                lastitem = step_5_array[step_5_array.length - 1]
-                step_5_array.forEach(step_5 => {
-                    if((start < step_5 || step_5 ==  lastitem) && step_5 != step_5_array[0]) 
-                    {
-                        if(step_5 == lastitem)
-                            step_5_temp = step_5;
-                        let step_4_array =  Object.keys(index_db[chr][step_6_temp][step_5_temp]).sort()
-                        let step_4_temp = step_4_array[0]
-                        lastitem = step_4_array[step_4_array.length - 1]
-                        step_4_array.forEach(step_4 => {
-                            if((start < step_4 || step_4 ==  lastitem) && step_4 != step_4_array[0]) 
-                            {
-                                if(step_4 == lastitem)
-                                    step_4_temp = step_4;
-                                let step_3_array = Object.keys(index_db[chr][step_6_temp][step_5_temp][step_4_temp]).sort()
-                                let step_3_temp = step_3_array[0]
-                                lastitem = step_3_array[step_3_array.length - 1]
-                                step_3_array.forEach(step_3 => {
-                                    if((start < step_3 || step_3 ==  lastitem) && step_3 != step_3_array[0]) 
-                                    {
-                                        if(step_3 == lastitem)
-                                            step_3_temp = step_3;
-                                        for(let s_pos in index_db[chr][step_6_temp][step_5_temp][step_4_temp][step_3_temp])
-                                        {
-                                            for(let e_pos in index_db[chr][step_6_temp][step_5_temp][step_4_temp][step_3_temp][s_pos])
-                                            {
-                                                if(start >= s_pos && start <= e_pos)
-                                                {
-                                                    index_db[chr][step_6_temp][step_5_temp][step_4_temp][step_3_temp][s_pos][e_pos].forEach(_id => results.push(_id))
-                                                }
-                                            }
-                                        }
-                                        resolve(results);
-                                    } 
-                                    step_3_temp = step_3;
-                                });
-                                resolve([]);
-                            } 
-                            step_4_temp = step_4;
-                        });
-                        resolve([]);
-                    } 
-                    step_5_temp = step_5;
-                });
-                resolve([]);
-            } 
-            step_6_temp = step_6;
-        });
-
-        resolve([]);
-    });
 }
 
 async function getTranscripts(chr, position)
 {
     return new Promise(resolve => {
 
-        if(!index_db.hasOwnProperty(chr))
+        if(!globals.variant.index_db.hasOwnProperty(chr))
             resolve([]);
 
 
-        let results = new Set();
+        var results = new Set();
 
         [
-            getRangeDictionaries(index_db[chr].largest, 1),
-            getRangeDictionaries(index_db[chr].large, 2),
-            getRangeDictionaries(index_db[chr].long, 3),
-            getRangeDictionaries(index_db[chr].middle, 4),
-            getRangeDictionaries(index_db[chr].short, 5)
+            getRangeDictionaries(globals.variant.index_db[chr].largest, 1),
+            getRangeDictionaries(globals.variant.index_db[chr].large, 2),
+            getRangeDictionaries(globals.variant.index_db[chr].long, 3),
+            getRangeDictionaries(globals.variant.index_db[chr].middle, 4),
+            getRangeDictionaries(globals.variant.index_db[chr].short, 5)
+        
         ].forEach(current_dicts =>
             {
                 current_dicts.forEach(current_dict => 
                 {
-                    Object.keys(current_dict).map(Number).filter(function(x) { return x <= position; }).forEach(s_pos =>
+                    Object.keys(current_dict).map(Number).filter(function(start) { return start <= position; }).forEach(s_pos =>
                     {
-                        Object.keys(current_dict[s_pos]).map(Number).filter(function(x) { return x >= position; }).forEach(e_pos =>
+                        Object.keys(current_dict[s_pos]).map(Number).filter(function(end) { return end >= position; }).forEach(e_pos =>
                         {
                             current_dict[s_pos][e_pos].forEach(_id => results.add(_id))
                         });
@@ -1312,20 +1193,20 @@ async function getTranscripts(chr, position)
 
         function getRangeDictionaries(dict, iterations)
         {
-            let breakflag = true;
-            let current_dicts = [dict]
-            let _array = undefined;    
+            var breakflag = true;
+            var current_dicts = [dict]
+            var _array = undefined;    
             for (var i = 1; i <= iterations; i++) {
-                let new_dicts = []
+                var new_dicts = []
                 current_dicts.forEach(current_dict => 
                 {
                     _array = Object.keys(current_dict).map(Number).filter(function(x) { return x <= position; }).sort(function(a, b){return a-b});
-                    if(_array.length >= 1)
+                    if(_array.length > 0)
                     {
                         if(i == iterations)
                             breakflag = false;
                         
-                        let laststep = _array[_array.length - 1]
+                        var laststep = _array[_array.length - 1]
                         new_dicts.push(current_dict[laststep])
                         if(_array.length >= 2 && (laststep + Math.pow(10, 8 - iterations) > position))
                             new_dicts.push(current_dict[_array[_array.length - 2]])
@@ -1342,28 +1223,163 @@ async function getTranscripts(chr, position)
     
 }
 
-async function getTranscriptIDs(chr, position)
-{
-    return new Promise(resolve => {
-        let results = []
-        if(!index_db.hasOwnProperty(chr))
-            resolve([]);
+function gv_create_table_popup(button, parameters) {
+    var $target = $('#gv_table_popover');
+    var $btn = $(button);
 
-        for(let start in index_db[chr])
+    var m = parameters.element;
+    var sample = parameters.sample;
+
+    if($target)
+    {
+        
+        
+        $('#gv_clickedpopupcell').css('background-color', 'transparent');
+        $('#gv_clickedpopupcell').removeAttr('id');
+
+        if($target.siblings().is($btn))
         {
-            if(position >= start)
+            $target.remove();
+            return;
+        }   
+        $target.remove();
+
+    }
+
+    $(button).attr('id', 'gv_clickedpopupcell');
+    $(button).css('background-color', 'lightgray');
+
+    $target = $(`<div id="gv_table_popover" class="popover bottom in" style="max-width: none; top: 40px; z-index: 2;">
+                    <div class="arrow" style="left: 9.375%;"></div>
+                    <div id="gv_table_popover_content" class="popover-content">
+
+                    </div>
+                </div>`);
+
+
+    $btn.after($target);
+
+    for(var t in globals.variant.gv_results[sample][m])
+    {
+        if(validTranscript(t))
+        {
+            var tstring = []
+            if(globals.variant.transcripts[t].r != "")
+                tstring.push('<a target="_blank" href="https://www.ensembl.org/Homo_sapiens/Transcript/Summary?t=' + globals.variant.transcripts[t].r + '"><span class="fa fa-external-link-alt ml-2"></span></a>')
+                tstring.push(globals.variant.transcripts[t].p == true? "positive":"negative");   
+            tstring.push(globals.variant.transcripts[t].t)
+            tstring.push("(" + globals.variant.transcripts[t].s + ' <i class="fas fa-arrow-right"></i> ' + globals.variant.transcripts[t].e) 
+
+            var vstring = []
             {
-                for(let end in index_db[chr][start])
-                {
-                    if(position <= end)
-                    {
-                        index_db[chr][start][end].forEach(r => results.push(r))
-                    }
+                for(var v in globals.variant.gv_results[sample][m][t])
+                {    
+                    var variant = globals.variant.variants[v];
+                    vstring.push("<p>" + variant["POS"] + ": " + variant["REF"] + ' <i class="fas fa-arrow-right"></i> ' + variant["ALT"] + "</p>");
                 }
             }
+            if(vstring.length > 0)
+            {
+                $(`
+                <button class="air_collapsible_smallgrey mt-1 mb-1">${tstring.join(" ")}</button>
+                    <div class="air_collapsible_content">
+                        ${vstring.join("")}
+                    </div>
+                `).appendTo("#gv_table_popover_content");
+            }
         }
-
-        resolve(results)
-    });
+       
+    }
     
-}
+            
+    $('#gv_table_popover_content .collapse').collapse();  
+
+    var coll = document.getElementById("gv_table_popover_content").getElementsByClassName("air_collapsible_smallgrey");
+    var i;
+
+    for (i = 0; i < coll.length; i++) {
+        coll[i].addEventListener("click", function() {
+            this.classList.toggle("active");
+            var content = this.nextElementSibling;
+            if (content.style.maxHeight){
+            content.style.maxHeight = null;
+            } else {
+            content.style.maxHeight = content.scrollHeight + 1 + "px";
+            } 
+        });
+    }
+
+    $target.show();
+};
+
+function gv_create_cons_popup(button, parameters) {
+    var $target = $('#gv_cons_popover');
+    var $btn = $(button);
+
+    var m = parameters.element;
+    var sample = parameters.sample;
+
+    if($target)
+    {        
+        $('#gv_clickedpopupcell').css('border', 'none');
+        $('#gv_clickedpopupcell').removeAttr('id');
+
+        $("#gv_table_cons").parents(".dataTables_scrollBody").css({
+            minHeight: "0px",
+        });
+
+        if($btn.siblings().is($target))
+        {
+            $target.remove();
+            return;
+        }   
+        $target.remove();
+    }
+
+    $(button).attr('id', 'gv_clickedpopupcell');
+    $(button).css('border', '2px solid black');
+
+    $target = $(`<div id="gv_cons_popover" class="popover bottom in" style="max-width: none; top: 40px; z-index: 2;">
+                    <div class="arrow" style="left: 9.375%;"></div>
+                    <div id="gv_cons_popover_content" class="popover-content">
+
+                    </div>
+                </div>`);
+
+
+    $btn.after($target);
+
+    var element_result = globals.variant.mutation_results[m][sample].variants;
+    var ouput = new Set()
+    for(var t in element_result)
+    {
+        var tstring = []
+        if(element_result[t].id != "")
+            tstring.push('<a target="_blank" href="https://www.ncbi.nlm.nih.gov/snp/' + element_result[t].id + '"><span class="fa fa-external-link-alt ml-2"></span></a>')
+        tstring.push(element_result[t]["impact"]);   
+        tstring.push(element_result[t]["most_severe_consequence"])
+        if(element_result[t].frequency != "")
+            tstring.push(element_result[t].frequency)
+        
+        var pubmeds = [];
+        for(var p of element_result[t].pubmed) 
+            pubmeds.push('<a target="_blank" href="https://pubmed.ncbi.nlm.nih.gov/' + p + '">' + p + '</a>')
+        if(pubmeds.length > 0)
+            tstring.push("(" + pubmeds.join(", ") + ")") 
+
+        ouput.add("<p>" + tstring.join(" ") + "</p>")
+    }
+
+    if(ouput.size > 0)
+    {
+        $(Array.from(ouput).join("")).appendTo("#gv_cons_popover_content");
+
+        var popupheight = $("#gv_cons_popover_content").height() + 50;
+        $("#gv_table_cons").parents(".dataTables_scrollBody").css({
+            minHeight: (popupheight > 400? 400 : popupheight) + "px",
+        });
+    }  
+
+    $target.show();
+};
+

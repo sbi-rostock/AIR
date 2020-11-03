@@ -106,11 +106,9 @@
   border: none !important; }
 
 
-.xp_collapsible {
-  background-color: #6E6EC8;
+.air_collapsible, .air_collapsible_smallgrey {
   color: white;
   cursor: pointer;
-  padding: 10px;
   width: 100%;
   border: 1px solid white;
   border-radius: 16px;
@@ -118,20 +116,29 @@
   outline: none !important;
   font-size: 15px;
   font-weight: bold;
-  padding-left: 25px; }
+}
 
-.xp_collapsible.active, .xp_collapsible:hover {
+.air_collapsible {
+    background-color: #6E6EC8;
+    padding: 10px;
+    padding-left: 25px; }
+
+.air_collapsible_smallgrey {
+      background-color: lightgray;
+}
+
+.air_collapsible.active, .air_collapsible:hover {
   background-color: #6E6EC8; 
 }
 
-.xp_collapsible:after {
+.air_collapsible:after, .air_collapsible_smallgrey:after {
   content: '\002B';
   color: white;
   font-weight: bold;
   float: right;
   margin-left: 5px; }
 
-.xp_collapsible.active:after {
+.air_collapsible.active:after, .air_collapsible_smallgrey.active:after {
   content: "\2212"; }
 
 .xp_slider {
@@ -162,7 +169,7 @@
   background: #6E6EC8;
   cursor: pointer; }
 
-.xp_content {
+.air_collapsible_content {
   padding: 0px 10px;
   max-height: 0;
   overflow: hidden;
@@ -198,19 +205,25 @@
 .wrapper {
   text-align: center; }
 
-.xp_btn_air {
+.air_btn {
   background-color: #FF8C8C;
   border-color: #FF8C8C;
   font-weight: bold;
+  color: white; 
+  padding: 0;
+  height: 32.5px;}
+
+.air_btn:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: #FF8C8C;
+  border-color: #FF8C8C;
   color: white; }
 
-.xp_btn_air:focus {
-  outline: none !important;
-  box-shadow: none; }
-
-.xp_btn_air:active, .xp_btn_air:hover {
+.air_btn:active, .air_btn:hover {
   background-color: #ff5959;
-  border-color: #ff5959; }
+  border-color: #ff5959;
+  color: white; }
 
 .air_disabledbutton {
   pointer-events: none;
@@ -328,3 +341,22 @@ input[type=checkbox] .cbcontainer {
     text-align: right;
     margin-left: 5px;
   }
+
+.air_progress {
+  color: white;
+  background-color: #FF8C8C;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+.air_progress_value {
+  background-color: #ff5959;
+  height: 100%;
+}
+
+.air_progress_label {
+  height:100%;
+  top: 4.5px;
+  font-size: 1rem;
+  font-weight: bold;
+}
