@@ -597,7 +597,7 @@ function getElementType(name)
     {
         if(AIR.Molecules[element].name.toLowerCase() === name.toLowerCase())
         {
-            type = AIR.Molecules[element].type;
+            type = AIR.Molecules[element].realtype;
             break;
         }
     }

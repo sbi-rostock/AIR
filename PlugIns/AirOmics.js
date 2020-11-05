@@ -2037,7 +2037,7 @@ async function calculateTargets() {
 
             if((++count) % 70 == 0)
             {
-                await updateProgress(count, molLength, "om_regulator_progress");
+                await updateProgress(count, molLength, "om_regulator");
             }
 
             if(AIR.Molecules[e].emptySP == true)
@@ -2324,7 +2324,7 @@ async function enrichr() {
         }
 
 
-        await updateProgress(_count++, globals.omics.samples.length, "om_enrichr_progress");
+        await updateProgress(_count++, globals.omics.samples.length, "om_enrichr");
     }
 
 

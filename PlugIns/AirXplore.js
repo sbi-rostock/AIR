@@ -1411,7 +1411,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 for(let inter in AIR.Interactions)
                 {
-                    let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+                    let {source:_source, target:_target, subtype:_type, pubmed:_pubmed} = AIR.Interactions[inter];
 
                     if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
@@ -1419,7 +1419,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                     }
                     if(_target == elementid)
                     {
-                        let {type: _sourcetype, name:_sourcename, ids:_sourceids} = AIR.Molecules[_source];
+                        let {subtype: _sourcetype, name:_sourcename, ids:_sourceids} = AIR.Molecules[_source];
                         let typevalue = $("#xp_select_interaction_type").val();
                         switch(typevalue){
                             case "1":
@@ -1696,7 +1696,7 @@ function isProtein(elementid)
     {
         return false;
     }
-    else if(AIR.Molecules[elementid].type == "PROTEIN" || AIR.Molecules[elementid].type == "TF" || AIR.Molecules[elementid].type == "miRNA" || AIR.Molecules[elementid].type == "lncRNA")
+    else if(AIR.Molecules[elementid].type == "PROTEIN" || AIR.Molecules[elementid].subtype == "TF" || AIR.Molecules[elementid].subtype == "miRNA" || AIR.Molecules[elementid].subtype == "lncRNA")
     {
         return true
     }
