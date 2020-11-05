@@ -449,8 +449,10 @@ async function AirGenvar(){
         }
         for(var sample in globals.variant.samples)
         {            
-            gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
+            await gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
         }
+
+        enablebtn("gv_addoverlay", text);
     });
 
     $('#gv_getConsequences').on('click', getConsequences);
@@ -550,62 +552,61 @@ async function AirGenvar(){
 
 async function gv_addoverlay(sample, olname)
 {
-    var _content = await gv_contentString(sample) 
-    if(_content != "")
-    {
-        $.ajax({
-            method: 'POST',
-            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+    return new Promise((resolve, reject) =>  
+    { 
+        var _content = gv_contentString(sample) 
+        if(_content != "")
+        {
+            $.ajax({
+                method: 'POST',
+                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-            data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
-            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-            success: (response) => {
-                enablebtn("gv_addoverlay", text);
-                $("[name='refreshOverlays']").click();
-            },
-            error: (response) => {
-                enablebtn("gv_addoverlay", text);
-            }
-        })
-    }
-    else
-    {
-        enablebtn("gv_addoverlay", text);
-    }
-
-    function deleteOldOverlay()
-    {
-        return new Promise((resolve, reject) =>  
-        { 
-            var _found = false;
-            var overlays = minervaProxy.project.data.getDataOverlays();
-
-            for (var ol in overlays)
-            {
-                if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
-                {
-                    _found = true;
-                    $.ajax({
-                        method: 'DELETE',
-                        url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
-                        cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                        success: (response) => {
-                            $("[name='refreshOverlays']").click();
-                            resolve("");
-                        }
-                    })
+                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
+                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                success: (response) => {
+                    resolve("")
+                    $("[name='refreshOverlays']").click();
+                },
+                error: (response) => {
+                    resolve("")
                 }
-            };
-            if(!_found)
-            {
-                resolve("")
-            }
-        });
-    }
-    function gv_contentString()
+            })
+        }
+        else {
+            resolve("")
+        }
+
+        function deleteOldOverlay()
+        {
+            return new Promise((resolve, reject) =>  
+            { 
+                var _found = false;
+                var overlays = minervaProxy.project.data.getDataOverlays();
+
+                for (var ol in overlays)
+                {
+                    if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
+                    {
+                        _found = true;
+                        $.ajax({
+                            method: 'DELETE',
+                            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
+                            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                            success: (response) => {
+                                $("[name='refreshOverlays']").click();
+                                resolve("");
+                            }
+                        })
+                    }
+                };
+                if(!_found)
+                {
+                    resolve("")
+                }
+            });
+        }
+        function gv_contentString()
     {
-        return new Promise((resolve, reject) =>  
-        { 
             var olfilter = $("#gv_overlayselect").val();
             var output = '';
 
@@ -664,9 +665,9 @@ async function gv_addoverlay(sample, olname)
                 };
             }   
 
-            resolve(output);
-        })
-    }
+            return output;
+        }
+    });
 }
 
 $(document).on('change', '.gv_clickCBinTable',function () {
