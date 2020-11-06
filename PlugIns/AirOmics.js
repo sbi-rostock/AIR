@@ -573,11 +573,10 @@ async function Start() {
                 $('.air_btn_info[data-toggle="popover"]').popover();
                 $('#om_pheno_analyzebtn').on('click', async function() {
                     var _text = await disablebutton("om_pheno_analyzebtn");
-                    analyze().catch(function (error) {
+                    await analyze().catch(function (error) {
                         alert(error);
-                    }).finally(function (r) {
-                        enablebtn("om_pheno_analyzebtn", _text);
-                    });
+                    })
+                    enablebtn("om_pheno_analyzebtn", "Estimate Phenotype Levels");
                 });
 
                 let sampleSelect = document.getElementById('om_select_sample');
@@ -1229,20 +1228,19 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
 }
 
   
-function analyze() {
+async function analyze() {
   return new Promise(function (resolve, reject) {    
           PhenotypeSP().then(function (pr) {
             normalizePhenotypeValues().then(function (pv) {
               createTable().then(function (ct) {
                 resolve('');
-              }).catch(function (error) {
-                return reject('Failed to create the result table.');
+                }).catch(function (error) {
+                    reject('Failed to create the result table.');
               });
             });
           }).catch(function (error) {
-            return reject('Failed to analyze the phenotype levels.');
-          });
-        
+            reject('Failed to analyze the phenotype levels.');
+          });   
   });
 }
 
@@ -2477,11 +2475,11 @@ function om_createpopup(button, parameter) {
                     pValue = 1;
             }
 
-            rad = 2
+            rad = 4
 
             if(globals.omics.pvalue)
             {
-                rad = 1 + (5 * (1 - pValue));
+                rad = 1 + (4 * (1 - pValue));
             }
 
             if(isNaN(FC))
@@ -2566,7 +2564,7 @@ function om_createpopup(button, parameter) {
                         labelString: 'Influence on Phenotype'
                     },
                     ticks: {
-                        beginAtZero: true,
+                        //beginAtZero: true,
                     }
                 }],
                 xAxes: [{
