@@ -1411,7 +1411,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 for(let inter in AIR.Interactions)
                 {
-                    let {source:_source, target:_target, subtype:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+                    let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
 
                     if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
