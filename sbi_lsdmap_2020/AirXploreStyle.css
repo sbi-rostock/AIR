@@ -107,24 +107,32 @@
 
 
 .air_collapsible, .air_collapsible_smallgrey {
-  color: white;
   cursor: pointer;
   width: 100%;
   border: 1px solid white;
-  border-radius: 16px;
+
   text-align: left;
   outline: none !important;
-  font-size: 15px;
   font-weight: bold;
 }
 
 .air_collapsible {
+  color: white;
     background-color: #6E6EC8;
     padding: 10px;
-    padding-left: 25px; }
+    padding-left: 25px;
+    border-radius: 16px;
+    font-size: 15px; }
 
 .air_collapsible_smallgrey {
-      background-color: lightgray;
+    color: white;
+      background-color: #FF8C8C;
+      font-size: 12px;
+      white-space: nowrap;
+      padding: 0;
+}
+.air_collapsible_smallgrey.active {
+  background-color: #FF8C8C;
 }
 
 .air_collapsible.active, .air_collapsible:hover {

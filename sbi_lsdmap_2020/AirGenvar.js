@@ -449,8 +449,10 @@ async function AirGenvar(){
         }
         for(var sample in globals.variant.samples)
         {            
-            gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
+            await gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
         }
+
+        enablebtn("gv_addoverlay", text);
     });
 
     $('#gv_getConsequences').on('click', getConsequences);
@@ -550,62 +552,61 @@ async function AirGenvar(){
 
 async function gv_addoverlay(sample, olname)
 {
-    var _content = await gv_contentString(sample) 
-    if(_content != "")
-    {
-        $.ajax({
-            method: 'POST',
-            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+    return new Promise((resolve, reject) =>  
+    { 
+        var _content = gv_contentString(sample) 
+        if(_content != "")
+        {
+            $.ajax({
+                method: 'POST',
+                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-            data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
-            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-            success: (response) => {
-                enablebtn("gv_addoverlay", text);
-                $("[name='refreshOverlays']").click();
-            },
-            error: (response) => {
-                enablebtn("gv_addoverlay", text);
-            }
-        })
-    }
-    else
-    {
-        enablebtn("gv_addoverlay", text);
-    }
-
-    function devareOldOverlay()
-    {
-        return new Promise((resolve, reject) =>  
-        { 
-            var _found = false;
-            var overlays = minervaProxy.project.data.getDataOverlays();
-
-            for (var ol in overlays)
-            {
-                if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
-                {
-                    _found = true;
-                    $.ajax({
-                        method: 'DEvarE',
-                        url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
-                        cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                        success: (response) => {
-                            $("[name='refreshOverlays']").click();
-                            resolve("");
-                        }
-                    })
+                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
+                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                success: (response) => {
+                    resolve("")
+                    $("[name='refreshOverlays']").click();
+                },
+                error: (response) => {
+                    resolve("")
                 }
-            };
-            if(!_found)
-            {
-                resolve("")
-            }
-        });
-    }
-    function gv_contentString()
+            })
+        }
+        else {
+            resolve("")
+        }
+
+        function deleteOldOverlay()
+        {
+            return new Promise((resolve, reject) =>  
+            { 
+                var _found = false;
+                var overlays = minervaProxy.project.data.getDataOverlays();
+
+                for (var ol in overlays)
+                {
+                    if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
+                    {
+                        _found = true;
+                        $.ajax({
+                            method: 'DELETE',
+                            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
+                            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                            success: (response) => {
+                                $("[name='refreshOverlays']").click();
+                                resolve("");
+                            }
+                        })
+                    }
+                };
+                if(!_found)
+                {
+                    resolve("")
+                }
+            });
+        }
+        function gv_contentString()
     {
-        return new Promise((resolve, reject) =>  
-        { 
             var olfilter = $("#gv_overlayselect").val();
             var output = '';
 
@@ -664,9 +665,9 @@ async function gv_addoverlay(sample, olname)
                 };
             }   
 
-            resolve(output);
-        })
-    }
+            return output;
+        }
+    });
 }
 
 $(document).on('change', '.gv_clickCBinTable',function () {
@@ -972,7 +973,7 @@ function set_cons_table()
 
         if(break_flag)
         {
-            tbl.devareRow(result_row.parentNode.parentNode.rowIndex);
+            tbl.deleteRow(result_row.parentNode.parentNode.rowIndex);
         }
 
         _elementnames.push(AIR.Molecules[m].name)
@@ -1260,47 +1261,53 @@ function gv_create_table_popup(button, parameters) {
     $target = $(`<div id="gv_table_popover" class="popover bottom in" style="max-width: none; top: 40px; z-index: 2;">
                     <div class="arrow" style="left: 9.375%;"></div>
                     <div id="gv_table_popover_content" class="popover-content">
+                        <ul class="list-group" id="gv_table_popovr_transcript_list">
 
+                        </ul>
                     </div>
                 </div>`);
 
 
     $btn.after($target);
 
+    var addedtranscripts = []
     for(var t in globals.variant.gv_results[sample][m])
     {
         if(validTranscript(t))
         {
             var tstring = []
             if(globals.variant.transcripts[t].r != "")
-                tstring.push('<a target="_blank" href="https://www.ensembl.org/Homo_sapiens/Transcript/Summary?t=' + globals.variant.transcripts[t].r + '"><span class="fa fa-external-link-alt ml-2"></span></a>')
+                tstring.push('<a target="_blank" href="https://www.ensembl.org/Homo_sapiens/Transcript/Summary?t=' + globals.variant.transcripts[t].r + '"><span class="fa fa-external-link-alt ml-2"></span>' + globals.variant.transcripts[t].r + '</a>')
                 tstring.push(globals.variant.transcripts[t].p == true? "positive":"negative");   
             tstring.push(globals.variant.transcripts[t].t)
-            tstring.push("(" + globals.variant.transcripts[t].s + ' <i class="fas fa-arrow-right"></i> ' + globals.variant.transcripts[t].e) 
+            tstring.push("(" + globals.variant.transcripts[t].s + ' <i class="fas fa-arrow-right"></i> ' + globals.variant.transcripts[t].e + ")")  
+
+            if(addedtranscripts.includes(tstring.join("$")))
+            {
+                continue;
+            }
+            addedtranscripts.push(tstring.join("$"))
 
             var vstring = []
             {
                 for(var v in globals.variant.gv_results[sample][m][t])
                 {    
                     var variant = globals.variant.variants[v];
-                    vstring.push("<p>" + variant["POS"] + ": " + variant["REF"] + ' <i class="fas fa-arrow-right"></i> ' + variant["ALT"] + "</p>");
+                    vstring.push('<li class="list-group-item d-flex justify-content-between align-items-center">' + variant["POS"] + ": " + variant["REF"] + ' <i class="fas fa-arrow-right"></i> ' + variant["ALT"] + "</li>");
                 }
             }
             if(vstring.length > 0)
             {
                 $(`
-                <button class="air_collapsible_smallgrey mt-1 mb-1">${tstring.join(" ")}</button>
-                    <div class="air_collapsible_content">
-                        ${vstring.join("")}
-                    </div>
-                `).appendTo("#gv_table_popover_content");
+                <li class="air_collapsible_smallgrey list-group-item d-flex justify-content-between align-items-center"> ${tstring.join(" ")}<span class="badge badge-primary badge-pill">${vstring.length}</span></button></li>
+                <ul class="air_collapsible_content list-group">
+                    ${vstring.join("")}
+                </ul>    
+                `).appendTo("#gv_table_popovr_transcript_list");
             }
         }
        
     }
-    
-            
-    $('#gv_table_popover_content .collapse').collapse();  
 
     var coll = document.getElementById("gv_table_popover_content").getElementsByClassName("air_collapsible_smallgrey");
     var i;
@@ -1350,44 +1357,99 @@ function gv_create_cons_popup(button, parameters) {
     $target = $(`<div id="gv_cons_popover" class="popover bottom in" style="max-width: none; top: 40px; z-index: 2;">
                     <div class="arrow" style="left: 9.375%;"></div>
                     <div id="gv_cons_popover_content" class="popover-content">
-
+                    <table style="width:100%" class="air_table table nowrap table-sm" id="gv_cons_sub_table" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th style="vertical-align: middle;"></th>
+                                <th style="vertical-align: middle;">Impact</th>
+                                <th style="vertical-align: middle;">Frequency</th>
+                                <th style="vertical-align: middle;">Consequence</th>
+                                <th style="vertical-align: middle;">References</th>
+                            </tr>
+                        </thead>
+                    </table>
                     </div>
                 </div>`);
 
 
     $btn.after($target);
 
+    $("#gv_cons_sub_table").empty()
+
+    var tbl = document.getElementById('gv_cons_sub_table');
+
     var element_result = globals.variant.mutation_results[m][sample].variants;
-    var ouput = new Set()
+
+    var addedrows = [];
+
     for(var t in element_result)
     {
-        var tstring = []
-        if(element_result[t].id != "")
-            tstring.push('<a target="_blank" href="https://www.ncbi.nlm.nih.gov/snp/' + element_result[t].id + '"><span class="fa fa-external-link-alt ml-2"></span></a>')
-        tstring.push(element_result[t]["impact"]);   
-        tstring.push(element_result[t]["most_severe_consequence"])
-        if(element_result[t].frequency != "")
-            tstring.push(element_result[t].frequency)
-        
+        var rowcontent = [];
+        rowcontent.push('<a target="_blank" href="https://www.ncbi.nlm.nih.gov/snp/' + element_result[t].id + '"><span class="fa fa-external-link-alt ml-2"></span></a>');
+        rowcontent.push(element_result[t]["impact"])
+        rowcontent.push(element_result[t]["most_severe_consequence"]);
+        rowcontent.push(isNaN(element_result[t].frequency) ? "N/A":element_result[t].frequency);
+
         var pubmeds = [];
         for(var p of element_result[t].pubmed) 
             pubmeds.push('<a target="_blank" href="https://pubmed.ncbi.nlm.nih.gov/' + p + '">' + p + '</a>')
-        if(pubmeds.length > 0)
-            tstring.push("(" + pubmeds.join(", ") + ")") 
 
-        ouput.add("<p>" + tstring.join(" ") + "</p>")
+        rowcontent.push(pubmeds.join(", "));
+        
+        if(addedrows.includes(rowcontent.join("$")))
+        {
+            continue;
+        }
+        addedrows.push(rowcontent.join("$"))
+
+        var result_row = tbl.insertRow(tbl.rows.length);
+        result_row.setAttribute("id", m);
+
+        createCell(result_row, 'td', rowcontent[0], 'col-3', '', 'center');
+
+        var impact = globals.variant.impacts.indexOf(element_result[t]["impact"])
+
+        var cell = createCell(result_row, 'td', rowcontent[1], 'col-3', '', 'center');
+
+        cell.setAttribute("data-order", impact);
+        switch(impact)
+            {
+                case 4: $(cell).addClass('air_red'); break;
+                case 3: $(cell).addClass('air_yellow'); break;
+                case 1: $(cell).addClass('air_green'); break;
+                case 2: $(cell).addClass('air_gray'); break;
+                default: break;
+            }
+
+
+        createCell(result_row, 'td', rowcontent[2], 'col-3', '', 'center');
+        createCell(result_row, 'td', rowcontent[3], 'col-3', '', 'center');
+        createCell(result_row, 'td', rowcontent[4], 'col-3', '', 'center');
+            
     }
+    
 
-    if(ouput.size > 0)
-    {
-        $(Array.from(ouput).join("")).appendTo("#gv_cons_popover_content");
+    var header = tbl.createTHead();
+    var headerrow = header.insertRow(0);
 
-        var popupheight = $("#gv_cons_popover_content").height() + 50;
-        $("#gv_table_cons").parents(".dataTables_scrollBody").css({
-            minHeight: (popupheight > 400? 400 : popupheight) + "px",
-        });
-    }  
+    createCell(headerrow, 'th', '', 'col-3', 'col', 'center');  
+    createCell(headerrow, 'th', 'Impact', 'col-3', 'col', 'center');
+    createCell(headerrow, 'th', 'Consequence', 'col-3', 'col', 'center');
+    createCell(headerrow, 'th', 'Frequency', 'col-3', 'col', 'center');
+    createCell(headerrow, 'th', 'References', 'col-3', 'col', 'center');
+
+    var popupheight = $("#gv_cons_popover_content").height() + 50;
+    $("#gv_table_cons").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400? 400 : popupheight) + "px",
+    });
+   
+    $('#gv_cons_sub_table').DataTable({
+        "order": [[ 1, "desc" ]], 
+        "scrollX": true,
+        "autoWidth": true,
+    }).columns.adjust().draw();
 
     $target.show();
 };
+
 

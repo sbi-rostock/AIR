@@ -268,6 +268,7 @@ async function AirOmics(){
         <select id="om_target_filter" class="browser-default om_select custom-select mb-1">
             <option value="0" selected>All Elements</option>
             <option value="1">Proteins</option>
+            <option value="5">Receptors</option>
             <option value="2">miRNAs</option>
             <option value="3">lncRNAs</option>
             <option value="4">Transcription Factors</option>
@@ -572,11 +573,10 @@ async function Start() {
                 $('.air_btn_info[data-toggle="popover"]').popover();
                 $('#om_pheno_analyzebtn').on('click', async function() {
                     var _text = await disablebutton("om_pheno_analyzebtn");
-                    analyze().catch(function (error) {
+                    await analyze().catch(function (error) {
                         alert(error);
-                    }).finally(function (r) {
-                        enablebtn("om_pheno_analyzebtn", _text);
-                    });
+                    })
+                    enablebtn("om_pheno_analyzebtn", "Estimate Phenotype Levels");
                 });
 
                 let sampleSelect = document.getElementById('om_select_sample');
@@ -1228,20 +1228,19 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
 }
 
   
-function analyze() {
+async function analyze() {
   return new Promise(function (resolve, reject) {    
           PhenotypeSP().then(function (pr) {
             normalizePhenotypeValues().then(function (pv) {
               createTable().then(function (ct) {
                 resolve('');
-              }).catch(function (error) {
-                return reject('Failed to create the result table.');
+                }).catch(function (error) {
+                    reject('Failed to create the result table.');
               });
             });
           }).catch(function (error) {
-            return reject('Failed to analyze the phenotype levels.');
-          });
-        
+            reject('Failed to analyze the phenotype levels.');
+          });   
   });
 }
 
@@ -2036,7 +2035,7 @@ async function calculateTargets() {
 
             if((++count) % 70 == 0)
             {
-                await updateProgress(count, molLength, "om_regulator_progress");
+                await updateProgress(count, molLength, "om_regulator");
             }
 
             if(AIR.Molecules[e].emptySP == true)
@@ -2045,7 +2044,7 @@ async function calculateTargets() {
             }
 
             let last = !--iterations;
-            let {name:_name, type:_type, phenotypes:_sp} = AIR.Molecules[e];
+            let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
 
             if (_type.toLowerCase() === "phenotype") {
                 continue;
@@ -2058,17 +2057,22 @@ async function calculateTargets() {
                 }
             }
             if (typevalue == 2) {
-                if (_type != "miRNA") {
+                if (_subtype != "miRNA") {
                     continue;
                 }
             }
             if (typevalue == 3) {
-                if (_type != "lncRNA") {
+                if (_subtype != "lncRNA") {
                     continue;
                 }
             }
             if (typevalue == 4) {
-                if (_type != "TF") {
+                if (_subtype != "TF") {
+                    continue;
+                }
+            } 
+            if (typevalue == 5) {
+                if (_subtype != "RECEPTOR") {
                     continue;
                 }
             } 
@@ -2318,7 +2322,7 @@ async function enrichr() {
         }
 
 
-        await updateProgress(_count++, globals.omics.samples.length, "om_enrichr_progress");
+        await updateProgress(_count++, globals.omics.samples.length, "om_enrichr");
     }
 
 
@@ -2471,11 +2475,11 @@ function om_createpopup(button, parameter) {
                     pValue = 1;
             }
 
-            rad = 2
+            rad = 4
 
             if(globals.omics.pvalue)
             {
-                rad = 1 + (5 * (1 - pValue));
+                rad = 1 + (4 * (1 - pValue));
             }
 
             if(isNaN(FC))
@@ -2560,7 +2564,7 @@ function om_createpopup(button, parameter) {
                         labelString: 'Influence on Phenotype'
                     },
                     ticks: {
-                        beginAtZero: true,
+                        //beginAtZero: true,
                     }
                 }],
                 xAxes: [{

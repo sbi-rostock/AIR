@@ -4,9 +4,10 @@ let filetesting;
 let Chart;
 let JSZip;
 let FileSaver;
+let VCF;
 
 
-const localURL = 'http://localhost:3000/';
+const localURL = 'http://localhost:3000/datafiles/Full_MIM';
 const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020';
 
 const AIR = {
@@ -596,7 +597,7 @@ function getElementType(name)
     {
         if(AIR.Molecules[element].name.toLowerCase() === name.toLowerCase())
         {
-            type = AIR.Molecules[element].type;
+            type = AIR.Molecules[element].realtype;
             break;
         }
     }
