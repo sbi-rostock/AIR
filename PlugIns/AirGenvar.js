@@ -973,10 +973,13 @@ function set_cons_table()
 
         if(break_flag)
         {
-            tbl.deleteRow(result_row.parentNode.parentNode.rowIndex);
+            result_row.parentNode.removeChild(result_row);
+        }
+        else
+        {
+            _elementnames.push(AIR.Molecules[m].name)
         }
 
-        _elementnames.push(AIR.Molecules[m].name)
     }
 
     var header = tbl.createTHead();
