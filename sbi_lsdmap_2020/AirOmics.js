@@ -22,13 +22,17 @@ async function AirOmics(){
         spsliderchart: undefined,
         plevelchart_config: undefined,
         plevelchart: undefined,
+        om_container: undefined,
         numberofuserprobes: 0,
+        numberOfRandomSamples: 0,
         selected: [],
         colors: ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F","#EDC948", "#B07AA1","#FF9DA7","#9C755F","#BAB0AC"],
         pickedcolors: [],
+        resultsTable: undefined
     }
     let t0 = performance.now();
-    globals.omics.om_container = $('#airomics_tab_content');   
+    globals.omics.om_container = $('#airomics_tab_content');
+
     $(`<div id="om_stat_spinner" class="mt-5">
         <div class="d-flex justify-content-center">
             <div class="spinner-border" role="status">
@@ -39,8 +43,6 @@ async function AirOmics(){
             <span id="om_loading_text">LOADING...</span>
         </div>
     </div>`).appendTo(globals.omics.om_container);
-
-    $(minervaProxy.element).parent().css('overflow-y', 'scroll');
 
     $(
         /*<div class="text-center">
@@ -153,7 +155,7 @@ async function AirOmics(){
     `).appendTo('#airomics_tab_content');
 
     globals.omics.phenotab = $(`
-    <div class="tab-pane air_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
+    <div class="tab-pane air_sub_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
         <div id="om_pheno_startcontainer">
             <div class="row mb-1">
                 <div class="col-auto">
@@ -207,6 +209,7 @@ async function AirOmics(){
 
             <hr>  
 
+
             <div class="row mt-1 mb-1">
                 <div class="col-auto">
                     <div class="wrapper">
@@ -227,6 +230,24 @@ async function AirOmics(){
 
             <hr>
 
+            <div id="om_pheno_randomsampleNumber-container" class="row mb-4">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-content="Number of random samples to be generated for statistical evaluation. Larger numbers combined with large data sets will increase the calculation time.">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;"># of random Samples:</span>
+                </div>
+                <div class="col">
+                    <input type="text" class="textfield" value="1000" id="om_pheno_randomsampleNumber" onkeypress="return isNumber(event)" />
+                </div>
+            </div>
+
             <button type="button" id="om_pheno_analyzebtn" class="air_btn btn btn-block mt-2">Estimate Phenotype Levels</button>
 
         </div>
@@ -235,7 +256,7 @@ async function AirOmics(){
     </div>
     `
     ).appendTo('#om_tab');
-    globals.omics.targettab = $(`<div class="tab-pane air_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
+    globals.omics.targettab = $(`<div class="tab-pane air_sub_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
         <div class="air_alert alert alert-warning mb-4">
             <span>This requires much more computationally intensive calculations that need to fetch a larger amount of data. The calculation speed mainly depends on your internet bandwidth.<br/>We also recommend having at least 1 GB of RAM available.</span>
             <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
@@ -279,7 +300,7 @@ async function AirOmics(){
     </div>`).appendTo('#om_tab');
 
     globals.omics.enrichrtab = $(`
-        <div class="tab-pane air_tab_pane mb-2" id="om_enrichr" role="tabpanel" aria-labelledby="om_enrichr-tab">
+        <div class="tab-pane air_sub_tab_pane mb-2" id="om_enrichr" role="tabpanel" aria-labelledby="om_enrichr-tab">
             <p>Define thresholds to create gene sets from the data:</p>
             <div id="om_fcthreshold-container" class="row mb-2">
                 <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
@@ -546,7 +567,7 @@ async function Start() {
     
     var text = await disablebutton("om_initializebtn");
 
-    loadfile().then(function (lf) {
+    om_loadfile().then(function (lf) {
         if (lf != "") {
             alert(lf);
         }
@@ -571,13 +592,7 @@ async function Start() {
         readExpressionValues().then(function (re) {
             normalizeExpressionValues().then(function (ne) {
                 $('.air_btn_info[data-toggle="popover"]').popover();
-                $('#om_pheno_analyzebtn').on('click', async function() {
-                    var _text = await disablebutton("om_pheno_analyzebtn");
-                    await analyze().catch(function (error) {
-                        alert(error);
-                    })
-                    enablebtn("om_pheno_analyzebtn", "Estimate Phenotype Levels");
-                });
+                $('#om_pheno_analyzebtn').on('click',  om_PhenotypeSP);
 
                 let sampleSelect = document.getElementById('om_select_sample');
 
@@ -637,7 +652,7 @@ $(document).on('change', '.om_clickCBinTable',function () {
     }
 
 
-    if ($(this).prop('checked') === true) {
+    if ($(this).prop('checked') == true) {
 ;
         if(globals.omics.colors.length <= 0)
         {
@@ -692,10 +707,11 @@ function getRandomColor() {
 }
 
 
-function createTable() {
+async function om_createTable() {
     
     return new Promise((resolve, reject) => {
-
+    if(globals.omics.resultsTable)
+        globals.omics.resultsTable.destroy();
         
     $("#om_pheno_resultscontainer").replaceWith(
         /*html*/`
@@ -738,12 +754,15 @@ function createTable() {
             <button type="button" id="om_addimagebtn"  class="btn-image air_btn btn btn-block mb-2 mt-2">Generate Image</button>
 
             <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
-
+            
             <hr>
 
             <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
 
-            <table class="air_table order-column hover" style="width:100%" id="om_resultstable" cellspacing=0></table>
+            <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+            <div id="om_resultstable_container" class="mb-2">
+                <table class="air_table order-column hover" style="width:100%" id="om_resultstable" cellspacing=0></table>
+            </div>
             <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
             <div id="om_legend" class="chart-legend"></div>
         </div>
@@ -761,25 +780,34 @@ function createTable() {
 
         globals.omics.om_phenotype_downloadtext += `\n${pname}`;
         checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
-        let phenocell = createButtonCell(result_row, 'th', pname, phenotype, 'center');
+        let phenocell = createButtonCell(result_row, 'th', "<b>" +  pname + "</b>", phenotype, 'center');
 
         for (let sample in globals.omics.samples) {
             globals.omics.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
-            createPopupCell(result_row, 'td', AIR.Phenotypes[phenotype].norm_results[sample], 'col-3', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype});
+            createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + "</b><br>(" + expo(AIR.Phenotypes[phenotype].pvalue[sample]) + ")", 'col-3', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = AIR.Phenotypes[phenotype].norm_results[sample]);
         }
-
-        createCell(result_row, 'td', Math.round((AIR.Phenotypes[phenotype].accuracy + Number.EPSILON) * 10000) / 100, 'col-3', '', 'center');
-
+        
         let genenumber = [];
+        let pvalues = []
         for(let sample in  AIR.Phenotypes[phenotype].GeneNumber)
         {
             genenumber.push(AIR.Phenotypes[phenotype].GeneNumber[sample]);
+            pvalues.push(AIR.Phenotypes[phenotype].pvalue[sample]);
         }
 
-        let numberofgenes = Object.keys(AIR.Phenotypes[phenotype].values).length;
-        createCell(result_row, 'td', mean(genenumber) + " [" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-3', '', 'center', true);
 
-        let topgenes = "";
+        createCell(result_row, 'td',expo(mean(pvalues)), 'col-3', '', 'center', true);
+        
+        createCell(result_row, 'td', Math.round((AIR.Phenotypes[phenotype].accuracy + Number.EPSILON) * 10000) / 100, 'col-3', '', 'center');
+
+
+        let numberofgenes = Object.keys(AIR.Phenotypes[phenotype].values).length;
+
+        let meannumberofgenes = mean(genenumber);
+        createCell(result_row, 'td', meannumberofgenes + " [" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-3', '', 'center', true, order= meannumberofgenes);
+
+
+        let topgenes = [];
 
         var items = Object.keys(AIR.Phenotypes[phenotype].MainRegulators).map(function(key) {
             return [key, AIR.Phenotypes[phenotype].MainRegulators[key]];
@@ -789,20 +817,12 @@ function createTable() {
             return second[1] - first[1];
         });
 
-        let c = items.length;
-        if(c > 5)
-            c = 5;
-
-        for (i = 0; i < c; i++) 
+        for (i = 0; i < (items.length > 5? 5: items.length); i++) 
         {
-            topgenes += items[i][0];
-            if(i < c-1)
-            {
-                topgenes += ", ";
-            }
+            topgenes.push(getLinkIconHTML(items[i][0]));
         }
 
-        createCell(result_row, 'td', topgenes, 'col-3', '', 'center', true);
+        createCell(result_row, 'td', topgenes.join(", "), 'col-3', '', 'left', true);
 
     }
 
@@ -819,6 +839,12 @@ function createTable() {
         createCell(headerrow, 'th', globals.omics.samples[sample], 'col-3', 'col', 'center');
     }
 
+    
+    var $pvalue_cell = $(createCell(headerrow, 'th', 'avg. p-value', 'col-3', 'col', 'center'));
+    $pvalue_cell.attr("title", "Probability to achieve the same or a higher accuracy by analyzing " + globals.omics.numberOfRandomSamples + " random samples.");
+    $pvalue_cell.attr("data-toggle", "tooltip");
+    $pvalue_cell.tooltip();
+
     var $acc_cell = $(createCell(headerrow, 'th', 'Accuracy (%)', 'col-3', 'col', 'center'));
     $acc_cell.attr("title", "Accuracy represents the percentage of regulating elements (in proportion to their influence), for which a value was supplied by the data.");
     $acc_cell.attr("data-toggle", "tooltip");
@@ -829,9 +855,32 @@ function createTable() {
     $reg_cell.attr("data-toggle", "tooltip");
     $reg_cell.tooltip();
 
-    createCell(headerrow, 'th', 'Top 5 Regulators', 'col-3', 'col', 'center')
+    createCell(headerrow, 'th', 'Top 5 Regulators', 'col-3', 'col', 'left')
 
+    $("#om_tablemodal_container").html(`
+        <!-- The Modal -->
+        <div id="om_table_modal" class="air_modal">
 
+            <!-- The Close Button -->
+            <span id="om_img_close" class="air_close_white">&times;</span>
+            <!-- Modal Content (The Image) -->
+            <div class="air_modal_content" id="om_table_modal_content"></div>
+
+        </div>`);
+
+    // Get the modal
+
+    let modal = document.getElementById("om_table_modal");
+
+    // Get the <span> element that closes the modal
+    let span = document.getElementById("om_img_close");
+    // When the user clicks on <span> (x), close the modal
+    span.onclick = function() {
+        $('#om_resultstable_container').prepend($('#om_resultstable_wrapper'))
+        $('#om_resultstable_wrapper').css("background-color", "transparent");
+        modal.style.display = "none";
+        globals.omics.resultsTable.columns.adjust().draw();
+    }
 
     $('#om_showoverlaybtn').on('click', async function() {
         let text = await disablebutton('om_showoverlaybtn');
@@ -1022,11 +1071,35 @@ function createTable() {
         ci.update();
     }) */
 
-    $('#om_resultstable').DataTable({
-        "order": [[ globals.omics.samples.length + 2, "desc" ]],  
-        "scrollX": true
-    });
+    globals.omics.resultsTable = $('#om_resultstable').DataTable({
+        "order": [[ globals.omics.samples.length + 2, "asc" ]],  
+        "scrollX": true,
+        "initComplete": function( settings, json ) {  
+            $('#om_popup_table').remove();          
+            $('#om_resultstable_length').find("label").first().prepend(`<button type="button" id="om_popup_table" class="btn-image" style="background-color: transparent; border: none;">
+                                                        <i class="fas fa-expand">
+                                                        </i>
+                                                    </button>`)
 
+            $('#om_popup_table').on('click', function() {
+                
+                if(modal.style.display == "block")
+                {
+                    $('#om_resultstable_container').prepend($('#om_resultstable_wrapper'))
+                    $('#om_resultstable_wrapper').css("background-color", "transparent");
+                    modal.style.display = "none";
+                    globals.omics.resultsTable.columns.adjust().draw();
+                }
+                else{
+                    modal.style.display = "block";
+                    $('#om_table_modal_content').prepend($('#om_resultstable_wrapper'))
+                    $('#om_resultstable_wrapper').css("background-color", "white");
+                    $('#om_table_modal_content').css("width", "100%");
+                    globals.omics.resultsTable.columns.adjust().draw();
+                }
+            });        
+        }
+    });
 
     resolve(' ');
 });
@@ -1050,144 +1123,226 @@ function getImageSource() {
     });
 }
 
-function PhenotypeSP() {
-    return new Promise((resolve, reject) => {
+async function om_PhenotypeSP() {
 
-        let pvalue_threshold = 1;
+    let randomSamples = {};
+    var _text = await disablebutton("om_pheno_analyzebtn" ,progress = true);
 
+    let phenotype_elementvalues = {};
+    let pvalue_threshold = 1;
 
-        if(globals.omics.pvalue)
+    if(globals.omics.pvalue)
+    {
+        pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
+        if(isNaN(pvalue_threshold))
         {
-            pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
-            if(isNaN(pvalue_threshold))
+            alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 1.")
+            pvalue_threshold = 1;
+        }
+    }
+    
+    globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
+    if(isNaN(globals.omics.numberOfRandomSamples))
+    {
+        alert("Only numbers are allowed. n was set to 1000.")
+        globals.omics.numberOfRandomSamples = 1000;
+    }
+
+    async function statisticalAnalysis(phenotype, score, sample)
+    { 
+        return new Promise((resolve, reject) => {                
+            let elementvalues = phenotype_elementvalues[phenotype];
+            let numberOfHigherScores = 0;
+            let random_score;
+            for(let _sampleprobes of randomSamples[sample])
             {
-                alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 1.")
-                pvalue_threshold = 1;
+                random_score = 0;
+                for(let _id of _sampleprobes)
+                {
+                    if (!isNaN(elementvalues[_id]))
+                    {
+                        random_score += elementvalues[_id]
+                    }
+                }
+
+                if(random_score >= score)
+                {
+                    numberOfHigherScores += 1;
+                }
             }
+            resolve(numberOfHigherScores/randomSamples[sample].length);
+        }); 
+    }
+
+    for (let sample in globals.omics.samples) {
+        await updateProgress(sample, globals.omics.samples.length, "om_pheno_analyzebtn", text=" Generating random samples ...");
+
+        randomSamples[sample] = [];
+
+        let probeNumber = (Object.keys(globals.omics.ExpressionValues).filter(function(e) 
+        {
+            let _fc = globals.omics.ExpressionValues[e].nonnormalized[sample]; 
+            let pvalue = globals.omics.ExpressionValues[e].pvalues[sample];
+
+            if(isNaN(pvalue))
+            {
+                pvalue = 1;
+            }
+
+            if(globals.omics.pvalue && pvalue >= pvalue_threshold)
+            {
+                return false;
+            }
+
+            return isNaN(_fc) == false && _fc != 0; 
+
+        })).length
+        
+        randomSamples[sample] = randomIDs(probeNumber, Object.keys(AIR.Molecules).length, globals.omics.numberOfRandomSamples);
+    }
+
+    let count = 0;
+    let elementarray = Object.keys(AIR.Molecules);
+    for (let phenotype in AIR.Phenotypes) {
+
+        phenotype_elementvalues[phenotype] = {};
+        for(let _id in elementarray)
+        {
+            phenotype_elementvalues[phenotype][_id] =  Math.abs(AIR.Phenotypes[phenotype].values[elementarray[_id]]);
         }
 
-        for (let phenotype in AIR.Phenotypes) {
-            let accuracymax = 0;
+        await updateProgress(count++, (Object.keys(AIR.Phenotypes)).length, "om_pheno_analyzebtn", text=" Estimating phenotype levels.");
 
-            AIR.Phenotypes[phenotype].results = {};
-            AIR.Phenotypes[phenotype].norm_results = {};
-            AIR.Phenotypes[phenotype].accuracy = 0;
-            AIR.Phenotypes[phenotype].MainRegulators = {};
-            AIR.Phenotypes[phenotype].GeneNumber = {};
+        let accuracymax = 0;
+
+        AIR.Phenotypes[phenotype].results = {};
+        AIR.Phenotypes[phenotype]["pvalue"] = {}
+        AIR.Phenotypes[phenotype].norm_results = {};
+        AIR.Phenotypes[phenotype].accuracy = 0;
+        AIR.Phenotypes[phenotype].MainRegulators = {};
+        AIR.Phenotypes[phenotype].GeneNumber = {};
+        for (let element in AIR.Phenotypes[phenotype].values) {
+            let SP = AIR.Phenotypes[phenotype].values[element];
+
+            if (isNaN(SP) || SP === 0)
+            {
+                continue;
+            }
+
+            accuracymax += Math.abs(SP);
+        }
+
+        let max = 0;
+
+        var accuracyvalues = [];
+        var accuracyavg = 0;
+
+
+        for (let sample in globals.omics.samples) {
+            let activity = 0.0;
+            var accuracy = 0; 
+            AIR.Phenotypes[phenotype].GeneNumber[sample] = 0;
             for (let element in AIR.Phenotypes[phenotype].values) {
-                let SP = AIR.Phenotypes[phenotype].values[element];
 
-                if (isNaN(SP) || SP === 0)
+                if(!globals.omics.ExpressionValues.hasOwnProperty(element))
                 {
                     continue;
                 }
 
-                accuracymax += Math.abs(SP);
-            }
+                let SP = AIR.Phenotypes[phenotype].values[element];
 
-            let max = 0;
 
-            var accuracyvalues = [];
-            var accuracyavg = 0;
+                if (isNaN(SP))
+                {
+                    continue;
+                }
 
-            for (let sample in globals.omics.samples) {
-                let activity = 0.0;
-                var accuracy = 0;
-                AIR.Phenotypes[phenotype].GeneNumber[sample] = 0;
-                for (let element in AIR.Phenotypes[phenotype].values) {
+                let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
 
-                    if(!globals.omics.ExpressionValues.hasOwnProperty(element))
+                if(isNaN(pvalue))
+                {
+                    pvalue = 1;
+                }
+
+                if(globals.omics.pvalue && pvalue >= pvalue_threshold)
+                {
+                    continue;
+                }
+
+                let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
+
+                if(isNaN(FC) || FC === 0)
+                {
+                    continue;
+                }
+
+                if (document.getElementById("om_checkbox_absolute").checked === true) {
+                    FC = Math.abs(FC);
+                    SP = Math.abs(SP);
+                }
+
+                if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
+                {
+                    activity += FC * SP * (1 - pvalue)
+                }
+                else
+                {
+                    activity += FC * SP; 
+                }
+
+                
+                accuracy += Math.abs(SP);
+                AIR.Phenotypes[phenotype].GeneNumber[sample] += 1;
+                
+                if(AIR.Molecules.hasOwnProperty(element))
+                {
+                    if(AIR.Phenotypes[phenotype].MainRegulators.hasOwnProperty(AIR.Molecules[element].name))
                     {
-                        continue;
-                    }
-
-                    let SP = AIR.Phenotypes[phenotype].values[element];
-
-
-                    if (isNaN(SP))
-                    {
-                        continue;
-                    }
-
-                    let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
-
-                    if(isNaN(pvalue))
-                    {
-                        pvalue = 1;
-                    }
-
-                    if(globals.omics.pvalue && pvalue >= pvalue_threshold)
-                    {
-                        continue;
-                    }
-
-                    let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
-
-                    if(isNaN(FC) || FC === 0)
-                    {
-                        continue;
-                    }
-
-                    if (document.getElementById("om_checkbox_absolute").checked === true) {
-                        FC = Math.abs(FC);
-                        SP = Math.abs(SP);
-                    }
-
-                    if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
-                    {
-                        activity += FC * SP * (1 - pvalue)
+                        AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] += Math.abs(activity);
                     }
                     else
                     {
-                        activity += FC * SP; 
-                    }
-
-                    
-                    accuracy += Math.abs(SP);
-                    AIR.Phenotypes[phenotype].GeneNumber[sample] += 1;
-                    
-                    if(AIR.Molecules.hasOwnProperty(element))
-                    {
-                        if(AIR.Phenotypes[phenotype].MainRegulators.hasOwnProperty(AIR.Molecules[element].name))
-                        {
-                            AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] += Math.abs(activity);
-                        }
-                        else
-                        {
-                            AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] = Math.abs(activity);
-                        }
+                        AIR.Phenotypes[phenotype].MainRegulators[AIR.Molecules[element].name] = Math.abs(activity);
                     }
                 }
-
-
-                if (Math.abs(activity) > max)
-                    max = Math.abs(activity);
-
-                AIR.Phenotypes[phenotype].results[sample] = activity;
-
-                
-                
-                accuracyvalues.push(accuracy);
             }
+
+            let _pvalue = await statisticalAnalysis(phenotype, accuracy, sample);
+
+            AIR.Phenotypes[phenotype].pvalue[sample] = _pvalue;
+
+
+            if (Math.abs(activity) > max)
+                max = Math.abs(activity);
+
+            AIR.Phenotypes[phenotype].results[sample] = activity;
 
             
-            var sum = 0;
-            for( var a = 0; a < accuracyvalues.length; a++ ){
-                sum += accuracyvalues[a]; //don't forget to add the base
-            }
-
-            accuracyavg = sum/accuracyvalues.length;
-            if(accuracymax === 0)
-            {
-                AIR.Phenotypes[phenotype].accuracy = 0;
-            }
-            else{
-                AIR.Phenotypes[phenotype].accuracy = accuracyavg / accuracymax;
-            }
+            
+            accuracyvalues.push(accuracy);
         }
 
-        resolve('');
+        
+        var sum = 0;
+        for( var a = 0; a < accuracyvalues.length; a++ ){
+            sum += accuracyvalues[a]; //don't forget to add the base
+        }
 
+        accuracyavg = sum/accuracyvalues.length;
+        if(accuracymax === 0)
+        {
+            AIR.Phenotypes[phenotype].accuracy = 0;
+        }
+        else{
+            AIR.Phenotypes[phenotype].accuracy = accuracyavg / accuracymax;
+        }
+    }
+
+
+    await om_normalizePhenotypeValues().then(async function (pv) {
+             
+        await om_createTable()
+        await enablebtn("om_pheno_analyzebtn", _text);
     });
 }
 
@@ -1227,24 +1382,7 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
     });
 }
 
-  
-async function analyze() {
-  return new Promise(function (resolve, reject) {    
-          PhenotypeSP().then(function (pr) {
-            normalizePhenotypeValues().then(function (pv) {
-              createTable().then(function (ct) {
-                resolve('');
-                }).catch(function (error) {
-                    reject('Failed to create the result table.');
-              });
-            });
-          }).catch(function (error) {
-            reject('Failed to analyze the phenotype levels.');
-          });   
-  });
-}
-
-function loadfile() {
+function om_loadfile() {
 
     return new Promise((resolve, reject) => {
 
@@ -1801,7 +1939,7 @@ function normalizeExpressionValues() {
     });
 }
 
-function normalizePhenotypeValues() {
+function om_normalizePhenotypeValues() {
     return new Promise((resolve, reject) => {
         let typevalue = $('#om_select_normalize').val();
 
@@ -2160,7 +2298,7 @@ async function calculateTargets() {
 
                     
                         var pstyle = 'circle';
-                        if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+                        if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
                         {
                             pstyle = 'triangle'
                         }
@@ -2505,7 +2643,7 @@ function om_createpopup(button, parameter) {
         }
 
         var pstyle = 'circle';
-        if(AIR.MIMSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false)
+        if(AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false)
         {
             pstyle = 'triangle'
         }
@@ -2607,3 +2745,14 @@ function om_createpopup(button, parameter) {
     };
     $target.show();
 };
+
+function randomIDs(size, max, n){
+    let output = []
+    let numbers = Array.from(Array(max).keys());
+
+    for(let i = 0; i < n; i++)
+    {
+        output.push(shuffle(numbers).slice(0, size));
+    }
+    return output;
+}

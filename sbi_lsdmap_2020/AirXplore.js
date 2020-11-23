@@ -34,6 +34,7 @@ function AirXplore(){
             <span id="xp_loading_text">LOADING...</span>
         </div>
     </div>`).appendTo($('#airxplore_tab_content'));
+
     setTimeout(() => {
         Initiate().then(r => {
             $('#xp_stat_spinner').hide();
@@ -334,7 +335,7 @@ function getInteractionPanel()
             </li>
         </ul>
         <div class="tab-content air_tab_content" id="xp_tab">
-            <div class="tab-pane air_tab_pane show active" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
+            <div class="tab-pane air_sub_tab_pane show active" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
                 <select id="xp_select_interaction_type" class="browser-default xp_select custom-select mb-4">
                     <option value="0" selected>All Elements</option>
                     <option value="1">miRNAs</option>
@@ -352,7 +353,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_target" cellspacing="0">
                     <thead>
                         <tr>
@@ -364,7 +365,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype">
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_phenotype" cellspacing="0">
                     <thead>
                         <tr>
@@ -375,7 +376,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_hpo" role="tabpanel" aria-labelledby="xp_tab_inter_hpo">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_hpo" role="tabpanel" aria-labelledby="xp_tab_inter_hpo">
                 <select id="xp_select_interaction_hpo" class="browser-default xp_select custom-select mb-4">
                     <option value="0" selected>All</option>
                     <option value="1">Phenotype</option>
@@ -392,7 +393,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_sequence" role="tabpanel" aria-labelledby="xp_tab_inter_sequence">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_sequence" role="tabpanel" aria-labelledby="xp_tab_inter_sequence">
                 <div id="xp_molart">No information available.</div>
             </div>
         </div>
@@ -495,7 +496,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        }).columns.adjust();;
+        }).columns.adjust().draw();
 
         $('.xp_inter_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
             var target = $(e.target).attr("href") // activated tab
@@ -639,7 +640,7 @@ function getTargetPanel() {
 
             globals.xplore.targetphenotypetable.rows().every( function () {
                 var row = this.nodes().to$()
-                row.find('.xp_slider').val(0);
+                row.find('.air_slider').val(0);
                 row.find('.slidervalue')[0].innerHTML = `<font data-order="1"><b>0<b></font>`;
             } );
 
@@ -1104,7 +1105,7 @@ function getCentralityPanel() {
                 {
                     
                     var pstyle = 'circle';
-                    if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+                    if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
                     {
                         pstyle = 'triangle'
                     }
@@ -1817,7 +1818,7 @@ function XP_PredictTargets() {
 
         
         var pstyle = 'circle';
-        if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+        if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
         {
             pstyle = 'triangle'
         }

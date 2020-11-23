@@ -176,6 +176,7 @@ async function AirGenvar(){
 
     `).appendTo(globals.gv_container);
 
+
     $('#gv_btn_download').on('click', function() {
 
         var _text = "gene\t" + globals.variant.samples.join("\t") + "\n";
@@ -449,7 +450,7 @@ async function AirGenvar(){
         }
         for(var sample in globals.variant.samples)
         {            
-            await gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
+            await air_addoverlay(olname + "_" + globals.variant.samples[sample], gv_contentString, sample)
         }
 
         enablebtn("gv_addoverlay", text);
@@ -550,124 +551,68 @@ async function AirGenvar(){
     });
 }
 
-async function gv_addoverlay(sample, olname)
+
+function gv_contentString()
 {
-    return new Promise((resolve, reject) =>  
-    { 
-        var _content = gv_contentString(sample) 
-        if(_content != "")
-        {
-            $.ajax({
-                method: 'POST',
-                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+    var olfilter = $("#gv_overlayselect").val();
+    var output = '';
 
-                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
-                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                success: (response) => {
-                    resolve("")
-                    $("[name='refreshOverlays']").click();
-                },
-                error: (response) => {
-                    resolve("")
-                }
-            })
-        }
-        else {
-            resolve("")
-        }
-
-        function deleteOldOverlay()
-        {
-            return new Promise((resolve, reject) =>  
-            { 
-                var _found = false;
-                var overlays = minervaProxy.project.data.getDataOverlays();
-
-                for (var ol in overlays)
-                {
-                    if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
-                    {
-                        _found = true;
-                        $.ajax({
-                            method: 'DELETE',
-                            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
-                            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                            success: (response) => {
-                                $("[name='refreshOverlays']").click();
-                                resolve("");
-                            }
-                        })
-                    }
-                };
-                if(!_found)
-                {
-                    resolve("")
-                }
-            });
-        }
-        function gv_contentString()
+    if(olfilter == 2)
     {
-            var olfilter = $("#gv_overlayselect").val();
-            var output = '';
-
-            if(olfilter == 2)
+        for (var m in globals.variant.mutation_results)
+        {
+            output += `%0A${AIR.Molecules[m].name}`;
+            switch(globals.variant.mutation_results[m][sample].impact)
             {
-                for (var m in globals.variant.mutation_results)
-                {
-                    output += `%0A${AIR.Molecules[m].name}`;
-                    switch(globals.variant.mutation_results[m][sample].impact)
-                    {
-                        case "HIGH": output += '%09%23ff0000'; break;
-                        case "LOW": output += '%09%2300ff00'; break;
-                        case "MODERATE": output += '%09%23ffff00'; break;
-                        case "MODIFIER": output += '%09%23d3d3d3'; break;
-                        default: output += '%09%23ffffff'; break;
-                    }
-                }
-            }        
-
-            else
-            {
-                var _values = {};
-
-                for (var m in globals.variant.gv_results[sample])
-                {            
-                    if(olfilter == 0)
-                    {
-                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(globals.variant.gv_results[sample][m]).length;
-                    }
-                    else if (olfilter == 1)
-                    {
-                        var _value = new Set();
-                        for (var t in globals.variant.gv_results[sample][m])
-                        { 
-                            globals.variant.gv_results[sample][m][t].forEach(v => {
-                                _value.add(v)
-                            })
-                        }
-                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Array.from(_value).length;
-                    }
-                }
-
-
-                var _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
-
-                for (var m in _values)
-                {
-                    var _value = _max != 0? _values[m]/Math.abs(_max) : 0
-                    var hex = rgbToHex((1 - Math.abs(_value)) * 255);
-                    output += `%0A${m}`;
-                    if (_value > 0)
-                        output += '%09%23ff' + hex + hex;
-                    else if (_value < 0)
-                        output += '%09%23' + hex + hex + 'ff';
-                    else output += '%09%23ffffff';
-                };
-            }   
-
-            return output;
+                case "HIGH": output += '%09%23ff0000'; break;
+                case "LOW": output += '%09%2300ff00'; break;
+                case "MODERATE": output += '%09%23ffff00'; break;
+                case "MODIFIER": output += '%09%23d3d3d3'; break;
+                default: output += '%09%23ffffff'; break;
+            }
         }
-    });
+    }        
+
+    else
+    {
+        var _values = {};
+
+        for (var m in globals.variant.gv_results[sample])
+        {            
+            if(olfilter == 0)
+            {
+                _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(globals.variant.gv_results[sample][m]).length;
+            }
+            else if (olfilter == 1)
+            {
+                var _value = new Set();
+                for (var t in globals.variant.gv_results[sample][m])
+                { 
+                    globals.variant.gv_results[sample][m][t].forEach(v => {
+                        _value.add(v)
+                    })
+                }
+                _values[encodeURIComponent(AIR.Molecules[m].name)] = Array.from(_value).length;
+            }
+        }
+
+
+        var _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
+
+        for (var m in _values)
+        {
+            var _value = _max != 0? _values[m]/Math.abs(_max) : 0
+            var hex = rgbToHex((1 - Math.abs(_value)) * 255);
+            output += `%0A${m}`;
+            if (_value > 0)
+                output += '%09%23ff' + hex + hex;
+            else if (_value < 0)
+                output += '%09%23' + hex + hex + 'ff';
+            else output += '%09%23ffffff';
+        };
+    }   
+
+    return output;
 }
 
 $(document).on('change', '.gv_clickCBinTable',function () {
@@ -973,10 +918,13 @@ function set_cons_table()
 
         if(break_flag)
         {
-            tbl.deleteRow(result_row.parentNode.parentNode.rowIndex);
+            result_row.parentNode.removeChild(result_row);
+        }
+        else
+        {
+            _elementnames.push(AIR.Molecules[m].name)
         }
 
-        _elementnames.push(AIR.Molecules[m].name)
     }
 
     var header = tbl.createTHead();

@@ -96,6 +96,7 @@ function initMainPageStructure() {
   let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? "http://localhost:3000/" : "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
+  let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
   CssFiles = Array.from(css_files, x => filepath + x);
   ScriptPaths = Array.from(js_files, x => filepath + x);
   CssFiles.forEach(s => {
@@ -117,6 +118,9 @@ function initMainPageStructure() {
   }
 
   let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(pluginContainer);
+  $("#air_plugincontainer").parents(".tab-pane").css({
+    "overflow": "hidden"
+  });
   $(`<div id="stat_spinner" class="mt-5">
         <div class="d-flex justify-content-center">
                     <div class="spinner-border" role="status">
@@ -132,14 +136,17 @@ function initMainPageStructure() {
   `
 
     <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-        <li class="air_nav_item nav-item"  style="width: 33.333%;">
+        <li class="air_nav_item nav-item"  style="width: 25%;">
             <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">LsdXplore</a>
         </li>
-        <li class="air_nav_item nav-item" style="width: 33.333%;">
+        <li class="air_nav_item nav-item" style="width: 25%;">
             <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">LsdOmics</a>
         </li>
-        <li class="air_nav_item nav-item" style="width: 33.333%;">
+        <li class="air_nav_item nav-item" style="width: 25%;">
             <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">LsdVariant</a>
+        </li>
+        <li class="air_nav_item nav-item" style="width: 25%;">
+            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">LsdMassSpec</a>
         </li>
     </ul>
     <div class="tab-content" id="air_tab">
@@ -148,6 +155,8 @@ function initMainPageStructure() {
         <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
         </div>
         <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+        </div>
+        <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
         </div>
     </div>
 
@@ -167,32 +176,44 @@ function initMainPageStructure() {
     return deferred.promise();
   }
 
-  setTimeout(() => {
-    $.getScript(ScriptPaths[0]).done(function () {
-      readDataFiles(minervaProxy, Chart, filetesting, JSZip, FileSaver, VCF).finally(data => {
-        try {
-          $.getScript("https://ebi-uniprot.github.io/CDN/protvista/protvista.js");
-        } catch (err) {
-          console.log(error);
-        }
+  $.getScript(ScriptPaths[0]).done(function () {
+    readDataFiles(minervaProxy, Chart, filetesting, JSZip, FileSaver, VCF).finally(async function (data) {
+      for (let s of scripts) {
+        await loadScript(s);
+      }
 
-        document.getElementById("stat_spinner").remove();
-        let p = document.getElementById('Air_Tab');
-        p.removeAttribute("hidden");
-        setTimeout(() => {
-          $.getScript(ScriptPaths[1]).done(function () {
-            AirXplore();
-          });
-          $.getScript(ScriptPaths[2]).done(function () {
-            AirOmics();
-          });
-          $.getScript(ScriptPaths[3]).done(function () {
-            AirGenvar();
-          });
-        }, 0);
-      });
+      document.getElementById("stat_spinner").remove();
+      $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
+      let p = document.getElementById('Air_Tab');
+      p.removeAttribute("hidden");
+      setTimeout(() => {
+        $.getScript(ScriptPaths[1]).done(function () {
+          AirXplore();
+        });
+        $.getScript(ScriptPaths[2]).done(function () {
+          AirOmics();
+        });
+        $.getScript(ScriptPaths[3]).done(function () {
+          AirGenvar();
+        });
+        $.getScript(ScriptPaths[4]).done(function () {
+          AirMassSpec();
+        });
+      }, 0);
     });
-  }, 0);
+  });
+}
+
+async function loadScript(script) {
+  return new Promise((resolve, reject) => {
+    try {
+      $.getScript(script).done(function () {
+        resolve();
+      });
+    } catch (err) {
+      resolve();
+    }
+  });
 }
 },{"@gmod/vcf":11,"chart.js":17,"file-saver":20,"jszip":35}],2:[function(require,module,exports){
 function _arrayLikeToArray(arr, len) {

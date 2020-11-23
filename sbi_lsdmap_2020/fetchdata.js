@@ -11,6 +11,7 @@ const localURL = 'http://localhost:3000/datafiles/Full_MIM';
 const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020';
 
 const AIR = {
+    HGNCElements: [],
     MoleculeData: {},
     Phenotypes: {},
     Hypoth_Phenotypes: {},
@@ -36,8 +37,8 @@ const AIR = {
         Outdegree: {},
     },
     centralityheader: new Set(),
-    MIMSpecies: [],
-    MIMSpeciesLowerCase: [],
+    MapSpecies: [],
+    MapSpeciesLowerCase: [],
     allBioEntities: [],
     MapElements: {},
 }
@@ -47,7 +48,7 @@ const globals = {
     variant: {},
     omics: {},
     xplore: {},
-
+    masspec: {},
 
     container: undefined,
 
@@ -135,8 +136,8 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         bioEntities.forEach(e => {
                             if (e.constructor.name === 'Alias') {
                                 let namelower = e.getName().toLowerCase();
-                                AIR.MIMSpeciesLowerCase.push(namelower);
-                                AIR.MIMSpecies.push(e.getName());
+                                AIR.MapSpeciesLowerCase.push(namelower);
+                                AIR.MapSpecies.push(e.getName());
                                 AIR.MapElements[namelower] = e;
                             }
                         });
@@ -281,7 +282,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     if(AIR.Molecules[element].complex === false)
                                     {
                                         for(let id in AIR.Molecules[element].ids)
-                                        {
+                                        {                                            
                                             let db_key = id.replace('.','');
                                             if(AIR.ElementNames.hasOwnProperty(db_key))
                                             {
@@ -696,10 +697,14 @@ function createLinkCell(row, type, text, style, align) {
 }
 
 
-function createCell(row, type, text, style, scope, align, nowrap = false) {
+function createCell(row, type, text, style, scope, align, nowrap = false, order = "") {
     var cell = document.createElement(type); // create text node
     cell.innerHTML = text;                    // append text node to the DIV
     cell.setAttribute('class', style);
+    if(order)
+    {
+        cell.setAttribute("data-order", order);
+    }
     if(scope != '')
         cell.setAttribute('scope', scope);  // set DIV class attribute // set DIV class attribute for IE (?!)
     if(nowrap)
@@ -711,11 +716,14 @@ function createCell(row, type, text, style, scope, align, nowrap = false) {
     return cell;
 }
 
-function createPopupCell(row, type, text, style, align, callback, callbackParameters) {
+function createPopupCell(row, type, text, style, align, callback, callbackParameters, order = "") {
     var cell = document.createElement(type); // create text node                  // append text node to the DIV
     cell.setAttribute('class', style);
     cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
-    
+    if(order)
+    {
+        cell.setAttribute("data-order", order);
+    }
 
     var button = document.createElement('button'); // create text node
     button.innerHTML = text;
@@ -769,7 +777,7 @@ function createSliderCell(row, type, data) {
     button.setAttribute('min', '-2');
     button.setAttribute('max', '2');
     button.setAttribute('step', '0.1');
-    button.setAttribute('class', 'slider xp_slider');
+    button.setAttribute('class', 'slider air_slider');
 
     var cell = document.createElement(type);
     cell.setAttribute('style', 'text-align: center; vertical-align: middle;');     // create text node
@@ -1028,6 +1036,15 @@ function rgbToHex(rgb) {
     return hex;
 };
 
+function valueToHex(_value) {
+    var hex = rgbToHex((1 - Math.abs(_value)) * 255);
+    if (_value > 0)
+        return '#ff' + hex + hex;
+    else if (_value < 0)
+        return '#' + hex + hex + 'ff';
+    else return '#ffffff';
+}
+
 function adjustPanels(container) {
     
     var coll = container.getElementsByClassName("air_collapsible");
@@ -1037,4 +1054,60 @@ function adjustPanels(container) {
             content.style.maxHeight = content.scrollHeight + 1 + "px";
         } 
     }
+}
+function expo(x, f=2, e=1) {
+    let _round = Math.floor(x*Math.pow(10,f))/Math.pow(10,f)
+    if(_round == 0)
+        return x.toExponential(e);
+    else
+      return Math.round(x*Math.pow(10,f))/Math.pow(10,f)
+  }
+
+
+async function air_addoverlay(olname, callback, cb_param = null)
+{
+    return new Promise((resolve, reject) =>  
+    { 
+        var _content = callback(cb_param) 
+        if(_content != "")
+        {
+            $.ajax({
+                method: 'POST',
+                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+
+                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
+                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                success: (response) => {
+                    resolve("")
+                    $("[name='refreshOverlays']").click();
+                },
+                error: (response) => {
+                    resolve("")
+                }
+            })
+        }
+        else {
+            resolve("")
+        }
+
+    });
+}
+
+function shuffle(array) {
+    var currentIndex = array.length, temporaryValue, randomIndex;
+  
+    // While there remain elements to shuffle...
+    while (0 !== currentIndex) {
+  
+      // Pick a remaining element...
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex -= 1;
+  
+      // And swap it with the current element.
+      temporaryValue = array[currentIndex];
+      array[currentIndex] = array[randomIndex];
+      array[randomIndex] = temporaryValue;
+    }
+  
+    return array;
 }

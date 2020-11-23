@@ -35,8 +35,8 @@
   margin-bottom: 0px;
 }
 
-.Centogene-container {
-  padding: 5px;
+.AirPlugins-container {
+  padding-left: 5px;
   background-color: #ffffff;
   overflow-x: hidden;
   overflow-y: hidden;
@@ -149,7 +149,7 @@
 .air_collapsible.active:after, .air_collapsible_smallgrey.active:after {
   content: "\2212"; }
 
-.xp_slider {
+.air_slider {
   -webkit-appearance: none;
   height: 15px;
   border-radius: 5px;
@@ -160,7 +160,7 @@
   -webkit-transition: .2s;
   transition: opacity .2s; }
 
-.xp_slider::-webkit-slider-thumb {
+.air_slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   opacity: 1;
@@ -170,7 +170,7 @@
   background: #6E6EC8;
   cursor: pointer; }
 
-.xp_slider::-moz-range-thumb {
+.air_slider::-moz-range-thumb {
   width: 20px;
   height: 25px;
   border-radius: 20%;
@@ -323,12 +323,19 @@ input[type=checkbox] .cbcontainer {
   margin-bottom: 0 !important;
 }
 
-.air_tab_pane {
+.air_sub_tab_pane {
   padding-top: 20px;
   padding-right: 10px;
   padding-bottom: 10px;
   padding-left: 10px;
   background-color: #fafafa;
+}
+
+.air_tab_pane {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  height: calc(100vh - 91px);
+  padding-right: 5px;
 }
 
 .xp_molartContainer {
@@ -368,3 +375,25 @@ input[type=checkbox] .cbcontainer {
   font-size: 1rem;
   font-weight: bold;
 }
+
+.air_checkboxlist_container {
+    width: 47%;
+    margin: 5px;
+    float: left;
+  }
+
+.air_checkboxlist_scroll_container {
+  overflow: auto;
+  max-height: 300px;
+}
+  
+.air_checkboxlist {
+    list-style-type: none;  
+    white-space: nowrap;
+    padding-left: 10px;
+  }
+
+  .air_simple_table td, .air_simple_table th {
+    text-align: center; 
+    vertical-align: middle;
+  }
