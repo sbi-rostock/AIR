@@ -93,7 +93,7 @@ function removeScripts() {
 }
 
 function initMainPageStructure() {
-  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js"];
+  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? "http://localhost:3000/" : "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
