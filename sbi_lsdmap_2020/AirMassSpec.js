@@ -659,6 +659,9 @@ async function AirMassSpec(){
             $("#ms_mzSelect").empty();
             $("#ms_retentionSelect").empty();
 
+            $("#ms_control_sample_list").empty()
+            $("#ms_case_sample_list").empty()
+
             var fileReader = new FileReader();
             var success = false;
 
@@ -1227,9 +1230,10 @@ async function fillGraph(updateAll, redraw)
                 }
                 if(globals.massspec.max_fc != 0 && !isNaN(entry.fc))
                 {
-                    let hex = valueToHex(entry.fc/globals.massspec.max_fc);
-                    _result["backgroundColor"] = hex
-                    _result["hoverBackgroundColor"] = hex
+                    var rgb = valueToRGB(entry.fc/globals.massspec.max_fc);
+                    var colorstring = `rgb(${rgb[0]},${rgb[1]},${rgb[2]}, 1)`
+                    _result["backgroundColor"] = colorstring
+                    _result["hoverBackgroundColor"] = colorstring
                 }
                 globals.massspec.data_chart.data.datasets.push(_result);
             }
@@ -1373,7 +1377,9 @@ async function fillGraph(updateAll, redraw)
 async function initializeData() {
     return new Promise((resolve, reject) => {
         var client = new XMLHttpRequest();
-        client.open('GET', "http://localhost:3000/datafiles/Metabolite_meta.txt");
+
+        var _url = (filetesting? "http://localhost:3000/datafiles/" : (fileURL + "/")) + "Metabolite_meta.txt";
+        client.open('GET', _url);
         client.onreadystatechange = async function() {
             if (this.readyState == 4)
             {

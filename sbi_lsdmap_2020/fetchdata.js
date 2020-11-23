@@ -1045,6 +1045,15 @@ function valueToHex(_value) {
     else return '#ffffff';
 }
 
+function valueToRGB(_value) {
+    var rgb = (1 - Math.abs(_value)) * 255;
+    if (_value > 0)
+        return [255, rgb, rgb]
+    else if (_value < 0)
+        return [rgb, rgb, 255]
+    else return [255, 255, 255];
+}
+
 function adjustPanels(container) {
     
     var coll = container.getElementsByClassName("air_collapsible");
