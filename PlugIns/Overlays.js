@@ -153,7 +153,7 @@ function initMainPageStructure() {
     globals.user = user._login.toString().toLowerCase();
 
     if (globals.defaultusers.includes(globals.user) === true) {
-      alert('Waning: You can reate overlays only after sing-in');
+      alert('Waning: You can create overlays only after sign-in');
     }
 
     if (globals.guestuser.includes(globals.user) === true) {
