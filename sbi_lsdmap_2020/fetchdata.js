@@ -1,4 +1,4 @@
-let fileURL = 'https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/';
+let fileURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/';
 let filetesting;
 let Chart;
 let JSZip;
@@ -258,7 +258,13 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
 
-								AIR.Molecules = content;
+                                if(filetesting)
+                                {
+                                    AIR.Molecules = content;
+                                }
+                                else{
+                                    AIR.Molecules = JSON.parse(content);
+                                }
 
                                 for(let element in AIR.Molecules)
                                 {
@@ -360,7 +366,13 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         }
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
-								AIR.Interactions = content;
+                                if(filetesting)
+                                {
+                                    AIR.Interactions = content;
+                                }
+                                else{
+                                    AIR.Interactions = JSON.parse(content);
+                                }
                                 resolve('');
                             });
                         }
