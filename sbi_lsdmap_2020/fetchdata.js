@@ -1,14 +1,9 @@
-let fileURL = '';
-let testing = false;
+let fileURL = 'https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/';
 let filetesting;
 let Chart;
 let JSZip;
 let FileSaver;
 let VCF;
-
-
-const localURL = 'http://localhost:3000/datafiles/Full_MIM';
-const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020';
 
 const AIR = {
     HGNCElements: [],
@@ -98,6 +93,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
             VCF = _vcf;
             JSZip = _jszip;
             FileSaver = _filesaver;
+            filetesting = _filetesting;
             minervaProxy = _minerva;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
@@ -141,22 +137,12 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                 AIR.MapElements[namelower] = e;
                             }
                         });
-                        //testing = _testing;
-                        filetesting = _filetesting;
-                    
-                        
-                        if(filetesting){
-                            fileURL = localURL;
-                        }
-                        else {
-                            fileURL = githubURL;
-                        }
 
                         let typevalue = $('.selectdata').val();
                         //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
                         t0 = performance.now();
                         $.ajax({
-                            url: fileURL + '/Interactions.json',
+                            url: fileURL + 'Interactions.json',
                             success: function (content) {
                                 readInteractions(content).then(r => {
                                     t1 = performance.now()
@@ -166,7 +152,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     setTimeout(() => {
                                         $.ajax({
                                             //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                            url: fileURL + '/Molecules.json', 
+                                            url: fileURL + 'Elements.json', 
                                             success: function (moleculecontent) {
                                                 t1 = performance.now()
                                                 console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
@@ -182,7 +168,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                                         centralities.forEach(c => {
                                                             promises.push(openCentrality(c));
                                                         });
-                                                        Promise.all(promises).then(r => {
+                                                        Promise.allSettled(promises).then(r => {
                                                             t1 = performance.now()
                                                             console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
                                                             resolve(AIR);
@@ -207,13 +193,16 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                             return new Promise((resolve, reject) => {
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                    url: fileURL + '/' + centrality.toLowerCase() + ".txt", 
+                                    url: fileURL + centrality.toLowerCase() + ".txt", 
                                     success: function (info) {
                                         readCentrality(info, centrality).then(s => resolve('')).catch(e => {
                                             console.log(e);
                                             reject(e);
                                         })
                                     },
+                                    error: function () {
+                                        reject(e);
+                                    }
                                 });
                             });
                         }
@@ -316,26 +305,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     }
                                 }
 
-                                if(testing)
-                                {
-                                    let t0 = performance.now()
-                                    $.ajax({
-                                        url: localURL + "/SP.txt",
-                                        success: function (content) {
-                                            let t1 = performance.now()
-                                            console.log("Call to get File took " + (t1 - t0) + " milliseconds.")
-                                            readFile(content).then(r => {
-                                                let t1 = performance.now()
-                                                console.log("Call to readFile took " + (t1 - t0) + " milliseconds.")
-                                                resolve('');
-                                            });
-                                        },
-                                        error: function () {
-                                        }
-                                    });
-                                }
-                                else
-                                    resolve('');
+                                resolve('');
                             });
                         }
                         function readCentrality(content, centrality) {
@@ -439,34 +409,19 @@ function getValue(key)
 {
     return new Promise(
        (resolve, reject) => {
-            if(testing)
-            {
-                $.ajax({
-                    url: "http://localhost:8080/minerva/api/plugins/6f8b4f372b3ecaca43031b747162aa82/data/global/" + key,
-                    success: (response) => {
-                        resolve(response["value"]);
-                    },
-                    error: (e) => {
-                        reject(e);
-                    }
-                })
-            }
-            else {
-                minervaProxy.pluginData.getGlobalParam(key).then(
-                    response => {
-                        let output = JSON.parse(response).value;
-                        output = replaceAll(output, ",", ".");
-                        output = replaceAll(output, "y", '"},"');
-                        output = replaceAll(output, "x", '":{"');
-                        output = replaceAll(output, "z", '":"');
-                        output = replaceAll(output, "q", '","');
-                        output = replaceAll(output, '"-.', '"-0.');
-                        resolve(output);
-                }).catch(e => {
-                    reject(e)
-                });
-            }
-
+            minervaProxy.pluginData.getGlobalParam(key).then(
+                response => {
+                    let output = JSON.parse(response).value;
+                    output = replaceAll(output, ",", ".");
+                    output = replaceAll(output, "y", '"},"');
+                    output = replaceAll(output, "x", '":{"');
+                    output = replaceAll(output, "z", '":"');
+                    output = replaceAll(output, "q", '","');
+                    output = replaceAll(output, '"-.', '"-0.');
+                    resolve(output);
+            }).catch(e => {
+                reject(e)
+            });
         });
 
 }
@@ -1065,6 +1020,8 @@ function adjustPanels(container) {
     }
 }
 function expo(x, f=2, e=1) {
+    if(x == 0)
+        return 0;
     let _round = Math.floor(x*Math.pow(10,f))/Math.pow(10,f)
     if(_round == 0)
         return x.toExponential(e);
@@ -1119,4 +1076,12 @@ function shuffle(array) {
     }
   
     return array;
+}
+
+function union(setA, setB) {
+    let _union = new Set(setA)
+    for (let elem of setB) {
+        _union.add(elem)
+    }
+    return _union
 }
