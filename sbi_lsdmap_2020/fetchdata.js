@@ -279,7 +279,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                             }
                                         }
                                     }
-                                    if(AIR.Molecules[element].type === "PHENOTYPE")
+                                    if(AIR.Molecules[element].subtype === "PHENOTYPE")
                                     {
                                         AIR.Phenotypes[element] = {};
                                         AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
@@ -292,7 +292,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                         AIR.Phenotypes[element]["MainRegulators"] = {};
                                         AIR.Phenotypes[element]["GeneNumber"] = {};
                                     }
-                                    if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
+                                    if(AIR.Molecules[element].subtype === "HYPOTH_PHENOTYPE")
                                     {
                                         AIR.Hypoth_Phenotypes[element] = {};
                                         AIR.Hypoth_Phenotypes[element]["name"] = AIR.Molecules[element].name;
