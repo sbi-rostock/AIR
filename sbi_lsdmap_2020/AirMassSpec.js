@@ -21,6 +21,7 @@ async function AirMassSpec(){
 
         raw_values: [],
         metadata: null,
+        metabolite_values: null,
 
         ms_container: undefined,
         data_chart: undefined,
@@ -42,6 +43,11 @@ async function AirMassSpec(){
 
     globals.massspec.ms_container = $('#airmassspec_tab_content');   
 
+    $("#airmassspec_tab").on('shown.bs.tab', function () {
+        globals.massspec.metabolite_table.columns.adjust();
+        globals.massspec.adduct_table.columns.adjust();     
+    });
+    
     $(
         /*<div class="text-center">
             <img src="https://www.sbi.uni-rostock.de/files/Projects/AIR/AIR3D_croped.png" class="img-fluid" width="100%">
@@ -249,6 +255,23 @@ async function AirMassSpec(){
                     </select>
                 </div>
             </div>
+            <div class="row mt-2 mb-4">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-content="If checked, every second column will be mapped as a p-value for the previous sample column.<br/>">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="ms_checkbox_weighting">
+                        <label class="air_checkbox air_checkbox_label" for="ms_checkbox_weighting">Weighted Distance?</label>
+                    </div>
+                </div>
+            </div>
 
 
             <div class="mt-4" id="ms_maintab" >
@@ -290,7 +313,30 @@ async function AirMassSpec(){
                                 </table>  
                             </div>
                             <div class="tab-pane air_sub_tab_pane mb-2" id="ms_table_metabolite" role="tabpanel" aria-labelledby="ms_table_metabolite-tab"> 
-                                <table class="air_table order-column hover nowrap mt-2" style="width:100%" id="ms_metabolite_table" cellspacing=0>
+                                <div class="row  mt-2 mb-2">
+                                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
+                                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Mapping of adducts by:</span>
+                                    </div>
+                                    <div class="col">
+                                        <select id="ms_select_a_mapping" class="browser-default ms_axis_select custom-select">
+                                            <option selected value="0">Highest Intensity</option>
+                                            <option value="1">Lowest Intensity</option>
+                                            <option value="2">Mean Value</option>
+                                        </select>
+                                    </div>
+                                </div>   
+                                <div class="row  mt-2 mb-4">
+                                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
+                                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Mapping of compounds by:</span>
+                                    </div>
+                                    <div class="col">
+                                        <select id="ms_select_c_mapping" class="browser-default ms_axis_select custom-select">
+                                            <option selected value="0">Mean Value</option>
+                                            <option value="1">Aggregated Intensity</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <table class="air_table order-column hover nowrap mt-4" style="width:100%" id="ms_metabolite_table" cellspacing=0>
                                     <thead>
                                         <tr>
                                             <th style="vertical-align: middle;">Metabolite</th>
@@ -299,7 +345,6 @@ async function AirMassSpec(){
                                         </tr>
                                     </thead>
                                 </table>  
-
                                 <table class="air_simple_table mb-4 mt-4" style="width: 100%">
                                     <colgroup>
                                         <col span="1" style="width: 30%;"/>
@@ -424,16 +469,16 @@ async function AirMassSpec(){
     });
 
     $("#ms_table-tab").on('shown.bs.tab', function () {
-        globals.massspec.metabolite_table.columns.adjust().draw();
-        globals.massspec.adduct_table.columns.adjust().draw();     
+        globals.massspec.metabolite_table.columns.adjust();
+        globals.massspec.adduct_table.columns.adjust();     
     });
 
     $("#ms_table_metabolite-tab").on('shown.bs.tab', function () {
-        globals.massspec.metabolite_table.columns.adjust().draw();    
+        globals.massspec.metabolite_table.columns.adjust();    
     });
 
     $("#ms_table_adduct-tab").on('shown.bs.tab', function () {
-        globals.massspec.adduct_table.columns.adjust().draw();     
+        globals.massspec.adduct_table.columns.adjust();     
     });
 
     $("#ms_peak-tab").on('shown.bs.tab', function () {
@@ -480,6 +525,14 @@ async function AirMassSpec(){
     });
 
     $('#ms_select_mapping').on('change', async function() {
+        if($("#ms_select_mapping").val() == 0)
+            $("#ms_checkbox_weighting").removeClass("air_disabledbutton");
+        else
+            $("#ms_checkbox_weighting").addClass("air_disabledbutton");
+        await fillGraph(true, false);
+    });
+
+    $("#ms_checkbox_weighting").on('change', async function() {
         await fillGraph(true, false);
     });
 
@@ -528,8 +581,18 @@ async function AirMassSpec(){
     });
 
     $('#ms_filetypeSelect').on('change', async function() {
+
+        switch(parseFloat($('#ms_filetypeSelect').val()))
+        {
+            case 1:
+                globals.massspec.seperator = ",";
+                break;
+            case 0:
+                globals.massspec.seperator = "\t";
+                break;
+        }
         globals.massspec.ms_container.addClass("air_disabledbutton")
-        await detectFile();
+        await ms_detectFile(true);
         globals.massspec.ms_container.removeClass("air_disabledbutton")
     });
 
@@ -544,9 +607,16 @@ async function AirMassSpec(){
 
     $('#ms_inputId').on('change', async function() {
         globals.massspec.ms_container.addClass("air_disabledbutton")
-        let result = await detectFile();
+        let result = await ms_detectFile(false);
         globals.massspec.ms_container.removeClass("air_disabledbutton")
         return result;
+    });
+
+    $('#ms_select_a_mapping').on('change', async function() { 
+        await updateMetaboliteTable();
+    });
+    $('#ms_select_c_mapping').on('change', async function() { 
+        await updateMetaboliteTable();
     });
 
     $('#ms_negative').change(function() {
@@ -651,7 +721,7 @@ async function AirMassSpec(){
     }).columns.adjust().draw();
 
 
-    async function detectFile() {
+    async function ms_detectFile(force_seperator) {
         return new Promise((resolve, reject) => {
             var fileToLoad = document.getElementById("ms_inputId").files[0];
 
@@ -681,17 +751,20 @@ async function AirMassSpec(){
                     return stopfile('The file appears to be empty.');
                 }
                 var line = textFromFileLoaded.split('\n')[0];
-                if((line.match(new RegExp(",", "g")) || []).length > (line.match(new RegExp("\t", "g")) || []).length )
-                {
-                    globals.massspec.seperator = ",";
-                    $("#ms_filetypeSelect").val(1);
-                }
-                else
-                {
-                    globals.massspec.seperator = "\t";
-                    $("#ms_filetypeSelect").val(0);
-                }
 
+                if(!force_seperator)
+                {
+                    if((line.match(new RegExp(",", "g")) || []).length > (line.match(new RegExp("\t", "g")) || []).length )
+                    {
+                        globals.massspec.seperator = ",";
+                        $("#ms_filetypeSelect").val(1);
+                    }
+                    else
+                    {
+                        globals.massspec.seperator = "\t";
+                        $("#ms_filetypeSelect").val(0);
+                    }
+                }
 
                 var index = 0;
                 line.split(globals.massspec.seperator).forEach(entry => {
@@ -1070,7 +1143,6 @@ async function fillGraph(updateAll, redraw)
     if(updateAll)
     {
         globals.massspec.adduct_table.clear();
-        globals.massspec.metabolite_table.clear();
     }
 
     let accountfor_zaxis = ($("#ms_checkbox_zaxis").prop('checked') == true);
@@ -1101,6 +1173,9 @@ async function fillGraph(updateAll, redraw)
     globals.massspec.data_chart.data.datasets = [];
 
     let selected_compound = $( "#ms_select_compound option:selected" ).text();
+    let weighted = $("#ms_checkbox_weighting").prop('checked') == true;
+
+    
     if(!globals.massspec.metadata.hasOwnProperty(selected_compound))
     {
         return;
@@ -1125,13 +1200,14 @@ async function fillGraph(updateAll, redraw)
     }
     let compoundsWithPeaks = new Set()
     let x_margin, y_margin, z_margin;
+    let entry, xvalue, yvalue, zvalue;
 
     for(let e in globals.massspec.raw_values)
     {
-        let entry = globals.massspec.raw_values[e];
-        let xvalue = entry[xaxis];        
-        let yvalue = entry[yaxis];
-        let zvalue = entry[zaxis];
+        entry = globals.massspec.raw_values[e];
+        xvalue = entry[xaxis];        
+        yvalue = entry[yaxis];
+        zvalue = entry[zaxis];
 
         for(let c in globals.massspec.metadata)
         {
@@ -1150,11 +1226,13 @@ async function fillGraph(updateAll, redraw)
                 {
                     mapped_values[c][a] = {};
                 }
+
                 var adduct = globals.massspec.metadata[c].adducts[a];
                 if(adduct["polarity"] != globals.massspec.polarity)
                 {
                     continue;
                 }
+
                 x_margin = isNaN(abs_thresholds[xaxis])? adduct[xaxis] * globals.massspec.thresholds[xaxis] / 100 : abs_thresholds[xaxis];
                 if(xvalue > (adduct[xaxis] + x_margin) || xvalue < (adduct[xaxis] - x_margin))
                 {
@@ -1186,11 +1264,14 @@ async function fillGraph(updateAll, redraw)
                 switch(mapping)
                 {
                     case "0": 
-                        mapped_values[c][a][e] = -Math.sqrt(Math.pow(1-(xvalue/adduct[xaxis]), 2) + Math.pow(1-(yvalue/adduct[yaxis]), 2) + Math.pow(1-(zvalue/adduct[zaxis]), 2))
+                        if(weighted)
+                            mapped_values[c][a][e] = -Math.sqrt(Math.pow((1-(xvalue/adduct[xaxis])), 2)*Math.sqrt(x_margin/adduct[xaxis],2) + Math.pow((1-(yvalue/adduct[yaxis])), 2)*Math.sqrt(y_margin/adduct[yaxis],2) + Math.pow((1-(zvalue/adduct[zaxis])), 2)* Math.sqrt(z_margin/adduct[zaxis],2))
+                        else
+                            mapped_values[c][a][e] = -Math.sqrt(Math.pow(1-(xvalue/adduct[xaxis]), 2) + Math.pow(1-(yvalue/adduct[yaxis]), 2) + Math.pow(1-(zvalue/adduct[zaxis]), 2))
                         break;
                     case "1":
                         mapped_values[c][a][e] = Math.abs(entry.fc)
-                        break;
+                        break;  
                     case "2":
                         mapped_values[c][a][e] = entry.fc
                         break;
@@ -1239,6 +1320,7 @@ async function fillGraph(updateAll, redraw)
             }
         }
     }
+
     compoundsWithPeaks = Array.from(compoundsWithPeaks)
     $('#ms_select_compound').children().each(
         function (){
@@ -1251,7 +1333,7 @@ async function fillGraph(updateAll, redraw)
         }
     );
 
-    var metabolite_values = {};
+    globals.massspec.metabolite_values = {};
     var only_selected = {}
     only_selected[selected_compound] = {};
 
@@ -1277,11 +1359,15 @@ async function fillGraph(updateAll, redraw)
             let _id = items[0][0];
             let adduct = globals.massspec.metadata[c].adducts[a]
 
-            if(!metabolite_values.hasOwnProperty(_metabolite))
+            if(!globals.massspec.metabolite_values.hasOwnProperty(_metabolite))
             {
-                metabolite_values[_metabolite] = new Set();
+                globals.massspec.metabolite_values[_metabolite] = {};
             }
-            metabolite_values[_metabolite].add(_id);
+            if(!globals.massspec.metabolite_values[_metabolite].hasOwnProperty(c))
+            {
+                globals.massspec.metabolite_values[_metabolite][c] = new Set();
+            }
+            globals.massspec.metabolite_values[_metabolite][c].add(_id);
 
             if(updateAll)
             {
@@ -1328,43 +1414,11 @@ async function fillGraph(updateAll, redraw)
     }
     if(updateAll)
     {
-        globals.massspec.results = {};
-        for(let m in metabolite_values)
-        {
-            let control_values = new Array(globals.massspec.numberofcontrols).fill(0);
-            let case_values = new Array(globals.massspec.numberofcases).fill(0);
-
-            for(let _id of Array.from(metabolite_values[m]))
-            {
-                var entry = globals.massspec.raw_values[_id];
-
-                for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                {
-                    control_values[i] += entry.control[i];
-                }
-                for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                {
-                    case_values[i] += entry.case[i];
-                }
-            }
-            
-            var fc = Math.log2((mean(case_values)+1)/(mean(control_values)+1))
-            fc = isNaN(fc)? 0 : fc;
-
-            var result_row = [
-                getLinkIconHTML(m),
-                expo(fc),
-                ""
-            ]
-
-            globals.massspec.results[m] = fc;
-            globals.massspec.metabolite_table.row.add(result_row)  
-        }
+        await updateMetaboliteTable()
     }
 
     if(updateAll)
     {
-        globals.massspec.metabolite_table.columns.adjust().draw();
         globals.massspec.adduct_table.columns.adjust().draw();
     }
     if($('#ms_peak').hasClass('active'))
@@ -1374,11 +1428,181 @@ async function fillGraph(updateAll, redraw)
 
 }
 
+async function updateMetaboliteTable() {
+    globals.massspec.metabolite_table.clear();
+    globals.massspec.results = {};
+
+    let adduct_mapping = parseFloat($("#ms_select_a_mapping").val());
+    let compound_mapping = parseFloat($("#ms_select_c_mapping").val());
+
+    for(let m in globals.massspec.metabolite_values)
+    {
+        let m_control_values, m_case_values;
+
+        switch(compound_mapping)
+        {
+            
+            case 0:
+                m_control_values = Array.from(Array(globals.massspec.numberofcontrols), () => [])
+                m_case_values = Array.from(Array(globals.massspec.numberofcases), () => [])
+                break;
+            case 1:
+                m_control_values = new Array(globals.massspec.numberofcontrols).fill(0);
+                m_case_values = new Array(globals.massspec.numberofcases).fill(0);
+                break;
+        }
+
+        for(let c in globals.massspec.metabolite_values[m])
+        {
+            let c_control_values, c_case_values;
+            
+            switch(adduct_mapping)
+            {
+                case 0:
+                    c_control_values = new Array(globals.massspec.numberofcontrols).fill(0);
+                    c_case_values = new Array(globals.massspec.numberofcases).fill(0);
+                    break;
+                case 1:
+                    c_control_values = new Array(globals.massspec.numberofcontrols).fill(Number.MAX_SAFE_INTEGER);
+                    c_case_values = new Array(globals.massspec.numberofcases).fill(Number.MAX_SAFE_INTEGER);
+                    break;
+                case 2:
+                    c_control_values = Array.from(Array(globals.massspec.numberofcontrols), () => [])
+                    c_case_values = Array.from(Array(globals.massspec.numberofcases), () => [])
+                    break;
+            }
+            
+
+            for(let _id of Array.from(globals.massspec.metabolite_values[m][c]))
+            {
+                var entry = globals.massspec.raw_values[_id];
+                switch(adduct_mapping)
+                {
+                    case 0:
+                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                        {
+                            if(entry.control[i] > c_control_values[i])
+                                c_control_values[i] = entry.control[i];
+                        }
+                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                        {
+                            if(entry.case[i] > c_case_values[i])
+                                c_case_values[i] = entry.case[i];
+                        }
+                        break;
+                    case 1:
+                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                        {
+                            if(entry.control[i] < c_control_values[i])
+                                c_control_values[i] = entry.control[i];
+                        }
+                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                        {
+                            if(entry.case[i] < c_case_values[i])
+                                c_case_values[i] = entry.case[i];
+                        }
+                        break;
+                    case 2:
+                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                        {
+                            c_control_values[i].push(entry.control[i])
+                        }
+                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                        {
+                            c_case_values[i].push(entry.case[i])
+                        }
+                        break;
+                }
+
+            }
+            switch(adduct_mapping)
+            {
+                case 1:
+                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                    {
+                        if(c_control_values[i] == Number.MAX_SAFE_INTEGER)
+                            c_control_values[i] = 0;
+                    }
+                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                    {
+                        if(c_case_values[i] == Number.MAX_SAFE_INTEGER)
+                            c_case_values[i] = 0;
+                    }
+                    break;
+                case 2:
+                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                    {
+                        c_control_values[i] = mean(c_control_values[i]);
+                    }
+                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                    {
+                        c_case_values[i] = mean(c_case_values[i]);
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            
+            switch(compound_mapping)
+            {
+                
+                case 1:                    
+                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                    {
+                        m_control_values[i] += c_control_values[i];
+                    }
+                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                    {
+                        m_case_values[i] += c_case_values[i];
+                    }
+                    break;
+                case 0:              
+                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+                    {
+                        m_control_values[i].push(c_control_values[i])
+                    }
+                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
+                    {
+                        m_case_values[i].push(c_case_values[i])
+                    }
+                    break;
+            }
+        }
+
+        if(compound_mapping == 0)
+        {
+            for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
+            {
+                m_control_values[i] = mean(m_control_values[i])
+            }
+            for(var i = 0; i < globals.massspec.numberofcases; i ++)
+            {
+                m_case_values[i] = mean(m_case_values[i])
+            }
+        }
+            
+        var fc = Math.log2((mean(m_case_values)+1)/(mean(m_control_values)+1))
+        fc = isNaN(fc)? 0 : fc;
+
+        var result_row = [
+            getLinkIconHTML(m),
+            expo(fc),
+            ""
+        ]
+
+        globals.massspec.results[m] = fc;
+        globals.massspec.metabolite_table.row.add(result_row)   
+    }
+    globals.massspec.metabolite_table.columns.adjust().draw();
+    update_importMassSpecTable();
+}
+
 async function initializeData() {
     return new Promise((resolve, reject) => {
         var client = new XMLHttpRequest();
 
-        var _url = (filetesting? "http://localhost:3000/datafiles/" : (fileURL + "/")) + "Metabolite_meta.txt";
+        var _url = fileURL + "Metabolite_meta.txt";
         client.open('GET', _url);
         client.onreadystatechange = async function() {
             if (this.readyState == 4)

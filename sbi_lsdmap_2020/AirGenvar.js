@@ -53,7 +53,7 @@ async function AirGenvar(){
                 </div>
             </div>
             <div class="col">
-                <input id="gv_inputId" type="file"  accept=".vcf" class="om_inputfile inputfile" multiple/>
+                <input id="gv_inputId" type="file"  accept=".vcf" class="air_inputfile inputfile" multiple/>
             </div>
         </div>
 
@@ -175,7 +175,14 @@ async function AirGenvar(){
         <button type="button" id="gv_addoverlay" class="air_btn btn btn-block mt-4 mb-5">Create Overlay</button>
 
     `).appendTo(globals.gv_container);
+    
+    $("#airgenvar_tab").on('shown.bs.tab', function () {
 
+        if(globals.variant.gv_table)
+            globals.variant.gv_table.columns.adjust();
+        if(globals.variant.gv_table_cons)
+            globals.variant.gv_table_cons.columns.adjust();
+    });
 
     $('#gv_btn_download').on('click', function() {
 
@@ -235,7 +242,7 @@ async function AirGenvar(){
             var _text = disablebutton("gv_readfile")
             var client = new XMLHttpRequest();
 
-            client.open('GET', fileURL + '/' + genome + '_genome.json');
+            client.open('GET', fileURL + genome + '_genome.json');
             client.onreadystatechange = async function() {
                 if (this.readyState == 4)
                 {
@@ -900,6 +907,8 @@ function set_cons_table()
             {
                 break_flag = false;
             }
+
+            globals.variant.mutation_results[m][sample]["impact_value"] = impact
             globals.variant.mutation_results[m][sample]["impact"] = globals.variant.impacts[impact];
             globals.variant.mutation_results[m][sample]["consequences"] = Array.from(consequences);
 
@@ -946,6 +955,8 @@ function set_cons_table()
     }).columns.adjust().draw();
     
     highlightSelected(_elementnames);
+
+    update_importVariantTable();
 }
 
 async function gv_createTable() 
@@ -1027,7 +1038,7 @@ async function gv_createTable()
         "order": [[ 1, "asc" ]], 
         "scrollX": true,
         "autoWidth": true
-    }).columns.adjust();
+    })
 
 
     globals.variant.gv_table.columns.adjust().draw();
