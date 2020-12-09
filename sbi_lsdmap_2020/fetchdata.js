@@ -1,9 +1,10 @@
-let fileURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/';
+let fileURL = '';
 let filetesting;
 let Chart;
 let JSZip;
 let FileSaver;
 let VCF;
+let ttest;
 
 const AIR = {
     HGNCElements: [],
@@ -74,7 +75,7 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 
-function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf) {
+function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf) {
 
     return new Promise((resolve, reject) => {
 
@@ -95,6 +96,8 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
             FileSaver = _filesaver;
             filetesting = _filetesting;
             minervaProxy = _minerva;
+            fileURL = _filepath;
+            ttest = _ttest;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -257,14 +260,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         }
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
-
-                                if(filetesting)
-                                {
-                                    AIR.Molecules = content;
-                                }
-                                else{
-                                    AIR.Molecules = JSON.parse(content);
-                                }
+                                AIR.Molecules = content;
 
                                 for(let element in AIR.Molecules)
                                 {
@@ -279,7 +275,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                             }
                                         }
                                     }
-                                    if(AIR.Molecules[element].subtype === "PHENOTYPE")
+                                    if(AIR.Molecules[element].type === "PHENOTYPE")
                                     {
                                         AIR.Phenotypes[element] = {};
                                         AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
@@ -292,7 +288,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                         AIR.Phenotypes[element]["MainRegulators"] = {};
                                         AIR.Phenotypes[element]["GeneNumber"] = {};
                                     }
-                                    if(AIR.Molecules[element].subtype === "HYPOTH_PHENOTYPE")
+                                    if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
                                     {
                                         AIR.Hypoth_Phenotypes[element] = {};
                                         AIR.Hypoth_Phenotypes[element]["name"] = AIR.Molecules[element].name;
@@ -366,13 +362,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         }
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
-                                if(filetesting)
-                                {
-                                    AIR.Interactions = content;
-                                }
-                                else{
-                                    AIR.Interactions = JSON.parse(content);
-                                }
+                                AIR.Interactions = content;
                                 resolve('');
                             });
                         }
