@@ -1355,7 +1355,7 @@ async function om_PhenotypeSP() {
             pvalue_threshold = 1;
         }
     }
-    
+
      /*
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if(isNaN(globals.omics.numberOfRandomSamples))
@@ -3272,7 +3272,7 @@ function updateImportTable(new_data = false) {
     
     for(let element of Array.from(elements))
     {
-        var result_row = [AIR.Molecules[element].name];
+        var result_row = [getLinkIconHTML(AIR.Molecules[element].name)];
         for(let sample in globals.omics.import_data)
         {
             if(globals.omics.import_data[sample].hasOwnProperty(element))
