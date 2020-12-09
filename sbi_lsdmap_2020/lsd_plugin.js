@@ -10,7 +10,7 @@ let VCF = require('@gmod/vcf');
 let ttest = require('ttest');
 
 let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
-let datafile_url = "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
+let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
 let localURL = "http://localhost:3000/PlugIns/";
 const pluginName = 'AirPlugins';
 const pluginVersion = '0.9.0';

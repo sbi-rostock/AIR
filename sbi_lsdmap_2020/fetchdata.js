@@ -260,7 +260,15 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         }
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
-                                AIR.Molecules = content;
+
+                                if(filetesting)
+                                {
+                                    AIR.Molecules = content;
+                                }
+                                else
+                                {
+                                    AIR.Molecules = JSON.parse(content);
+                                }
 
                                 for(let element in AIR.Molecules)
                                 {
@@ -362,7 +370,15 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         }
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
-                                AIR.Interactions = content;
+                                
+                                if(filetesting)
+                                {
+                                    AIR.Interactions = content;
+                                }
+                                else
+                                {
+                                    AIR.Interactions = JSON.parse(content);
+                                }
                                 resolve('');
                             });
                         }
