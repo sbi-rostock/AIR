@@ -559,7 +559,7 @@ async function AirGenvar(){
 }
 
 
-function gv_contentString()
+function gv_contentString(sample)
 {
     var olfilter = $("#gv_overlayselect").val();
     var output = '';
