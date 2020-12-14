@@ -12,7 +12,7 @@ let ttest = require('ttest');
 let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
 let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/sbi_lsdmap_2020/";
 let localURL = "http://localhost:3000/PlugIns/";
-const pluginName = 'AirPlugins';
+const pluginName = 'Centogene';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = false;
@@ -98,6 +98,11 @@ function removeScripts() {
 }
 
 async function initMainPageStructure() {
+  if ($("#Air_Tab").length) {
+    alert("Plugins have already been initialized.");
+    return false;
+  }
+
   var url = new URL(window.location.href);
   var query = url.searchParams.get("AirPluginSource");
 
@@ -170,16 +175,16 @@ async function initMainPageStructure() {
 
     <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
         <li class="air_nav_item nav-item"  style="width: 25%;">
-            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
+            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">LsdXplore</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
+            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">LsdOmics</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
+            <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">LsdVariant</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
+            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">LsdMassSpec</a>
         </li>
     </ul>
     <div class="tab-content" id="air_tab">
