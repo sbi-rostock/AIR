@@ -965,7 +965,8 @@ async function ms_loadfile() {
                     }
 
                     let fc = Math.log2((mean(case_values) + 1)/(mean(control_values) + 1))
-                
+                    let pvalue = ttest(control_values, case_values).pValue();
+
                     if(!isNaN(fc))
                     {
                         if(Math.abs(fc) > globals.massspec.max_fc)
@@ -985,7 +986,8 @@ async function ms_loadfile() {
                         "c": parseFloat(entries[globals.massspec.c_column].replace(",", ".").trim()),
                         "control": control_values,
                         "case": case_values,
-                        "fc": fc
+                        "fc": fc,
+                        "pvalue": pvalue
                     })
                 }
 
@@ -1379,7 +1381,7 @@ async function fillGraph(updateAll, redraw)
                     c,
                     adduct.adduct,
                     expo(entry.fc),
-                    "",
+                    expo(entry.pvalue),
                     expo(entry.m) + " (" + expo(adduct.m) + ")",
                     expo(entry.r) + " (" + expo(adduct.r) + ")",
                     expo(entry.c) + " (" + expo(adduct.c) + ")",
@@ -1583,15 +1585,19 @@ async function updateMetaboliteTable() {
         }
             
         var fc = Math.log2((mean(m_case_values)+1)/(mean(m_control_values)+1))
+        var pvalue = ttest(m_control_values, m_case_values).pValue()
         fc = isNaN(fc)? 0 : fc;
 
         var result_row = [
             getLinkIconHTML(m),
             expo(fc),
-            ""
+            expo(pvalue)
         ]
 
-        globals.massspec.results[m] = fc;
+        globals.massspec.results[m] = {
+            "fc": fc,
+            "pvalue": pvalue
+        };
         globals.massspec.metabolite_table.row.add(result_row)   
     }
     globals.massspec.metabolite_table.columns.adjust().draw();
@@ -1676,7 +1682,7 @@ function ms_contentString()
 
     for (var m in globals.massspec.results)
     {
-        var _value = globals.massspec.results[m];
+        var _value = globals.massspec.results[m].fc;
         output += `%0A${m}`;
         if(_value <= min)
         {

@@ -152,7 +152,7 @@ async function AirGenvar(){
         <table style="width:100%" id="gv_table_cons" cellspacing=0>
         </table>
         <button type="button" id="gv_resetConsequences" class="air_btn btn btn-block mt-2 mb-2">Reset Outputs</button>
-        <button id="gv_btn_download" class="om_btn_download btn mt-2 mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+        <button id="gv_btn_download" class="om_btn_download btn mt-2 mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results</button>
         <hr>
 
         <h4 class="mt-4 mb-4">3. Create Overlays</h4> 
@@ -185,24 +185,21 @@ async function AirGenvar(){
     });
 
     $('#gv_btn_download').on('click', function() {
-
-        var _text = "gene\t" + globals.variant.samples.join("\t") + "\n";
+        
+        var resultsFull_text = "gene\t" + globals.variant.samples.join("\t") + "\n";
 
         for(var m in globals.variant.mutation_results)
         {
-            _text += AIR.Molecules[m].name;
+            resultsFull_text += AIR.Molecules[m].name;
             for(var sample in globals.variant.samples)
             {
-                switch(globals.variant.impacts.indexOf(globals.variant.mutation_results[m][sample].impact))
-                {
-                    case 4: _text += "\t-1"; break;
-                    case 3: _text += "\t-0.5"; break;
-                    default: _text += "\t0"; break;
-                }
+                resultsFull_text += "\t" + globals.variant.mutation_results[m][sample].impact;
             }
-            _text += "\n";
+            resultsFull_text += "\n";
         }
-        air_download('VariantEffectResults.txt', _text)
+
+        air_download("AirVariant_Results.txt", resultsFull_text)
+
     });
 
     $('#gv_typeselect').on('change', async function() {
@@ -725,15 +722,21 @@ async function getConsequences()
         for(var v in _elements[m])
         {                    
             var last = !--iterations;
-            variant_promises.push(getConsequencesFromVariant(v, Array.from(_elements[m][v])).then(r => 
-                {
-                    variant_results = variant_results.concat(r)
-                }).finally(r => {     
-                    updateProgress(count++, totallength, "gv_getConsequences", "  for sample " + (parseFloat(sample) + 1) + "/" + globals.variant.samples.length)
-            }));
+            count++;
+            for(var alt of globals.variant.variants[v].ALT)
+            {
+                variant_promises.push(getConsequencesFromVariant(v, Array.from(_elements[m][v]), alt).then(r => 
+                    {
+                        variant_results = variant_results.concat(r)
+                    }).finally(r => {    
+
+                        updateProgress(count, totallength, "gv_getConsequences", "  for sample " + (parseFloat(sample) + 1) + "/" + globals.variant.samples.length)
+                }));
+            }
+
 
             
-            if (last || variant_promises.length >= 20)
+            if (last || variant_promises.length >= 15)
             {
                 await Promise.allSettled(variant_promises).catch(e => {
                     console.log(e);
@@ -745,13 +748,12 @@ async function getConsequences()
 
         return variant_results;
             
-        function getConsequencesFromVariant(v, tIDs)
+        function getConsequencesFromVariant(v, tIDs, alt)
         {
             return new Promise((resolve, reject) => {
 
                 var variant = globals.variant.variants[v]
                 var p = variant["POS"]
-                var a = variant["ALT"]
                 var r = variant["REF"]
                 var c = variant["CHROM"]
                 var _result = []
@@ -772,7 +774,7 @@ async function getConsequences()
                     {
                         var client = new XMLHttpRequest();
 
-                        client.open('GET', `https://${$('#gv_genomeselect').val() == "hg19"? "grch37.":""}rest.ensembl.org/vep/human/region/${c.toLowerCase().replace("chr", "")}:${p}:${p}/${a}?`);
+                        client.open('GET', `https://${$('#gv_genomeselect').val() == "hg19"? "grch37.":""}rest.ensembl.org/vep/human/region/${c.toLowerCase().replace("chr", "")}:${p}:${p + r.length - 1}/${alt}?`);
                         client.setRequestHeader("Content-Type", "application/json")
                         client.onreadystatechange = function() {
                             if (this.readyState == 4)
@@ -830,16 +832,16 @@ async function getConsequences()
                                                 {
                                                     if(response.colocated_variants[_variant].hasOwnProperty("frequencies"))
                                                     {
-                                                        if(response.colocated_variants[_variant].frequencies.hasOwnProperty(a))
+                                                        if(response.colocated_variants[_variant].frequencies.hasOwnProperty(alt))
                                                         {
-                                                            if(response.colocated_variants[_variant].frequencies[a].hasOwnProperty("gnomad"))
+                                                            if(response.colocated_variants[_variant].frequencies[alt].hasOwnProperty("gnomad"))
                                                             {    
-                                                                if(response.colocated_variants[_variant].frequencies[a].gnomad >= frequency_th)
+                                                                if(response.colocated_variants[_variant].frequencies[alt].gnomad >= frequency_th)
                                                                 {
                                                                     breakflag = true;
                                                                 }
                                                             
-                                                                _temp["frequency"] = response.colocated_variants[_variant].frequencies[a].gnomad
+                                                                _temp["frequency"] = response.colocated_variants[_variant].frequencies[alt].gnomad
                                                             }
                                                         }
                                                     }

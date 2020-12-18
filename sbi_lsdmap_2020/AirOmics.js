@@ -213,6 +213,14 @@ async function AirOmics(){
                     <tbody>
                     </tbody>
                 </table>
+                <div id="om_import_massspec_pvaluethreshold-container" class="row mt-2 mb-2">
+                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="textfield" value="0.05" id="om_import_massspec_pvaluethreshold" onkeypress="return isNumber(event)" />
+                    </div>
+                </div>
                 <button type="button" id="om_import_massspec" class="air_btn btn btn-block air_disabledbutton mt-4 mb-4"><i class="fas fa-file-import"></i> Import from AirMassSpec</button>
 
                 <div class="btn-group btn-group-justified mt-4 mb-4">
@@ -1658,7 +1666,7 @@ async function om_datamerge_dialog(imported) {
                     $(this).dialog("close");
                     resolve([true, false]);
                   },
-                Cancel: function() {
+                "Cancel": function() {
                     $(this).dialog("close");
                     resolve([true, true]);
                 }
@@ -1689,13 +1697,13 @@ async function om_loadfile(imported) {
 
     return new Promise((resolve, reject) => {
 
+        let resolvemessage = "";
+
         if (break_flag)
         {
             resolve(resolvemessage)
             return;
         }
-
-        let resolvemessage = "";
 
         if(imported)
         {
@@ -3204,7 +3212,16 @@ function importVariant() {
 };
 
 function importMassSpec() {
+
+    let pvalue_threshold = parseFloat($("#om_import_massspec_pvaluethreshold").val().replace(',', '.'))
+    if(isNaN(pvalue_threshold))
+    {
+        alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 0.05")
+        pvalue_threshold = 1;
+    }
+
     $('.om_import_massspec_samples').each(
+        
         function (){
             for(let _sample of $(this).val().split(','))
             {
@@ -3215,11 +3232,10 @@ function importMassSpec() {
                 }
                 for(var m in globals.massspec.results)
                 {
-                    
-                    if(AIR.ElementNames["name"].hasOwnProperty(m.toLocaleLowerCase()))
+                    if(AIR.ElementNames["name"].hasOwnProperty(m.toLocaleLowerCase()) && (!globals.massspec.results[m].pvalue || globals.massspec.results[m].pvalue < pvalue_threshold))
                     {
                         let molecule_id = AIR.ElementNames["name"][m.toLocaleLowerCase()];
-                        globals.omics.import_data[sample][molecule_id] = globals.massspec.results[m];
+                        globals.omics.import_data[sample][molecule_id] = globals.massspec.results[m].fc;
                     }
                 }
             }
@@ -3276,7 +3292,7 @@ function updateImportTable(new_data = false) {
         for(let sample in globals.omics.import_data)
         {
             if(globals.omics.import_data[sample].hasOwnProperty(element))
-                result_row.push(globals.omics.import_data[sample][element])
+                result_row.push(expo(globals.omics.import_data[sample][element]))
             else
             {
                 result_row.push(0)
