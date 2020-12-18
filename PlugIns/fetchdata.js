@@ -1,16 +1,13 @@
 let fileURL = '';
-let testing = false;
 let filetesting;
 let Chart;
 let JSZip;
 let FileSaver;
 let VCF;
-
-
-const localURL = 'http://localhost:3000/datafiles/Full_MIM';
-const githubURL = 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/DataFiles';
+let ttest;
 
 const AIR = {
+    HGNCElements: [],
     MoleculeData: {},
     Phenotypes: {},
     Hypoth_Phenotypes: {},
@@ -36,8 +33,8 @@ const AIR = {
         Outdegree: {},
     },
     centralityheader: new Set(),
-    MIMSpecies: [],
-    MIMSpeciesLowerCase: [],
+    MapSpecies: [],
+    MapSpeciesLowerCase: [],
     allBioEntities: [],
     MapElements: {},
 }
@@ -47,7 +44,7 @@ const globals = {
     variant: {},
     omics: {},
     xplore: {},
-
+    masspec: {},
 
     container: undefined,
 
@@ -78,7 +75,7 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 
-function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf) {
+function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf) {
 
     return new Promise((resolve, reject) => {
 
@@ -97,7 +94,10 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
             VCF = _vcf;
             JSZip = _jszip;
             FileSaver = _filesaver;
+            filetesting = _filetesting;
             minervaProxy = _minerva;
+            fileURL = _filepath;
+            ttest = _ttest;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -135,27 +135,17 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         bioEntities.forEach(e => {
                             if (e.constructor.name === 'Alias') {
                                 let namelower = e.getName().toLowerCase();
-                                AIR.MIMSpeciesLowerCase.push(namelower);
-                                AIR.MIMSpecies.push(e.getName());
+                                AIR.MapSpeciesLowerCase.push(namelower);
+                                AIR.MapSpecies.push(e.getName());
                                 AIR.MapElements[namelower] = e;
                             }
                         });
-                        //testing = _testing;
-                        filetesting = _filetesting;
-                    
-                        
-                        if(filetesting){
-                            fileURL = localURL;
-                        }
-                        else {
-                            fileURL = githubURL;
-                        }
 
                         let typevalue = $('.selectdata').val();
                         //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
                         t0 = performance.now();
                         $.ajax({
-                            url: fileURL + '/Interactions.json',
+                            url: fileURL + 'Interactions.json',
                             success: function (content) {
                                 readInteractions(content).then(r => {
                                     t1 = performance.now()
@@ -165,7 +155,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     setTimeout(() => {
                                         $.ajax({
                                             //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                            url: fileURL + '/Molecules.json', 
+                                            url: fileURL + 'Elements.json', 
                                             success: function (moleculecontent) {
                                                 t1 = performance.now()
                                                 console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
@@ -174,14 +164,10 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                                     console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
                                                     t0 = performance.now();
                                                     readServerValues().then(r => {
-                                                        t1 = performance.now()
-                                                        console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
+                                                        t1 = performance.now();
+                                                        console.log("Reading Server values took " + (t1 - t0) + " milliseconds.");
                                                         t0 = performance.now();
-                                                        let promises = [];
-                                                        centralities.forEach(c => {
-                                                            promises.push(openCentrality(c));
-                                                        });
-                                                        Promise.all(promises).then(r => {
+                                                        readCentralityValues().then(r => {
                                                             t1 = performance.now()
                                                             console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
                                                             resolve(AIR);
@@ -201,18 +187,27 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                 reject(AIR);
                             }
                         });
-                        function openCentrality(centrality)
+                        function readCentralityValues(centrality)
                         {
                             return new Promise((resolve, reject) => {
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                    url: fileURL + '/' + centrality.toLowerCase() + ".txt", 
-                                    success: function (info) {
-                                        readCentrality(info, centrality).then(s => resolve('')).catch(e => {
-                                            console.log(e);
-                                            reject(e);
-                                        })
+                                    url: fileURL + "Centrality.json", 
+                                    success: function (content) {
+                                        
+                                        if(filetesting)
+                                        {
+                                            AIR.Centrality = content;
+                                        }
+                                        else
+                                        {
+                                            AIR.Centrality = JSON.parse(content);
+                                        }
+                                        resolve('');
                                     },
+                                    error: function () {
+                                        reject(e);
+                                    }
                                 });
                             });
                         }
@@ -272,7 +267,8 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                 {
                                     AIR.Molecules = content;
                                 }
-                                else{
+                                else
+                                {
                                     AIR.Molecules = JSON.parse(content);
                                 }
 
@@ -281,7 +277,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     if(AIR.Molecules[element].complex === false)
                                     {
                                         for(let id in AIR.Molecules[element].ids)
-                                        {
+                                        {                                            
                                             let db_key = id.replace('.','');
                                             if(AIR.ElementNames.hasOwnProperty(db_key))
                                             {
@@ -315,26 +311,7 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                                     }
                                 }
 
-                                if(testing)
-                                {
-                                    let t0 = performance.now()
-                                    $.ajax({
-                                        url: localURL + "/SP.txt",
-                                        success: function (content) {
-                                            let t1 = performance.now()
-                                            console.log("Call to get File took " + (t1 - t0) + " milliseconds.")
-                                            readFile(content).then(r => {
-                                                let t1 = performance.now()
-                                                console.log("Call to readFile took " + (t1 - t0) + " milliseconds.")
-                                                resolve('');
-                                            });
-                                        },
-                                        error: function () {
-                                        }
-                                    });
-                                }
-                                else
-                                    resolve('');
+                                resolve('');
                             });
                         }
                         function readCentrality(content, centrality) {
@@ -395,11 +372,13 @@ function readDataFiles(_minerva, _chart, _filetesting, _jszip, _filesaver, _vcf)
                         }
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
+                                
                                 if(filetesting)
                                 {
                                     AIR.Interactions = content;
                                 }
-                                else{
+                                else
+                                {
                                     AIR.Interactions = JSON.parse(content);
                                 }
                                 resolve('');
@@ -438,34 +417,19 @@ function getValue(key)
 {
     return new Promise(
        (resolve, reject) => {
-            if(testing)
-            {
-                $.ajax({
-                    url: "http://localhost:8080/minerva/api/plugins/6f8b4f372b3ecaca43031b747162aa82/data/global/" + key,
-                    success: (response) => {
-                        resolve(response["value"]);
-                    },
-                    error: (e) => {
-                        reject(e);
-                    }
-                })
-            }
-            else {
-                minervaProxy.pluginData.getGlobalParam(key).then(
-                    response => {
-                        let output = JSON.parse(response).value;
-                        output = replaceAll(output, ",", ".");
-                        output = replaceAll(output, "y", '"},"');
-                        output = replaceAll(output, "x", '":{"');
-                        output = replaceAll(output, "z", '":"');
-                        output = replaceAll(output, "q", '","');
-                        output = replaceAll(output, '"-.', '"-0.');
-                        resolve(output);
-                }).catch(e => {
-                    reject(e)
-                });
-            }
-
+            minervaProxy.pluginData.getGlobalParam(key).then(
+                response => {
+                    let output = JSON.parse(response).value;
+                    output = replaceAll(output, ",", ".");
+                    output = replaceAll(output, "y", '"},"');
+                    output = replaceAll(output, "x", '":{"');
+                    output = replaceAll(output, "z", '":"');
+                    output = replaceAll(output, "q", '","');
+                    output = replaceAll(output, '"-.', '"-0.');
+                    resolve(output);
+            }).catch(e => {
+                reject(e)
+            });
         });
 
 }
@@ -696,10 +660,14 @@ function createLinkCell(row, type, text, style, align) {
 }
 
 
-function createCell(row, type, text, style, scope, align, nowrap = false) {
+function createCell(row, type, text, style, scope, align, nowrap = false, order = "") {
     var cell = document.createElement(type); // create text node
     cell.innerHTML = text;                    // append text node to the DIV
     cell.setAttribute('class', style);
+    if(order)
+    {
+        cell.setAttribute("data-order", order);
+    }
     if(scope != '')
         cell.setAttribute('scope', scope);  // set DIV class attribute // set DIV class attribute for IE (?!)
     if(nowrap)
@@ -711,11 +679,14 @@ function createCell(row, type, text, style, scope, align, nowrap = false) {
     return cell;
 }
 
-function createPopupCell(row, type, text, style, align, callback, callbackParameters) {
+function createPopupCell(row, type, text, style, align, callback, callbackParameters, order = "") {
     var cell = document.createElement(type); // create text node                  // append text node to the DIV
     cell.setAttribute('class', style);
     cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
-    
+    if(order)
+    {
+        cell.setAttribute("data-order", order);
+    }
 
     var button = document.createElement('button'); // create text node
     button.innerHTML = text;
@@ -769,7 +740,7 @@ function createSliderCell(row, type, data) {
     button.setAttribute('min', '-2');
     button.setAttribute('max', '2');
     button.setAttribute('step', '0.1');
-    button.setAttribute('class', 'slider xp_slider');
+    button.setAttribute('class', 'slider air_slider');
 
     var cell = document.createElement(type);
     cell.setAttribute('style', 'text-align: center; vertical-align: middle;');     // create text node
@@ -1028,6 +999,24 @@ function rgbToHex(rgb) {
     return hex;
 };
 
+function valueToHex(_value) {
+    var hex = rgbToHex((1 - Math.abs(_value)) * 255);
+    if (_value > 0)
+        return '#ff' + hex + hex;
+    else if (_value < 0)
+        return '#' + hex + hex + 'ff';
+    else return '#ffffff';
+}
+
+function valueToRGB(_value) {
+    var rgb = (1 - Math.abs(_value)) * 255;
+    if (_value > 0)
+        return [255, rgb, rgb]
+    else if (_value < 0)
+        return [rgb, rgb, 255]
+    else return [255, 255, 255];
+}
+
 function adjustPanels(container) {
     
     var coll = container.getElementsByClassName("air_collapsible");
@@ -1037,4 +1026,70 @@ function adjustPanels(container) {
             content.style.maxHeight = content.scrollHeight + 1 + "px";
         } 
     }
+}
+function expo(x, f=2, e=1) {
+    if(x == 0)
+        return 0;
+    let _round = Math.floor(x*Math.pow(10,f))/Math.pow(10,f)
+    if(_round == 0)
+        return x.toExponential(e);
+    else
+      return Math.round(x*Math.pow(10,f))/Math.pow(10,f)
+  }
+
+
+async function air_addoverlay(olname, callback, cb_param = null)
+{
+    return new Promise((resolve, reject) =>  
+    { 
+        var _content = callback(cb_param) 
+        if(_content != "")
+        {
+            $.ajax({
+                method: 'POST',
+                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+
+                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
+                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
+                success: (response) => {
+                    resolve("")
+                    $("[name='refreshOverlays']").click();
+                },
+                error: (response) => {
+                    resolve("")
+                }
+            })
+        }
+        else {
+            resolve("")
+        }
+
+    });
+}
+
+function shuffle(array) {
+    var currentIndex = array.length, temporaryValue, randomIndex;
+  
+    // While there remain elements to shuffle...
+    while (0 !== currentIndex) {
+  
+      // Pick a remaining element...
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex -= 1;
+  
+      // And swap it with the current element.
+      temporaryValue = array[currentIndex];
+      array[currentIndex] = array[randomIndex];
+      array[randomIndex] = temporaryValue;
+    }
+  
+    return array;
+}
+
+function union(setA, setB) {
+    let _union = new Set(setA)
+    for (let elem of setB) {
+        _union.add(elem)
+    }
+    return _union
 }

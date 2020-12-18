@@ -56,16 +56,6 @@
     /* chromes and blink button */
     cursor: pointer; }
   
-  .om_inputfile {
-    background-color: #FFFFFF !important;
-    cursor: pointer; }
-  
-  .om_inputfile {
-    font-size: 1.0em;
-    font-weight: 500;
-    color: black;
-    display: inline-block; }
-  
   .om_btn_download {
     border: none;
     padding: 12px 30px;

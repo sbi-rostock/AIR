@@ -4,6 +4,7 @@ function AirXplore(){
         interactionpanel: undefined,
         targetpanel: undefined,
         centralitypanel: undefined,
+        phenotypepanel: undefined,
         exportpanel: undefined,
         centralitychart: undefined,
         xp_target_downloadtext: '',
@@ -14,7 +15,13 @@ function AirXplore(){
         hpotable: undefined,
         targetphenotypetable: undefined,
         xp_targetchart: undefined,
+
+        pe_element_table: undefined,
+        pe_reults_table: undefined,
+        pe_data: [{}],
+        pe_data_index: 0,
     }
+
     globals.xplore["container"] = document.getElementById("airxplore_tab_content")
 
     let t0 = performance.now();
@@ -22,7 +29,24 @@ function AirXplore(){
         dbOverlayName: "search",
         type: "onSearch",
         callback: xp_searchListener
-    });    
+    }); 
+    
+    $("#airomics_tab").on('shown.bs.tab', function () {
+
+        if(globals.xplore.regulationtable)
+            globals.xplore.regulationtable.columns.adjust();
+        if(globals.xplore.targettable)
+            globals.xplore.targettable.columns.adjust();
+        if(globals.xplore.phenotypetable)
+            globals.xplore.phenotypetable.columns.adjust();
+        if(globals.xplore.centraliytable)
+            globals.xplore.centraliytable.columns.adjust();
+        if(globals.xplore.hpotable)
+            globals.xplore.hpotable.columns.adjust();
+        if(globals.xplore.targetphenotypetable)
+            globals.xplore.targetphenotypetable.columns.adjust();
+    });
+
 
     $(`<div id="xp_stat_spinner" class="mt-5">
         <div class="d-flex justify-content-center">
@@ -34,6 +58,7 @@ function AirXplore(){
             <span id="xp_loading_text">LOADING...</span>
         </div>
     </div>`).appendTo($('#airxplore_tab_content'));
+
     setTimeout(() => {
         Initiate().then(r => {
             $('#xp_stat_spinner').hide();
@@ -64,6 +89,10 @@ function Initiate() {
             </div>
         <button class="air_collapsible mt-2">Export Data</button>
             <div id="xp_panel_export" class="air_collapsible_content">
+
+            </div>
+        <button class="air_collapsible mt-2">Phenotype Estimation</button>
+            <div id="xp_panel_phenotypes" class="air_collapsible_content">
 
             </div>
         <button class="air_collapsible mt-2">Regulator Prediction</button>
@@ -97,32 +126,40 @@ function Initiate() {
         globals.xplore.targetpanel = $("#xp_panel_targets");
         globals.xplore.centralitypanel = $("#xp_panel_centrality");
         globals.xplore.exportpanel = $("#xp_panel_export");
+        globals.xplore.phenotypepanel = $("#xp_panel_phenotypes");
 
         $('#xp_loading_text').html('Generating interaction panel ...')
         setTimeout(() => {
             getInteractionPanel().then(r => {
-                $('#xp_loading_text').html('Generating export panel ...')
+                $('#xp_loading_text').html('Generating Phenotype panel ...')
                 setTimeout(() => {
-                    getExportPanel().then(r => {
-                        $('#xp_loading_text').html('Generating target panel ...')
+                    getPhenotypePanel().then(s => {
+                        $('#xp_loading_text').html('Generating export panel ...')
                         setTimeout(() => {
-                            getTargetPanel().then(s => {
-                                $('#xp_loading_text').html('Generating centrality panel ...')
+                            getExportPanel().then(r => {
+                                $('#xp_loading_text').html('Generating target panel ...')
                                 setTimeout(() => {
-                                    getCentralityPanel().then(t => {
-                                        resolve('');
+                                    getTargetPanel().then(s => {
+                                        $('#xp_loading_text').html('Generating centrality panel ...')
+                                        setTimeout(() => {
+                                            getCentralityPanel().then(t => {
+                                                resolve('');
+                                            }).catch(error => {            
+                                                reject(error);
+                                            })
+                                        }, 0);
                                     }).catch(error => {            
-                                        reject(error);
-                                    })
-                                }, 0);
+                                        reject(error);;
+                                    });
+                                },0);
                             }).catch(error => {            
-                                reject(error);;
-                            });
-                        },0);
+                                reject(error);
+                            })
+                        }, 0);
                     }).catch(error => {            
                         reject(error);
-                    })
-                }, 0);
+                    });
+                });
             }).catch(error => {            
                 reject(error);
             })
@@ -154,10 +191,13 @@ function getExportPanel()
         var phenotypeSelect = document.getElementById('xp_select_export_phenotype');
 
         i = 0;
-        AIR.centralityheader.forEach(p => {
+        for (let phenotype in AIR.Phenotypes)
+        {
+            var p = AIR.Phenotypes[phenotype].name;
+    
             phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
             i++;
-        });
+        };
 
 
         $('#xp_btn_download_gmt').on('click', function() {
@@ -290,6 +330,318 @@ function getExportPanel()
 
 }
 
+function getFontfromValue(invalue) {
+    if(invalue < 0)
+    {
+        return `<font color="blue" data-order="2"><b>${invalue}<b></font>`;
+    }
+    else if(invalue > 0)
+    {
+        return `<font color="red" data-order="0"><b>${invalue}<b></font>`;
+    }
+    else
+    {
+        return `<font data-order="1"><b>${invalue}<b></font>`
+    }    
+}
+
+
+async function getPhenotypePanel()
+{    
+    async function xp_EstimatePhenotypes()
+    {
+        return new Promise((resolve, reject) => {
+            globals.xplore.pe_results_table.clear()
+
+            for(let p in AIR.Phenotypes)
+            {       
+                let max_influence = 0;
+                let influence = 0;
+                let level = 0;
+
+                for(let e in AIR.Phenotypes[p].values) 
+                {
+                    let _influene = AIR.Phenotypes[p].values[e];
+                    max_influence += Math.abs(_influene);
+
+                    if(globals.xplore.pe_data[globals.xplore.pe_data_index].hasOwnProperty(e))
+                    {
+                        let fc = globals.xplore.pe_data[globals.xplore.pe_data_index][e]
+
+                        if(fc != 0)
+                        {
+                            influence += Math.abs(_influene);
+                            level += _influene * fc;
+                        }
+                    }
+                }
+                globals.xplore.pe_results_table.row.add([
+                    getLinkIconHTML(AIR.Phenotypes[p].name),
+                    getFontfromValue(expo(level)),
+                    expo((influence/max_influence)*100)
+                ])
+            }                  
+            globals.xplore.pe_results_table.columns.adjust().draw();
+            adjustPanels(globals.xplore.container);
+            resolve()
+        });
+    }
+
+    async function setPeTable()
+    {
+        return new Promise((resolve, reject) => {
+            if (globals.xplore.pe_element_table)
+                globals.xplore.pe_element_table.destroy(); 
+            else
+                return;
+
+            $("#xp_table_pe_elements > tbody").empty()
+            var tbl = document.getElementById('xp_table_pe_elements').getElementsByTagName('tbody')[0];;
+
+            for (let e in globals.xplore.pe_data[globals.xplore.pe_data_index]) 
+            {
+                var row = tbl.insertRow(tbl.rows.length);
+
+                createCell(row, 'td', getLinkIconHTML(AIR.Molecules[e].name), 'col', '', 'right');
+                createCell(row, 'td', getFontfromValue(globals.xplore.pe_data[globals.xplore.pe_data_index][e]), 'col slidervalue', '', 'center').setAttribute('id', 'ESliderValue' + e);
+                var slider = createSliderCell(row, 'td', e);
+                slider.setAttribute('id', 'ESlider' + e);
+                slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e]);
+                slider.oninput = function () {
+                    let value = this.value;
+                    $("#ESliderValue" + e).html(getFontfromValue(parseFloat(value)));
+                    globals.xplore.pe_data[globals.xplore.pe_data_index][e] = value;
+                    xp_EstimatePhenotypes()
+                }
+            }
+
+            globals.xplore.pe_element_table = $('#xp_table_pe_elements').DataTable({
+                //"scrollX": true,
+                //"autoWidth": true,
+                "table-layout": "fixed", // ***********add this
+                "word-wrap": "break-word", 
+                "columns": [
+                    { "width": "30%" },
+                    { "width": "10%" },
+                    { "width": "60%" }
+                ]
+            } ).columns.adjust().draw();
+            adjustPanels(globals.xplore.container);
+            resolve()
+        });
+    }
+
+
+    return new Promise((resolve, reject) => {
+
+        globals.xplore.phenotypepanel.append(`
+
+
+        <div class="mt-4">
+            <input type="text" style="width: 75%" class="textfield" id="xp_pe_element_input"/>
+            <button type="button" id="xp_pe_element_btn" style="width: 20%" class="air_btn btn mr-1">Add Elements</button>
+            <div class="btn-group btn-group-justified mt-4 mb-4">
+                <div class="btn-group">
+                    <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
+                </div>
+                <div class="btn-group">
+                    <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
+                </div>
+            </div>
+            <table id="xp_table_pe_elements" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                <thead>
+                    <tr>
+                        <th style="vertical-align: middle;">Element</th>
+                        <th style="vertical-align: middle;">FC</th>
+                        <th style="vertical-align: middle;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+
+            <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
+
+            <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                <thead>
+                    <tr>
+                        <th style="vertical-align: middle;">Phenotype</th>
+                        <th style="vertical-align: middle;">Level</th>
+                        <th style="vertical-align: middle;">Accuracy %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>`);
+
+        globals.xplore.pe_element_table = $('#xp_table_pe_elements').DataTable({
+            //"scrollX": true,
+            "order": [[ 0, "asc" ]], 
+            "table-layout": "fixed", // ***********add this
+            "word-wrap": "break-word", 
+            "columns": [
+                { "width": "30%" },
+                { "width": "10%" },
+                { "width": "60%" }
+            ],
+            "columnDefs": [
+                {
+                    targets: 0,
+                    className: 'dt-left',
+                },
+                {
+                    targets: 1,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 2,
+                    className: 'dt-center'
+                },
+            ]
+        } );
+
+        globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
+            //"scrollX": true,
+            "order": [[ 2, "desc" ]], 
+            "table-layout": "fixed", // ***********add this
+            "word-wrap": "break-word", 
+            "columns": [
+                { "width": "70%" },
+                { "width": "15%" },
+                { "width": "15%" }
+            ],
+            "columnDefs": [
+                {
+                    targets: 0,
+                    className: 'dt-left',
+                },
+                {
+                    targets: 1,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 2,
+                    className: 'dt-center'
+                },
+            ]
+        } );
+        
+        for(let p in AIR.Phenotypes)
+        {
+            globals.xplore.pe_results_table.row.add([
+                getLinkIconHTML(AIR.Phenotypes[p].name),
+                `<div id="xp_pe_value_${p}">0</div>`,
+                `<div id="xp_pe_accuracy_${p}">0</div>`
+            ])
+        }                  
+        globals.xplore.pe_results_table.columns.adjust().draw();
+        globals.xplore.pe_element_table.columns.adjust().draw();
+
+        $('#xp_import_undo').on('click', async function() {
+
+            if(globals.xplore.pe_data_index == 0)
+            {
+                return;
+            }
+            
+            globals.xplore.pe_data_index -= 1;
+            $("#xp_import_redo").removeClass("air_disabledbutton");
+
+            if(globals.xplore.pe_data_index == 0)
+            {
+                $("#xp_import_undo").addClass("air_disabledbutton");
+            }
+
+            await setPeTable()
+            await xp_EstimatePhenotypes();
+        })
+
+        $('#xp_import_redo').on('click', async function() {
+
+            if(globals.xplore.pe_data_index == (globals.xplore.pe_data.length - 1))
+            {
+                return;
+            }
+            
+            globals.xplore.pe_data_index += 1;
+            $("#xp_import_undo").removeClass("air_disabledbutton");
+
+            if(globals.xplore.pe_data_index == (globals.xplore.pe_data.length - 1))
+            {
+                $('#xp_import_redo').addClass("air_disabledbutton");
+            }
+
+            await setPeTable()
+            await xp_EstimatePhenotypes();
+        })
+
+        $('#xp_pe_element_btn').on('click', async function() {
+
+            globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
+            
+            let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
+
+            for(let element of $("#xp_pe_element_input").val().split(','))
+            {
+                if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
+                {
+                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
+
+                    if(!_data.hasOwnProperty(m))
+                        _data[m] = 0;
+                }
+            }
+
+            if(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]) == JSON.stringify(_data))
+            {
+                return;
+            }
+
+            globals.xplore.pe_data.push(_data) 
+            globals.xplore.pe_data_index += 1;
+
+            $("#xp_import_redo").addClass("air_disabledbutton");
+            $("#xp_import_undo").removeClass("air_disabledbutton");
+
+            await setPeTable()
+            await xp_EstimatePhenotypes();
+            adjustPanels(globals.xplore.container);
+        });
+        
+        $('#xp_pe_reset_btn').on('click', () => {
+
+            let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
+
+            if(Object.keys(_data) == 0)
+            {
+                return;
+            }
+
+            for(let e in _data)
+            {
+                _data[e] = 0;
+            }
+
+            globals.xplore.pe_element_table.rows().every( function () {
+                var row = this.nodes().to$()
+                row.find('.air_slider').val(0);
+                row.find('.slidervalue')[0].innerHTML = `<font data-order="1"><b>0<b></font>`;
+            } );
+
+            globals.xplore.pe_element_table.columns.adjust().draw(false);
+            globals.xplore.pe_data.push(_data) 
+            globals.xplore.pe_data_index += 1;
+
+            xp_EstimatePhenotypes()
+        });
+
+
+        globals.xplore.targetpanel.append('<div class="mb-4"></div>');
+
+        resolve('');
+    });
+}
 
 function getInteractionPanel()
 {
@@ -334,7 +686,7 @@ function getInteractionPanel()
             </li>
         </ul>
         <div class="tab-content air_tab_content" id="xp_tab">
-            <div class="tab-pane air_tab_pane show active" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
+            <div class="tab-pane air_sub_tab_pane show active" id="xp_tabcontent_inter_regulation" role="tabpanel" aria-labelledby="xp_tab_inter_regulation">
                 <select id="xp_select_interaction_type" class="browser-default xp_select custom-select mb-4">
                     <option value="0" selected>All Elements</option>
                     <option value="1">miRNAs</option>
@@ -352,7 +704,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_target" role="tabpanel" aria-labelledby="xp_tab_inter_target">
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_target" cellspacing="0">
                     <thead>
                         <tr>
@@ -364,7 +716,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_phenotype" role="tabpanel" aria-labelledby="xp_tab_inter_phenotype">
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_phenotype" cellspacing="0">
                     <thead>
                         <tr>
@@ -375,7 +727,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_hpo" role="tabpanel" aria-labelledby="xp_tab_inter_hpo">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_hpo" role="tabpanel" aria-labelledby="xp_tab_inter_hpo">
                 <select id="xp_select_interaction_hpo" class="browser-default xp_select custom-select mb-4">
                     <option value="0" selected>All</option>
                     <option value="1">Phenotype</option>
@@ -392,7 +744,7 @@ function getInteractionPanel()
                     </thead>
                 </table>
             </div>
-            <div class="tab-pane air_tab_pane" id="xp_tabcontent_inter_sequence" role="tabpanel" aria-labelledby="xp_tab_inter_sequence">
+            <div class="tab-pane air_sub_tab_pane" id="xp_tabcontent_inter_sequence" role="tabpanel" aria-labelledby="xp_tab_inter_sequence">
                 <div id="xp_molart">No information available.</div>
             </div>
         </div>
@@ -422,7 +774,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        }).columns.adjust();;
+        })
 
         globals.xplore.targettable = $('#xp_table_inter_target').DataTable({
             scrollX: true,
@@ -448,7 +800,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        }).columns.adjust();;
+        })
 
         globals.xplore.hpotable = $('#xp_table_inter_hpo').DataTable({
             scrollX: true,
@@ -474,7 +826,7 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        }).columns.adjust();;
+        })
 
         globals.xplore.phenotypetable = $('#xp_table_inter_phenotype').DataTable({
             scrollX: true,
@@ -495,19 +847,19 @@ function getInteractionPanel()
                     className: 'dt-center'
                 }
             ]
-        }).columns.adjust();;
+        })
 
         $('.xp_inter_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
             var target = $(e.target).attr("href") // activated tab
             switch(target) {
                 case "#xp_tabcontent_inter_regulation":
-                    globals.xplore.regulationtable.columns.adjust().draw(); 
+                    globals.xplore.regulationtable.columns.adjust(); 
                     break;
                 case "#xp_tabcontent_inter_target":
-                    globals.xplore.targettable.columns.adjust().draw();
+                    globals.xplore.targettable.columns.adjust();
                     break;
                 case "#xp_tabcontent_inter_phenotype":
-                    globals.xplore.phenotypetable.columns.adjust().draw(); 
+                    globals.xplore.phenotypetable.columns.adjust(); 
                     break;
             }
             $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
@@ -639,7 +991,7 @@ function getTargetPanel() {
 
             globals.xplore.targetphenotypetable.rows().every( function () {
                 var row = this.nodes().to$()
-                row.find('.xp_slider').val(0);
+                row.find('.air_slider').val(0);
                 row.find('.slidervalue')[0].innerHTML = `<font data-order="1"><b>0<b></font>`;
             } );
 
@@ -912,13 +1264,15 @@ function getCentralityPanel() {
 
 
         i = 0;
-        AIR.centralityheader.forEach(p => {
-
+        for (let phenotype in AIR.Phenotypes)
+        {
+            var p = AIR.Phenotypes[phenotype].name;
+    
             phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
             xphenotypeSelect.options[xphenotypeSelect.options.length] = new Option(p, i); 
             yphenotypeSelect.options[yphenotypeSelect.options.length] = new Option(p, i); 
             i++;
-        });
+        };
 
         i = 0;
         centralities.forEach(p => {
@@ -928,10 +1282,10 @@ function getCentralityPanel() {
             i++;
         });
         
-        createCentralityTable(phenotypeSelect.options[0].text);
+        createCentralityTable(AIR.ElementNames.name[phenotypeSelect.options[0].text]);
 
         $('#xp_select_centrality_phenotype').on('change', function() {
-            createCentralityTable(phenotypeSelect.options[phenotypeSelect.selectedIndex].text);
+            createCentralityTable(AIR.ElementNames.name[phenotypeSelect.options[phenotypeSelect.selectedIndex].text]);
         });
         
         var outputCanvas = document.getElementById('xp_chart_centrality').getContext('2d');
@@ -1104,7 +1458,7 @@ function getCentralityPanel() {
                 {
                     
                     var pstyle = 'circle';
-                    if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+                    if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
                     {
                         pstyle = 'triangle'
                     }
@@ -1411,7 +1765,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 for(let inter in AIR.Interactions)
                 {
-                    let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+                    let {source:_source, target:_target, typestring:_typestring, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
 
                     if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
@@ -1452,7 +1806,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         }
                         else if(_type == 0)
                         {
-                            typehtml = "unknown";
+                            typehtml = _typestring;
                         }
                         
 
@@ -1499,7 +1853,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         }
                         else if(_type == 0)
                         {
-                            typehtml = "unknown";
+                            typehtml = _typestring;
                         }                                 
                         
                         result_row.push(_targettype);
@@ -1817,7 +2171,7 @@ function XP_PredictTargets() {
 
         
         var pstyle = 'circle';
-        if(AIR.MIMSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+        if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
         {
             pstyle = 'triangle'
         }
@@ -1868,7 +2222,7 @@ function createCentralityTable(phenotype) {
                 {
                     hasvalue = true;
                 }
-                result_row.push(value);
+                result_row.push(expo(value));
             }
             else
             {

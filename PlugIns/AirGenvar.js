@@ -53,7 +53,7 @@ async function AirGenvar(){
                 </div>
             </div>
             <div class="col">
-                <input id="gv_inputId" type="file"  accept=".vcf" class="om_inputfile inputfile" multiple/>
+                <input id="gv_inputId" type="file"  accept=".vcf" class="air_inputfile inputfile" multiple/>
             </div>
         </div>
 
@@ -152,7 +152,7 @@ async function AirGenvar(){
         <table style="width:100%" id="gv_table_cons" cellspacing=0>
         </table>
         <button type="button" id="gv_resetConsequences" class="air_btn btn btn-block mt-2 mb-2">Reset Outputs</button>
-        <button id="gv_btn_download" class="om_btn_download btn mt-2 mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+        <button id="gv_btn_download" class="om_btn_download btn mt-2 mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results</button>
         <hr>
 
         <h4 class="mt-4 mb-4">3. Create Overlays</h4> 
@@ -175,26 +175,31 @@ async function AirGenvar(){
         <button type="button" id="gv_addoverlay" class="air_btn btn btn-block mt-4 mb-5">Create Overlay</button>
 
     `).appendTo(globals.gv_container);
+    
+    $("#airgenvar_tab").on('shown.bs.tab', function () {
+
+        if(globals.variant.gv_table)
+            globals.variant.gv_table.columns.adjust();
+        if(globals.variant.gv_table_cons)
+            globals.variant.gv_table_cons.columns.adjust();
+    });
 
     $('#gv_btn_download').on('click', function() {
-
-        var _text = "gene\t" + globals.variant.samples.join("\t") + "\n";
+        
+        var resultsFull_text = "gene\t" + globals.variant.samples.join("\t") + "\n";
 
         for(var m in globals.variant.mutation_results)
         {
-            _text += AIR.Molecules[m].name;
+            resultsFull_text += AIR.Molecules[m].name;
             for(var sample in globals.variant.samples)
             {
-                switch(globals.variant.impacts.indexOf(globals.variant.mutation_results[m][sample].impact))
-                {
-                    case 4: _text += "\t-1"; break;
-                    case 3: _text += "\t-0.5"; break;
-                    default: _text += "\t0"; break;
-                }
+                resultsFull_text += "\t" + globals.variant.mutation_results[m][sample].impact;
             }
-            _text += "\n";
+            resultsFull_text += "\n";
         }
-        air_download('VariantEffectResults.txt', _text)
+
+        air_download("AirVariant_Results.txt", resultsFull_text)
+
     });
 
     $('#gv_typeselect').on('change', async function() {
@@ -234,7 +239,7 @@ async function AirGenvar(){
             var _text = disablebutton("gv_readfile")
             var client = new XMLHttpRequest();
 
-            client.open('GET', fileURL + '/' + genome + '_genome.json');
+            client.open('GET', fileURL + genome + '_genome.json');
             client.onreadystatechange = async function() {
                 if (this.readyState == 4)
                 {
@@ -449,7 +454,7 @@ async function AirGenvar(){
         }
         for(var sample in globals.variant.samples)
         {            
-            await gv_addoverlay(sample, olname + "_" + globals.variant.samples[sample])
+            await air_addoverlay(olname + "_" + globals.variant.samples[sample], gv_contentString, sample)
         }
 
         enablebtn("gv_addoverlay", text);
@@ -550,124 +555,68 @@ async function AirGenvar(){
     });
 }
 
-async function gv_addoverlay(sample, olname)
+
+function gv_contentString(sample)
 {
-    return new Promise((resolve, reject) =>  
-    { 
-        var _content = gv_contentString(sample) 
-        if(_content != "")
-        {
-            $.ajax({
-                method: 'POST',
-                url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
+    var olfilter = $("#gv_overlayselect").val();
+    var output = '';
 
-                data: `content=name%09color${_content}&description=PhenotypeActivity&filename=${olname}.txt&name=${olname}&googleLicenseConsent=true`,
-                cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                success: (response) => {
-                    resolve("")
-                    $("[name='refreshOverlays']").click();
-                },
-                error: (response) => {
-                    resolve("")
-                }
-            })
-        }
-        else {
-            resolve("")
-        }
-
-        function deleteOldOverlay()
-        {
-            return new Promise((resolve, reject) =>  
-            { 
-                var _found = false;
-                var overlays = minervaProxy.project.data.getDataOverlays();
-
-                for (var ol in overlays)
-                {
-                    if(overlays[ol].name.toLowerCase() == olname.toLowerCase())
-                    {
-                        _found = true;
-                        $.ajax({
-                            method: 'DELETE',
-                            url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/' + ol,
-                            cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
-                            success: (response) => {
-                                $("[name='refreshOverlays']").click();
-                                resolve("");
-                            }
-                        })
-                    }
-                };
-                if(!_found)
-                {
-                    resolve("")
-                }
-            });
-        }
-        function gv_contentString()
+    if(olfilter == 2)
     {
-            var olfilter = $("#gv_overlayselect").val();
-            var output = '';
-
-            if(olfilter == 2)
+        for (var m in globals.variant.mutation_results)
+        {
+            output += `%0A${AIR.Molecules[m].name}`;
+            switch(globals.variant.mutation_results[m][sample].impact)
             {
-                for (var m in globals.variant.mutation_results)
-                {
-                    output += `%0A${AIR.Molecules[m].name}`;
-                    switch(globals.variant.mutation_results[m][sample].impact)
-                    {
-                        case "HIGH": output += '%09%23ff0000'; break;
-                        case "LOW": output += '%09%2300ff00'; break;
-                        case "MODERATE": output += '%09%23ffff00'; break;
-                        case "MODIFIER": output += '%09%23d3d3d3'; break;
-                        default: output += '%09%23ffffff'; break;
-                    }
-                }
-            }        
-
-            else
-            {
-                var _values = {};
-
-                for (var m in globals.variant.gv_results[sample])
-                {            
-                    if(olfilter == 0)
-                    {
-                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(globals.variant.gv_results[sample][m]).length;
-                    }
-                    else if (olfilter == 1)
-                    {
-                        var _value = new Set();
-                        for (var t in globals.variant.gv_results[sample][m])
-                        { 
-                            globals.variant.gv_results[sample][m][t].forEach(v => {
-                                _value.add(v)
-                            })
-                        }
-                        _values[encodeURIComponent(AIR.Molecules[m].name)] = Array.from(_value).length;
-                    }
-                }
-
-
-                var _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
-
-                for (var m in _values)
-                {
-                    var _value = _max != 0? _values[m]/Math.abs(_max) : 0
-                    var hex = rgbToHex((1 - Math.abs(_value)) * 255);
-                    output += `%0A${m}`;
-                    if (_value > 0)
-                        output += '%09%23ff' + hex + hex;
-                    else if (_value < 0)
-                        output += '%09%23' + hex + hex + 'ff';
-                    else output += '%09%23ffffff';
-                };
-            }   
-
-            return output;
+                case "HIGH": output += '%09%23ff0000'; break;
+                case "LOW": output += '%09%2300ff00'; break;
+                case "MODERATE": output += '%09%23ffff00'; break;
+                case "MODIFIER": output += '%09%23d3d3d3'; break;
+                default: output += '%09%23ffffff'; break;
+            }
         }
-    });
+    }        
+
+    else
+    {
+        var _values = {};
+
+        for (var m in globals.variant.gv_results[sample])
+        {            
+            if(olfilter == 0)
+            {
+                _values[encodeURIComponent(AIR.Molecules[m].name)] = Object.keys(globals.variant.gv_results[sample][m]).length;
+            }
+            else if (olfilter == 1)
+            {
+                var _value = new Set();
+                for (var t in globals.variant.gv_results[sample][m])
+                { 
+                    globals.variant.gv_results[sample][m][t].forEach(v => {
+                        _value.add(v)
+                    })
+                }
+                _values[encodeURIComponent(AIR.Molecules[m].name)] = Array.from(_value).length;
+            }
+        }
+
+
+        var _max = _values[Object.keys(_values).reduce((a, b) => _values[a] > _values[b] ? a : b)];
+
+        for (var m in _values)
+        {
+            var _value = _max != 0? _values[m]/Math.abs(_max) : 0
+            var hex = rgbToHex((1 - Math.abs(_value)) * 255);
+            output += `%0A${m}`;
+            if (_value > 0)
+                output += '%09%23ff' + hex + hex;
+            else if (_value < 0)
+                output += '%09%23' + hex + hex + 'ff';
+            else output += '%09%23ffffff';
+        };
+    }   
+
+    return output;
 }
 
 $(document).on('change', '.gv_clickCBinTable',function () {
@@ -773,15 +722,21 @@ async function getConsequences()
         for(var v in _elements[m])
         {                    
             var last = !--iterations;
-            variant_promises.push(getConsequencesFromVariant(v, Array.from(_elements[m][v])).then(r => 
-                {
-                    variant_results = variant_results.concat(r)
-                }).finally(r => {     
-                    updateProgress(count++, totallength, "gv_getConsequences", "  for sample " + (parseFloat(sample) + 1) + "/" + globals.variant.samples.length)
-            }));
+            count++;
+            for(var alt of globals.variant.variants[v].ALT)
+            {
+                variant_promises.push(getConsequencesFromVariant(v, Array.from(_elements[m][v]), alt).then(r => 
+                    {
+                        variant_results = variant_results.concat(r)
+                    }).finally(r => {    
+
+                        updateProgress(count, totallength, "gv_getConsequences", "  for sample " + (parseFloat(sample) + 1) + "/" + globals.variant.samples.length)
+                }));
+            }
+
 
             
-            if (last || variant_promises.length >= 20)
+            if (last || variant_promises.length >= 15)
             {
                 await Promise.allSettled(variant_promises).catch(e => {
                     console.log(e);
@@ -793,13 +748,12 @@ async function getConsequences()
 
         return variant_results;
             
-        function getConsequencesFromVariant(v, tIDs)
+        function getConsequencesFromVariant(v, tIDs, alt)
         {
             return new Promise((resolve, reject) => {
 
                 var variant = globals.variant.variants[v]
                 var p = variant["POS"]
-                var a = variant["ALT"]
                 var r = variant["REF"]
                 var c = variant["CHROM"]
                 var _result = []
@@ -820,7 +774,7 @@ async function getConsequences()
                     {
                         var client = new XMLHttpRequest();
 
-                        client.open('GET', `https://${$('#gv_genomeselect').val() == "hg19"? "grch37.":""}rest.ensembl.org/vep/human/region/${c.toLowerCase().replace("chr", "")}:${p}:${p}/${a}?`);
+                        client.open('GET', `https://${$('#gv_genomeselect').val() == "hg19"? "grch37.":""}rest.ensembl.org/vep/human/region/${c.toLowerCase().replace("chr", "")}:${p}:${p + r.length - 1}/${alt}?`);
                         client.setRequestHeader("Content-Type", "application/json")
                         client.onreadystatechange = function() {
                             if (this.readyState == 4)
@@ -878,16 +832,16 @@ async function getConsequences()
                                                 {
                                                     if(response.colocated_variants[_variant].hasOwnProperty("frequencies"))
                                                     {
-                                                        if(response.colocated_variants[_variant].frequencies.hasOwnProperty(a))
+                                                        if(response.colocated_variants[_variant].frequencies.hasOwnProperty(alt))
                                                         {
-                                                            if(response.colocated_variants[_variant].frequencies[a].hasOwnProperty("gnomad"))
+                                                            if(response.colocated_variants[_variant].frequencies[alt].hasOwnProperty("gnomad"))
                                                             {    
-                                                                if(response.colocated_variants[_variant].frequencies[a].gnomad >= frequency_th)
+                                                                if(response.colocated_variants[_variant].frequencies[alt].gnomad >= frequency_th)
                                                                 {
                                                                     breakflag = true;
                                                                 }
                                                             
-                                                                _temp["frequency"] = response.colocated_variants[_variant].frequencies[a].gnomad
+                                                                _temp["frequency"] = response.colocated_variants[_variant].frequencies[alt].gnomad
                                                             }
                                                         }
                                                     }
@@ -955,6 +909,8 @@ function set_cons_table()
             {
                 break_flag = false;
             }
+
+            globals.variant.mutation_results[m][sample]["impact_value"] = impact
             globals.variant.mutation_results[m][sample]["impact"] = globals.variant.impacts[impact];
             globals.variant.mutation_results[m][sample]["consequences"] = Array.from(consequences);
 
@@ -1001,6 +957,8 @@ function set_cons_table()
     }).columns.adjust().draw();
     
     highlightSelected(_elementnames);
+
+    update_importVariantTable();
 }
 
 async function gv_createTable() 
@@ -1082,7 +1040,7 @@ async function gv_createTable()
         "order": [[ 1, "asc" ]], 
         "scrollX": true,
         "autoWidth": true
-    }).columns.adjust();
+    })
 
 
     globals.variant.gv_table.columns.adjust().draw();
