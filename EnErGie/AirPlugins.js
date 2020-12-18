@@ -131,7 +131,7 @@ async function initMainPageStructure() {
     globalURL = query;
   }
 
-  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js"];
+  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : globalURL;
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
@@ -183,6 +183,9 @@ async function initMainPageStructure() {
         <li class="air_nav_item nav-item" style="width: 25%;">
             <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
         </li>
+        <li class="air_nav_item nav-item" style="width: 25%;">
+            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
+        </li>
     </ul>
     <div class="tab-content" id="air_tab">
         <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
@@ -190,6 +193,8 @@ async function initMainPageStructure() {
         <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
         </div>
         <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+        </div>
+        <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
         </div>
     </div>
 
@@ -228,6 +233,9 @@ async function initMainPageStructure() {
         });
         $.getScript(ScriptPaths[3]).done(function () {
           AirGenvar();
+        });
+        $.getScript(ScriptPaths[4]).done(function () {
+          AirMassSpec();
         });
       }, 0);
     });
