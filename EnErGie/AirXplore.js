@@ -191,10 +191,13 @@ function getExportPanel()
         var phenotypeSelect = document.getElementById('xp_select_export_phenotype');
 
         i = 0;
-        AIR.centralityheader.forEach(p => {
+        for (let phenotype in AIR.Phenotypes)
+        {
+            var p = AIR.Phenotypes[phenotype].name;
+    
             phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
             i++;
-        });
+        };
 
 
         $('#xp_btn_download_gmt').on('click', function() {
@@ -1261,13 +1264,15 @@ function getCentralityPanel() {
 
 
         i = 0;
-        AIR.centralityheader.forEach(p => {
-
+        for (let phenotype in AIR.Phenotypes)
+        {
+            var p = AIR.Phenotypes[phenotype].name;
+    
             phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
             xphenotypeSelect.options[xphenotypeSelect.options.length] = new Option(p, i); 
             yphenotypeSelect.options[yphenotypeSelect.options.length] = new Option(p, i); 
             i++;
-        });
+        };
 
         i = 0;
         centralities.forEach(p => {
@@ -1277,10 +1282,10 @@ function getCentralityPanel() {
             i++;
         });
         
-        createCentralityTable(phenotypeSelect.options[0].text);
+        createCentralityTable(AIR.ElementNames.name[phenotypeSelect.options[0].text]);
 
         $('#xp_select_centrality_phenotype').on('change', function() {
-            createCentralityTable(phenotypeSelect.options[phenotypeSelect.selectedIndex].text);
+            createCentralityTable(AIR.ElementNames.name[phenotypeSelect.options[phenotypeSelect.selectedIndex].text]);
         });
         
         var outputCanvas = document.getElementById('xp_chart_centrality').getContext('2d');
@@ -1760,7 +1765,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 for(let inter in AIR.Interactions)
                 {
-                    let {source:_source, target:_target, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+                    let {source:_source, target:_target, typestring:_typestring, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
 
                     if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
@@ -1801,7 +1806,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         }
                         else if(_type == 0)
                         {
-                            typehtml = "unknown";
+                            typehtml = _typestring;
                         }
                         
 
@@ -1848,7 +1853,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         }
                         else if(_type == 0)
                         {
-                            typehtml = "unknown";
+                            typehtml = _typestring;
                         }                                 
                         
                         result_row.push(_targettype);
@@ -2217,7 +2222,7 @@ function createCentralityTable(phenotype) {
                 {
                     hasvalue = true;
                 }
-                result_row.push(value);
+                result_row.push(expo(value));
             }
             else
             {

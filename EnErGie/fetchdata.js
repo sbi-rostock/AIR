@@ -164,14 +164,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                     console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
                                                     t0 = performance.now();
                                                     readServerValues().then(r => {
-                                                        t1 = performance.now()
-                                                        console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
+                                                        t1 = performance.now();
+                                                        console.log("Reading Server values took " + (t1 - t0) + " milliseconds.");
                                                         t0 = performance.now();
-                                                        let promises = [];
-                                                        centralities.forEach(c => {
-                                                            promises.push(openCentrality(c));
-                                                        });
-                                                        Promise.allSettled(promises).then(r => {
+                                                        readCentralityValues().then(r => {
                                                             t1 = performance.now()
                                                             console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
                                                             resolve(AIR);
@@ -191,17 +187,23 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                 reject(AIR);
                             }
                         });
-                        function openCentrality(centrality)
+                        function readCentralityValues(centrality)
                         {
                             return new Promise((resolve, reject) => {
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                    url: fileURL + centrality.toLowerCase() + ".txt", 
-                                    success: function (info) {
-                                        readCentrality(info, centrality).then(s => resolve('')).catch(e => {
-                                            console.log(e);
-                                            reject(e);
-                                        })
+                                    url: fileURL + "Centrality.json", 
+                                    success: function (content) {
+                                        
+                                        if(filetesting)
+                                        {
+                                            AIR.Centrality = content;
+                                        }
+                                        else
+                                        {
+                                            AIR.Centrality = JSON.parse(content);
+                                        }
+                                        resolve('');
                                     },
                                     error: function () {
                                         reject(e);
