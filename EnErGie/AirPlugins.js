@@ -9,10 +9,11 @@ let VCF = require('@gmod/vcf');
 
 let ttest = require('ttest');
 
-let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/PlugIns/";
-let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/DataFiles/";
+let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/";
+let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/";
+
 let localURL = "http://localhost:3000/PlugIns/";
-const pluginName = 'AirPlugins';
+const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = false;
