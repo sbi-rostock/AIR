@@ -283,7 +283,7 @@ function initMainPageStructure() {
                     <div class="wrapper">
                         <button type="button" class="ol_info-btn btn btn-secondary"
                                 data-html="true" data-toggle="popover" data-placement="top" title="Overlays"
-                                data-content="If checked, overlays with same name will be ">
+                                data-content="If checked, overlays with the same name will be overwritten.">
                             ?
                         </button>
                     </div>
