@@ -83,7 +83,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
         minerva.ServerConnector.getLoggedUser().then(function (user) {
             globals.user = user._login.toString().toLowerCase();
             if (globals.defaultusers.includes(globals.user) === true) {
-                alert('Waning: You can reate overlays only after sing-in');
+                alert('Warning: you can create overlays only after logging into your account.');
             }
             if (globals.guestuser.includes(globals.user) === true) {
                 alert("Warning: You're logged in through a public account. Overlays you create may be visible to other users if not removed.");

@@ -153,11 +153,11 @@ function initMainPageStructure() {
     globals.user = user._login.toString().toLowerCase();
 
     if (globals.defaultusers.includes(globals.user) === true) {
-      alert('Waning: You can reate overlays only after sing-in');
+      alert('Warning: you can create overlays only after logging into your account.');
     }
 
     if (globals.guestuser.includes(globals.user) === true) {
-      alert("Warning: You're logged in through a public account. Overlays you create are visible to other users if not removed.");
+      alert("Warning: You're logged in through a public account. Overlays you create will be visible to other users.");
     }
 
     minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
