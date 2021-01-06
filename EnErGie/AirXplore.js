@@ -586,10 +586,12 @@ async function getPhenotypePanel()
             {
                 if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
                 {
-                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
-
-                    if(!_data.hasOwnProperty(m))
+                    for(var m of AIR.ElementNames.name[element.toLowerCase().trim()])
+                    {
+                        if(!_data.hasOwnProperty(m))
                         _data[m] = 0;
+                    }
+
                 }
             }
 
@@ -1492,7 +1494,14 @@ function xp_searchListener(entites) {
     if (globals.xplore.selected.length > 0) { 
         if(globals.xplore.selected[0].constructor.name === 'Alias')
         {
-            xp_setSelectedElement(globals.xplore.selected[0].name);
+            if(globals.xplore.selected[0]._compartmentId)
+            {
+                xp_setSelectedElement(globals.xplore.selected[0].name + "_" + AIR.Compartments[globals.xplore.selected[0]._compartmentId]);
+            }
+            else
+            {
+                xp_setSelectedElement(globals.xplore.selected[0].name + "_secreted");
+            }
         }
     }
 }
@@ -1765,13 +1774,13 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 for(let inter in AIR.Interactions)
                 {
-                    let {source:_source, target:_target, typestring:_typestring, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
+                    let {source:_source, target:_target, typeString:_typestring, type:_type, pubmed:_pubmed} = AIR.Interactions[inter];
 
                     if(AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false)
                     {
                         continue;
                     }
-                    if(_target == elementid)
+                    if(_target == elementid || AIR.Molecules[_target].subunits.includes(elementid))
                     {
                         let {subtype: _sourcetype, name:_sourcename, ids:_sourceids} = AIR.Molecules[_source];
                         let typevalue = $("#xp_select_interaction_type").val();
@@ -1837,7 +1846,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         globals.xplore.regulationtable.row.add(result_row)
                     }
 
-                    if(_source == elementid && onlyRegulators === false)
+                    if((_source == elementid || AIR.Molecules[_source].subunits.includes(elementid))&& onlyRegulators === false)
                     {
 
                         let {type: _targettype, name:_targetname, ids:_targetids} = AIR.Molecules[_target];
