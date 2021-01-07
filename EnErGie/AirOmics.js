@@ -1840,59 +1840,58 @@ async function om_loadfile(imported) {
 
                     if(AIR.ElementNames[globals.omics.selectedmapping].hasOwnProperty(probeid))
                     {
-                        let molecule_id = AIR.ElementNames[globals.omics.selectedmapping][probeid];
-
-                        
-
-                        if (!_tempdata.hasOwnProperty(molecule_id))
+                        for(let molecule_id of AIR.ElementNames[globals.omics.selectedmapping][probeid])
                         {
-                            _tempdata[molecule_id] = {}
-                        }
-                        let even_count = 1;
-                        let samplename = "";
-                        let sampleid = 0;
-                        for(let i = 0; i < entries.length; i++)
-                        {
-                            if(i === headerid)
+                            if (!_tempdata.hasOwnProperty(molecule_id))
                             {
-                                continue;
+                                _tempdata[molecule_id] = {}
                             }
-
-                            var number = parseFloat(entries[i].replace(",", ".").trim());
-
-                            if(even_count%2 != 0 || globals.omics.pvalue == false)
+                            let even_count = 1;
+                            let samplename = "";
+                            let sampleid = 0;
+                            for(let i = 0; i < entries.length; i++)
                             {
-                                samplename = globals.omics.columnheaders[i];
-                                sampleid = globals.omics.samples.indexOf(samplename, 0);
-
-                                if(!_tempdata[molecule_id].hasOwnProperty(sampleid))
+                                if(i === headerid)
                                 {
-                                    _tempdata[molecule_id][sampleid] = {}
-                                    _tempdata[molecule_id][sampleid]["values"] = []
-                                    _tempdata[molecule_id][sampleid]["pvalues"] = []
+                                    continue;
                                 }
-                                _tempdata[molecule_id][sampleid]["values"].push(number)
-                            }
-                            if(even_count%2 == 0 && globals.omics.pvalue == true)
-                            {
-                                _tempdata[molecule_id][sampleid]["pvalues"].push(number)
-                            }
-                            
-                            if(isNaN(number))
-                            {
-                                var numbererror = "Some values could not be read as numbers."
-                                if(resolvemessage.includes(numbererror) === false)
+
+                                var number = parseFloat(entries[i].replace(",", ".").trim());
+
+                                if(even_count%2 != 0 || globals.omics.pvalue == false)
                                 {
-                                    if(resolvemessage != "")
+                                    samplename = globals.omics.columnheaders[i];
+                                    sampleid = globals.omics.samples.indexOf(samplename, 0);
+
+                                    if(!_tempdata[molecule_id].hasOwnProperty(sampleid))
                                     {
-                                        resolvemessage += "\n";
+                                        _tempdata[molecule_id][sampleid] = {}
+                                        _tempdata[molecule_id][sampleid]["values"] = []
+                                        _tempdata[molecule_id][sampleid]["pvalues"] = []
                                     }
-                                    resolvemessage += numbererror
+                                    _tempdata[molecule_id][sampleid]["values"].push(number)
                                 }
-                            }
+                                if(even_count%2 == 0 && globals.omics.pvalue == true)
+                                {
+                                    _tempdata[molecule_id][sampleid]["pvalues"].push(number)
+                                }
+                                
+                                if(isNaN(number))
+                                {
+                                    var numbererror = "Some values could not be read as numbers."
+                                    if(resolvemessage.includes(numbererror) === false)
+                                    {
+                                        if(resolvemessage != "")
+                                        {
+                                            resolvemessage += "\n";
+                                        }
+                                        resolvemessage += numbererror
+                                    }
+                                }
 
-                            even_count++;
-                        }  
+                                even_count++;
+                            }  
+                        }
                     } 
                 }
 
@@ -3234,8 +3233,8 @@ function importMassSpec() {
                 {
                     if(AIR.ElementNames["name"].hasOwnProperty(m.toLocaleLowerCase()) && (!globals.massspec.results[m].pvalue || globals.massspec.results[m].pvalue < pvalue_threshold))
                     {
-                        let molecule_id = AIR.ElementNames["name"][m.toLocaleLowerCase()];
-                        globals.omics.import_data[sample][molecule_id] = globals.massspec.results[m].fc;
+                        for(let molecule_id of AIR.ElementNames["name"][m.toLocaleLowerCase()])
+                            globals.omics.import_data[sample][molecule_id] = globals.massspec.results[m].fc;
                     }
                 }
             }

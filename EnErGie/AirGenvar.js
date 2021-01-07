@@ -530,9 +530,12 @@ async function AirGenvar(){
                 
                 if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
                 {
-                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
-                    _idset.add(m)
-                    globals.variant.selected_elements.add(AIR.Molecules[m].name)
+                    for(var m of AIR.ElementNames.name[element.toLowerCase().trim()])
+                    {
+                        _idset.add(m)
+                        globals.variant.selected_elements.add(AIR.Molecules[m].name)
+                    }
+
                 }
                 else 
                 {
@@ -668,7 +671,8 @@ async function getConsequences()
             var e = _e.trim().toLowerCase();
             if(AIR.ElementNames.name.hasOwnProperty(e))
             {
-                _elementids.add(AIR.ElementNames.name[e])
+                for(let m of AIR.ElementNames.name[e])
+                    _elementids.add(m)
             }
         });
     }

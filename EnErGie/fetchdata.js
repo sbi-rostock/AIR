@@ -37,6 +37,7 @@ const AIR = {
     MapSpeciesLowerCase: [],
     allBioEntities: [],
     MapElements: {},
+    Compartments: {},
 }
 
 const globals = {
@@ -132,14 +133,31 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         console.log("Call to getAllBioEntities took " + (t1 - t0) + " milliseconds.")
 
                         AIR.allBioEntities = bioEntities;
-                        bioEntities.forEach(e => {
+                        for(let e of bioEntities)
+                        {
+                            if(e._type == "Compartment")
+                            {
+                                AIR.Compartments[e.id] = e.name.trim().toLowerCase().replace(" ", "");
+                            }
+                        };
+                        for(let e of bioEntities)
+                        {
                             if (e.constructor.name === 'Alias') {
-                                let namelower = e.getName().toLowerCase();
+                                let name = e.getName();
+                                if(e._compartmentId)
+                                {
+                                    name += "_" + AIR.Compartments[e._compartmentId];
+                                }
+                                else
+                                {
+                                    name += "_secreted";
+                                }
+                                let namelower = name.toLowerCase();
                                 AIR.MapSpeciesLowerCase.push(namelower);
-                                AIR.MapSpecies.push(e.getName());
+                                AIR.MapSpecies.push(name);                                
                                 AIR.MapElements[namelower] = e;
                             }
-                        });
+                        };
 
                         let typevalue = $('.selectdata').val();
                         //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
@@ -281,7 +299,9 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                             let db_key = id.replace('.','');
                                             if(AIR.ElementNames.hasOwnProperty(db_key))
                                             {
-                                                AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = element
+                                                if(!AIR.ElementNames[db_key].hasOwnProperty(AIR.Molecules[element].ids[id]))
+                                                    AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = [];
+                                                AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]].push(element)
                                             }
                                         }
                                     }
