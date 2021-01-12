@@ -1944,7 +1944,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                 if(elementid == null || isProtein(elementid))
                 {
 
-                    let uniportID = await getUniprotID(elementname);
+                    let uniportID = await getUniprotID(elementid == null? elementname : AIR.Molecules[elementid].ids.name);
 
                     if(uniportID != "")
                     {
