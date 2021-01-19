@@ -1092,7 +1092,9 @@ async function om_createTable() {
     // Get the modal
 
     let modal = document.getElementById("om_table_modal");
-
+    $('#om_table_modal').on('shown.bs.modal', function (e) {
+        $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+    });
     // Get the <span> element that closes the modal
     let span = document.getElementById("om_img_close");
     // When the user clicks on <span> (x), close the modal
@@ -1100,7 +1102,7 @@ async function om_createTable() {
         $('#om_resultstable_container').prepend($('#om_resultstable_wrapper'))
         $('#om_resultstable_wrapper').css("background-color", "transparent");
         modal.style.display = "none";
-        globals.omics.resultsTable.columns.adjust().draw(false);
+        $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
     }
 
     $('#om_showoverlaybtn').on('click', async function() {
@@ -1148,14 +1150,14 @@ async function om_createTable() {
             </div>`);
 
             // Get the modal
-            var modal = document.getElementById("om_om_resultsimg-modal");
+            var image_modal = document.getElementById("om_om_resultsimg-modal");
     
             // Get the image and insert it inside the modal - use its "alt" text as a caption
             var img = document.getElementById("om_resultsimg");
             var modalImg = document.getElementById("om_img");
             var captionText = document.getElementById("om_img-caption");
             img.onclick = function(){
-                modal.style.display = "block";
+                image_modal.style.display = "block";
                 modalImg.src = this.src;
                 captionText.innerHTML = this.alt;
             }
@@ -1165,7 +1167,7 @@ async function om_createTable() {
     
             // When the user clicks on <span> (x), close the modal
             span.onclick = function() {
-                modal.style.display = "none";
+                image_modal.style.display = "none";
             }
             
         }).catch(error => alert(error)).finally(r => {
@@ -1351,6 +1353,8 @@ async function om_PhenotypeSP() {
     let randomSamples = {};
     var _text = await disablebutton("om_pheno_analyzebtn" ,progress = true);
 
+    let considered_elements = new Set()
+
     let phenotype_elementvalues = {};
     let pvalue_threshold = 1;
 
@@ -1498,6 +1502,8 @@ async function om_PhenotypeSP() {
                     continue;
                 }
 
+                considered_elements.add(element);
+
                 let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
 
                 if(isNaN(FC) || FC === 0)
@@ -1549,9 +1555,7 @@ async function om_PhenotypeSP() {
 
             //let _pvalue = await statisticalAnalysis(phenotype, accuracy, sample);
 
-            let _pvalue = ttest(negative_influences, positive_influences).pValue()
-
-            AIR.Phenotypes[phenotype].pvalue[sample] = _pvalue;
+            AIR.Phenotypes[phenotype].pvalue[sample] = ttest(negative_influences, positive_influences).pValue();
 
 
             if (Math.abs(activity) > max)
@@ -1579,7 +1583,16 @@ async function om_PhenotypeSP() {
             AIR.Phenotypes[phenotype].accuracy = accuracyavg / accuracymax;
         }
     }
-
+5
+    if ( !$( "#om_pheno_mapped_elements" ).length ) {
+    
+        $( `<p id="om_pheno_mapped_elements">${considered_elements.size} elements were considered.<p>`).insertAfter($( "#om_pheno_analyzebtn" ));
+    
+    }
+    else
+    {
+        $( "#om_pheno_mapped_elements" ).replaceWith(`<p id="om_pheno_mapped_elements">${considered_elements.size} elements were considered.<p>`);
+    }
 
     await om_normalizePhenotypeValues().then(async function (pv) {
              
