@@ -336,17 +336,6 @@ async function AirOmics(){
 
             <hr>
 
-            <button type="button" id="om_pheno_analyzebtn" class="air_btn btn btn-block mt-2">Estimate Phenotype Levels</button>
-
-        </div>
-
-        <div id="om_pheno_resultscontainer"></div>
-    </div>
-    `
-    ).appendTo('#om_tab');
-
-    /*
-    
             <div id="om_pheno_randomsampleNumber-container" class="row mb-4">
                 <div class="col-auto">
                     <div class="wrapper">
@@ -364,7 +353,22 @@ async function AirOmics(){
                     <input type="text" class="textfield" value="1000" id="om_pheno_randomsampleNumber" onkeypress="return isNumber(event)" />
                 </div>
             </div>
-    */
+
+            <hr>
+
+            <button type="button" id="om_pheno_analyzebtn" class="air_btn btn btn-block mt-2">Estimate Phenotype Levels</button>
+
+        </div>
+
+        <div id="om_pheno_resultscontainer"></div>
+    </div>
+    `
+    ).appendTo('#om_tab');
+
+    
+    
+
+    
     globals.omics.targettab = $(`<div class="tab-pane air_sub_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
         <div class="air_alert alert alert-warning mb-4">
             <span>This requires much more computationally intensive calculations that need to fetch a larger amount of data. The calculation speed mainly depends on your internet bandwidth.<br/>We also recommend having at least 1 GB of RAM available.</span>
@@ -1294,6 +1298,11 @@ async function om_createTable() {
         ci.update();
     }) */
 
+    var popupheight = $("#om_chart_popover").height() + 50;
+    $("#om_resultstable").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400? 400 : popupheight) + "px",
+    });
+   
     globals.omics.resultsTable = $('#om_resultstable').DataTable({
         "order": [[ globals.omics.samples.length + 2, "asc" ]],  
         "scrollX": true,
@@ -1368,7 +1377,7 @@ async function om_PhenotypeSP() {
         }
     }
 
-     /*
+     
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if(isNaN(globals.omics.numberOfRandomSamples))
     {
@@ -1376,6 +1385,7 @@ async function om_PhenotypeSP() {
         globals.omics.numberOfRandomSamples = 1000;
     }
 
+    /*
     async function statisticalAnalysis(phenotype, score, sample)
     { 
         return new Promise((resolve, reject) => {                
@@ -1475,12 +1485,12 @@ async function om_PhenotypeSP() {
             var positive_influences = [];
 
             AIR.Phenotypes[phenotype].GeneNumber[sample] = 0;
+
+            var elements_with_FC = [];
+            var SP_Values = [];
+
             for (let element in AIR.Phenotypes[phenotype].values) {
 
-                if(!globals.omics.ExpressionValues.hasOwnProperty(element))
-                {
-                    continue;
-                }
 
                 let SP = parseFloat(AIR.Phenotypes[phenotype].values[element]);
 
@@ -1490,6 +1500,12 @@ async function om_PhenotypeSP() {
                     continue;
                 }
 
+                SP_Values.push(SP)
+
+                if(!globals.omics.ExpressionValues.hasOwnProperty(element))
+                {
+                    continue;
+                }
                 let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
 
                 if(isNaN(pvalue))
@@ -1515,7 +1531,7 @@ async function om_PhenotypeSP() {
                     FC = Math.abs(FC);
                     SP = Math.abs(SP);
                 }
-
+                elements_with_FC.push(FC)
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
                 {
@@ -1528,14 +1544,18 @@ async function om_PhenotypeSP() {
 
                 activity += weightedInfluence;
 
-                if(weightedInfluence < 0)
+                if(Math.abs(SP) > 0.05)
                 {
-                    negative_influences.push(Math.abs(weightedInfluence));
+                    if(weightedInfluence < 0)
+                    {
+                        negative_influences.push(Math.abs(weightedInfluence));
+                    }
+                    else if(weightedInfluence > 0)
+                    {
+                        positive_influences.push(weightedInfluence);
+                    }
                 }
-                else if(weightedInfluence > 0)
-                {
-                    positive_influences.push(weightedInfluence);
-                }
+
 
                 accuracy += Math.abs(SP);
                 AIR.Phenotypes[phenotype].GeneNumber[sample] += 1;
@@ -1553,9 +1573,9 @@ async function om_PhenotypeSP() {
                 }
             }
 
-            //let _pvalue = await statisticalAnalysis(phenotype, accuracy, sample);
+            //let _pvalue = ttest(negative_influences, positive_influences).pValue();
 
-            AIR.Phenotypes[phenotype].pvalue[sample] = ttest(negative_influences, positive_influences).pValue();
+            
 
 
             if (Math.abs(activity) > max)
@@ -1563,8 +1583,24 @@ async function om_PhenotypeSP() {
 
             AIR.Phenotypes[phenotype].results[sample] = activity;
 
-            
-            
+            let numberOfHigherScores = 0;
+
+            for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
+            {
+                SP_Values = shuffle(SP_Values);
+                let pseudo_activity = 0;
+
+                for(let _id in elements_with_FC)
+                {
+                    pseudo_activity += elements_with_FC[_id] * SP_Values[_id]
+                }
+                if(Math.abs(pseudo_activity) > Math.abs(activity))
+                {
+                    numberOfHigherScores ++;
+                }
+
+            }
+            AIR.Phenotypes[phenotype].pvalue[sample] = numberOfHigherScores / globals.omics.numberOfRandomSamples;
             accuracyvalues.push(accuracy);
         }
 
@@ -1872,6 +1908,20 @@ async function om_loadfile(imported) {
                             }
 
                             var number = parseFloat(entries[i].replace(",", ".").trim());
+                            
+                            if(isNaN(number))
+                            {
+                                number = 0;
+                                var numbererror = "Some values could not be read as numbers."
+                                if(resolvemessage.includes(numbererror) === false)
+                                {
+                                    if(resolvemessage != "")
+                                    {
+                                        resolvemessage += "\n";
+                                    }
+                                    resolvemessage += numbererror
+                                }
+                            }
 
                             if(even_count%2 != 0 || globals.omics.pvalue == false)
                             {
@@ -1884,24 +1934,11 @@ async function om_loadfile(imported) {
                                     _tempdata[molecule_id][sampleid]["values"] = []
                                     _tempdata[molecule_id][sampleid]["pvalues"] = []
                                 }
-                                _tempdata[molecule_id][sampleid]["values"].push(number)
+                                _tempdata[molecule_id][sampleid]["values"].push(number?? 0)
                             }
                             if(even_count%2 == 0 && globals.omics.pvalue == true)
                             {
                                 _tempdata[molecule_id][sampleid]["pvalues"].push(number)
-                            }
-                            
-                            if(isNaN(number))
-                            {
-                                var numbererror = "Some values could not be read as numbers."
-                                if(resolvemessage.includes(numbererror) === false)
-                                {
-                                    if(resolvemessage != "")
-                                    {
-                                        resolvemessage += "\n";
-                                    }
-                                    resolvemessage += numbererror
-                                }
                             }
 
                             even_count++;
@@ -2955,6 +2992,9 @@ function om_createpopup(button, parameter) {
         if($target.siblings().is($btn))
         {
             $target.remove();
+            $("#om_resultstable").parents(".dataTables_scrollBody").css({
+                minHeight: "0px",
+            });
             return;
         }   
         $target.remove();
@@ -3143,6 +3183,11 @@ function om_createpopup(button, parameter) {
             }
     };
     $target.show();
+
+    var popupheight = $("#om_chart_popover").height() + 50;
+    $("#om_resultstable").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400? 400 : popupheight) + "px",
+    });
 };
 
 function randomIDs(size, max, n){
