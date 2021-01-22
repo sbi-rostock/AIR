@@ -1322,14 +1322,14 @@ async function om_createTable() {
                     $('#om_resultstable_container').prepend($('#om_resultstable_wrapper'))
                     $('#om_resultstable_wrapper').css("background-color", "transparent");
                     modal.style.display = "none";
-                    globals.omics.resultsTable.columns.adjust().draw(false);
+                    globals.omics.resultsTable.columns.adjust()
                 }
                 else{
                     modal.style.display = "block";
                     $('#om_table_modal_content').prepend($('#om_resultstable_wrapper'))
                     $('#om_resultstable_wrapper').css("background-color", "white");
                     $('#om_table_modal_content').css("width", "100%");
-                    globals.omics.resultsTable.columns.adjust().draw(false);
+                    globals.omics.resultsTable.columns.adjust()
                 }
             });        
         }
