@@ -205,6 +205,8 @@
 .air_tab {
   color: #337ab7;
   font-weight: bold;
+  border-bottom: 1px solid darkgray !important;
+  height: 100%;
 }
 
 .btn-group {
@@ -294,9 +296,6 @@ input[type=checkbox] .cbcontainer {
   margin-bottom: 5px;
 }
 
-.air_tab {
-  border-bottom: 1px solid darkgray !important;
-}
 .air_nav_tabs, .air_tab {
     border: 0px solid transparent;
     border-top-left-radius: 1rem !important;

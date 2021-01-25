@@ -353,6 +353,17 @@ async function getPhenotypePanel()
         return new Promise((resolve, reject) => {
             globals.xplore.pe_results_table.clear()
 
+            let elementsToHighlight = {};
+            let elementswithFC = 0
+            for(let e in globals.xplore.pe_data[globals.xplore.pe_data_index])
+            {
+                let FC = globals.xplore.pe_data[globals.xplore.pe_data_index][e]
+                if (FC != 0)
+                {
+                    elementswithFC++;
+                    elementsToHighlight[AIR.Molecules[e].name] = valueToHex(FC);
+                }
+            }  
             for(let p in AIR.Phenotypes)
             {       
                 let max_influence = 0;
@@ -375,14 +386,21 @@ async function getPhenotypePanel()
                         }
                     }
                 }
+                if(level != 0)
+                {
+                    elementsToHighlight[AIR.Molecules[p].name] = valueToHex(level/elementswithFC);
+                }
+
                 globals.xplore.pe_results_table.row.add([
                     getLinkIconHTML(AIR.Phenotypes[p].name),
                     getFontfromValue(expo(level)),
                     expo((influence/max_influence)*100)
                 ])
-            }                  
+            }   
+             
             globals.xplore.pe_results_table.columns.adjust().draw();
             adjustPanels(globals.xplore.container);
+            ColorElements(elementsToHighlight);
             resolve()
         });
     }
@@ -407,7 +425,7 @@ async function getPhenotypePanel()
                 var slider = createSliderCell(row, 'td', e);
                 slider.setAttribute('id', 'ESlider' + e);
                 slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e]);
-                slider.oninput = function () {
+                slider.onchange = function () {
                     let value = this.value;
                     $("#ESliderValue" + e).html(getFontfromValue(parseFloat(value)));
                     globals.xplore.pe_data[globals.xplore.pe_data_index][e] = value;
@@ -438,8 +456,9 @@ async function getPhenotypePanel()
 
 
         <div class="mt-4">
-            <input type="text" style="width: 75%" class="textfield" id="xp_pe_element_input"/>
+            <input type="text" style="width: 55%" class="textfield" id="xp_pe_element_input"/>
             <button type="button" id="xp_pe_element_btn" style="width: 20%" class="air_btn btn mr-1">Add Elements</button>
+            <button type="button" id="xp_pe_selectedelement_btn" style="width: 20%" class="air_btn btn mr-1">Add Selected</button>
             <div class="btn-group btn-group-justified mt-4 mb-4">
                 <div class="btn-group">
                     <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
@@ -575,6 +594,43 @@ async function getPhenotypePanel()
             await setPeTable()
             await xp_EstimatePhenotypes();
         })
+        
+        $('#xp_pe_selectedelement_btn').on('click', async function() {
+
+            if (globals.xplore.selected.length > 0) { 
+                if(globals.xplore.selected[0].constructor.name === 'Alias')
+                {
+                    globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
+            
+                    let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
+
+                    let element = globals.xplore.selected[0].name
+                    if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
+                    {
+                        var m = AIR.ElementNames.name[element.toLowerCase().trim()];
+
+                        if(!_data.hasOwnProperty(m))
+                            _data[m] = 0;
+                    }
+
+                    if(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]) == JSON.stringify(_data))
+                    {
+                        return;
+                    }
+
+                    globals.xplore.pe_data.push(_data) 
+                    globals.xplore.pe_data_index += 1;
+
+                    $("#xp_import_redo").addClass("air_disabledbutton");
+                    $("#xp_import_undo").removeClass("air_disabledbutton");
+
+                    await setPeTable()
+                    await xp_EstimatePhenotypes();
+                    adjustPanels(globals.xplore.container);
+                }
+            }
+            
+        });
 
         $('#xp_pe_element_btn').on('click', async function() {
 
@@ -608,7 +664,7 @@ async function getPhenotypePanel()
             await xp_EstimatePhenotypes();
             adjustPanels(globals.xplore.container);
         });
-        
+
         $('#xp_pe_reset_btn').on('click', () => {
 
             let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));

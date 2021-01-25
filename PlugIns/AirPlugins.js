@@ -11,11 +11,11 @@ let ttest = require('ttest');
 
 let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/PlugIns/";
 let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/DataFiles/";
-let localURL = "http://localhost:3000/PlugIns/";
+let localURL = "http://localhost:3000/AirPlugIns/";
 const pluginName = 'AirPlugins';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
-let filetesting = false;
+let filetesting = true;
 let ScriptPaths = [];
 let CssFiles = [];
 let $ = window.$;
@@ -131,7 +131,7 @@ async function initMainPageStructure() {
     globalURL = query;
   }
 
-  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js"];
+  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : globalURL;
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
@@ -174,14 +174,17 @@ async function initMainPageStructure() {
   `
 
     <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-        <li class="air_nav_item nav-item"  style="width: 33.3%;">
+        <li class="air_nav_item nav-item"  style="width: 25%;">
             <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
         </li>
-        <li class="air_nav_item nav-item" style="width: 33.3%;">
+        <li class="air_nav_item nav-item" style="width: 25%;">
             <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
         </li>
-        <li class="air_nav_item nav-item" style="width: 33.3%;">
+        <li class="air_nav_item nav-item" style="width: 25%;">
             <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
+        </li>
+        <li class="air_nav_item nav-item" style="width: 25%;">
+            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
         </li>
     </ul>
     <div class="tab-content" id="air_tab">
@@ -190,6 +193,8 @@ async function initMainPageStructure() {
         <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
         </div>
         <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+        </div>
+        <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
         </div>
     </div>
 
@@ -228,6 +233,9 @@ async function initMainPageStructure() {
         });
         $.getScript(ScriptPaths[3]).done(function () {
           AirGenvar();
+        });
+        $.getScript(ScriptPaths[4]).done(function () {
+          AirMassSpec();
         });
       }, 0);
     });

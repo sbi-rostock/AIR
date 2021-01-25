@@ -164,10 +164,14 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                     console.log("Call to read Molecules took " + (t1 - t0) + " milliseconds.")
                                                     t0 = performance.now();
                                                     readServerValues().then(r => {
-                                                        t1 = performance.now();
-                                                        console.log("Reading Server values took " + (t1 - t0) + " milliseconds.");
+                                                        t1 = performance.now()
+                                                        console.log("Call to readServerValues took " + (t1 - t0) + " milliseconds.")
                                                         t0 = performance.now();
-                                                        readCentralityValues().then(r => {
+                                                        let promises = [];
+                                                        centralities.forEach(c => {
+                                                            promises.push(openCentrality(c));
+                                                        });
+                                                        Promise.allSettled(promises).then(r => {
                                                             t1 = performance.now()
                                                             console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
                                                             resolve(AIR);
@@ -187,23 +191,17 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                 reject(AIR);
                             }
                         });
-                        function readCentralityValues(centrality)
+                        function openCentrality(centrality)
                         {
                             return new Promise((resolve, reject) => {
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                    url: fileURL + "Centrality.json", 
-                                    success: function (content) {
-                                        
-                                        if(filetesting)
-                                        {
-                                            AIR.Centrality = content;
-                                        }
-                                        else
-                                        {
-                                            AIR.Centrality = JSON.parse(content);
-                                        }
-                                        resolve('');
+                                    url: fileURL + centrality.toLowerCase() + ".txt", 
+                                    success: function (info) {
+                                        readCentrality(info, centrality).then(s => resolve('')).catch(e => {
+                                            console.log(e);
+                                            reject(e);
+                                        })
                                     },
                                     error: function () {
                                         reject(e);
@@ -499,7 +497,37 @@ function getMoleculeData(key, phenotype = false)
 
 }
 
-function highlightSelected(elements, hideprevious = true) {
+function highlightSelected(_elements, hideprevious = true) {
+
+    let elements = _elements.map(v => v.toLowerCase());
+    minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
+
+        minervaProxy.project.map.hideBioEntity(hideprevious? highlighted : []).then(r => {
+
+            highlightDefs =[]
+            
+            AIR.allBioEntities.forEach(e => {
+                if (e.constructor.name === 'Alias' && elements.includes(e.getName().toLowerCase())) {
+                    highlightDefs.push({
+                        element: {
+                            id: e.id,
+                            modelId: e.getModelId(),
+                            type: "ALIAS"
+                        },
+                        type: "ICON"
+                    });
+                }
+            });
+
+            minervaProxy.project.map.showBioEntity(highlightDefs);
+        });
+    });
+}
+function ColorElements(_elements, hideprevious = true) {
+
+    let elements = Object.fromEntries(
+        Object.entries(_elements).map(([k, v]) => [k.toLowerCase(), v])
+      );
 
     minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
 
@@ -508,14 +536,18 @@ function highlightSelected(elements, hideprevious = true) {
             highlightDefs =[]
             
             AIR.allBioEntities.forEach(e => {
-                if (e.constructor.name === 'Alias' && elements.includes(e.getName())) {
+                if (e.constructor.name === 'Alias' && elements.hasOwnProperty(e.getName().toLowerCase())) {
                     highlightDefs.push({
                         element: {
                             id: e.id,
                             modelId: e.getModelId(),
                             type: "ALIAS"
                         },
-                        type: "ICON"
+                        type: "SURFACE",
+                        options: {
+                            color: elements[e.getName().toLowerCase()]
+                        }
+
                     });
                 }
             });
@@ -737,9 +769,9 @@ function createSliderCell(row, type, data) {
     var button = document.createElement('input'); // create text node
     button.setAttribute('type', 'range');
     button.setAttribute('value', '0');
-    button.setAttribute('min', '-2');
-    button.setAttribute('max', '2');
-    button.setAttribute('step', '0.1');
+    button.setAttribute('min', '-1');
+    button.setAttribute('max', '1');
+    button.setAttribute('step', '0.05');
     button.setAttribute('class', 'slider air_slider');
 
     var cell = document.createElement(type);
@@ -999,7 +1031,16 @@ function rgbToHex(rgb) {
     return hex;
 };
 
-function valueToHex(_value) {
+function valueToHex(_param) {
+    let _value = _param;
+    if (_value > 1)
+    {
+        _value = 1;
+    }
+    else if (_value < -1)
+    {
+        _value = -1
+    }
     var hex = rgbToHex((1 - Math.abs(_value)) * 255);
     if (_value > 0)
         return '#ff' + hex + hex;

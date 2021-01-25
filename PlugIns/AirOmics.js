@@ -29,7 +29,7 @@ async function AirOmics(){
         colors: ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F","#EDC948", "#B07AA1","#FF9DA7","#9C755F","#BAB0AC"],
         pickedcolors: [],
         resultsTable: undefined,
-
+        pvalue_threshold: 1,
         import_table: undefined,
         import_variant_table: undefined,
         import_massspec_table: undefined,
@@ -1365,15 +1365,15 @@ async function om_PhenotypeSP() {
     let considered_elements = new Set()
 
     let phenotype_elementvalues = {};
-    let pvalue_threshold = 1;
+    globals.omics.pvalue_threshold = 1;
 
     if(globals.omics.pvalue)
     {
-        pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
-        if(isNaN(pvalue_threshold))
+        globals.omics.pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
+        if(isNaN(globals.omics.pvalue_threshold))
         {
             alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 1.")
-            pvalue_threshold = 1;
+            globals.omics.pvalue_threshold = 1;
         }
     }
 
@@ -1513,7 +1513,7 @@ async function om_PhenotypeSP() {
                     pvalue = 1;
                 }
 
-                if(globals.omics.pvalue && pvalue >= pvalue_threshold)
+                if(globals.omics.pvalue && pvalue >= globals.omics.pvalue_threshold)
                 {
                     continue;
                 }
@@ -1909,22 +1909,23 @@ async function om_loadfile(imported) {
 
                             var number = parseFloat(entries[i].replace(",", ".").trim());
                             
-                            if(isNaN(number))
-                            {
-                                number = 0;
-                                var numbererror = "Some values could not be read as numbers."
-                                if(resolvemessage.includes(numbererror) === false)
-                                {
-                                    if(resolvemessage != "")
-                                    {
-                                        resolvemessage += "\n";
-                                    }
-                                    resolvemessage += numbererror
-                                }
-                            }
 
                             if(even_count%2 != 0 || globals.omics.pvalue == false)
                             {
+                                if(isNaN(number))
+                                {
+                                    number = 0;
+                                    var numbererror = "Some values could not be read as numbers and were set to 0."
+                                    if(resolvemessage.includes(numbererror) === false)
+                                    {
+                                        if(resolvemessage != "")
+                                        {
+                                            resolvemessage += "\n";
+                                        }
+                                        resolvemessage += numbererror
+                                    }
+                                }
+
                                 samplename = globals.omics.columnheaders[i];
                                 sampleid = globals.omics.samples.indexOf(samplename, 0);
 
@@ -1938,6 +1939,20 @@ async function om_loadfile(imported) {
                             }
                             if(even_count%2 == 0 && globals.omics.pvalue == true)
                             {
+                                if(isNaN(number))
+                                {
+                                    number = 1;
+                                    var numbererror = "Some p-values could not be read as numbers and were set to 1."
+                                    if(resolvemessage.includes(numbererror) === false)
+                                    {
+                                        if(resolvemessage != "")
+                                        {
+                                            resolvemessage += "\n";
+                                        }
+                                        resolvemessage += numbererror
+                                    }
+                                }
+
                                 _tempdata[molecule_id][sampleid]["pvalues"].push(number)
                             }
 
@@ -3047,9 +3062,14 @@ function om_createpopup(button, parameter) {
             FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
             if(globals.omics.pvalue)
             {
-                pValue = globals.omics.ExpressionValues[element].pvalues[sample];                    
+                pValue = globals.omics.ExpressionValues[element].pvalues[sample];   
                 if(isNaN(pValue))
                     pValue = 1;
+
+                if(pValue > globals.omics.pvalue_threshold)
+                {
+                    continue;
+                }
             }
 
             rad = 4
@@ -3090,7 +3110,7 @@ function om_createpopup(button, parameter) {
 
         targets.push(
             {
-                label: AIR.Molecules[element].name,
+                label: element,
                 data: [{
                     x: FC,
                     y: SP,
@@ -3157,15 +3177,20 @@ function om_createpopup(button, parameter) {
             tooltips: {
                 callbacks: {
                     label: function (tooltipItem, data) {
-                        var label = data.datasets[tooltipItem.datasetIndex].label || '';
+                        var element = data.datasets[tooltipItem.datasetIndex].label || '';
 
-                        if (label) {
-                            label += ': ';
+                        if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
+                        {                          
+                            return [
+                                'Name: ' + AIR.Molecules[element].name,
+                                'Influence: ' + expo(AIR.Phenotypes[phenotype].values[element],4,3),
+                                'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
+                                'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
+                            ];                     
                         }
-                        label += tooltipItem.xLabel;
-                        label += "; ";
-                        label += tooltipItem.yLabel;
-                        return label;
+                        else
+                            return "";
+                        
                     }
                 }
             }
@@ -3177,9 +3202,13 @@ function om_createpopup(button, parameter) {
     document.getElementById('om_popup_chart').onclick = function (evt) {
             var activePoint = popupchart.lastActive[0];
             if (activePoint !== undefined) {
-                let name = popupchart.data.datasets[activePoint._datasetIndex].label;
-                selectElementonMap(name, true);
-                xp_setSelectedElement(name);
+                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
+                if(_id && AIR.Molecules.hasOwnProperty(_id))
+                {
+                    let name = AIR.Molecules[_id].name;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
             }
     };
     $target.show();
