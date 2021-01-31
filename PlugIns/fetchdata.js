@@ -6,6 +6,11 @@ let FileSaver;
 let VCF;
 let ttest;
 
+Object.filter = (obj, predicate) => 
+    Object.keys(obj)
+          .filter( key => predicate(key) )
+          .reduce( (res, key) => (res[key] = obj[key], res), {} );
+
 const AIR = {
     HGNCElements: [],
     MoleculeData: {},
@@ -37,6 +42,7 @@ const AIR = {
     MapSpeciesLowerCase: [],
     allBioEntities: [],
     MapElements: {},
+    MapReactions: [],
 }
 
 const globals = {
@@ -142,6 +148,17 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                 AIR.MapSpecies.push(name);                                
                                 AIR.MapElements[namelower] = e;
                             }
+                            if (e.constructor.name === 'Reaction') {
+                                AIR.MapReactions.push({
+                                    "reactants": e._reactants.map(r => r._alias.name.toLowerCase()),
+                                    "products" : e._products.map(r => r._alias.name.toLowerCase()),
+                                    "modifiers" : e._modifiers.map(r => r._alias.name.toLowerCase()),
+                                    "id": e.id,
+                                    "modelId": e.getModelId()
+                                })
+
+                            }
+
                         };
 
                         let typevalue = $('.selectdata').val();
@@ -172,7 +189,16 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                         t0 = performance.now();
                                                         readCentralityValues().then(r => {
                                                             t1 = performance.now()
-                                                            console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
+                                                            console.log("Call to centralities took " + (t1 - t0) + " milliseconds.");
+                                                            
+                                                            $("#stat_spinner").before(`
+                                                            <div class="air_alert alert alert-info mt-2">
+                                                                <span>The AirPlugins are currently still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>     
+                                                            `)
                                                             resolve(AIR);
                                                         });
                                                     });
@@ -220,7 +246,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                 for (let p in AIR.Phenotypes) 
                                 {
                                     promises.push(
-                                        getMoleculeData(p, phenotype=true).then(
+                                        getMoleculeData(p, type="phenotype").then(
                                             data => {
                                                 let sum = 0;
                                                 if(data.hasOwnProperty("i"))
@@ -419,14 +445,17 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
 }
 
 
-function getValue(key)
+function getValue(key, replacecomma = true)
 {
     return new Promise(
        (resolve, reject) => {
             minervaProxy.pluginData.getGlobalParam(key).then(
                 response => {
                     let output = JSON.parse(response).value;
-                    output = replaceAll(output, ",", ".");
+                    if(replacecomma == true)
+                    {
+                        output = replaceAll(output, ",", ".");
+                    }
                     output = replaceAll(output, "y", '"},"');
                     output = replaceAll(output, "x", '":{"');
                     output = replaceAll(output, "z", '":"');
@@ -440,8 +469,11 @@ function getValue(key)
 
 }
 
-function getMoleculeData(key, phenotype = false)
+function getMoleculeData(_key, type = "molecule")
 {
+    let phenotype = (type == "molecule"? false : true);
+    let key = _key + (type == "path"? "_paths" : "");
+
     return new Promise(
        (resolve, reject) => {
             if(AIR.MoleculeData.hasOwnProperty(key))
@@ -456,7 +488,7 @@ function getMoleculeData(key, phenotype = false)
                 }
                 else
                 {
-                    getValue(key).then(response => {
+                    getValue(key, replacecomma = (type == "path"? false : true)).then(response => {
                         let data = {};
                         if(phenotype == false)
                         {
@@ -564,29 +596,27 @@ function ColorElements(_elements, hideprevious = true) {
         });
     });
 }
+function focus(entity) {
+    if (entity.constructor.name === 'Alias') {
+        minervaProxy.project.map.fitBounds({
+            modelId: entity.getModelId(),
+            x1: entity.getX(),
+            y1: entity.getY(),
+            x2: entity.getX() + entity.getWidth(),
+            y2: entity.getY() + entity.getHeight()
+        });
+    } else {
+        minervaProxy.project.map.fitBounds({
+            modelId: entity.getModelId(),
+            x1: entity.getCenter().x,
+            y1: entity.getCenter().y,
+            x2: entity.getCenter().x,
+            y2: entity.getCenter().y
+        });
+    }
+}
 
 function focusOnSelected() {
-
-    function focus(entity) {
-        if (entity.constructor.name === 'Alias') {
-            minervaProxy.project.map.fitBounds({
-                modelId: entity.getModelId(),
-                x1: entity.getX(),
-                y1: entity.getY(),
-                x2: entity.getX() + entity.getWidth(),
-                y2: entity.getY() + entity.getHeight()
-            });
-        } else {
-            minervaProxy.project.map.fitBounds({
-                modelId: entity.getModelId(),
-                x1: entity.getCenter().x,
-                y1: entity.getCenter().y,
-                x2: entity.getCenter().x,
-                y2: entity.getCenter().y
-            });
-        }
-    }
-
     if (globals.selected.length > 0) {
         minervaProxy.project.map.openMap({ id: globals.selected[0].getModelId() });
         focus(globals.selected[0]);
@@ -760,9 +790,10 @@ function createButtonCell(row, type, text, data, align) {
 
     return button; // append DIV to the table cell
 }
-function checkBoxCell(row, type, text, data, align, prefix) {
+function checkBoxCell(row, type, text, data, align, prefix, _checked = false) {
     var button = document.createElement('input'); // create text node
     button.innerHTML = text;
+    button.checked = _checked;
     button.setAttribute('type', 'checkbox');
     button.setAttribute('class', prefix + 'clickCBinTable');
     button.setAttribute('data', data);
@@ -791,7 +822,28 @@ function createSliderCell(row, type, data) {
 
     return button;
 }
+async function disablediv(id, progress = false) {
+    var promise = new Promise(function(resolve, reject) {
+        setTimeout(() => {
+            var $btn = $('#'+id);
+            $btn.addClass("air_spinner")
+            $btn.addClass("air_disabledbutton")
+            resolve()
+        }, 0);
+    });
+    return promise;
+}
 
+async function enablediv(id) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            var $btn = $('#'+id);
+            $btn.removeClass("air_spinner")
+            $btn.removeClass("air_disabledbutton")
+            resolve()
+        }, 0);
+    });
+}
 async function disablebutton(id, progress = false) {
     var promise = new Promise(function(resolve, reject) {
         setTimeout(() => {
@@ -1141,4 +1193,209 @@ function union(setA, setB) {
         _union.add(elem)
     }
     return _union
+}
+
+function findPhenotypePath(element, phenotype, perturbedElements = [], visualize = true)
+{
+           
+    getMoleculeData(phenotype, type = "path").then(pathdata => {
+        
+            
+        let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+    
+        var pathsfromelement = newpaths.filter(p => p.startsWith(element + "_"));
+
+
+        if(pathsfromelement.length > 0)
+        {
+            let _additionalelements = perturbedElements.reduce((accumulator, currentValue) => {
+                accumulator[currentValue] = "#a9a9a9";
+                return accumulator;
+              }, {});
+              
+            let shortestpath = pathsfromelement.reduce((a, b) => (a.match(/_/g) || []).length <= (b.match(/_/g) || []).length ? a : b);
+            highlightPath(shortestpath.split("_"), pathdata.paths[shortestpath] == -1 ? "#ff0000" : "#0000ff",  _additionalelements);
+        }
+    });
+}
+
+function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hideprevious = true) {
+
+    let _additionalelements = Object.fromEntries(
+        Object.entries(additionalelements).map(([k, v]) => [AIR.Molecules[k].name.toLowerCase(), v])
+      );
+    let elements = [];
+    for(let i = 0; i < _elements.length - 1; i++)
+    {
+        let source = _elements[i];
+        let target = _elements[i+1];
+        elements.push({
+            "source": AIR.Molecules[source].name.toLowerCase(),
+            "target": AIR.Molecules[target].name.toLowerCase()
+        })
+        for(let parent of AIR.Molecules[source].family)
+        {
+            elements.push({
+                "source": AIR.Molecules[parent].name.toLowerCase(),
+                "target": AIR.Molecules[target].name.toLowerCase()
+            })
+        }
+        for(let parent of AIR.Molecules[target].family)
+        {
+            elements.push({
+                "source": AIR.Molecules[source].name.toLowerCase(),
+                "target": AIR.Molecules[parent].name.toLowerCase()
+            })
+        }
+    }
+
+    minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
+
+        minervaProxy.project.map.hideBioEntity(hideprevious? highlighted : []).then(r => {
+
+            highlightDefs =[]
+            let modeids = {};
+
+            for(let r of AIR.MapReactions)
+            {
+                for(let path of elements)
+                {
+                    if(r.products.includes(path.target) && (r.reactants.includes(path.source) || r.modifiers.includes(path.source)))
+                    {
+                        highlightDefs.push({
+                            element: {
+                                id: r.id,
+                                modelId: r.modelId,
+                                type: "REACTION"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                lineColor: color
+                            }                    
+                        })
+
+                        if(modeids.hasOwnProperty(r.modelId))
+                        {
+                            modeids[r.modelId] += 1;
+                        }
+                        else
+                        {
+                            modeids[r.modelId] = 1;
+                        }
+                    }
+                }
+
+            };
+
+            if (Object.keys(modeids).length > 0) {
+                minervaProxy.project.map.openMap({"id": parseFloat(Object.keys(modeids).reduce((a, b) => obj[a] > obj[b] ? a : b))});
+            }
+            AIR.allBioEntities.forEach(e => {
+                if (e.constructor.name === 'Alias')
+                {
+
+                    if (e.getName().toLowerCase() == elements[0].source || e.getName().toLowerCase() == elements[elements.length - 1].target) {
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "ICON"
+                        });
+                    }
+                    else if (_additionalelements.hasOwnProperty(e.getName().toLowerCase())) {
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                color: _additionalelements[e.getName().toLowerCase()]
+                            }
+    
+                        });
+                    }
+                }
+            });
+
+            minervaProxy.project.map.showBioEntity(highlightDefs);
+        });
+    });
+}
+
+async function getPerturbedInfluences(phenotype, perturbedElements) {
+    return new Promise((resolve, reject) =>  
+    {
+        getMoleculeData(phenotype, type = "path").then(pathdata => {
+
+            let influencevalues = {
+                values: {},
+                SPs: {}
+            }
+
+            let regulators = new Set();
+            Object.keys(pathdata.paths).map(path => path.split("_").map(e => regulators.add(e)));
+            regulators = Array.from(regulators);
+
+            if(perturbedElements.every(e => regulators.includes(e) == false))
+            {
+                resolve({
+                    values: AIR.Phenotypes[phenotype].values,
+                    SPs: AIR.Phenotypes[phenotype].SPs,
+                });
+
+                return;
+            }
+
+            
+            let newregulators = regulators.filter(e => perturbedElements.includes(e) == false)
+            let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+
+            for(let e of newregulators)
+            {
+                // paths from e to p as strings and arrays
+                var epaths = newpaths.filter(p => p.startsWith(e + "_"))
+                var epatharrays = epaths.map(path => path.split("_"));
+
+                if(epaths.length == 0)
+                {
+                    continue;
+                }
+
+                //number of elements that are included in paths from e to p
+                var elementsonpaths = new Set();
+                epatharrays.map(path => path.map(e => elementsonpaths.add(e)));
+
+                //find shortest path type from e to p
+                let minlength = epatharrays.reduce((a, b) => a.length <= b.length ? a : b).length
+                var filteredpaths = epaths.filter(path => path.split("_").length == minlength);
+                var objetvalues = Object.values(Object.filter(pathdata.paths, path => filteredpaths.includes(path)));
+                var type = Math.min.apply(null, objetvalues);
+
+                influencevalues.SPs[e] = minlength * type;
+
+                // number of paths to p that include e
+                var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
+                if(pathdata.modifiers.hasOwnProperty(e))
+                {
+                    for(let m in pathdata.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
+                    {
+                        newpaths.filter(p => p.includes(m)).map(path => includedpaths.add(path));
+                    }
+                }
+
+                influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
+            };            
+
+            let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
+            Object.keys(influencevalues.values).map(function(key, index) {
+                influencevalues.values[key] /= maxvalue;
+              });
+
+            resolve(influencevalues);
+        });
+    });
 }
