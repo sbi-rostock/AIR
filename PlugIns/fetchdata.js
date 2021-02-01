@@ -1390,6 +1390,33 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
                 influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
             };            
 
+            for(let e in pathdata.regulators)
+            {
+                if(newregulators.includes(e) || perturbedElements.includes(e))
+                {
+                    continue;
+                }
+                
+                for(let connectedSP in pathdata.regulators[e])
+                {
+                    for(let t of pathdata.regulators[e][connectedSP])
+                    {
+                        if(perturbedElements.includes(t))
+                        {
+                            continue;
+                        }                            
+                        if(influencevalues.values.hasOwnProperty(t))
+                        {
+                            influencevalues.values[e] = influencevalues.values[t] / (Math.abs(connectedSP) + 1) * Math.sign(connectedSP);
+                        }
+                        if(influencevalues.SPs.hasOwnProperty(t))
+                        {
+                            influencevalues.SPs[e] = (Math.abs(influencevalues.SPs[t]) + 1) * Math.sign(influencevalues.SPs[t]) * Math.sign(connectedSP);
+                        }
+                    }
+                }                
+            }
+
             let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
             Object.keys(influencevalues.values).map(function(key, index) {
                 influencevalues.values[key] /= maxvalue;

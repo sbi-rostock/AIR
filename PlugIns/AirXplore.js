@@ -454,6 +454,22 @@ async function recalculateInfluenceScores()
     let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
     let _perturbedElements = perturbedElements();
     globals.xplore.pe_influenceScores = {}
+    if(_perturbedElements.length > 0)
+    {
+        if(!$("#xp_knockout_warning").length)
+        {
+            $("#xp_select_target_type").after(`<div class="air_alert alert alert-danger mt-2 mb-2" id="xp_knockout_warning">
+                <span>Beware: At least one element is knocked out.</span>
+                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>  `)
+        }   
+    }
+    else
+    {
+        $("#xp_knockout_warning").remove();
+    }
     for(let p in AIR.Phenotypes)
     {       
         globals.xplore.pe_influenceScores[p] = _perturbedElements.length > 0? await getPerturbedInfluences(p, _perturbedElements) : {values: AIR.Phenotypes[p].values, SPs: AIR.Phenotypes[p].SPs};
@@ -531,10 +547,10 @@ async function getPhenotypePanel()
 
 
         <div class="mt-4">
-            <h4 class="mb-4">Select perturbed elements:</h4>
-            <input type="text" style="width: 55%" class="textfield" id="xp_pe_element_input"/>
+            <h4 class="mb-2">Select perturbed elements:</h4>   
+            <input type="text" style="width: 55%" class="textfield" id="xp_pe_element_input" placeholder="Type in elements seperated by comma"/>
             <button type="button" id="xp_pe_element_btn" style="width: 20%" class="air_btn btn mr-1">Add Elements</button>
-            <button type="button" id="xp_pe_selectedelement_btn" style="width: 20%" class="air_btn btn mr-1">Add Selected</button>
+            <button type="button" id="xp_pe_selectedelement_btn" style="width: 20%" class="air_btn btn mr-1" title="Add the currently selected element from the map.">Add Selected</button>
             <div class="btn-group btn-group-justified mt-4 mb-4">
                 <div class="btn-group">
                     <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
@@ -570,6 +586,13 @@ async function getPhenotypePanel()
                 </tbody>
             </table>
         </div>`);
+
+        $("#xp_pe_selectedelement_btn").tooltip();
+        $("#xp_pe_element_input").keyup(function(event) {
+            if (event.keyCode === 13) {
+                $("#xp_pe_element_btn").click();
+            }
+        });
 
         globals.xplore.pe_element_table = $('#xp_table_pe_elements').DataTable({
             //"scrollX": true,
@@ -2265,7 +2288,7 @@ function XP_PredictTargets() {
 
         globals.xplore.xp_target_downloadtext += `\n${AIR.Phenotypes[p].name}\t${AIR.Phenotypes[p].value}`;
     }
-    globals.xplore.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivit';
+    globals.xplore.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivit\type';
 
     for (let e in AIR.Molecules) {
  
@@ -2303,63 +2326,60 @@ function XP_PredictTargets() {
         let negativeSum = 0;
         let negativeCount = 0;
 
-        for (let p in AIR.Phenotypes) {
+        for (let p in globals.xplore.pe_influenceScores) {
 
             let value = AIR.Phenotypes[p].value;
 
             let SP = 0;
-            if(AIR.Phenotypes[p].values.hasOwnProperty(e) == true)
+            if(globals.xplore.pe_influenceScores[p].values.hasOwnProperty(e) == true)
             {
-                SP = AIR.Phenotypes[p].SPs[e];
+                SP = globals.xplore.pe_influenceScores[p].values[e];
             }
 
-            if (value != 0) {
-
-                if (SP != 0) {
-                    positiveSum += value / SP;
-                    positiveinhibitorySum -= value / SP;
-                }
+            if (value != 0) 
+            {
+                positiveSum += value * SP;
+                positiveinhibitorySum -= value * SP;
 
                 positiveCount += Math.abs(value);              
             }
-            else {
-                if(SP != 0)
-                {
-                    negativeSum += (1 - (1 / Math.abs(SP)));
-                }
-                else 
-                {
-                    negativeSum ++;
-                }
+            else 
+            {
+                negativeSum += (1 - Math.abs(SP));
 
                 negativeCount ++; 
             }
-
         }
-
 
         let positiveSensitivity = 0;
         let negativeSensitivity = 0;
-        if (positiveCount > 0) {
+
+        if (positiveCount > 0) 
+        {
             positiveSensitivity = Math.round(((positiveSum / positiveCount) + Number.EPSILON) * 100) / 100;
             negativeSensitivity = Math.round(((positiveinhibitorySum / positiveCount) + Number.EPSILON) * 100) / 100;
         }
 
         if (positiveSensitivity <= 0 && negativeSensitivity <= 0)
+        {
             continue;
+        }
 
         let sensitivity = positiveSensitivity;
         let specificity = 0
 
-        if (negativeCount > 0) {
+        if (negativeCount > 0) 
+        {
             specificity = Math.round(((negativeSum / negativeCount) + Number.EPSILON) * 100) / 100;
         }
 
         //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
         var hex = '#00BFC4';
+        var regType = "positive";
         if(negativeSensitivity > positiveSensitivity)
         {
             hex = '#F9766E';
+            regType = "negative"
             sensitivity = negativeSensitivity;
         }
         var radius = ((sensitivity + specificity) / 2) * 8   ;
@@ -2386,7 +2406,7 @@ function XP_PredictTargets() {
             hoverBackgroundColor: hex,
             pointStyle: pstyle,
         });  
-        globals.xplore.xp_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}`;          
+        globals.xplore.xp_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}\t${regType}`;          
     }
     
     Promise.all(promises).finally(r => {
