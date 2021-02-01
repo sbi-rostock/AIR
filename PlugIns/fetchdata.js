@@ -1288,7 +1288,7 @@ function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hi
             };
 
             if (Object.keys(modeids).length > 0) {
-                minervaProxy.project.map.openMap({"id": parseFloat(Object.keys(modeids).reduce((a, b) => obj[a] > obj[b] ? a : b))});
+                minervaProxy.project.map.openMap({"id": parseFloat(Object.keys(modeids).reduce((a, b) => modeids[a] > modeids[b] ? a : b))});
             }
             AIR.allBioEntities.forEach(e => {
                 if (e.constructor.name === 'Alias')
