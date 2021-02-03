@@ -1904,7 +1904,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
             if(globals.xplore.pe_influenceScores.hasOwnProperty(elementid))
             {
                 elementsToHighlight= {}
-                for(let e in globals.xplore.pe_influenceScores[elementid])
+                for(let e in globals.xplore.pe_influenceScores[elementid].values)
                 {
                     elementsToHighlight[AIR.Molecules[e].name] = valueToHex(globals.xplore.pe_influenceScores[elementid].values[e]);
                 }
