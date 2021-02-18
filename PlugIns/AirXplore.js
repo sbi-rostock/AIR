@@ -780,20 +780,24 @@ async function getPhenotypePanel()
 
             let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
 
-            if(Object.keys(_data) == 0)
+            if(Object.keys(_data).length == 0)
             {
                 return;
             }
 
             for(let e in _data)
             {
-                _data[e] = 0;
+                _data[e] = {
+                    "value": 0,
+                    "perturbed": false
+                };
             }
 
             globals.xplore.pe_element_table.rows().every( function () {
                 var row = this.nodes().to$()
                 row.find('.air_slider').val(0);
                 row.find('.slidervalue')[0].innerHTML = `<font data-order="1"><b>0<b></font>`;
+                row.find('.xp_pe_clickCBinTable')[0].checked = false;
             } );
 
             globals.xplore.pe_element_table.columns.adjust().draw(false);
