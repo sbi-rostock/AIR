@@ -1165,19 +1165,25 @@ async function om_createTable() {
         targets: 1,
         className: 'dt-center',
     }]
+    let columns = [
+        { "width": "10px" },
+        null];
 
 
     for (let sample in globals.omics.samples) 
     {
 
         createCell(headerrow, 'th', globals.omics.samples[sample], 'col-auto', 'col', 'center');
-        
+        columns.push({ "width": "30px" });
         columnsdefs.push({
             targets: parseFloat(sample) + 2,
             className: 'dt-center',
         })
     }
-
+    columns.push({ "width": "10px" });
+    columns.push({ "width": "10px" });
+    columns.push({ "width": "40px" });
+    columns.push(null);
     
     var $pvalue_cell = $(createCell(headerrow, 'th', 'avg. p-value', 'col-auto', 'col', 'center'));
     $pvalue_cell.attr("title", "Probability to achieve the same or a higher accuracy by analyzing " + globals.omics.numberOfRandomSamples + " random samples.");
@@ -1435,15 +1441,7 @@ async function om_createTable() {
     globals.omics.resultsTable = $('#om_resultstable').DataTable({
         "order": [[ globals.omics.samples.length + 2, "asc" ]],  
         "scrollX": true,
-        "columns": [
-            { "width": "10px" },
-            null,
-            { "width": "30px" },
-            { "width": "10px" },
-            { "width": "10px" },
-            { "width": "40px" },
-            null
-        ],
+        "columns": columns,
         "columnDefs": columnsdefs,
         "initComplete": function( settings, json ) {  
             
