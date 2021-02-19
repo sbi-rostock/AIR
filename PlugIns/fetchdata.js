@@ -519,14 +519,7 @@ function getMoleculeData(_key, type = "molecule")
                     }
                     if(data[e].hasOwnProperty("t") == false)
                     {
-                        data[e]["t"] = 1;
-                    }
-                    if(data[e].hasOwnProperty("c") == false)
-                    {
-                        if(data[e].S == 0)
-                            data[e]["c"] = 0;
-                        else
-                            data[e]["ic"] = 1;
+                        data[e]["t"] = 0;
                     }
                     if(data[e].hasOwnProperty("i") == false)
                     {
@@ -1429,3 +1422,32 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
         });
     });
 }
+
+function pickHighest(obj, _num = 1, ascendend = true) {
+
+    let num = _num;
+    let requiredObj = {};
+
+    if(num > Object.keys(obj).length){
+       num = Object.keys(obj).length;
+    };
+
+    if(ascendend)
+    {
+        Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach((key, ind) =>
+        {
+           if(ind < num){
+              requiredObj[key] = obj[key];
+           }
+        });
+    }
+    else {
+        Object.keys(obj).sort((a, b) => obj[a] - obj[b]).forEach((key, ind) =>
+        {
+           if(ind < num){
+              requiredObj[key] = obj[key];
+           }
+        });
+    }
+    return requiredObj;
+ };
