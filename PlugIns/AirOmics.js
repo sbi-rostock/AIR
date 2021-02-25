@@ -2620,22 +2620,8 @@ async function calculateTargets() {
     globals.omics.om_target_downloadtext = `Sample: ${globals.omics.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity\tType\tRegulators`;
     try 
     {
-        await dataset();
-        globals.omics.om_targetchart.update();
-        globals.omics.om_targettable.columns.adjust().draw();
-    }
-    finally 
-    {        
-        $("#om_target_chart_canvas").height(400);
-        $("#om_regulator_progress").hide();
-        $("#om_btn_predicttarget").html('Predict Regulators');
-        $("#airomics_tab_content").removeClass("air_disabledbutton");
-    }
-    async function dataset()
-    {                
-        targets = [];
-
         var promises = [];
+
         let transcriptomics = document.getElementById("om_transcriptomics").checked;
         let molLength = Object.keys(AIR.Molecules).length;
         let iterations = molLength;
@@ -2670,111 +2656,41 @@ async function calculateTargets() {
                 negativeCount += 1;
             }
         }
-        
-        for (let e in AIR.Molecules) {
 
+        let e_ids = Object.keys(AIR.Molecules);
+        for (let e of e_ids) {
+
+                
             if((++count) % 70 == 0)
             {
                 await updateProgress(count, molLength, "om_regulator");
             }
 
-            if(AIR.Molecules[e].emptySP == true)
+            promises.push(analyzeElement(e))
+
+            if(promises.length >= 50 || e == e_ids[e_ids.length - 1])
             {
-                continue;
-            }
-
-            let last = !--iterations;
-            let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
-
-            if (_type.toLowerCase() === "phenotype") {
-                continue;
-            }
-
-            let typevalue = $('#om_target_filter').val();
-            if (typevalue == 1) {
-                if (_type != "PROTEIN" && _type != "TF") {
-                    continue;
-                }
-            }
-            if (typevalue == 2) {
-                if (_subtype != "miRNA") {
-                    continue;
-                }
-            }
-            if (typevalue == 3) {
-                if (_subtype != "lncRNA") {
-                    continue;
-                }
-            }
-            if (typevalue == 4) {
-                if (_subtype != "TF") {
-                    continue;
-                }
-            } 
-            if (typevalue == 5) {
-                if (_subtype != "RECEPTOR") {
-                    continue;
-                }
-            } 
-
-            promises.push(
-                getMoleculeData(e).then(async (data) => {
-
-                    let positiveSum = 0;
-                    let negativeSum = 0;
-
-                    let target_values = {};
-                    for (let p in data) 
+                Promise.allSettled(promises).then(targets => {
+                    for(let _data of targets)
                     {
-                        if(!globals.omics.ExpressionValues.hasOwnProperty(p))
+                        let targtetdata = _data.value;
+                        if(targtetdata == null)
                             continue;
-                        let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-                        let SP = transcriptomics? parseFloat(data[p].t) : parseFloat(data[p].i);
-
-                        if (value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
-                            positiveSum += value * SP;
-                            target_values[AIR.Molecules[p].name] = value * SP;
-                        }
-                        else 
-                        {
-                            negativeSum += (1 - Math.abs(SP));
-                        }
-                    }
-
-                    let sensitivity = positiveSum / positiveCount;
-                    let specificity = negativeSum / negativeCount
-
-                    //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
-
-                    if(specificity > 0 && sensitivity != 0)
-                    {
-
-                        let fc = 0
-                        if(globals.omics.ExpressionValues.hasOwnProperty(e) && (!globals.omics.pvalue || globals.omics.ExpressionValues[e].pvalues[sample] <= pvalue_threshold))
-                        {
-                            fc = expo(Math.abs(globals.omics.ExpressionValues[e].nonnormalized[sample]),3,3)
-                        } 
-                        if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
-                            return;
-                        }
-                        let positive = sensitivity > 0? true : false;
-                        sensitivity = Math.abs(sensitivity);
-                        var radius = 4 + 4 * (Math.abs(fc) / max_fc);
-                        
+                            
+                        var radius = 4 + 4 * (Math.abs(targtetdata.fc) / max_fc);
+                    
                         var pstyle = 'circle';
-                        if(AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false)
+                        if(AIR.MapSpeciesLowerCase.includes(targtetdata.name.toLowerCase()) === false)
                         {
                             pstyle = 'triangle'
                         }
     
-                        let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
-                        let hex = positive? (fc >= 0? '#00BFC4' : '#d3d3d3') : (fc <= 0? '#F9766E' : '#d3d3d3');
-                                                
+                        let hex = targtetdata.positive? (targtetdata.fc >= 0? '#00BFC4' : '#d3d3d3') : (targtetdata.fc <= 0? '#F9766E' : '#d3d3d3');
                         let result = {
-                            label: [_name, fc, regulators.slice(0, 5).join(", ")].join(";"),
+                            label: [targtetdata.name, targtetdata.fc, targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
                             data: [{
-                                x: expo(specificity, 3, 3),
-                                y: expo(sensitivity, 3, 3),
+                                x: expo(targtetdata.specificity, 3, 3),
+                                y: expo(targtetdata.sensitivity, 3, 3),
                                 r: radius
                             }],
                             backgroundColor:  hex ,
@@ -2782,27 +2698,152 @@ async function calculateTargets() {
                             pointStyle: pstyle,
                         }
                         globals.omics.om_targettable.row.add([
-                            getLinkIconHTML(_name),
-                            positive? "positive" : "negative",
-                            expo(sensitivity, 3, 3),
-                            expo(specificity, 3, 3),
-                            fc,
-                            regulators.map(r => getLinkIconHTML(r)).join(", ")
+                            getLinkIconHTML(targtetdata.name),
+                            targtetdata.positive? "positive" : "negative",
+                            expo(targtetdata.sensitivity, 3, 3),
+                            expo(targtetdata.specificity, 3, 3),
+                            targtetdata.fc,
+                            targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", ")
                         ])
-                        globals.omics.om_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}\t${positive? "positive" : "negative"}\t${regulators}`;
-
+                        globals.omics.om_target_downloadtext += `\n${targtetdata.name}\t${targtetdata.specificity}\t${targtetdata.sensitivity}\t${targtetdata.positive? "positive" : "negative"}\t${targtetdata.regulators}`;
+    
                         setTimeout(function(){
                             globals.omics.om_targetchart.data.datasets.push(result);
                             globals.omics.om_targetchart.update();
                         }, 0);
-                    }                    
+                    }
                 })
-            );
+
+                promises = [];
+            }
 
         }
 
-        return targets;
+        globals.omics.om_targetchart.update();
+        globals.omics.om_targettable.columns.adjust().draw();
+
+        async function analyzeElement(e)
+        {                
+            let data = await getMoleculeData(e)
+
+            return new Promise(
+                (resolve, reject) => {
+
+
+                if(AIR.Molecules[e].emptySP == true)
+                {
+                    resolve(null);
+                        return;
+                }
+
+                let last = !--iterations;
+                let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
+
+                if (_type.toLowerCase() === "phenotype") {
+                    resolve(null);
+                        return;
+                }
+
+                let typevalue = $('#om_target_filter').val();
+                if (typevalue == 1) {
+                    if (_type != "PROTEIN" && _type != "TF") {
+                        resolve(null);
+                        return;
+                    }
+                }
+                if (typevalue == 2) {
+                    if (_subtype != "miRNA") {
+                        resolve(null);
+                        return;
+                    }
+                }
+                if (typevalue == 3) {
+                    if (_subtype != "lncRNA") {
+                        resolve(null);
+                        return;
+                    }
+                }
+                if (typevalue == 4) {
+                    if (_subtype != "TF") {
+                        resolve(null);
+                        return;
+                    }
+                } 
+                if (typevalue == 5) {
+                    if (_subtype != "RECEPTOR") {
+                        resolve(null);
+                        return;
+                    }
+                } 
+                let positiveSum = 0;
+                let negativeSum = 0;
+
+                let target_values = {};
+                for (let p in data) 
+                {
+                    if(!globals.omics.ExpressionValues.hasOwnProperty(p))
+                    {
+                        continue;
+                    }
+
+                    let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
+                    let SP = transcriptomics? parseFloat(data[p].t) : parseFloat(data[p].i);
+
+                    if (value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
+                        positiveSum += value * SP;
+                        target_values[AIR.Molecules[p].name] = value * SP;
+                    }
+                    else 
+                    {
+                        negativeSum += (1 - Math.abs(SP));
+                    }
+                }
+
+                let sensitivity = positiveSum / positiveCount;
+                let specificity = negativeSum / negativeCount
+
+                //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
+
+                if(specificity > 0 && sensitivity != 0)
+                {
+
+                    let fc = 0
+                    if(globals.omics.ExpressionValues.hasOwnProperty(e) && (!globals.omics.pvalue || globals.omics.ExpressionValues[e].pvalues[sample] <= pvalue_threshold))
+                    {
+                        fc = expo(Math.abs(globals.omics.ExpressionValues[e].nonnormalized[sample]),3,3)
+                    } 
+                    if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
+                        resolve(null);
+                        return;
+                    }
+                    let positive = sensitivity > 0? true : false;
+                    sensitivity = Math.abs(sensitivity);
+
+                    let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+                                            
+                    resolve({
+                        "fc": fc,
+                        "sensitivity": sensitivity,
+                        "name": _name,
+                        "specificity": specificity,
+                        "regulators": regulators,
+                        "positive": positive
+                    });
+                    return;
+                }                    
+                resolve(null);
+                return;
+            });
+        }
     }
+    finally 
+    {        
+        $("#om_target_chart_canvas").height(400);
+        $("#om_regulator_progress").hide();
+        $("#om_btn_predicttarget").html('Predict Regulators');
+        $("#airomics_tab_content").removeClass("air_disabledbutton");
+    }
+
 }
 
 async function enrichr() {

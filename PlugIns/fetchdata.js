@@ -472,7 +472,7 @@ function getValue(key, replacecomma = true)
 
 }
 
-function getMoleculeData(_key, type = "molecule")
+async function getMoleculeData(_key, type = "molecule")
 {
     let phenotype = (type == "molecule"? false : true);
     let key = _key + (type == "path"? "_paths" : "");
