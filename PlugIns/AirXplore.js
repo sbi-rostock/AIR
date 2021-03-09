@@ -670,22 +670,25 @@ async function getPhenotypePanel()
         } );
 
         globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
-            dom: 'Bfrtip',
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
             buttons: [
                 {
                     text: 'Copy',
+                    className: 'air_dt_btn',
                     action: function () {
                         copyContent(getDTExportString(globals.xplore.pe_results_table));
                     }
                 },
                 {
                     text: 'CSV',
+                    className: 'air_dt_btn',
                     action: function () {
                         air_download("InSilicoPerturb_PhenotypeResults_csv.txt", getDTExportString(globals.xplore.pe_results_table, seperator = ","))
                     }
                 },
                 {
                     text: 'TSV',
+                    className: 'air_dt_btn',
                     action: function () {
                         air_download(download_string + "InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.xplore.pe_results_table))
                     }
