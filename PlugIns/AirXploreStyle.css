@@ -442,3 +442,23 @@ input[type=checkbox] .cbcontainer {
     from {transform: rotate(0deg);}
     to {transform: rotate(359deg);}
  }
+
+ .left-col {
+  float: left;
+  width: 40%;
+}
+
+.right-col {
+  float: left;
+  width: 60%;
+}
+
+.air_dt_btn 
+{
+    border: 1px solid gray;
+    color: gray;
+    background-color: white;
+    width: 50px;
+    border-radius: 8px;
+    font-size: 15px;
+}

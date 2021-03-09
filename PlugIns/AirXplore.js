@@ -382,6 +382,7 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
     await recalculateInfluenceScores();
     await xp_EstimatePhenotypes();
 });
+
 async function xp_EstimatePhenotypes()
 {
     return new Promise((resolve, reject) => {
@@ -412,6 +413,7 @@ async function xp_EstimatePhenotypes()
             let max_influence = 0;
             let influence = 0;
             let level = 0;
+            let count_elements = 0;
 
             for(let e in phenotypeValues) 
             {
@@ -426,19 +428,26 @@ async function xp_EstimatePhenotypes()
                     {
                         influence += Math.abs(_influene);
                         level += _influene * fc;
+                        count_elements++;
                     }
                 }
             }
             if(level != 0)
             {
-                elementsToHighlight[AIR.Molecules[p].name] = valueToHex(level/elementswithFC);
+                if(level > 1)
+                    level = 1;
+                else if (level < -1)
+                    level = -1;
+                elementsToHighlight[AIR.Molecules[p].name] = valueToHex(level);
             }
 
-            globals.xplore.pe_results_table.row.add([
-                getLinkIconHTML(AIR.Phenotypes[p].name),
-                getFontfromValue(expo(level)),
-                expo((influence/max_influence)*100)
-            ])
+            globals.xplore.pe_results_table.row.add(
+                [
+                    getLinkIconHTML(AIR.Phenotypes[p].name),
+                    '<button type="button" class="xp_pe_popup_btn air_invisiblebtn" data="' + p + '" style="cursor: pointer;">' +  getFontfromValue(expo(level)) + '</button>',
+                    expo((influence/max_influence)*100)
+                ]
+            )
         }   
          
         globals.xplore.pe_results_table.columns.adjust().draw();
@@ -447,6 +456,9 @@ async function xp_EstimatePhenotypes()
         resolve()
     });
 }
+$(document).on('click', '.xp_pe_popup_btn', function () {
+    xp_createpopup(this, $(this).attr("data"));
+});
 
 async function recalculateInfluenceScores()
 {  
@@ -507,22 +519,79 @@ async function setPeTable()
                     "perturbed": false,
                     "value": value
                 }
+                globals.xplore.pe_element_table.rows( $("#ESliderValue" + e).closest("tr")).invalidate().draw();
                 xp_EstimatePhenotypes()
+
             }
+
+            let delete_btn = createButtonCell(row, 'td', '<i class="fas fa-trash"></i>', "center");
+            delete_btn.onclick = async function () {
+                
+                globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
+                let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
+
+                delete _data[e];
+
+                if(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]) == JSON.stringify(_data))
+                {
+                    return;
+                }
+
+                globals.xplore.pe_data.push(_data) 
+                globals.xplore.pe_data_index += 1;
+
+                $("#xp_import_redo").addClass("air_disabledbutton");
+                $("#xp_import_undo").removeClass("air_disabledbutton");
+
+                await setPeTable()
+                await xp_EstimatePhenotypes();
+                adjustPanels(globals.xplore.container);
+            };
         }
 
-        globals.xplore.pe_element_table = $('#xp_table_pe_elements').DataTable({
+        globals.xplore.pe_element_table = $('#xp_table_pe_elements').DataTable({         
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.pe_element_table));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("InSilicoPerturb_ElementsSettings_csv.txt", getDTExportString(globals.xplore.pe_element_table, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.pe_element_table))
+                    }
+                }
+            ],   
             //"scrollX": true,
             //"autoWidth": true,
             "table-layout": "fixed", // ***********add this
             "word-wrap": "break-word", 
             "columns": [
-                { "width": "30%" },
+                { "width": "25%" },
                 { "width": "10%" },
                 { "width": "10%" },
-                { "width": "60%" }
+                { "width": "55%" },
+                { "width": "10%" }
             ]
         } ).columns.adjust().draw();
+        /*
+        for(let btn of createdtButtons(this, download_string))
+        {
+            globals.xplore.pe_element_table.button().add( 0, btn);
+        }*/
+
         adjustPanels(globals.xplore.container);
         resolve();
 
@@ -531,8 +600,6 @@ async function setPeTable()
 
 async function getPhenotypePanel()
 {    
-
-
     return new Promise((resolve, reject) => {
 
         for(let p in AIR.Phenotypes)
@@ -566,6 +633,7 @@ async function getPhenotypePanel()
                         <th style="vertical-align: middle;">Knockout</th>
                         <th style="vertical-align: middle;">FC</th>
                         <th style="vertical-align: middle;"></th>
+                        <th style="vertical-align: middle;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -578,8 +646,8 @@ async function getPhenotypePanel()
                 <thead>
                     <tr>
                         <th style="vertical-align: middle;">Phenotype</th>
-                        <th style="vertical-align: middle;">Level</th>
-                        <th style="vertical-align: middle;">Accuracy %</th>
+                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
+                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">% Regulators</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -599,33 +667,30 @@ async function getPhenotypePanel()
             "order": [[ 0, "asc" ]], 
             "table-layout": "fixed", // ***********add this
             "word-wrap": "break-word", 
-            "columns": [
-                { "width": "30%" },
-                { "width": "10%" },
-                { "width": "10%" },
-                { "width": "50%" }
-            ],
-            "columnDefs": [
-                {
-                    targets: 0,
-                    className: 'dt-left',
-                },
-                {
-                    targets: 1,
-                    className: 'dt-center'
-                },
-                {
-                    targets: 2,
-                    className: 'dt-center'
-                },
-                {
-                    targets: 3,
-                    className: 'dt-center'
-                }
-            ]
         } );
 
         globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    text: 'Copy',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.pe_results_table));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    action: function () {
+                        air_download("InSilicoPerturb_PhenotypeResults_csv.txt", getDTExportString(globals.xplore.pe_results_table, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.xplore.pe_results_table))
+                    }
+                }
+            ],
             //"scrollX": true,
             "order": [[ 2, "desc" ]], 
             "table-layout": "fixed", // ***********add this
@@ -651,6 +716,12 @@ async function getPhenotypePanel()
             ]
         } );
         
+        
+        $('#xp_table_pe_results').on( 'page.dt', function () {
+            adjustPanels(globals.xplore.container);
+        } );
+
+
         for(let p in AIR.Phenotypes)
         {
             globals.xplore.pe_results_table.row.add([
@@ -924,6 +995,30 @@ function getInteractionPanel()
         `);
 
         globals.xplore.regulationtable = $('#xp_table_inter_regulation').DataTable({
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.regulationtable));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("InSilicoPerturb_ElementsSettings_csv.txt", getDTExportString(globals.xplore.regulationtable, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.regulationtable))
+                    }
+                }
+            ], 
             scrollX: true,
             autoWidth: true,
             columns: [
@@ -949,6 +1044,30 @@ function getInteractionPanel()
         })
 
         globals.xplore.targettable = $('#xp_table_inter_target').DataTable({
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.targettable));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("InSilicoPerturb_ElementsSettings_csv.txt", getDTExportString(globals.xplore.targettable, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.targettable))
+                    }
+                }
+            ], 
             scrollX: true,
             autoWidth: true,
             columns: [
@@ -975,6 +1094,30 @@ function getInteractionPanel()
         })
 
         globals.xplore.hpotable = $('#xp_table_inter_hpo').DataTable({
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.hpotable));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("InSilicoPerturb_ElementsSettings_csv.txt", getDTExportString(globals.xplore.hpotable, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.hpotable))
+                    }
+                }
+            ], 
             scrollX: true,
             autoWidth: true,
             columns: [
@@ -1001,6 +1144,30 @@ function getInteractionPanel()
         })
 
         globals.xplore.phenotypetable = $('#xp_table_inter_phenotype').DataTable({
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.xplore.phenotypetable));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("InSilicoPerturb_ElementsSettings_csv.txt", getDTExportString(globals.xplore.phenotypetable, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.phenotypetable))
+                    }
+                }
+            ], 
             scrollX: true,
             autoWidth: true,
             columns: [
@@ -1194,10 +1361,28 @@ function getTargetPanel() {
                     <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
                     <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>
-            <button id="xp_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>`);
+            <div class="btn-group btn-group-justified mt-4 mb-4">
+                <div class="btn-group">
+                    <button id="xp_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> as .txt</button>
+                </div>
+                <div class="btn-group">
+                    <button id="xp_btn_download_chart" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> as .png</button>
+                </div>
+            </div>
+            `);
 
         $('#xp_btn_download_target').on('click', function() {
             air_download('PredictedPhenotypeRegulators.txt', globals.xplore.xp_target_downloadtext)
+        });
+        $('#xp_btn_download_chart').on('click', function() {
+            var a = document.createElement('a');
+            a.href = globals.xplore.xp_targetchart.toBase64Image();
+            a.download = 'AIR_predictedTargets.png';
+            
+            // Trigger the download
+            a.click();
+
+            a.remove();
         });
 
         var outputCanvas = document.getElementById('xp_chart_target').getContext('2d');
@@ -2049,7 +2234,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 }
             }
-            if (onlyRegulators === false) {
+            if (onlyRegulators === false && ENABLE_API_CALLS == false) {
 
                 globals.xplore.hpotable.clear();
                 let response = await getHPO(elementid)
@@ -2094,8 +2279,13 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
            
         if(onlyRegulators === false && onlyHPO == false)
         {
-            setTimeout(async function() {
-
+            setTimeout(async function() 
+            {                
+                if(ENABLE_API_CALLS == false)
+                {
+                    return;
+                }
+                
                 if(elementid == null || isProtein(elementid))
                 {
 
@@ -2129,6 +2319,11 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
             setTimeout(async function() {
                 
+                if(ENABLE_API_CALLS == false)
+                {
+                    return;
+                }
+
                 let idstring = '';
                 if(elementid != null)
                 {
@@ -2210,6 +2405,7 @@ $(document).on('click', '.air_phenotypepath', function () {
     let _perturbedElements = perturbedElements();
     findPhenotypePath(data[0], data[1], _perturbedElements);
 });
+
 async function xp_updatePhenotypeTable() {
     return new Promise((resolve, reject) => {
 
@@ -2245,7 +2441,7 @@ async function xp_updatePhenotypeTable() {
             }
             if(SP > 0)
             {
-                type = '<font color="green">activation</font>';
+                type = '<font color="blue">activation</font>';
             }    
 
             result_row.push(type);               
@@ -2296,7 +2492,7 @@ function XP_PredictTargets() {
 
     for (let e in AIR.Molecules) {
  
-        let {name:_name, type:_type} = AIR.Molecules[e];
+        let {name:_name, subtype:_type} = AIR.Molecules[e];
 
         if (_type.toLowerCase() === "phenotype") {
             continue;
@@ -2462,3 +2658,220 @@ function createCentralityTable(phenotype) {
     let t1 = performance.now();
     console.log("Centrality Table took " + (t1 - t0) + " milliseconds.")
 }
+
+
+function xp_createpopup(button, phenotype) {
+
+    let phenotypeValues = globals.xplore.pe_influenceScores[phenotype].values;
+
+    var $target = $('#xp_chart_popover');
+    var $btn = $(button);
+
+    if($target)
+    {
+        
+        
+        $('#xp_clickedpopupcell').css('background-color', 'transparent');
+        $('#xp_clickedpopupcell').removeAttr('id');
+
+        if($target.siblings().is($btn))
+        {
+            $target.remove();
+            $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+                minHeight: "0px",
+            });
+            return;
+        }   
+        $target.remove();
+
+    }
+
+    $(button).attr('id', 'xp_clickedpopupcell');
+    $(button).css('background-color', 'lightgray');
+
+    $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+                    <div class="arrow" style="left: 9.375%;"></div>
+                    <div id="xp_chart_popover_content" class="popover-content">
+                        <canvas class="popup_chart" id="xp_popup_chart"></canvas>
+                        <div id="xp_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#009933"></span>
+                                Activates Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                Represses Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                Not diff. expressed</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="triangle_small"></span>
+                                External Link</li>
+                        </div>
+                    </div>
+                </div>`);
+
+    $btn.after($target);
+    
+    let targets = []
+    let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
+
+    for(let e in phenotypeValues) 
+    {
+        if(_data.hasOwnProperty(e))
+        {
+            let fc = _data[e].value
+            let sp = phenotypeValues[e]
+            var pstyle = 'circle';
+            if(AIR.MapSpeciesLowerCase.includes(AIR.Molecules[e].name.toLowerCase()) === false)
+            {
+                pstyle = 'triangle'
+            }
+            let level =  (sp * fc)
+            targets.push(
+                {
+                    label: e,
+                    data: [{
+                        x: fc,
+                        y: sp,
+                        r: level == 0? 3 : 6
+                    }],
+                    pointStyle: pstyle,
+                    backgroundColor: level == 0? "#cccccc" : (level < 0? "#ffcccc" : "#009933"),
+                    hoverBackgroundColor: level == 0? "#cccccc" : (level < 0? "#ffcccc" : "#009933"),
+                }
+            );
+        }
+    }
+
+    var outputCanvas = document.getElementById('xp_popup_chart');
+
+    var chartOptions = {
+        type: 'bubble',        
+        data: {
+            datasets: targets,
+        },
+        options: {
+            plugins: {
+                zoom: {
+                    // Container for pan options
+                    pan: {
+                        // Boolean to enable panning
+                        enabled: true,
+    
+                        // Panning directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow panning in the y direction
+                        mode: 'xy',
+                        rangeMin: {
+                            // Format of min pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+                        rangeMax: {
+                            // Format of max pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+            
+                        // On category scale, factor of pan velocity
+                        speed: 20,
+            
+                        // Minimal pan distance required before actually applying pan
+                        threshold: 10,
+            
+                    },
+    
+                    // Container for zoom options
+                    zoom: {
+                        // Boolean to enable zooming
+                        enabled: true,
+                        // Zooming directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow zooming in the y direction
+                        mode: 'xy',
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            hover: {
+                onHover: function(e) {
+                var point = this.getElementAtEvent(e);
+                if (point.length) e.target.style.cursor = 'pointer';
+                else e.target.style.cursor = 'default';
+                }
+            },
+            legend: {
+                display: false
+            },
+            layout: {
+                padding: {
+                top: 0
+                }
+            },
+            title: {
+                display: true,
+                text: "Regulators for '" +AIR.Phenotypes[phenotype].name,
+                fontFamily: 'Helvetica',
+            },
+            scales: {
+                yAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Influence on Phenotype'
+                    },
+                    ticks: {
+                        //beginAtZero: true,
+                    }
+                }],
+                xAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'User set Fold Change'
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var e = data.datasets[tooltipItem.datasetIndex].label || '';
+
+                        if(e && AIR.Molecules.hasOwnProperty(e))
+                        {                          
+                            return [
+                                'Name: ' + AIR.Molecules[e].name,
+                                'Influence: ' + expo(phenotypeValues[e]),
+                                'FC: ' + _data[e].value,
+                            ];                     
+                        }
+                        else
+                            return "";
+                        
+                    }
+                }
+            }
+        }
+        
+    }; 
+
+    let popupchart = new Chart(outputCanvas, chartOptions);
+    document.getElementById('xp_popup_chart').onclick = function (evt) {
+            var activePoint = popupchart.lastActive[0];
+            if (activePoint !== undefined) {
+                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
+                if(_id && AIR.Molecules.hasOwnProperty(_id))
+                {
+                    let name = AIR.Molecules[_id].name;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+            }
+    };
+    $target.show();
+
+    var popupheight = $("#xp_chart_popover").height() + 50;
+    $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400? 400 : popupheight) + "px",
+    });
+};

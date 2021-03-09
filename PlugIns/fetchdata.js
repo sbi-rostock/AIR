@@ -1,5 +1,8 @@
-let fileURL = '';
-let filetesting;
+let ENABLE_API_CALLS = true;
+let FILE_URL = '';
+let TESTING;
+
+//npm modules
 let Chart;
 let JSZip;
 let FileSaver;
@@ -101,9 +104,9 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
             VCF = _vcf;
             JSZip = _jszip;
             FileSaver = _filesaver;
-            filetesting = _filetesting;
+            TESTING = _filetesting;
             minervaProxy = _minerva;
-            fileURL = _filepath;
+            FILE_URL = _filepath;
             ttest = _ttest;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
@@ -165,7 +168,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
                         t0 = performance.now();
                         $.ajax({
-                            url: fileURL + 'Interactions.json',
+                            url: FILE_URL + 'Interactions.json',
                             success: function (content) {
                                 readInteractions(content).then(r => {
                                     t1 = performance.now()
@@ -175,7 +178,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                     setTimeout(() => {
                                         $.ajax({
                                             //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                            url: fileURL + 'Elements.json', 
+                                            url: FILE_URL + 'Elements.json', 
                                             success: function (moleculecontent) {
                                                 t1 = performance.now()
                                                 console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
@@ -224,10 +227,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                             return new Promise((resolve, reject) => {
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                    url: fileURL + "Centrality.json", 
+                                    url: FILE_URL + "Centrality.json", 
                                     success: function (content) {
                                         
-                                        if(filetesting)
+                                        if(TESTING)
                                         {
                                             AIR.Centrality = content;
                                         }
@@ -295,7 +298,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
 
-                                if(filetesting)
+                                if(TESTING)
                                 {
                                     AIR.Molecules = content;
                                 }
@@ -407,7 +410,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
                                 
-                                if(filetesting)
+                                if(TESTING)
                                 {
                                     AIR.Interactions = content;
                                 }
@@ -720,7 +723,9 @@ function createLinkCell(row, type, text, style, align) {
     cell.innerHTML = getLinkIconHTML(text);                    // append text node to the DIV
     cell.setAttribute('class', style);
     cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;');             // append DIV to the table cell
-    row.appendChild(cell);
+    
+    if(row != null)
+        row.appendChild(cell);
 
     return cell;
 }
@@ -740,7 +745,9 @@ function createCell(row, type, text, style, scope, align, nowrap = false, order 
         cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;'); 
     else
         cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
-    row.appendChild(cell);
+    
+        if(row != null)
+        row.appendChild(cell);
 
     return cell;
 }
@@ -767,17 +774,16 @@ function createPopupCell(row, type, text, style, align, callback, callbackParame
 
     $(cell).append();
 
+    if(row != null)
+        row.appendChild(cell);
 
-    row.appendChild(cell);
-
-    return cell;
+    return button;
 }
-function createButtonCell(row, type, text, data, align) {
+function createButtonCell(row, type, text, align) {
     var button = document.createElement('button'); // create text node
     button.innerHTML = text;
     button.setAttribute('type', 'button');
-    button.setAttribute('class', 'clickPhenotypeinTable air_invisiblebtn');
-    button.setAttribute('data', data);
+    button.setAttribute('class', 'air_invisiblebtn');
 
     var cell = document.createElement(type); // create text node
     cell.appendChild(button);
@@ -1451,3 +1457,115 @@ function pickHighest(obj, _num = 1, ascendend = true) {
     }
     return requiredObj;
  };
+
+ function getDTExportString(dt, seperator = "\t")
+ {
+    let output = [];
+
+
+    dt.rows().every( function ( rowIdx, tableLoop, rowLoop ) {
+        output.push(this.data().map( function( cell ) { 
+              return extractContent(cell); 
+              }));
+    } );
+ 
+    let columnstodelete = [];
+
+    if(output.length > 1)
+    {
+        let index_hasValue = {}
+        for(let i in output[0])
+        {
+            index_hasValue[i] = false;
+        }
+        for(let row of output)
+        {
+            for(let i in row)
+            {
+                if(row[i] != "")
+                {
+                    index_hasValue[i] = true;
+                }
+            }
+        }
+
+        columnstodelete = Object.keys(index_hasValue).filter(key => index_hasValue[key] === false)
+    }
+
+
+    output.unshift([]);
+    dt.columns().every(function() {
+        output[0].push(this.header().textContent )
+      })
+
+      output = output.map(row => {
+
+        let newarray = []
+        for(let i in row)
+        {
+            if(!columnstodelete.includes(i))
+            {
+                newarray.push(row[i]);
+            }
+        }
+        return newarray
+    });
+
+    return output.map(e => e.join(seperator)).join("\n");
+ }
+
+ function extractContent(s) {    
+    var span = document.createElement('span');    
+    span.innerHTML = s;
+    if(span.textContent == "" && span.innerText == "")
+    {
+        var htmlObject = $(s);
+        if(htmlObject && htmlObject.is(":checkbox")) {
+            return htmlObject.is(':checked')? "true" : "false";
+        }        
+    }
+    return span.textContent || span.innerText;
+  }
+     
+ function copyContent(str) {
+    const el = document.createElement('textarea');  // Create a <textarea> element
+    el.value = str;                                 // Set its value to the string that you want copied
+    el.setAttribute('readonly', '');                // Make it readonly to be tamper-proof
+    el.style.position = 'absolute';                 
+    el.style.left = '-9999px';                      // Move outside the screen to make it invisible
+    document.body.appendChild(el);                  // Append the <textarea> element to the HTML document
+    const selected =            
+        document.getSelection().rangeCount > 0        // Check if there is any content selected previously
+        ? document.getSelection().getRangeAt(0)     // Store selection if found
+        : false;                                    // Mark as false to know no selection existed before
+    el.select();                                    // Select the <textarea> content
+    document.execCommand('copy');                   // Copy - only works as a result of a user action (e.g. click events)
+    document.body.removeChild(el);                  // Remove the <textarea> element
+    if (selected) {                                 // If a selection existed before copying
+        document.getSelection().removeAllRanges();    // Unselect everything on the HTML document
+        document.getSelection().addRange(selected);   // Restore the original selection
+    }
+  };
+
+  function createdtButtons(dt, download_string) {
+    return [
+        {
+            text: 'Copy',
+            action: function () {
+                copyContent(getDTExportString(dt));
+            }
+        },
+        {
+            text: 'CSV',
+            action: function () {
+                air_download(download_string + "_csv.txt", etDTExportString(dt, seperator = ","))
+            }
+        },
+        {
+            text: 'TSV',
+            action: function () {
+                air_download(download_string + "_csv.txt", etDTExportString(dt))
+            }
+        }
+    ]
+  }
