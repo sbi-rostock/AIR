@@ -205,6 +205,8 @@
 .air_tab {
   color: #337ab7;
   font-weight: bold;
+  border-bottom: 1px solid darkgray !important;
+  height: 100%;
 }
 
 .btn-group {
@@ -294,9 +296,6 @@ input[type=checkbox] .cbcontainer {
   margin-bottom: 5px;
 }
 
-.air_tab {
-  border-bottom: 1px solid darkgray !important;
-}
 .air_nav_tabs, .air_tab {
     border: 0px solid transparent;
     border-top-left-radius: 1rem !important;
@@ -334,7 +333,7 @@ input[type=checkbox] .cbcontainer {
 .air_tab_pane {
   overflow-y: scroll;
   overflow-x: hidden;
-  height: calc(100vh - 91px);
+  height: calc(100vh - 185px);
   padding-right: 5px;
 }
 
@@ -397,3 +396,69 @@ input[type=checkbox] .cbcontainer {
     text-align: center; 
     vertical-align: middle;
   }
+
+  
+.air_inputfile {
+  background-color: transparent !important;
+  cursor: pointer; }
+
+.air_inputfile {
+  font-size: 1.0em;
+  font-weight: 500;
+  color: black;
+  display: inline-block; }
+
+  ._airspinner {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height:60px;
+    width:60px;
+    margin:0px auto;
+    -webkit-animation: rotation .6s infinite linear;
+    -moz-animation: rotation .6s infinite linear;
+    -o-animation: rotation .6s infinite linear;
+    animation: rotation .6s infinite linear;
+    border-left:6px solid rgba(0,174,239,.15);
+    border-right:6px solid rgba(0,174,239,.15);
+    border-bottom:6px solid rgba(0,174,239,.15);
+    border-top:6px solid rgba(0,174,239,.8);
+    border-radius:100%;
+ }
+ 
+ @-webkit-keyframes rotation {
+    from {-webkit-transform: rotate(0deg);}
+    to {-webkit-transform: rotate(359deg);}
+ }
+ @-moz-keyframes rotation {
+    from {-moz-transform: rotate(0deg);}
+    to {-moz-transform: rotate(359deg);}
+ }
+ @-o-keyframes rotation {
+    from {-o-transform: rotate(0deg);}
+    to {-o-transform: rotate(359deg);}
+ }
+ @keyframes rotation {
+    from {transform: rotate(0deg);}
+    to {transform: rotate(359deg);}
+ }
+
+ .left-col {
+  float: left;
+  width: 40%;
+}
+
+.right-col {
+  float: left;
+  width: 60%;
+}
+
+.air_dt_btn 
+{
+    border: 1px solid gray;
+    color: gray;
+    background-color: white;
+    width: 50px;
+    border-radius: 8px;
+    font-size: 15px;
+}

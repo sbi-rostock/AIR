@@ -1,10 +1,18 @@
-let fileURL = '';
-let filetesting;
+let ENABLE_API_CALLS = true;
+let FILE_URL = '';
+let TESTING;
+
+//npm modules
 let Chart;
 let JSZip;
 let FileSaver;
 let VCF;
 let ttest;
+
+Object.filter = (obj, predicate) => 
+    Object.keys(obj)
+          .filter( key => predicate(key) )
+          .reduce( (res, key) => (res[key] = obj[key], res), {} );
 
 const AIR = {
     HGNCElements: [],
@@ -15,7 +23,7 @@ const AIR = {
     MoleculeNames: {},
     Interactions: {},
     ElementNames: {
-
+        fullname: {},
         name:{},
         uniprot: {},
         mirbasemature: {},
@@ -292,6 +300,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
 
                                 for(let element in AIR.Molecules)
                                 {
+                                    if(!AIR.ElementNames.fullname.hasOwnProperty(AIR.Molecules[element].name.toLowerCase()))
+                                        AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()] = [];
+                                    AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()].push(element)
+
                                     if(AIR.Molecules[element].complex === false)
                                     {
                                         for(let id in AIR.Molecules[element].ids)
@@ -669,109 +681,134 @@ function getLinkIconHTML(element) {
 }
 
 function createLinkCell(row, type, text, style, align) {
-               // append text node to the DIV
-    var cell = document.createElement(type); // create text node
-    cell.innerHTML = getLinkIconHTML(text);                    // append text node to the DIV
-    cell.setAttribute('class', style);
-    cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;');             // append DIV to the table cell
-    row.appendChild(cell);
+    // append text node to the DIV
+var cell = document.createElement(type); // create text node
+cell.innerHTML = getLinkIconHTML(text);                    // append text node to the DIV
+cell.setAttribute('class', style);
+cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;');             // append DIV to the table cell
 
-    return cell;
+if(row != null)
+row.appendChild(cell);
+
+return cell;
 }
 
 
 function createCell(row, type, text, style, scope, align, nowrap = false, order = "") {
-    var cell = document.createElement(type); // create text node
-    cell.innerHTML = text;                    // append text node to the DIV
-    cell.setAttribute('class', style);
-    if(order)
-    {
-        cell.setAttribute("data-order", order);
-    }
-    if(scope != '')
-        cell.setAttribute('scope', scope);  // set DIV class attribute // set DIV class attribute for IE (?!)
-    if(nowrap)
-        cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;'); 
-    else
-        cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
-    row.appendChild(cell);
+var cell = document.createElement(type); // create text node
+cell.innerHTML = text;                    // append text node to the DIV
+cell.setAttribute('class', style);
+if(order)
+{
+cell.setAttribute("data-order", order);
+}
+if(scope != '')
+cell.setAttribute('scope', scope);  // set DIV class attribute // set DIV class attribute for IE (?!)
+if(nowrap)
+cell.setAttribute('style', 'text-align: ' + align + '; white-space: nowrap; vertical-align: middle;'); 
+else
+cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
 
-    return cell;
+if(row != null)
+row.appendChild(cell);
+
+return cell;
 }
 
 function createPopupCell(row, type, text, style, align, callback, callbackParameters, order = "") {
-    var cell = document.createElement(type); // create text node                  // append text node to the DIV
-    cell.setAttribute('class', style);
-    cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
-    if(order)
-    {
-        cell.setAttribute("data-order", order);
-    }
-
-    var button = document.createElement('button'); // create text node
-    button.innerHTML = text;
-    button.setAttribute('type', 'button');
-    button.setAttribute('class', 'air_invisiblebtn');
-    button.setAttribute('style', 'cursor: pointer;');
-    button.onclick = function(){
-        callback(button, callbackParameters)
-    }
-
-    cell.appendChild(button);
-
-    $(cell).append();
-
-
-    row.appendChild(cell);
-
-    return cell;
+var cell = document.createElement(type); // create text node                  // append text node to the DIV
+cell.setAttribute('class', style);
+cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');               // append DIV to the table cell
+if(order)
+{
+cell.setAttribute("data-order", order);
 }
-function createButtonCell(row, type, text, data, align) {
-    var button = document.createElement('button'); // create text node
-    button.innerHTML = text;
-    button.setAttribute('type', 'button');
-    button.setAttribute('class', 'clickPhenotypeinTable air_invisiblebtn');
-    button.setAttribute('data', data);
 
-    var cell = document.createElement(type); // create text node
-    cell.appendChild(button);
-    cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
-    row.appendChild(cell);
-
-    return button; // append DIV to the table cell
+var button = document.createElement('button'); // create text node
+button.innerHTML = text;
+button.setAttribute('type', 'button');
+button.setAttribute('class', 'air_invisiblebtn');
+button.setAttribute('style', 'cursor: pointer;');
+button.onclick = function(){
+callback(button, callbackParameters)
 }
-function checkBoxCell(row, type, text, data, align, prefix) {
-    var button = document.createElement('input'); // create text node
-    button.innerHTML = text;
-    button.setAttribute('type', 'checkbox');
-    button.setAttribute('class', prefix + 'clickCBinTable');
-    button.setAttribute('data', data);
 
-    var cell = document.createElement(type); // create text node
-    cell.appendChild(button);
-    cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
-    row.appendChild(cell);// append DIV to the table cell
+cell.appendChild(button);
+
+$(cell).append();
+
+if(row != null)
+row.appendChild(cell);
+
+return button;
+}
+function createButtonCell(row, type, text, align) {
+var button = document.createElement('button'); // create text node
+button.innerHTML = text;
+button.setAttribute('type', 'button');
+button.setAttribute('class', 'air_invisiblebtn');
+
+var cell = document.createElement(type); // create text node
+cell.appendChild(button);
+cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
+row.appendChild(cell);
+
+return button; // append DIV to the table cell
+}
+function checkBoxCell(row, type, text, data, align, prefix, _checked = false) {
+var button = document.createElement('input'); // create text node
+button.innerHTML = text;
+button.checked = _checked;
+button.setAttribute('type', 'checkbox');
+button.setAttribute('class', prefix + 'clickCBinTable');
+button.setAttribute('data', data);
+
+var cell = document.createElement(type); // create text node
+cell.appendChild(button);
+cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
+row.appendChild(cell);// append DIV to the table cell
 }
 
 function createSliderCell(row, type, data) {
-    var button = document.createElement('input'); // create text node
-    button.setAttribute('type', 'range');
-    button.setAttribute('value', '0');
-    button.setAttribute('min', '-2');
-    button.setAttribute('max', '2');
-    button.setAttribute('step', '0.1');
-    button.setAttribute('class', 'slider air_slider');
+var button = document.createElement('input'); // create text node
+button.setAttribute('type', 'range');
+button.setAttribute('value', '0');
+button.setAttribute('min', '-1');
+button.setAttribute('max', '1');
+button.setAttribute('step', '0.05');
+button.setAttribute('class', 'slider air_slider');
 
-    var cell = document.createElement(type);
-    cell.setAttribute('style', 'text-align: center; vertical-align: middle;');     // create text node
-    cell.appendChild(button);     // append DIV to the table cell
-    row.appendChild(cell);
+var cell = document.createElement(type);
+cell.setAttribute('style', 'text-align: center; vertical-align: middle;');     // create text node
+cell.appendChild(button);     // append DIV to the table cell
+row.appendChild(cell);
 
 
 
-    return button;
+return button;
+}
+async function disablediv(id, progress = false) {
+var promise = new Promise(function(resolve, reject) {
+setTimeout(() => {
+ var $btn = $('#'+id);
+ $btn.addClass("air_spinner")
+ $btn.addClass("air_disabledbutton")
+ resolve()
+}, 0);
+});
+return promise;
 }
 
+async function enablediv(id) {
+return new Promise(resolve => {
+setTimeout(() => {
+ var $btn = $('#'+id);
+ $btn.removeClass("air_spinner")
+ $btn.removeClass("air_disabledbutton")
+ resolve()
+}, 0);
+});
+}
 async function disablebutton(id, progress = false) {
     var promise = new Promise(function(resolve, reject) {
         setTimeout(() => {
@@ -1112,4 +1149,416 @@ function union(setA, setB) {
         _union.add(elem)
     }
     return _union
+}
+
+
+function findPhenotypePath(element, phenotype, perturbedElements = [], visualize = true)
+{
+           
+    getMoleculeData(phenotype, type = "path").then(pathdata => {
+        
+            
+        let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+    
+        var pathsfromelement = newpaths.filter(p => p.startsWith(element + "_"));
+
+
+        if(pathsfromelement.length > 0)
+        {
+            let _additionalelements = perturbedElements.reduce((accumulator, currentValue) => {
+                accumulator[currentValue] = "#a9a9a9";
+                return accumulator;
+              }, {});
+              
+            let shortestpath = pathsfromelement.reduce((a, b) => (a.match(/_/g) || []).length <= (b.match(/_/g) || []).length ? a : b);
+            highlightPath(shortestpath.split("_"), pathdata.paths[shortestpath] == -1 ? "#ff0000" : "#0000ff",  _additionalelements);
+        }
+    });
+}
+
+function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hideprevious = true) {
+
+    let _additionalelements = Object.fromEntries(
+        Object.entries(additionalelements).map(([k, v]) => [AIR.Molecules[k].name.toLowerCase(), v])
+      );
+    let elements = [];
+    for(let i = 0; i < _elements.length - 1; i++)
+    {
+        let source = _elements[i];
+        let target = _elements[i+1];
+        elements.push({
+            "source": AIR.Molecules[source].name.toLowerCase(),
+            "target": AIR.Molecules[target].name.toLowerCase()
+        })
+        for(let parent of AIR.Molecules[source].family)
+        {
+            elements.push({
+                "source": AIR.Molecules[parent].name.toLowerCase(),
+                "target": AIR.Molecules[target].name.toLowerCase()
+            })
+        }
+        for(let parent of AIR.Molecules[target].family)
+        {
+            elements.push({
+                "source": AIR.Molecules[source].name.toLowerCase(),
+                "target": AIR.Molecules[parent].name.toLowerCase()
+            })
+        }
+    }
+
+    minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
+
+        minervaProxy.project.map.hideBioEntity(hideprevious? highlighted : []).then(r => {
+
+            highlightDefs =[]
+            let modeids = {};
+
+            for(let r of AIR.MapReactions)
+            {
+                for(let path of elements)
+                {
+                    if(r.products.includes(path.target) && (r.reactants.includes(path.source) || r.modifiers.includes(path.source)))
+                    {
+                        highlightDefs.push({
+                            element: {
+                                id: r.id,
+                                modelId: r.modelId,
+                                type: "REACTION"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                lineColor: color
+                            }                    
+                        })
+
+                        if(modeids.hasOwnProperty(r.modelId))
+                        {
+                            modeids[r.modelId] += 1;
+                        }
+                        else
+                        {
+                            modeids[r.modelId] = 1;
+                        }
+                    }
+                }
+
+            };
+
+            if (Object.keys(modeids).length > 0) {
+                minervaProxy.project.map.openMap({"id": parseFloat(Object.keys(modeids).reduce((a, b) => modeids[a] > modeids[b] ? a : b))});
+            }
+            AIR.allBioEntities.forEach(e => {
+                if (e.constructor.name === 'Alias')
+                {
+
+                    if (e.getName().toLowerCase() == elements[0].source || e.getName().toLowerCase() == elements[elements.length - 1].target) {
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "ICON"
+                        });
+                    }
+                    else if (_additionalelements.hasOwnProperty(e.getName().toLowerCase())) {
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                color: _additionalelements[e.getName().toLowerCase()]
+                            }
+    
+                        });
+                    }
+                }
+            });
+
+            minervaProxy.project.map.showBioEntity(highlightDefs);
+        });
+    });
+}
+
+async function getPerturbedInfluences(phenotype, perturbedElements) {
+    return new Promise((resolve, reject) =>  
+    {
+        getMoleculeData(phenotype, type = "path").then(pathdata => {
+
+            let influencevalues = {
+                values: {},
+                SPs: {}
+            }
+
+            let regulators = new Set();
+            Object.keys(pathdata.paths).map(path => path.split("_").map(e => regulators.add(e)));
+            regulators = Array.from(regulators);
+
+            if(perturbedElements.every(e => regulators.includes(e) == false))
+            {
+                resolve({
+                    values: AIR.Phenotypes[phenotype].values,
+                    SPs: AIR.Phenotypes[phenotype].SPs,
+                });
+
+                return;
+            }
+
+            
+            let newregulators = regulators.filter(e => perturbedElements.includes(e) == false)
+            let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+
+            for(let e of newregulators)
+            {
+                // paths from e to p as strings and arrays
+                var epaths = newpaths.filter(p => p.startsWith(e + "_"))
+                var epatharrays = epaths.map(path => path.split("_"));
+
+                if(epaths.length == 0)
+                {
+                    continue;
+                }
+
+                //number of elements that are included in paths from e to p
+                var elementsonpaths = new Set();
+                epatharrays.map(path => path.map(e => elementsonpaths.add(e)));
+
+                //find shortest path type from e to p
+                let minlength = epatharrays.reduce((a, b) => a.length <= b.length ? a : b).length
+                var filteredpaths = epaths.filter(path => path.split("_").length == minlength);
+                var objetvalues = Object.values(Object.filter(pathdata.paths, path => filteredpaths.includes(path)));
+                var type = Math.min.apply(null, objetvalues);
+
+                influencevalues.SPs[e] = minlength * type;
+
+                // number of paths to p that include e
+                var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
+                if(pathdata.modifiers.hasOwnProperty(e))
+                {
+                    for(let m in pathdata.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
+                    {
+                        newpaths.filter(p => p.includes(m)).map(path => includedpaths.add(path));
+                    }
+                }
+
+                influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
+            };            
+
+            for(let e in pathdata.regulators)
+            {
+                if(newregulators.includes(e) || perturbedElements.includes(e))
+                {
+                    continue;
+                }
+                
+                for(let connectedSP in pathdata.regulators[e])
+                {
+                    for(let t of pathdata.regulators[e][connectedSP])
+                    {
+                        if(perturbedElements.includes(t))
+                        {
+                            continue;
+                        }                            
+                        if(influencevalues.values.hasOwnProperty(t))
+                        {
+                            influencevalues.values[e] = influencevalues.values[t] / (Math.abs(connectedSP) + 1) * Math.sign(connectedSP);
+                        }
+                        if(influencevalues.SPs.hasOwnProperty(t))
+                        {
+                            influencevalues.SPs[e] = (Math.abs(influencevalues.SPs[t]) + 1) * Math.sign(influencevalues.SPs[t]) * Math.sign(connectedSP);
+                        }
+                    }
+                }                
+            }
+
+            let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
+            Object.keys(influencevalues.values).map(function(key, index) {
+                influencevalues.values[key] /= maxvalue;
+              });
+
+            resolve(influencevalues);
+        });
+    });
+}
+
+function pickHighest(obj, _num = 1, ascendend = true) {
+
+    let num = _num;
+    let requiredObj = {};
+
+    if(num > Object.keys(obj).length){
+       num = Object.keys(obj).length;
+    };
+
+    if(ascendend)
+    {
+        Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach((key, ind) =>
+        {
+           if(ind < num){
+              requiredObj[key] = obj[key];
+           }
+        });
+    }
+    else {
+        Object.keys(obj).sort((a, b) => obj[a] - obj[b]).forEach((key, ind) =>
+        {
+           if(ind < num){
+              requiredObj[key] = obj[key];
+           }
+        });
+    }
+    return requiredObj;
+ };
+
+ function getDTExportString(dt, seperator = "\t")
+ {
+    let output = [];
+
+
+    dt.rows().every( function ( rowIdx, tableLoop, rowLoop ) {
+        output.push(this.data().map( function( cell ) { 
+              return extractContent(cell); 
+              }));
+    } );
+ 
+    let columnstodelete = [];
+
+    if(output.length > 1)
+    {
+        let index_hasValue = {}
+        for(let i in output[0])
+        {
+            index_hasValue[i] = false;
+        }
+        for(let row of output)
+        {
+            for(let i in row)
+            {
+                if(row[i] != "")
+                {
+                    index_hasValue[i] = true;
+                }
+            }
+        }
+
+        columnstodelete = Object.keys(index_hasValue).filter(key => index_hasValue[key] === false)
+    }
+
+
+    output.unshift([]);
+    dt.columns().every(function() {
+        output[0].push(this.header().textContent )
+      })
+
+      output = output.map(row => {
+
+        let newarray = []
+        for(let i in row)
+        {
+            if(!columnstodelete.includes(i))
+            {
+                newarray.push(row[i]);
+            }
+        }
+        return newarray
+    });
+
+    return output.map(e => e.join(seperator)).join("\n");
+ }
+
+ function extractContent(s) {    
+    var span = document.createElement('span');    
+    span.innerHTML = s;
+    if(span.textContent == "" && span.innerText == "")
+    {
+        var htmlObject = $(s);
+        if(htmlObject && htmlObject.is(":checkbox")) {
+            return htmlObject.is(':checked')? "true" : "false";
+        }        
+    }
+    return span.textContent || span.innerText;
+  }
+     
+ function copyContent(str) {
+    const el = document.createElement('textarea');  // Create a <textarea> element
+    el.value = str;                                 // Set its value to the string that you want copied
+    el.setAttribute('readonly', '');                // Make it readonly to be tamper-proof
+    el.style.position = 'absolute';                 
+    el.style.left = '-9999px';                      // Move outside the screen to make it invisible
+    document.body.appendChild(el);                  // Append the <textarea> element to the HTML document
+    const selected =            
+        document.getSelection().rangeCount > 0        // Check if there is any content selected previously
+        ? document.getSelection().getRangeAt(0)     // Store selection if found
+        : false;                                    // Mark as false to know no selection existed before
+    el.select();                                    // Select the <textarea> content
+    document.execCommand('copy');                   // Copy - only works as a result of a user action (e.g. click events)
+    document.body.removeChild(el);                  // Remove the <textarea> element
+    if (selected) {                                 // If a selection existed before copying
+        document.getSelection().removeAllRanges();    // Unselect everything on the HTML document
+        document.getSelection().addRange(selected);   // Restore the original selection
+    }
+  };
+
+  function createdtButtons(dt, download_string) {
+    return [
+        {
+            text: 'Copy',
+            action: function () {
+                copyContent(getDTExportString(dt));
+            }
+        },
+        {
+            text: 'CSV',
+            action: function () {
+                air_download(download_string + "_csv.txt", etDTExportString(dt, seperator = ","))
+            }
+        },
+        {
+            text: 'TSV',
+            action: function () {
+                air_download(download_string + "_csv.txt", etDTExportString(dt))
+            }
+        }
+    ]
+  }
+
+  function ColorElements(_elements, hideprevious = true) {
+
+    let elements = Object.fromEntries(
+        Object.entries(_elements).map(([k, v]) => [k.toLowerCase(), v])
+      );
+
+    minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
+
+        minervaProxy.project.map.hideBioEntity(hideprevious? highlighted : []).then(r => {
+
+            highlightDefs =[]
+            
+            AIR.allBioEntities.forEach(e => {
+                if (e.constructor.name === 'Alias')
+                {
+                    let e_name = e.name + "_" + (e._compartmentId != null? AIR.Compartments[e._compartmentId] : "secreted"); 
+                    if(elements.hasOwnProperty(e_name.toLowerCase())) {
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                color: elements[e_name.toLowerCase()]
+                            }
+
+                        });
+                    }
+                }
+            });
+
+            minervaProxy.project.map.showBioEntity(highlightDefs);
+        });
+    });
 }

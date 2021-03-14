@@ -239,7 +239,7 @@ async function AirGenvar(){
             var _text = disablebutton("gv_readfile")
             var client = new XMLHttpRequest();
 
-            client.open('GET', fileURL + genome + '_genome.json');
+            client.open('GET', FILE_URL + genome + '_genome.json');
             client.onreadystatechange = async function() {
                 if (this.readyState == 4)
                 {
@@ -530,12 +530,9 @@ async function AirGenvar(){
                 
                 if(AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim()))
                 {
-                    for(var m of AIR.ElementNames.name[element.toLowerCase().trim()])
-                    {
-                        _idset.add(m)
-                        globals.variant.selected_elements.add(AIR.Molecules[m].name)
-                    }
-
+                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
+                    _idset.add(m)
+                    globals.variant.selected_elements.add(AIR.Molecules[m].name)
                 }
                 else 
                 {
@@ -671,8 +668,7 @@ async function getConsequences()
             var e = _e.trim().toLowerCase();
             if(AIR.ElementNames.name.hasOwnProperty(e))
             {
-                for(let m of AIR.ElementNames.name[e])
-                    _elementids.add(m)
+                _elementids.add(AIR.ElementNames.name[e])
             }
         });
     }
@@ -762,7 +758,7 @@ async function getConsequences()
                 var c = variant["CHROM"]
                 var _result = []
 
-                if(r.length != 1)
+                if(r.length != 1 || ENABLE_API_CALLS == false)
                 {
                     resolve([])
                 }
