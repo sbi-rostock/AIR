@@ -105,34 +105,6 @@ async function initMainPageStructure() {
     return false;
   }
 
-  var url = new URL(window.location.href);
-  var query = url.searchParams.get("AirPluginSource");
-
-  if (query == null) {
-    $("#gal_stat_spinner").html(`
-            <div class="alert alert-danger ml-2 mr-2" role="alert">
-                <span><i class="fas fa-exclamation-triangle"></i></span>
-                <span class="sr-only">Error:</span>
-                Please supply a 'datasource' parameter within the URL.
-            </div>    
-        `);
-  } else {
-    try {
-      new URL(query);
-    } catch (_) {
-      $("#gal_stat_spinner").html(`
-                <div class="alert alert-danger ml-2 mr-2" role="alert">
-                    <span><i class="fas fa-exclamation-triangle"></i></span>
-                    <span class="sr-only">Error:</span>
-                    The data source is not a valid URL.
-                </div>    
-            `);
-      return;
-    }
-
-    globalURL = query;
-  }
-
   let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : globalURL;

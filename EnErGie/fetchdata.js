@@ -195,7 +195,19 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                         t0 = performance.now();
                                                         readCentralityValues().then(r => {
                                                             t1 = performance.now()
-                                                            console.log("Call to centralities took " + (t1 - t0) + " milliseconds.")
+                                                            console.log("Call to centralities took " + (t1 - t0) + " milliseconds.");                                                            
+                                                            $("#stat_spinner").before(`
+                                                            <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
+                                                                <span>The AirPlugins are still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>     
+                                                            `)
+                                                            $('#air_welcome_alert .close').on('click', function() {
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 90px)");
+                                                             });
+                                                            resolve(AIR);
                                                             resolve(AIR);
                                                         });
                                                     });
