@@ -177,16 +177,16 @@ async function initMainPageStructure() {
 
     <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
         <li class="air_nav_item nav-item"  style="width: 25%;">
-            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">LsdXplore</a>
+            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">LsdOmics</a>
+            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">LsdVariant</a>
+            <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
         </li>
         <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">LsdMassSpec</a>
+            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
         </li>
     </ul>
     <div class="tab-content" id="air_tab">
@@ -199,6 +199,7 @@ async function initMainPageStructure() {
         <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
         </div>
     </div>
+
 
     `);
 
