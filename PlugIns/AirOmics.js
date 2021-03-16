@@ -1753,22 +1753,29 @@ async function om_PhenotypeSP() {
 
             let numberOfHigherScores = 0;
 
-            for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
+            if(elements_with_FC.length == 0)
             {
-                SP_Values = shuffle(SP_Values);
-                let pseudo_activity = 0;
-
-                for(let _id in elements_with_FC)
-                {
-                    pseudo_activity += elements_with_FC[_id] * SP_Values[_id]
-                }
-                if(Math.abs(pseudo_activity) > Math.abs(activity) && Math.sign(pseudo_activity) == Math.sign(activity))
-                {
-                    numberOfHigherScores ++;
-                }
-
+                AIR.Phenotypes[phenotype].pvalue[sample] = 1;
             }
-            AIR.Phenotypes[phenotype].pvalue[sample] = numberOfHigherScores / globals.omics.numberOfRandomSamples;
+            else
+            {
+                for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
+                {
+                    SP_Values = shuffle(SP_Values);
+                    let pseudo_activity = 0;
+
+                    for(let _id in elements_with_FC)
+                    {
+                        pseudo_activity += elements_with_FC[_id] * SP_Values[_id]
+                    }
+                    if(Math.abs(pseudo_activity) > Math.abs(activity) && Math.sign(pseudo_activity) == Math.sign(activity))
+                    {
+                        numberOfHigherScores ++;
+                    }
+
+                }
+                AIR.Phenotypes[phenotype].pvalue[sample] = numberOfHigherScores / globals.omics.numberOfRandomSamples;
+            }
             accuracyvalues.push(accuracy);
         }
 

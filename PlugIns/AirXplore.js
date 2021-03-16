@@ -2114,6 +2114,15 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                     globals.xplore.targettable.clear();
                     await xp_updatePhenotypeTable();
                 }
+                for(let s of AIR.Molecules[elementid].subunits)
+                {
+                    globals.xplore.regulationtable.row.add([
+                        getLinkIconHTML(AIR.Molecules[s].name),
+                        "Subunit",
+                        AIR.Molecules[s].subtype,
+                        ""
+                    ])
+                }
 
                 for(let inter in AIR.Interactions)
                 {

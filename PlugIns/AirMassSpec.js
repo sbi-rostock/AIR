@@ -1608,7 +1608,7 @@ async function initializeData() {
     return new Promise((resolve, reject) => {
         var client = new XMLHttpRequest();
 
-        var _url = fileURL + "Metabolite_meta.txt";
+        var _url = FILE_URL + "Metabolite_meta.txt";
         client.open('GET', _url);
         client.onreadystatechange = async function() {
             if (this.readyState == 4)

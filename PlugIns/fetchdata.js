@@ -203,7 +203,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                             </div>     
                                                             `)
                                                             $('#air_welcome_alert .close').on('click', function() {
-                                                                $(".air_tab_pane").css("height", "calc(100vh - 80px)");
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 90px)");
                                                              });
                                                             resolve(AIR);
                                                         });
