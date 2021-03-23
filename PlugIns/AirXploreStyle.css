@@ -462,3 +462,15 @@ input[type=checkbox] .cbcontainer {
     border-radius: 8px;
     font-size: 15px;
 }
+
+.air_table_background {
+  border: 2px,black;
+  background-color: lightgray;
+  padding: 10px;
+  border-radius: 25px;
+}
+.air_datatable {
+  background-color: white;
+    border-radius: 25px;
+    padding: 10px;
+}

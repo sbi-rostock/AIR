@@ -380,6 +380,7 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
     $("#xp_import_undo").removeClass("air_disabledbutton");
 
     await recalculateInfluenceScores();
+    await setPeTable();
     await xp_EstimatePhenotypes();
 });
 
@@ -492,7 +493,6 @@ async function recalculateInfluenceScores()
 
 async function setPeTable()
 {
-    await recalculateInfluenceScores();
     return new Promise((resolve, reject) => {
         if (globals.xplore.pe_element_table)
             globals.xplore.pe_element_table.destroy(); 
@@ -511,14 +511,16 @@ async function setPeTable()
             createCell(row, 'td', getFontfromValue(globals.xplore.pe_data[globals.xplore.pe_data_index][e].value), 'col slidervalue', '', 'center').setAttribute('id', 'ESliderValue' + e);
             var slider = createSliderCell(row, 'td', e);
             slider.setAttribute('id', 'ESlider' + e);
-            slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e]);
+            slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e].value);
             slider.onchange = function () {
-                let value = this.value;
+                let value = parseFloat(this.value);
                 $("#ESliderValue" + e).html(getFontfromValue(parseFloat(value)));
-                globals.xplore.pe_data[globals.xplore.pe_data_index][e] = {
-                    "perturbed": false,
-                    "value": value
-                }
+
+                globals.xplore.pe_data_index += 1;
+                globals.xplore.pe_data[globals.xplore.pe_data_index] = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index - 1]));
+
+                globals.xplore.pe_data[globals.xplore.pe_data_index][e].value = value;
+
                 globals.xplore.pe_element_table.rows( $("#ESliderValue" + e).closest("tr")).invalidate().draw();
                 xp_EstimatePhenotypes()
 
@@ -586,6 +588,7 @@ async function setPeTable()
                 { "width": "10%" }
             ]
         } ).columns.adjust().draw();
+        $(globals.xplore.pe_element_table.table().container() ).addClass( 'air_datatable' );
         /*
         for(let btn of createdtButtons(this, download_string))
         {
@@ -626,33 +629,36 @@ async function getPhenotypePanel()
                     <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
                 </div>
             </div>
-            <table id="xp_table_pe_elements" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
-                <thead>
-                    <tr>
-                        <th style="vertical-align: middle;">Element</th>
-                        <th style="vertical-align: middle;">Knockout</th>
-                        <th style="vertical-align: middle;">FC</th>
-                        <th style="vertical-align: middle;"></th>
-                        <th style="vertical-align: middle;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-
+            <div class="air_table_background">
+                <table id="xp_table_pe_elements" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th style="vertical-align: middle;">Element</th>
+                            <th style="vertical-align: middle;">Knockout</th>
+                            <th style="vertical-align: middle;">FC</th>
+                            <th style="vertical-align: middle;"></th>
+                            <th style="vertical-align: middle;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
             <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
             <h4 class="mb-4">Resulting phenotype levels:</h4>
-            <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
-                <thead>
-                    <tr>
-                        <th style="vertical-align: middle;">Phenotype</th>
-                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
-                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">% Regulators</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
+            <div class="air_table_background">
+                <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th style="vertical-align: middle;">Phenotype</th>
+                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
+                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">% Regulators</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
         </div>`);
 
         $("#xp_pe_selectedelement_btn").tooltip();
@@ -668,6 +674,7 @@ async function getPhenotypePanel()
             "table-layout": "fixed", // ***********add this
             "word-wrap": "break-word", 
         } );
+        $(globals.xplore.pe_element_table.table().container() ).addClass( 'air_datatable' );
 
         globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
             "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
@@ -718,7 +725,7 @@ async function getPhenotypePanel()
                 },
             ]
         } );
-        
+        $(globals.xplore.pe_results_table.table().container() ).addClass( 'air_datatable' );
         
         $('#xp_table_pe_results').on( 'page.dt', function () {
             adjustPanels(globals.xplore.container);
@@ -750,7 +757,8 @@ async function getPhenotypePanel()
             {
                 $("#xp_import_undo").addClass("air_disabledbutton");
             }
-
+            
+            await recalculateInfluenceScores();
             await setPeTable()
             await xp_EstimatePhenotypes();
         })
@@ -770,6 +778,7 @@ async function getPhenotypePanel()
                 $('#xp_import_redo').addClass("air_disabledbutton");
             }
 
+            await recalculateInfluenceScores();
             await setPeTable()
             await xp_EstimatePhenotypes();
         })
@@ -1299,7 +1308,11 @@ function getTargetPanel() {
         createCell(headerrow, 'th', 'logFC', 'col', '', 'center');
         createCell(headerrow, 'th', 'Select FC', 'col-2', '', 'center');
 
-        globals.xplore.targetpanel.append(tbl);
+        var _div = document.createElement("div");
+        _div.setAttribute('class', "air_table_background");
+        _div.appendChild(tbl);
+
+        globals.xplore.targetpanel.append(_div);
 
         globals.xplore.targetphenotypetable = $('#xp_table_target_phenotype').DataTable({
             //"scrollX": true,
@@ -1312,6 +1325,7 @@ function getTargetPanel() {
                 { "width": "50%" }
             ]
         } );
+        $(globals.xplore.targetphenotypetable.table().container() ).addClass( 'air_datatable' );
 
         globals.xplore.targetphenotypetable.on('click', 'a', function () {
             selectElementonMap(this.innerHTML, false);

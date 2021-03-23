@@ -33,13 +33,6 @@ const AIR = {
         chebi:{},
         ensembl: {},
     },
-    Centrality: {
-        Betweenness: {},
-        Closeness: {},
-        Degree: {},
-        Indegree: {},
-        Outdegree: {},
-    },
     centralityheader: new Set(),
     MapSpecies: [],
     MapSpeciesLowerCase: [],
@@ -309,17 +302,21 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
 
                                 for(let element in AIR.Molecules)
                                 {
-                                    if(AIR.Molecules[element].complex === false)
-                                    {
-                                        for(let id in AIR.Molecules[element].ids)
-                                        {                                            
-                                            let db_key = id.replace('.','');
-                                            if(AIR.ElementNames.hasOwnProperty(db_key))
-                                            {
-                                                if(!AIR.ElementNames[db_key].hasOwnProperty(AIR.Molecules[element].ids[id]))
-                                                    AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = [];
-                                                AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]].push(element)
-                                            }
+                                    AIR.Molecules[element]["Centrality"] = {
+                                        Betweenness: {},
+                                        Closeness: {},
+                                        Degree: {},
+                                        Indegree: {},
+                                        Outdegree: {},
+                                    }
+                                    for(let id in AIR.Molecules[element].ids)
+                                    {                                            
+                                        let db_key = id.replace('.','');
+                                        if(AIR.ElementNames.hasOwnProperty(db_key))
+                                        {
+                                            if(!AIR.ElementNames[db_key].hasOwnProperty(AIR.Molecules[element].ids[id]))
+                                                AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = [];
+                                            AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]].push(element)
                                         }
                                     }
                                     if(AIR.Molecules[element].type === "PHENOTYPE")

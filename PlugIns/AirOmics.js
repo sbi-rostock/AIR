@@ -40,6 +40,20 @@ async function AirOmics(){
         import_data: {},
 
         seperator: "\t", 
+
+        SamplesWithCalculatedSP: [],
+        sc_chart: undefined,
+
+        abbreviations: {
+            "b": "Betweenness",
+            "c": "Closeness",
+            "i": "Indegree",
+            "o": "Outdegree",
+            "d": "Degree",
+            "e": "Expression"
+        },
+
+        selectedDataType: "",
     }
     let t0 = performance.now();
     globals.omics.om_container = $('#airomics_tab_content');
@@ -96,7 +110,7 @@ async function AirOmics(){
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary ml-1"
                                     data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="File Specifications"
-                                    data-content="A tab-delimited .txt file with log2 fold change values.<br/>
+                                    data-content="A tab- or comma-delimited .txt file with log2 fold change (differential analysis) or normalized read count (single smaple analysis) values.<br/>
                                     One column must contain the official probe names or IDs.">
                                 ?
                             </button>
@@ -139,11 +153,10 @@ async function AirOmics(){
                             <option value="name" selected>Gene Symbol</option>
                             <option value="uniprot">Uniprot ID</option>
                             <option value="HGNC">HGNC ID</option>
-                            <option value="entrez">Entrez ID</option>
                             <option value="ncbigene">NCBI gene ID</option>
                             <option value="chebi">ChEBI ID</option>
                             <option value="ensembl">Ensembl ID</option>
-                            <option value="mirbasemature">MIRBase ID</option>
+                            <option value="mirbase.mature">MIRBase ID</option>
                         </select>
                     </div>
                 </div>
@@ -152,7 +165,7 @@ async function AirOmics(){
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Integrating p-Values"
                                     data-content="If checked, every second column will be mapped as a p-value for the previous sample column.<br/>">
                                 ?
                             </button>
@@ -166,7 +179,7 @@ async function AirOmics(){
                     </div>
                 </div>
 
-                <div id="om_transcriptSelect-container" class="row mb-2">
+                <div id="om_transcriptSelect-container" class="row mb-4">
                     <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Multiple transcripts by:</span>
                     </div>
@@ -178,6 +191,27 @@ async function AirOmics(){
                             <option value="3">Highest absolute FC</option>
                             <option value="4">Lowest absolute FC</option>
                             <option value="5">Lowest p-value</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Analysis Type"
+                                    data-content="Decides on which analyses can be performed.<br/>Differential analysis predicts regulated processes and drug targets from datasets containing log2 fold change values of gene expression or molecule levels.<br/>Single sample analysis will compare altered network topology between samples from a dataset with normalized read counts.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto air_select_label" style="padding:0; width: 20%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Type of Data:</span>
+                    </div>
+                    <div class="col">
+                        <select id="om_analysistypeSelect" class="browser-default om_select custom-select">
+                            <option value="0" selected>Differential</option>
+                            <option value="1">Single Sample</option>
                         </select>
                     </div>
                 </div>
@@ -243,24 +277,73 @@ async function AirOmics(){
 
         <h4 class="mt-4 mb-4">2. Analyze Data</h4> 
 
-        <div class="air_disabledbutton" id="om_maintab" >
-            <ul class="air_nav_tabs nav nav-tabs" role="tablist">
-                <li class="air_nav_item nav-item" style="width: 40%;">
-                    <a class="air_tab air_tab_sub active nav-link" id="om_regulation-tab" data-toggle="tab" href="#om_regulation" role="tab" aria-controls="om_regulation" aria-selected="true">Phenotype Estimation</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 35%;">
-                    <a class="air_tab air_tab_sub nav-link" id="om_target-tab" data-toggle="tab" href="#om_target" role="tab" aria-controls="om_target" aria-selected="false">Regulator Prediction</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 25%;">
-                    <a class="air_tab air_tab_sub nav-link" id="om_enrichr-tab" data-toggle="tab" href="#om_enrichr" role="tab" aria-controls="om_enrichr" aria-selected="false">Enrichr</a>
-                </li>
-            </ul>
-            <div class="tab-content air_tab_content" id="om_tab">
+        <div class="air_disabledbutton" id="om_maintab">
 
-            </div>
         </div>
     `).appendTo('#airomics_tab_content');
 
+    $('#om_filetypeSelect').on('change', function() {
+        switch(parseFloat($("#om_filetypeSelect").val()))
+        {
+            case 1:
+                globals.omics.seperator = ",";
+                break;
+            case 0:
+                globals.omics.seperator = "\t";
+                break;
+        }
+
+        om_detectfile(true);
+    });
+
+    $('.air_btn_info[data-toggle="popover"]').popover();
+
+    $('#om_inputId').on('change', function() {
+        om_detectfile(false);
+    });
+
+    $('#om_mappingSelect').on('change', function() {
+        globals.omics.selectedmapping = this.value;
+    });
+
+    $('#om_initializebtn').on('click', function() {
+        Start(false);
+    });
+    
+
+    $('#om_initialize_import_btn').on('click', function() {
+        Start(true);
+    });
+
+
+    $("#om_import_massspec").on('click', importMassSpec);
+    $('#om_import_variant').on('click', importVariant);
+
+    $("#om_stat_spinner").remove();
+    
+
+    let t1 = performance.now()
+    console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
+}
+
+function createDifferentialAnalysisPanel()
+{
+    $("#om_maintab").empty().append(`            
+        <ul class="air_nav_tabs nav nav-tabs" role="tablist">
+            <li class="air_nav_item nav-item" style="width: 40%;">
+                <a class="air_tab air_tab_sub active nav-link" id="om_regulation-tab" data-toggle="tab" href="#om_regulation" role="tab" aria-controls="om_regulation" aria-selected="true">Phenotype Estimation</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 35%;">
+                <a class="air_tab air_tab_sub nav-link" id="om_target-tab" data-toggle="tab" href="#om_target" role="tab" aria-controls="om_target" aria-selected="false">Regulator Prediction</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 25%;">
+                <a class="air_tab air_tab_sub nav-link" id="om_enrichr-tab" data-toggle="tab" href="#om_enrichr" role="tab" aria-controls="om_enrichr" aria-selected="false">Enrichr</a>
+            </li>
+        </ul>
+        <div class="tab-content air_tab_content" id="om_tab">
+
+        </div>`
+    );
     globals.omics.phenotab = $(`
     <div class="tab-pane air_sub_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
         <div id="om_pheno_startcontainer">
@@ -289,7 +372,7 @@ async function AirOmics(){
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Absolute values"
                                 data-content="If checked, the absolute value of fold change will be considered for the phenotype assessement.<br/>">
                             ?
                         </button>
@@ -321,8 +404,8 @@ async function AirOmics(){
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                data-content="If checked, p-value are included as a weighting factor for phenotype regulators.<br/>">
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="p-value weighting"
+                                data-content="If checked, p-values are included as a weighting factor for phenotype regulators.<br/>">
                             ?
                         </button>
                     </div>
@@ -341,7 +424,7 @@ async function AirOmics(){
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
                                 data-content="Influence threshold (between 0 and 1) for regulators of phenotype to be considered for the analysis. Increasing the threshold may result in higher accuracy, if many significant probes are available.<br/>">
                             ?
                         </button>
@@ -365,8 +448,8 @@ async function AirOmics(){
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                data-content="Number of random samples to be generated for statistical evaluation. Larger numbers combined with large data sets will increase the calculation time.">
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Statistical evaluation."
+                                data-content="Number of random samples to be generated for statistical evaluation. Changing the number, espacially when using large datasets, will influence the calculation time.">
                             ?
                         </button>
                     </div>
@@ -390,7 +473,6 @@ async function AirOmics(){
     `
     ).appendTo('#om_tab');
 
-    
     $('#om_ithreshold_slider').on('input', function (e) {
         $("#om_ithreshold_value").html($(this).val());
     });
@@ -464,6 +546,18 @@ async function AirOmics(){
         <button type="button" id="om_btn_predicttarget" class="air_btn btn btn-block mt-1 mb-1">Predict Regulators</button>
         <hr>
     </div>`).appendTo('#om_tab');
+    
+    let sampleSelect = document.getElementById('om_select_sample');
+
+    for (let i = sampleSelect.options.length-1; i >= 0; i--) {
+        sampleSelect.options[i] = null;
+    };
+
+    for(let i = 0; i < globals.omics.samples.length; i++) {
+        sampleSelect.options[sampleSelect.options.length] = new Option(globals.omics.samples[i], i); 
+    };
+
+
     globals.omics.enrichrtab = $(`
         <div class="tab-pane air_sub_tab_pane mb-2" id="om_enrichr" role="tabpanel" aria-labelledby="om_enrichr-tab">
             <p>Define thresholds to create gene sets from the data:</p>
@@ -503,39 +597,13 @@ async function AirOmics(){
 
     $("#om_enrichr_progress").attr("aria-valuemax", Object.keys(globals.omics.samples).length);
 
-    $('#om_filetypeSelect').on('change', function() {
-        switch(parseFloat($("#om_filetypeSelect").val()))
-        {
-            case 1:
-                globals.omics.seperator = ",";
-                break;
-            case 0:
-                globals.omics.seperator = "\t";
-                break;
-        }
-
-        om_detectfile(true);
-    });
-
-    $('.air_btn_info[data-toggle="popover"]').popover();
-
-    $('#om_inputId').on('change', function() {
-        om_detectfile(false);
-    });
-
-    $('#om_mappingSelect').on('change', function() {
-        globals.omics.selectedmapping = this.value;
-    });
-
     $("#om_btn_predicttarget").on('click', function() {            
         OM_PredictTargets();
     });
     $("#om_btn_enrichr").on('click', function() {            
         enrichr();
     });
-    $('#om_initializebtn').on('click', function() {
-        Start(false);
-    });
+    
     $('#om_import_undo').on('click', function() {
         if(globals.omics.current_import_index <= 0)
         {
@@ -568,17 +636,6 @@ async function AirOmics(){
         }
     });
 
-
-    $('#om_initialize_import_btn').on('click', function() {
-        Start(true);
-    });
-
-
-    $("#om_import_massspec").on('click', importMassSpec);
-    $('#om_import_variant').on('click', importVariant);
-
-    $("#om_stat_spinner").remove();
-    
     globals.omics.targettab.append($(`
         <ul class="air_nav_tabs nav nav-tabs" role="tablist">
             <li class="air_nav_item nav-item" style="width: 50%;">
@@ -794,13 +851,451 @@ async function AirOmics(){
         ]
     }).columns.adjust().draw();
 
+    
+    $('.air_btn_info[data-toggle="popover"]').popover();
+}
 
-    let t1 = performance.now()
-    console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
+function createScAnalysisPanel()
+{
+    $("#om_maintab").empty().append(`            
+        <div class="mb-2 mt-4" style="overflow: hidden;">
+            <div class="air_checkboxlist_container">
+                <label>Control Samples</label>
+                <div class="air_checkboxlist_scroll_container">
+                    <ul class="air_checkboxlist" id="om_sc_control_sample_list">
+                    </ul>
+                </div>
+            </div>
+            <div class="air_checkboxlist_container">
+                <label>Case Samples</label>
+                <div class="air_checkboxlist_scroll_container">
+                    <ul  class="air_checkboxlist" id="om_sc_case_sample_list">
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-2 mb-2">
+            <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Read count threshold:</span>
+            </div>
+            <div class="col">
+                <input type="text" class="textfield" value="5" id="om_sc_threshold" onkeypress="return isNumber(event)" />
+            </div>
+        </div>
+
+        <button type="button" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2" id="om_sc_calculateSP">Compare Samples</button>
+
+        <hr>
+
+        <div class="row mt-2 mb-2">
+            <div class="col-2 air_select_label">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Type Filter:</span>
+            </div>
+            <div class="col" style="width: 80%; padding-left: 8px">
+                <select id="om_sc_selecttype" class="browser-default ms_axis_select custom-select">
+                    <option value="0" selected>All Elements</option>
+                    <option value="1">Proteins</option>
+                    <option value="5">Receptors</option>
+                    <option value="2">miRNAs</option>
+                    <option value="3">lncRNAs</option>
+                    <option value="4">Transcription Factors</option>
+                </select>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row mt-2 mb-2">
+            <div class="col-2 air_select_label">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">X-Axis:</span>
+            </div>
+            <div class="col" style="width: 80%; padding-left: 8px">
+                <select id="om_sc_selectxaxis" class="browser-default ms_axis_select custom-select">
+                    <option value="e">Expression</option>
+                    <option value="b">Betweenness</option>
+                    <option value="c">Closeness</option>
+                    <option value="i">Indegree</option>
+                    <option value="o">Outdegree</option>
+                    <option selected value="d">Degree</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-2 mb-2">
+            <div class="col-2 air_select_label">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Y-Axis:</span>
+            </div>
+            <div class="col" style="width: 80%; padding-left: 8px">
+                <select id="om_sc_selectyaxis" class="browser-default ms_axis_select custom-select">
+                    <option value="e">Expression</option>
+                    <option selected value="b">Betweenness</option>
+                    <option value="c">Closeness</option>
+                    <option value="i">Indegree</option>
+                    <option value="o">Outdegree</option>
+                    <option value="d">Degree</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-2 mb-2">
+            <div class="col-2 air_select_label">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Color:</span>
+            </div>
+            <div class="col" style="width: 80%; padding-left: 8px">
+                <select id="om_sc_selectcolor" class="browser-default ms_axis_select custom-select">
+                    <option value="n">None</option>
+                    <option selected value="e">Expression</option>
+                    <option value="b">Betweenness</option>
+                    <option value="c">Closeness</option>
+                    <option value="i">Indegree</option>
+                    <option value="o">Outdegree</option>
+                    <option value="d">Degree</option>
+                </select>
+            </div>
+        </div>
+        <hr>
+        
+        <div id="om_sc_chartpanel">
+    `
+    );
+
+    for(let i in globals.omics.samples)
+    {
+        $("#om_sc_control_sample_list").append(`<li>
+            <input class="ms_sample_item" id="om_sc_sampleitem_control_${i}" data="${i}" type="checkbox">
+            <label class="air_checkbox" for="om_sc_sampleitem_control_${i}">${globals.omics.samples[i]}</label>
+        </li>`)
+        $("#om_sc_case_sample_list").append(`<li>
+            <input class="ms_sample_item" id="om_sc_sampleitem_case_${i}" data="${i}" type="checkbox">
+            <label class="air_checkbox" for="om_sc_sampleitem_case_${i}">${globals.omics.samples[i]}</label>
+        </li>`)  
+    }
+
+    $('#om_sc_calculateSP').on('click', analyzeSCData);
+    $('#om_sc_selecttype').on('change', analyzeSCData);
+    $('#om_sc_selectxaxis').on('change', analyzeSCData);
+    $('#om_sc_selectyaxis').on('change', analyzeSCData);
+    $('#om_sc_selectcolor').on('change', analyzeSCData);
+    
+    
+    $('.air_btn_info[data-toggle="popover"]').popover();
+
+    async function analyzeSCData() {
+
+        disablediv("airomics_tab_content");
+
+        let control_samples = []
+        let case_samples = []
+
+        $("#om_sc_control_sample_list input:checked").each(function () {
+            control_samples.push($(this).attr("data"))
+        }) 
+        $("#om_sc_case_sample_list input:checked").each(function () {
+            case_samples.push($(this).attr("data"))
+        }) 
+
+        $("#om_sc_calculateSP").empty().append($(`
+            <div class="air_progress position-relative">
+                <div id="om_sc_calculateSP_progress" class="air_progress_value"></div>
+                <span id="om_sc_calculateSP_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
+            </div>  
+        `));
+
+        let uniquesamples = Array.from(new Set([control_samples, case_samples]));
+        let iterations = Object.keys(AIR.Molecules).length;
+        let totalIterations = 0;
+        let count = 0;
+        let elementlists = {}
+        
+        _threshold = parseFloat($("#om_sc_threshold").val().replace(',', '.')) || 5
+
+        for(var s of uniquesamples)
+        {
+           
+            if(globals.omics.SamplesWithCalculatedSP.hasOwnProperty(s) && globals.omics.SamplesWithCalculatedSP[s] == _threshold)
+            {
+                continue;
+            }
+
+            let elementids = Object.keys(AIR.Molecules).filter(m => (AIR.Molecules[m].type != "PROTEIN" && AIR.Molecules[m].type != "RNA") || (globals.omics.ExpressionValues.hasOwnProperty(m) && globals.omics.ExpressionValues[m].nonnormalized[s] > _threshold))
+            elementlists[s] = elementids;
+            totalIterations += elementids.length
+        }
+        for(let s in elementlists)
+        {
+            count += await calculateshortestPath(s, elementlists[s], count, totalIterations, "om_sc_calculateSP", "  Recalculate network topology for " + Object.keys(elementlists).length + " samples.");            
+            globals.omics.SamplesWithCalculatedSP[s] = _threshold;
+        }
+
+        $("#om_sc_calculateSP").html('Compare Samples');
+
+        if(globals.omics.sc_chart)
+            globals.omics.sc_chart.destroy();
+        $("#om_sc_chartpanel").empty().append(`
+            <div style="position: relative; max-height: 400px;">
+                <canvas id="om_sc_results_canvas" style="height: 400px;"></canvas>
+            </div>
+            <div id="om_legend_target" class="d-flex justify-content-center mt-2">
+                <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan"></span>in Submap</li>
+                <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+            </div>
+        `)
+
+        let xvalue = $("#om_sc_selectxaxis").val();
+        let yvalue = $("#om_sc_selectyaxis").val();
+        let cvalue = $("#om_sc_selectcolor").val();
+
+        var outputCanvas = document.getElementById('om_sc_results_canvas');
+        var chartOptions = {
+            type: 'scatter',        
+            data: {
+                datasets: [],
+            },
+            options: { 
+                plugins: {
+                    zoom: {
+                        // Container for pan options
+                        pan: {
+                            // Boolean to enable panning
+                            enabled: true,
+        
+                            // Panning directions. Remove the appropriate direction to disable 
+                            // Eg. 'y' would only allow panning in the y direction
+                            mode: 'xy',
+                            rangeMin: {
+                                // Format of min pan range depends on scale type
+                                x: null,
+                                y: null
+                            },
+                            rangeMax: {
+                                // Format of max pan range depends on scale type
+                                x: null,
+                                y: null
+                            },
+                
+                            // On category scale, factor of pan velocity
+                            speed: 20,
+                
+                            // Minimal pan distance required before actually applying pan
+                            threshold: 10,
+                
+                        },
+        
+                        // Container for zoom options
+                        zoom: {
+                            // Boolean to enable zooming
+                            enabled: true,
+                            // Zooming directions. Remove the appropriate direction to disable 
+                            // Eg. 'y' would only allow zooming in the y direction
+                            mode: 'xy',
+                        }
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false,                    
+                animation: {
+                    duration: 0
+                },
+                hover: {
+                    animationDuration: 0
+                },
+                responsiveAnimationDuration: 0,
+                hover: {
+                    onHover: function(e) {
+                        var point = this.getElementAtEvent(e);
+                        if (point.length) e.target.style.cursor = 'pointer';
+                        else e.target.style.cursor = 'default';
+                        }
+                },
+                legend: {
+                    display: false
+                },
+                layout: {
+                    padding: {
+                    top: 15
+                    }
+                },
+                title: {
+                    display: false,
+                    text: '',
+                    fontFamily: 'Helvetica',
+                    fontColor: '#6E6EC8',
+                    fontStyle: 'bold'
+                },
+                scales: {
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: "log2 FC " + globals.omics.abbreviations[yvalue]
+                        },
+                    }],
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: "log2 FC " + globals.omics.abbreviations[xvalue]
+                        },
+                    }]
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function (tooltipItem, data) {
+                            var label = data.datasets[tooltipItem.datasetIndex].label.split(";");
+
+                            if(label.length < 5)
+                                return "";  
+
+                            return ([
+                                "Name: " + label[0],
+                                "Type: " + label[1],
+                                globals.omics.abbreviations[xvalue] + ": " + label[2], 
+                                globals.omics.abbreviations[yvalue] + ": " + label[3], 
+                            ]).concat(cvalue != "n"? [
+                                globals.omics.abbreviations[cvalue] + ": " + label[4],
+                            ] : []);             
+                        }
+                    }
+                }
+            }
+        }; 
+
+        globals.omics.sc_chart = new Chart(outputCanvas, chartOptions); 
+
+        outputCanvas.onclick = function (evt) {
+
+            if(globals.omics.om_targetchart)
+            {
+                // => activePoints is an array of points on the canvas that are at the same position as the click event.
+                var activePoint = globals.omics.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
+    
+                if (activePoint !== undefined) {
+                    let name = globals.omics.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+            }
+            // Calling update now animates element from oldValue to newValue.
+        };       
+    
+        let typevalue = $('#om_sc_selecttype').val();
+        
+        for(let e in AIR.Molecules)
+        {
+            let {type:_type, subtype:_subtype} = AIR.Molecules[e];
+
+            if (typevalue == 1) {
+                if (_type != "PROTEIN") {
+                    continue;
+                }
+            }
+            if (typevalue == 2) {
+                if (_subtype != "miRNA") {
+                    continue;
+                }
+            }
+            if (typevalue == 3) {
+                if (_subtype != "lncRNA") {
+                    continue;
+                }
+            }
+            if (typevalue == 4) {
+                if (_subtype != "TF") {
+                    continue;
+                }
+            } 
+            if (typevalue == 5) {
+                if (_subtype != "RECEPTOR") {
+                    continue;
+                }
+            } 
+            
+            let element = AIR.Molecules[e];
+
+            let control_x_values = [];
+            let case_x_values = [];
+            let control_y_values = [];
+            let case_y_values = [];
+            let control_c_values = [];
+            let case_c_values = [];
+
+            for(let s of control_samples)
+            {
+                control_x_values.push(_getScValue(xvalue, e, s))
+                control_y_values.push(_getScValue(yvalue, e, s))
+                if(cvalue != "n")
+                    control_c_values.push(_getScValue(cvalue, e, s))
+            }
+            for(let s of case_samples)
+            {
+                case_x_values.push(_getScValue(xvalue, e, s))
+                case_y_values.push(_getScValue(yvalue, e, s))
+
+                if(cvalue != "n")
+                    case_c_values.push(_getScValue(cvalue, e, s))
+            }
+
+            
+            let logx = Math.log2((mean(case_x_values) + 1)/(mean(control_x_values) + 1)) || 0;
+            let logy = Math.log2((mean(case_y_values) + 1)/(mean(control_y_values) + 1)) || 0;
+
+            if(logy == 0 && logx == 0)
+            {
+                continue;
+            }
+            
+            let logc = Math.log2((mean(case_c_values) + 1)/(mean(control_c_values) + 1)) || 0;
+            let hex = (cvalue != "n"? valueToHex(logc/2) : "#808080");
+
+            var pstyle = 'circle';
+            if(AIR.MapSpeciesLowerCase.includes(element.name.toLowerCase()) === false)
+            {
+                pstyle = 'triangle'
+            }
+
+            globals.omics.sc_chart.data.datasets.push({
+                label: [element.name, _subtype, expo(logx), expo(logy), expo(logc)].join(";"),
+                data: [{
+                    x: logx,
+                    y: logy,
+                    r: 7,
+                }],
+                backgroundColor: hex,
+                hoverBackgroundColor: hex,
+            });
+
+        }
+
+        globals.omics.sc_chart.update();
+        enablediv("airomics_tab_content");
+        var objDiv = document.getElementById("airomics_tab_content");
+        objDiv.scrollTop = objDiv.scrollHeight;
+    }
+
+    function _getScValue(abbr, element, sample)
+    {
+        if(abbr == "e")
+        {            
+            var fcValue = globals.omics.ExpressionValues[element].nonnormalized[sample];
+            if(fcValue && fcValue > _threshold)
+                return fcValue;
+            else
+                return 0;
+        }
+        else
+        {
+            return AIR.Molecules[element].Centrality[globals.omics.abbreviations[abbr]][sample];
+        }
+    }
+
 }
 
 function om_detectfile(force_seperator) {
 
+    if(document.getElementById("om_inputId").files.length == 0)
+    {
+        $("#om_mappingselect-container").addClass("air_disabledbutton");
+        $("#om_columnSelect-container").addClass("air_disabledbutton");
+        $("#om_initializebtn").addClass("air_disabledbutton");
+        return false;
+    }
     var fileToLoad = document.getElementById("om_inputId").files[0];
     var fileReader = new FileReader();
     fileReader.readAsText(fileToLoad, "UTF-8");
@@ -816,11 +1311,40 @@ function om_detectfile(force_seperator) {
         {
             return stopfile('The file appears to be empty.');
         }
-        var line = textFromFileLoaded.split('\n')[0];
+
+        var stop_break = false;
+        for(let line of textFromFileLoaded.split('\n'))
+        {
+            for(var _entry of line.split("\t"))
+            {
+                var _value = parseFloat(_entry)
+
+                if(!isNaN(_value))
+                {
+                    if(_value < 0)
+                    {
+                        $("#om_analysistypeSelect").val(0);
+                        stop_break = true;
+                        break;
+                    }
+                    if(Math.abs(_value) > 100)
+                    {
+                        $("#om_analysistypeSelect").val(1);
+                        stop_break = true;
+                        break;
+                    }
+                }
+            }
+            if(stop_break)
+            {
+                break;
+            }
+        }
+        var firstline = textFromFileLoaded.split('\n')[0];
 
         if(!force_seperator)
         {
-            if((line.match(new RegExp(",", "g")) || []).length > (line.match(new RegExp("\t", "g")) || []).length )
+            if((firstline.match(new RegExp(",", "g")) || []).length > (firstline.match(new RegExp("\t", "g")) || []).length )
             {
                 globals.omics.seperator = ",";
                 $("#om_filetypeSelect").val(1);
@@ -833,7 +1357,7 @@ function om_detectfile(force_seperator) {
         }
 
         var index = 0;
-        line.split(globals.omics.seperator).forEach(entry => {
+        firstline.split(globals.omics.seperator).forEach(entry => {
             let header = entry;
             globals.specialCharacters.forEach(c => {
                 header = header.replace(c, "");
@@ -870,7 +1394,8 @@ function om_detectfile(force_seperator) {
 
         function stopfile(alerttext)
         {
-            alert(alerttext);
+            if(alerttext != "")
+                alert(alerttext);
             $("#om_mappingselect-container").addClass("air_disabledbutton");
             $("#om_columnSelect-container").addClass("air_disabledbutton");
             $("#om_initializebtn").addClass("air_disabledbutton");
@@ -938,18 +1463,19 @@ async function Start(imported) {
                 normalizeExpressionValues().then(function (ne) {
                     $('.air_btn_info[data-toggle="popover"]').popover();
 
-                    let sampleSelect = document.getElementById('om_select_sample');
-
-                    for (let i = sampleSelect.options.length-1; i >= 0; i--) {
-                        sampleSelect.options[i] = null;
-                    };
-
-                    for(let i = 0; i < globals.omics.samples.length; i++) {
-                        sampleSelect.options[sampleSelect.options.length] = new Option(globals.omics.samples[i], i); 
-                    };
-
                     globals.omics.Targets = {};
                     globals.omics.targetsanalyzed = false;
+                    globals.omics.SamplesWithCalculatedSP = [];
+
+                    if($("#om_analysistypeSelect").val() == 0)
+                    {
+                        createDifferentialAnalysisPanel();
+                    }
+                    else
+                    {
+                        createScAnalysisPanel();
+                    }
+
                     $("#om_maintab").removeClass("air_disabledbutton");
 
                 }).catch(function (error) {
@@ -1065,7 +1591,7 @@ async function om_createTable() {
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
                                 data-content="Include values of the user data file in the overlays and color mapped nodes in the network.<br/>This may decrease the performance significantly">
                             ?
                         </button>
@@ -1909,11 +2435,12 @@ async function om_loadfile(imported) {
 
     let delete_data = false;
     let break_flag = false;
+    let selectedDataType = $("#om_analysistypeSelect").val();
 
 
     if(globals.omics.ExpressionValues && Object.keys(globals.omics.ExpressionValues).length > 0)
     {
-        var _return = await om_datamerge_dialog();
+        var _return = (globals.omics.selectedDataType != selectedDataType? [true, false] : await om_datamerge_dialog());
 
         delete_data = _return[0];
         break_flag = _return[1];
@@ -1929,8 +2456,10 @@ async function om_loadfile(imported) {
             return;
         }
 
+        globals.omics.selectedDataType = selectedDataType;
+
         if(imported)
-        {
+        {     
             if(delete_data)
             {
                 globals.omics.samples = [];
@@ -1938,6 +2467,17 @@ async function om_loadfile(imported) {
                 globals.omics.samplesResults = [];
                 globals.omics.ExpressionValues = {};
                 globals.omics.numberofuserprobes = 0;
+        
+                for(let element in AIR.Molecules)
+                {
+                    AIR.Molecules[element].Centrality = {
+                        Betweenness: {},
+                        Closeness: {},
+                        Degree: {},
+                        Indegree: {},
+                        Outdegree: {},
+                    }
+                }
             }
 
             for(let sample in globals.omics.import_data)
@@ -2004,6 +2544,17 @@ async function om_loadfile(imported) {
                 globals.omics.samplesResults = [];
                 globals.omics.ExpressionValues = {};
                 globals.omics.numberofuserprobes = 0;
+        
+                for(let element in AIR.Molecules)
+                {
+                    AIR.Molecules[element].Centrality = {
+                        Betweenness: {},
+                        Closeness: {},
+                        Degree: {},
+                        Indegree: {},
+                        Outdegree: {},
+                    }
+                }
             }
             
             var datamapped = false;
@@ -2426,7 +2977,7 @@ function readExpressionValues() {
     return new Promise((resolve, reject) => {
         for (let item in AIR.Molecules) {
 
-            if(!AIR.Molecules[item].complex)
+            if(!AIR.Molecules[item].type == "COMPLEX")
             {
                 continue;
             }
@@ -2449,51 +3000,31 @@ function readExpressionValues() {
         }
 
         function itemExpression(item, sample)
-        {
-            if(AIR.Molecules[item].complex == false && globals.omics.ExpressionValues.hasOwnProperty(item))
-            {
-                return [globals.omics.ExpressionValues[item]["nonnormalized"][sample], globals.omics.ExpressionValues[item]["pvalues"][sample]];
-            }
-            else if(AIR.Molecules[item].subunits.length > 0) {
-                let sum = 0;
-                let sumpvalue = 0;
-                if(!AIR.Molecules[item].independent)
-                {
-                    sum = Number.MAX_SAFE_INTEGER;
-                    sumpvalue = 1;
-                }
+        {          
+            if(AIR.Molecules[item].subtype == "COMPLEX") {
+                let sum = Number.MAX_SAFE_INTEGER;
+                sumpvalue = -1;
                 for(let subunit in AIR.Molecules[item].subunits)
                 {
                     let subunitvalues = itemExpression(AIR.Molecules[item].subunits[subunit], sample)
                     let subunitvalue = subunitvalues[0];
                     let subunitpvalue = subunitvalues[1];
 
-                    if(!isNaN(subunitvalue))
+                    if(!isNaN(subunitvalue) && subunitvalue < sum)
                     {
-                        if(AIR.Molecules[item].independent)
-                        {
-                            sum += subunitvalue;
-                        }
-                        else if(subunitvalue < sum)
-                        {
-                            sum = subunitvalue;
-                        }
+                        sum = subunitvalue;
                     }
-                    if(!isNaN(subunitpvalue))
+                    if(!isNaN(subunitpvalue) && (subunitpvalue > sumpvalue))
                     {
-                        if(AIR.Molecules[item].independent)
-                        {
-                            if(subunitpvalue < sumpvalue)
-                                sumpvalue = subunitpvalue;
-                        }
-                        else if(subunitpvalue > sumpvalue)
-                        {
-                            sumpvalue = subunitpvalue;
-                        }
+                        sumpvalue = subunitpvalue;
                     }
                 }
 
-                return [( sum === Number.MAX_SAFE_INTEGER? 0 : sum), sumpvalue] ;
+                return [( sum === Number.MAX_SAFE_INTEGER? 0 : sum), (sumpvalue == -1? 1: sumpvalue)] ;
+            }
+            else if(globals.omics.ExpressionValues.hasOwnProperty(item))
+            {
+                return [globals.omics.ExpressionValues[item]["nonnormalized"][sample], globals.omics.ExpressionValues[item]["pvalues"][sample]];
             }
             else {
                 return [0,1];
@@ -2650,7 +3181,7 @@ async function calculateTargets() {
 
     var sample = $('#om_select_sample').val(); 
 
-    globals.omics.om_targetchart.data.datasets = [];
+    globals.omics.om_targetchart.removeData();
     globals.omics.om_targettable.clear();
     let filter = $('#om_target_filter option:selected').text();
     globals.omics.om_target_downloadtext = `Sample: ${globals.omics.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity\tType\tRegulators`;
@@ -2878,6 +3409,7 @@ async function calculateTargets() {
         $("#om_regulator_progress").hide();
         $("#om_btn_predicttarget").html('Predict Regulators');
         $("#airomics_tab_content").removeClass("air_disabledbutton");
+        globals.omics.om_targetchart.update()
     }
 
 }
@@ -3556,3 +4088,126 @@ function numberOfUserProbes() {
     }
     return count;
 }  
+
+async function calculateshortestPath(sample, elementids,  _count, _totalIterations, _progressbutton, _progressText)
+{
+    let count = _count;
+    await updateProgress(count, _totalIterations, _progressbutton, text=_progressText);
+
+
+    let elements = {};
+
+    for(let e of elementids)
+    {
+        elements[e] = [];
+    }
+
+    for(var s of elementids)
+    {
+        ElementCentrality = AIR.Molecules[s].Centrality;
+        ElementCentrality.Betweenness[sample] = 0;
+        ElementCentrality.Closeness[sample] = 0; 
+        ElementCentrality.Indegree[sample] = 0;
+        ElementCentrality.Outdegree[sample] = 0;   
+        ElementCentrality.Degree[sample] = 0; 
+    }
+
+    for(let inter of AIR.Interactions)
+    {
+        if(!elementids.includes(inter.source) || !elementids.includes(inter.target))            
+        {
+            continue;
+        }
+        
+        elements[inter.source].push(inter.target);
+     
+        ElementCentrality = AIR.Molecules[inter.source].Centrality;
+        ElementCentrality.Outdegree[sample] += 1; 
+        ElementCentrality.Degree[sample] += 1;
+
+        ElementCentrality = AIR.Molecules[inter.target].Centrality;
+        ElementCentrality.Indegree[sample] += 1; 
+        ElementCentrality.Degree[sample] += 1;
+    }
+
+    elements = Object.fromEntries(Object.entries(elements).filter(([_, v]) => v.length > 0));
+
+    var neighbour, e, visited, queue, dist, spcount;
+    var localBetweenness = {};
+
+
+    for(var s of elementids)
+    {
+        visited = [s] 
+        queue = [s] 
+        dist = {};
+        spcount = {};
+        localBetweenness = {}
+
+        dist[s] = 0;
+        spcount[s] = 0;
+
+        while(queue.length > 0)
+        {
+            e = queue.shift();
+            
+            localBetweenness[e] = []
+            for(var _neighbour in elements[e])
+            {
+                neighbour = elements[e][_neighbour]
+            
+                if(!visited.includes(neighbour))
+                {
+                    visited.push(neighbour);
+                    dist[neighbour] = dist[e] + 1;
+                    spcount[neighbour] = 1;
+                    queue.push(neighbour);
+
+                    localBetweenness[e].push(neighbour);
+                }
+                else
+                {
+                    if(dist[neighbour] == dist[e] + 1)
+                    {
+                        spcount[neighbour] += 1;
+                        localBetweenness[e].push(neighbour);
+                    }
+                }
+            }
+        }
+        for(var t in dist)
+        {
+            if(dist[t] > 0)
+            {
+                AIR.Molecules[s].Centrality.Closeness[sample] += 1/dist[t]
+            }
+        }
+        for(var k in localBetweenness)
+        {        
+            if(k != s)
+            {
+                for(var t of getSPNodes(k))
+                {
+                    AIR.Molecules[k].Centrality.Betweenness[sample] += 1/spcount[t]
+                }
+            }
+        }
+        await updateProgress(count++, _totalIterations, _progressbutton, text=_progressText);
+    }
+
+    function getSPNodes(node)
+    {
+        let _array = [];
+        if(localBetweenness.hasOwnProperty(node))
+        {          
+            _array = localBetweenness[node]
+            for(var t of localBetweenness[node])
+            {
+                _array = _array.concat(getSPNodes(t));
+            }
+        }
+        return _array;
+    }
+
+    return count;
+}
