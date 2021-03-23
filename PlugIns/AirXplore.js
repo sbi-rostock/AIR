@@ -1378,7 +1378,7 @@ function getTargetPanel() {
                     <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Regulator</li>
                     <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>
-            <div class="btn-group btn-group-justified mt-4 mb-4">
+            <div class="btn-group btn-group-justified">
                 <div class="btn-group">
                     <button id="xp_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> as .txt</button>
                 </div>
@@ -1486,8 +1486,6 @@ function getTargetPanel() {
 
             // Calling update now animates element from oldValue to newValue.
         };
-
-        globals.xplore.targetpanel.append('<div class="mb-4"></div>');
 
         resolve('');
     });

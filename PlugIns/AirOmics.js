@@ -953,7 +953,14 @@ function createScAnalysisPanel()
             </div>
         </div>
         <hr>
-        
+
+        <div class="cbcontainer">
+            <input type="checkbox" class="air_checkbox" id="sc_checkbox_zerovalues" checked>
+            <label class="air_checkbox air_checkbox_label" for="sc_checkbox_zerovalues">Hide zero values?</label>
+        </div>
+
+        <hr>
+
         <div id="om_sc_chartpanel">
     `
     );
@@ -970,17 +977,39 @@ function createScAnalysisPanel()
         </li>`)  
     }
 
-    $('#om_sc_calculateSP').on('click', analyzeSCData);
-    $('#om_sc_selecttype').on('change', analyzeSCData);
-    $('#om_sc_selectxaxis').on('change', analyzeSCData);
-    $('#om_sc_selectyaxis').on('change', analyzeSCData);
-    $('#om_sc_selectcolor').on('change', analyzeSCData);
+    $('#sc_checkbox_zerovalues').on('change', function() {
+        if(!globals.omics.sc_chart)
+            return;
+        analyzeSCData();
+    });
+    $('#om_sc_calculateSP').on('click', function() {
+        analyzeSCData();
+    });
+    $('#om_sc_selecttype').on('change', function() {
+        if(!globals.omics.sc_chart)
+            return;
+        analyzeSCData();
+    });
+    $('#om_sc_selectxaxis').on('change', function() {
+        if(!globals.omics.sc_chart)
+            return;
+        analyzeSCData();
+    });
+    $('#om_sc_selectyaxis').on('change', function() {
+        if(!globals.omics.sc_chart)
+            return;
+        analyzeSCData();
+    });
+    $('#om_sc_selectcolor').on('change', function() {
+        if(!globals.omics.sc_chart)
+            return;
+        analyzeSCData();
+    });
     
     
     $('.air_btn_info[data-toggle="popover"]').popover();
 
     async function analyzeSCData() {
-
         disablediv("airomics_tab_content");
 
         let control_samples = []
@@ -1035,7 +1064,7 @@ function createScAnalysisPanel()
                 <canvas id="om_sc_results_canvas" style="height: 400px;"></canvas>
             </div>
             <div id="om_legend_target" class="d-flex justify-content-center mt-2">
-                <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan"></span>in Submap</li>
+                <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#808080"></span>in Submap</li>
                 <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>
         `)
@@ -1161,15 +1190,20 @@ function createScAnalysisPanel()
 
         outputCanvas.onclick = function (evt) {
 
-            if(globals.omics.om_targetchart)
+            if(globals.omics.sc_chart)
             {
                 // => activePoints is an array of points on the canvas that are at the same position as the click event.
-                var activePoint = globals.omics.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
+                var activePoint = globals.omics.sc_chart.lastActive[0]; //.getElementsAtEvent(evt)[0];
     
                 if (activePoint !== undefined) {
-                    let name = globals.omics.om_targetchart.data.datasets[activePoint._datasetIndex].label;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
+                    let name = globals.omics.sc_chart.data.datasets[activePoint._datasetIndex].label.split(";")[0];
+
+                    if(name)
+                    {
+                        selectElementonMap(name, true);
+                        xp_setSelectedElement(name);
+                    }
+
                 }
             }
             // Calling update now animates element from oldValue to newValue.
@@ -1236,7 +1270,9 @@ function createScAnalysisPanel()
             let logx = Math.log2((mean(case_x_values) + 1)/(mean(control_x_values) + 1)) || 0;
             let logy = Math.log2((mean(case_y_values) + 1)/(mean(control_y_values) + 1)) || 0;
 
-            if(logy == 0 && logx == 0)
+            if(document.getElementById("sc_checkbox_zerovalues").checked === true && (logy == 0 || logx == 0))
+                continue;
+            else if(logy == 0 && logx == 0)
             {
                 continue;
             }
@@ -1259,6 +1295,7 @@ function createScAnalysisPanel()
                 }],
                 backgroundColor: hex,
                 hoverBackgroundColor: hex,
+                pointStyle: pstyle,
             });
 
         }
