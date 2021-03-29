@@ -511,7 +511,7 @@ async function setPeTable()
             createCell(row, 'td', getFontfromValue(globals.xplore.pe_data[globals.xplore.pe_data_index][e].value), 'col slidervalue', '', 'center').setAttribute('id', 'ESliderValue' + e);
             var slider = createSliderCell(row, 'td', e);
             slider.setAttribute('id', 'ESlider' + e);
-            slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e].value);
+            slider.setAttribute('value', globals.xplore.pe_data[globals.xplore.pe_data_index][e]);
             slider.onchange = function () {
                 let value = this.value;
                 $("#ESliderValue" + e).html(getFontfromValue(parseFloat(value)));
