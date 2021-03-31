@@ -1354,7 +1354,7 @@ function om_detectfile(force_seperator) {
         {
             for(var _entry of line.split("\t"))
             {
-                var _value = parseFloat(_entry)
+                var _value = Number(_entry)
 
                 if(!isNaN(_value))
                 {
@@ -1614,7 +1614,7 @@ function getRandomColor() {
 }
 
 
-async function om_createTable() {
+async function om_createTable(numberofregulators) {
     
     return new Promise((resolve, reject) => {
     if(globals.omics.resultsTable)
@@ -1711,11 +1711,8 @@ async function om_createTable() {
         
         createCell(result_row, 'td', Math.round((AIR.Phenotypes[phenotype].accuracy + Number.EPSILON) * 10000) / 100, 'col-auto', 'col', 'center');
 
-
-        let numberofgenes = Object.keys(AIR.Phenotypes[phenotype].values).length;
-
         let meannumberofgenes = mean(genenumber);
-        createCell(result_row, 'td', expo(meannumberofgenes) + " [" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofgenes, 'col-auto', 'col', 'center', true, order= meannumberofgenes);
+        createCell(result_row, 'td', expo(meannumberofgenes) + " [" + (Math.round((standarddeviation(genenumber) + Number.EPSILON) * 100) / 100) + "] out of " + numberofregulators[phenotype], 'col-auto', 'col', 'center', true, order= meannumberofgenes);
 
 
         let topgenes = [];
@@ -2096,6 +2093,8 @@ async function om_PhenotypeSP() {
     let phenotype_elementvalues = {};
     globals.omics.pvalue_threshold = 1;
 
+    let numberofregulators = []
+
     if(globals.omics.pvalue)
     {
         globals.omics.pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
@@ -2174,6 +2173,7 @@ async function om_PhenotypeSP() {
     let elementarray = Object.keys(AIR.Molecules);
     for (let phenotype in AIR.Phenotypes) {
 
+        numberofregulators[phenotype] = 0;
         phenotype_elementvalues[phenotype] = {};
         for(let _id in elementarray)
         {
@@ -2198,7 +2198,7 @@ async function om_PhenotypeSP() {
             {
                 continue;
             }
-
+            numberofregulators[phenotype] += 1;
             accuracymax += Math.abs(SP);
         }
 
@@ -2370,7 +2370,7 @@ async function om_PhenotypeSP() {
 
     await om_normalizePhenotypeValues().then(async function (pv) {
              
-        await om_createTable()
+        await om_createTable(numberofregulators)
         await enablebtn("om_pheno_analyzebtn", _text);
     });
 }
@@ -4202,13 +4202,10 @@ async function calculateshortestPath(sample, elementids,  _count, _totalIteratio
 
                     localBetweenness[e].push(neighbour);
                 }
-                else
+                else if(dist[neighbour] == dist[e] + 1)
                 {
-                    if(dist[neighbour] == dist[e] + 1)
-                    {
-                        spcount[neighbour] += 1;
-                        localBetweenness[e].push(neighbour);
-                    }
+                    spcount[neighbour] += 1;
+                    localBetweenness[e].push(neighbour);
                 }
             }
         }
