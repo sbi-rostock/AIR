@@ -330,6 +330,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                         AIR.Phenotypes[element]["value"] = 0;
                                         AIR.Phenotypes[element]["SPs"] = {};
                                         AIR.Phenotypes[element]["MainRegulators"] = {};
+                                        AIR.Phenotypes[element]["GeneNumber"] = {};
                                     }
                                     if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
                                     {
@@ -1170,11 +1171,9 @@ async function air_addoverlay(olname, callback, cb_param = null)
     });
 }
 
-function shuffle(_array) {  
-    let array = _array;
-    
+function shuffle(array) {
     var currentIndex = array.length, temporaryValue, randomIndex;
-
+  
     // While there remain elements to shuffle...
     while (0 !== currentIndex) {
   
