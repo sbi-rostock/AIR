@@ -1693,16 +1693,13 @@ async function om_createTable(numberofregulators) {
             selectElementonMap(pname, false);
         };
 
+        let genenumber = [];
+        let pvalues = []
         for (let sample in globals.omics.samples) {
             globals.omics.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
             createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(AIR.Phenotypes[phenotype].pvalue[sample]) + ")", 'col-auto', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = AIR.Phenotypes[phenotype].norm_results[sample]);
-        }
-        
-        let genenumber = [];
-        let pvalues = []
-        for(let sample in  AIR.Phenotypes[phenotype].GeneNumber)
-        {
-            genenumber.push(AIR.Phenotypes[phenotype].GeneNumber[sample]);
+
+            genenumber.push(AIR.Phenotypes[phenotype].includedelements[sample].length);
             pvalues.push(AIR.Phenotypes[phenotype].pvalue[sample]);
         }
 
@@ -2173,6 +2170,8 @@ async function om_PhenotypeSP() {
     let elementarray = Object.keys(AIR.Molecules);
     for (let phenotype in AIR.Phenotypes) {
 
+        
+
         numberofregulators[phenotype] = 0;
         phenotype_elementvalues[phenotype] = {};
         for(let _id in elementarray)
@@ -2189,7 +2188,7 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype].norm_results = {};
         AIR.Phenotypes[phenotype].accuracy = 0;
         AIR.Phenotypes[phenotype].MainRegulators = {};
-        AIR.Phenotypes[phenotype].GeneNumber = {};
+        AIR.Phenotypes[phenotype]["includedelements"] = {};
 
         for (let element in AIR.Phenotypes[phenotype].values) {
             let SP = AIR.Phenotypes[phenotype].values[element];
@@ -2209,60 +2208,60 @@ async function om_PhenotypeSP() {
 
 
         for (let sample in globals.omics.samples) {
+
+            var SP_Values = [];
             let activity = 0.0;
             var accuracy = 0; 
 
-            var negative_influences = [];
-            var positive_influences = [];
+            var negative_influences = 0;
+            var positive_influences = 0;
 
-            AIR.Phenotypes[phenotype].GeneNumber[sample] = 0;
+            AIR.Phenotypes[phenotype].includedelements[sample] = [];
 
             var elements_with_FC = [];
-            var SP_Values = [];
 
             for (let element in AIR.Phenotypes[phenotype].values) {
 
-
                 let SP = parseFloat(AIR.Phenotypes[phenotype].values[element]);
 
-
-                if (isNaN(SP) || SP < i_threshold)
+                if (isNaN(SP) || Math.abs(SP) < i_threshold)
                 {
-                    continue;
+                    continue;  
                 }
-
-                SP_Values.push(SP)
+                SP_Values.push(SP);
 
                 if(!globals.omics.ExpressionValues.hasOwnProperty(element))
                 {
                     continue;
                 }
-                let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
+                let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
+                if(FC == 0)
+                {
+                    continue;
+                }
 
+                                
+                let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
                 if(isNaN(pvalue))
                 {
                     pvalue = 1;
                 }
-
                 if(globals.omics.pvalue && pvalue >= globals.omics.pvalue_threshold)
                 {
                     continue;
                 }
 
-                considered_elements.add(element);
+                elements_with_FC.push(FC);
 
-                let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
-
-                if(isNaN(FC) || FC === 0)
-                {
-                    continue;
-                }
+                considered_elements.add(element); 
+                AIR.Phenotypes[phenotype].includedelements[sample].push(element);
 
                 if (document.getElementById("om_checkbox_absolute").checked === true) {
                     FC = Math.abs(FC);
                     SP = Math.abs(SP);
                 }
-                elements_with_FC.push(FC)
+
+
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
                 {
@@ -2272,24 +2271,19 @@ async function om_PhenotypeSP() {
                 {
                     weightedInfluence = FC * SP; 
                 }
-
                 activity += weightedInfluence;
 
-                if(Math.abs(SP) > 0.05)
+                if(weightedInfluence < 0)
                 {
-                    if(weightedInfluence < 0)
-                    {
-                        negative_influences.push(Math.abs(weightedInfluence));
-                    }
-                    else if(weightedInfluence > 0)
-                    {
-                        positive_influences.push(weightedInfluence);
-                    }
+                    negative_influences += Math.abs(SP);
+                }
+                else if(weightedInfluence > 0)
+                {
+                    positive_influences += Math.abs(SP);
                 }
 
-
                 accuracy += Math.abs(SP);
-                AIR.Phenotypes[phenotype].GeneNumber[sample] += 1;
+
                 
                 if(AIR.Molecules.hasOwnProperty(element))
                 {
@@ -2315,6 +2309,7 @@ async function om_PhenotypeSP() {
             AIR.Phenotypes[phenotype].results[sample] = activity;
 
             let numberOfHigherScores = 0;
+            let diff = Math.abs(positive_influences - negative_influences)
 
             if(elements_with_FC.length == 0)
             {
@@ -2325,17 +2320,27 @@ async function om_PhenotypeSP() {
                 for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
                 {
                     SP_Values = shuffle(SP_Values);
-                    let pseudo_activity = 0;
+                    elements_with_FC = shuffle(elements_with_FC);
 
+                    let _diff = 0;
                     for(let _id in elements_with_FC)
                     {
-                        pseudo_activity += elements_with_FC[_id] * SP_Values[_id]
+                        if(_id < SP_Values.length)
+                        {
+                            if(elements_with_FC[_id] * SP_Values[_id] < 0)
+                            {
+                                _diff -= Math.abs(SP_Values[_id])
+                            }
+                            else
+                            {
+                                _diff += Math.abs(SP_Values[_id])
+                            }
+                        }
                     }
-                    if(Math.abs(pseudo_activity) > Math.abs(activity) && Math.sign(pseudo_activity) == Math.sign(activity))
+                    if(Math.abs(_diff) > diff)
                     {
                         numberOfHigherScores ++;
                     }
-
                 }
                 AIR.Phenotypes[phenotype].pvalue[sample] = numberOfHigherScores / globals.omics.numberOfRandomSamples;
             }
@@ -3705,6 +3710,11 @@ function om_createpopup(button, parameter) {
     let targets = []
         
     for (let element in AIR.Phenotypes[phenotype].values) {
+
+        if(!AIR.Phenotypes[phenotype].includedelements[sample].includes(element))
+        {
+            continue;
+        }
 
 
         let SP = AIR.Phenotypes[phenotype].values[element];
