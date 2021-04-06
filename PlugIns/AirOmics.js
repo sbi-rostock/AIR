@@ -2224,7 +2224,7 @@ async function om_PhenotypeSP() {
 
                 let SP = parseFloat(AIR.Phenotypes[phenotype].values[element]);
 
-                if (isNaN(SP) || Math.abs(SP) < i_threshold)
+                if (!SP || isNaN(SP) || Math.abs(SP) < i_threshold)
                 {
                     continue;  
                 }
@@ -2235,7 +2235,7 @@ async function om_PhenotypeSP() {
                     continue;
                 }
                 let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
-                if(FC == 0)
+                if(!FC)
                 {
                     continue;
                 }
@@ -2246,7 +2246,7 @@ async function om_PhenotypeSP() {
                 {
                     pvalue = 1;
                 }
-                if(globals.omics.pvalue && pvalue >= globals.omics.pvalue_threshold)
+                if(globals.omics.pvalue && (!pvalue || pvalue >= globals.omics.pvalue_threshold))
                 {
                     continue;
                 }
