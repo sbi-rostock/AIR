@@ -218,6 +218,8 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         function readCentralityValues(centrality)
                         {
                             return new Promise((resolve, reject) => {
+                                resolve('');
+                                return;
                                 $.ajax({
                                     //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
                                     url: FILE_URL + "Centrality.json", 
@@ -233,7 +235,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                         }
                                         resolve('');
                                     },
-                                    error: function () {
+                                    error: function (e) {
                                         reject(e);
                                     }
                                 });
