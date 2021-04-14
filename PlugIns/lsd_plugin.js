@@ -106,93 +106,114 @@ async function initMainPageStructure() {
   }
 
   let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(pluginContainer);
-  $(`<div id="stat_spinner" class="mt-5">
-    <div class="d-flex justify-content-center">
-                <div class="spinner-border" role="status">
-                    <span class="sr-only"></span>
-                </div>
-    </div>
-    <div class="d-flex justify-content-center mt-2">
-        <span id="air_loading_text">LOADING ...</span>
-    </div>
-</div>`).appendTo(container);
 
   if (!filetesting) {
-    token = prompt("Please enter your GitHub authentication token:", "");
+    $(`<div id="github_auth_check" class="mt-4">
+                <label for="pass">Authentication Token:</label>
+                <input type="password" id="plugin_github_pass" name="Password" required>
+                <input type="submit" id="plugin_github_submit" "value="Sign in">
+            </div>
 
-    if (token == null || token == "") {
-      return;
-    }
+        `).appendTo(container);
+    $('#plugin_github_submit').on('click', function (event) {
+      event.preventDefault();
+      var el = $(this);
+      el.prop('disabled', true);
+      token = document.getElementById('plugin_github_pass').value;
+      initializePlugins();
+    });
+  } else {
+    initializePlugins();
   }
 
-  let js_files = ["fetchdata.js", "LsdXplore.js", "LsdOmics.js", "LsdGenvar.js", "LsdMassSpec.js"];
-  let css_files = ["LsdStyle.css"];
-  let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
-  CssFiles = Array.from(css_files, x => PLUGIN_URL + x);
-  ScriptPaths = Array.from(js_files, x => PLUGIN_URL + x);
-  if ((await GetGithubScript(js_files)) == false) alert("Failed to initialize plugins." + (filetesting == false ? "\nCheck the authentification token. If the error continues, please contact the developers." : ""));
-  readDataFiles(minervaProxy, filetesting, PLUGIN_URL, Chart, ttest, JSZip, FileSaver, VCF, token).then(async function (data) {
-    await GetGithubScript(css_files, true);
+  async function initializePlugins() {
+    $(`<div id="stat_spinner" class="mt-5">
+                <div class="d-flex justify-content-center">
+                            <div class="spinner-border" role="status">
+                                <span class="sr-only"></span>
+                            </div>
+                </div>
+                <div class="d-flex justify-content-center mt-2">
+                    <span id="air_loading_text">LOADING ...</span>
+                </div>
+            </div>`).appendTo(container);
+    let js_files = ["fetchdata.js", "LsdXplore.js", "LsdOmics.js", "LsdGenvar.js", "LsdMassSpec.js"];
+    let css_files = ["LsdStyle.css"];
+    let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
+    CssFiles = Array.from(css_files, x => PLUGIN_URL + x);
+    ScriptPaths = Array.from(js_files, x => PLUGIN_URL + x);
 
-    try {
-      $("<link/>", {
-        rel: "stylesheet",
-        type: "text/css",
-        href: "https://ebi-uniprot.github.io/CDN/protvista/css/main.css"
-      }).appendTo("head");
-    } catch (err) {
-      console.log(error);
+    if ((await GetGithubScript(js_files)) == false) {
+      alert("Failed to initialize plugins." + (filetesting == false ? "\nCheck the authentification token. If the error continues, please contact the developers." : ""));
+      $("#stat_spinner").remove();
+      return;
+    } else if (!filetesting) {
+      $("#github_auth_check").remove();
     }
 
-    $("#air_plugincontainer").parents(".tab-pane").css({
-      "overflow": "hidden"
+    readDataFiles(minervaProxy, filetesting, PLUGIN_URL, Chart, ttest, JSZip, FileSaver, VCF, token).then(async function (data) {
+      await GetGithubScript(css_files, true);
+
+      try {
+        $("<link/>", {
+          rel: "stylesheet",
+          type: "text/css",
+          href: "https://ebi-uniprot.github.io/CDN/protvista/css/main.css"
+        }).appendTo("head");
+      } catch (err) {
+        console.log(error);
+      }
+
+      $("#air_plugincontainer").parents(".tab-pane").css({
+        "overflow": "hidden"
+      });
+      container.append(
+      /*html*/
+      `
+
+            <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
+                <li class="air_nav_item nav-item"  style="width: 25%;">
+                    <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">LsdXplore</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">LsdOmics</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">LsdVariant</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">LsdMassSpec</a>
+                </li>
+            </ul>
+            <div class="tab-content" id="air_tab">
+                <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
+                </div>
+                <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
+                </div>
+                <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+                </div>
+                <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
+                </div>
+            </div>
+
+            `);
+
+      for (let s of scripts) {
+        await loadScript(s);
+      }
+
+      document.getElementById("stat_spinner").remove();
+      $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
+      let p = document.getElementById('Air_Tab');
+      p.removeAttribute("hidden");
+      setTimeout(async function () {
+        AirXplore();
+        AirOmics();
+        AirGenvar();
+        AirMassSpec();
+      }, 0);
     });
-    container.append(
-    /*html*/
-    `
-
-        <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-            <li class="air_nav_item nav-item"  style="width: 25%;">
-                <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">LsdXplore</a>
-            </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
-                <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">LsdOmics</a>
-            </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
-                <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">LsdVariant</a>
-            </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
-                <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">LsdMassSpec</a>
-            </li>
-        </ul>
-        <div class="tab-content" id="air_tab">
-            <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
-            </div>
-            <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
-            </div>
-            <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
-            </div>
-            <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
-            </div>
-        </div>
-
-        `);
-
-    for (let s of scripts) {
-      await loadScript(s);
-    }
-
-    document.getElementById("stat_spinner").remove();
-    $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
-    let p = document.getElementById('Air_Tab');
-    p.removeAttribute("hidden");
-    setTimeout(async function () {
-      AirXplore();
-      AirOmics();
-      AirGenvar();
-      AirMassSpec();
-    }, 0);
-  });
+  }
 }
 
 async function loadScript(script) {
@@ -209,7 +230,7 @@ async function loadScript(script) {
 
 async function GetGithubScript(filenames, css = false) {
   if (filetesting) {
-    for (filename of filenames) {
+    for (let filename of filenames) {
       if (css) {
         $("<link/>", {
           rel: "stylesheet",
