@@ -193,7 +193,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                                 <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                                                                     <span aria-hidden="true">&times;</span>
                                                                 </button>
-                                                            </div>     
+                                                            </div>      
                                                             `)
                                                             $('#air_welcome_alert .close').on('click', function() {
                                                                 $(".air_tab_pane").css("height", "calc(100vh - 90px)");

@@ -260,10 +260,10 @@ async function AirOmics(){
 
                 <div class="btn-group btn-group-justified mt-4 mb-4">
                     <div class="btn-group">
-                        <button type="button" id="om_import_undo" class="air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
+                        <button type="button" id="om_import_undo" class="air_btn btn mr-1" style="font-size: 14px;" ><i class="fas fa-undo"></i> Undo</button>
                     </div>
                     <div class="btn-group">
-                        <button type="button" id="om_import_redo" class="air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
+                        <button type="button" id="om_import_redo" class="air_btn btn ml-1" style="font-size: 14px;" ><i class="fas fa-redo"></i> Redo</button>
                     </div>
                 </div>
                 
@@ -856,6 +856,14 @@ function createDifferentialAnalysisPanel()
 
             if (activePoint !== undefined) {
                 let name = globals.omics.om_targetchart.data.datasets[activePoint._datasetIndex].label;
+                if(name)
+                {
+                    name = name.split(";")[0];
+                }
+                else
+                {
+                    return;
+                }
                 selectElementonMap(name, true);
                 xp_setSelectedElement(name);
             }
@@ -1854,7 +1862,7 @@ async function om_createTable(numberofregulators) {
     columns.push({ "width": "50px" });
     
     var $pvalue_cell = $(createCell(headerrow, 'th', '# sign. samples', 'col-auto', 'col', 'center'));
-    $pvalue_cell.attr("title", "Probability to achieve the same or a higher accuracy by analyzing " + globals.omics.numberOfRandomSamples + " random samples.");
+    $pvalue_cell.attr("title", "Number of samples with a p-value < 0.05");
     $pvalue_cell.attr("data-toggle", "tooltip");
     $pvalue_cell.tooltip();
 
@@ -1863,8 +1871,8 @@ async function om_createTable(numberofregulators) {
         className: 'dt-center',
     })
 
-    var $acc_cell = $(createCell(headerrow, 'th', 'Accuracy (%)', 'col-auto', 'col', 'center'));
-    $acc_cell.attr("title", "Accuracy represents the percentage of regulating elements (in proportion to their influence), for which a value was supplied by the data.");
+    var $acc_cell = $(createCell(headerrow, 'th', 'Saturation (%)', 'col-auto', 'col', 'center'));
+    $acc_cell.attr("title", "Saturation represents the percentage of regulating elements (in proportion to their influence), for which a value was supplied by the data.");
     $acc_cell.attr("data-toggle", "tooltip");
     $acc_cell.tooltip();
 

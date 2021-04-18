@@ -420,7 +420,7 @@ async function xp_EstimatePhenotypes()
 
             for(let e in phenotypeValues) 
             {
-                let _influene = phenotypeValues[e];
+                let _influene = parseFloat(phenotypeValues[e]);
                 max_influence += Math.abs(_influene);
 
                 if(_data.hasOwnProperty(e))
@@ -450,7 +450,7 @@ async function xp_EstimatePhenotypes()
 
         for(var r of results)
         {
-            var level = r.level / ((document.getElementById("xp_normalize_phen").checked === true)? max_level : 1);
+            var level = r.level / ((document.getElementById("xp_normalize_phen").checked === true && max_level != 0)? max_level : 1);
             if(level != 0)
             {
                 if(level > 1)
@@ -637,14 +637,14 @@ async function getPhenotypePanel()
         <div class="mt-4">
             <h4 class="mb-2">Select perturbed elements:</h4>   
             <input type="text" style="width: 55%" class="textfield" id="xp_pe_element_input" placeholder="Type in elements seperated by comma"/>
-            <button type="button" id="xp_pe_element_btn" style="width: 20%" class="air_btn btn mr-1">Add Elements</button>
-            <button type="button" id="xp_pe_selectedelement_btn" style="width: 20%" class="air_btn btn mr-1" title="Add the currently selected element from the map.">Add Selected</button>
+            <button type="button" id="xp_pe_element_btn" style="width: 20%; font-size: 14px;" class="air_btn btn mr-1">Add Elements</button>
+            <button type="button" id="xp_pe_selectedelement_btn" style="width: 20%; font-size: 14px;" class="air_btn btn mr-1" title="Add the currently selected element from the map.">Add Selected</button>
             <div class="btn-group btn-group-justified mt-4 mb-4">
                 <div class="btn-group">
-                    <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
+                    <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1" style="font-size: 14px;"><i class="fas fa-undo"></i> Undo</button>
                 </div>
                 <div class="btn-group">
-                    <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
+                    <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1" style="font-size: 14px;"><i class="fas fa-redo"></i> Redo</button>
                 </div>
             </div>
             <div class="air_table_background">
@@ -665,7 +665,7 @@ async function getPhenotypePanel()
             <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
             <h4 class="mb-4">Resulting phenotype levels:</h4>
 
-            <div class="row mt-4 mb-2">
+            <div class="row mt-2 mb-4">
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
@@ -689,7 +689,7 @@ async function getPhenotypePanel()
                         <tr>
                             <th style="vertical-align: middle;">Phenotype</th>
                             <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
-                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">% Regulators</th>
+                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Saturation</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -712,6 +712,10 @@ async function getPhenotypePanel()
             "word-wrap": "break-word", 
         } );
         $(globals.xplore.pe_element_table.table().container() ).addClass( 'air_datatable' );
+        globals.xplore.pe_element_table.on( 'draw', function () {
+            adjustPanels(globals.xplore.container);
+        } );
+
 
         globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
             "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
@@ -764,7 +768,7 @@ async function getPhenotypePanel()
         } );
         $(globals.xplore.pe_results_table.table().container() ).addClass( 'air_datatable' );
         
-        $('#xp_table_pe_results').on( 'page.dt', function () {
+        globals.xplore.pe_results_table.on( 'draw', function () {
             adjustPanels(globals.xplore.container);
         } );
 
