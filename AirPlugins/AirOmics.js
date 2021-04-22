@@ -224,40 +224,45 @@ async function AirOmics(){
                 
             </div>
             <div class="tab-pane air_sub_tab_pane mb-2" id="om_data_import" role="tabpanel" aria-labelledby="om_data_import-tab">
-                <h5>AirVariant</h5>
-                <table class="air_table order-column hover" style="width:100%" id="om_import_variant_table" cellspacing=0>
-                    <thead>
-                        <tr>
-                            <th style="vertical-align: middle;">Samples</th>
-                            <th style="vertical-align: middle;">Convert to</th>
-                        </tr>
+                <div id="om_import_variant_container" class="air_box_white">
+                    <h4>AirVariant</h4>
+                    <table class="air_table order-column hover" style="width:100%" id="om_import_variant_table" cellspacing=0>
+                        <thead>
+                            <tr>
+                                <th style="vertical-align: middle;">Samples</th>
+                                <th style="vertical-align: middle;">Convert to</th>
+                            </tr>
+                            <tbody>
+                            </tbody>
+                        </thead>
+                    </table>    
+                    <span id="om_import_variant_span">No data available.</span>
+                    <button type="button" id="om_import_variant" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2"><i class="fas fa-file-import"></i> Import from AirVariant</button>                
+                </div>
+                <hr>
+                <div id="om_import_massspec_container" class="air_box_white">
+                    <h4>AirMassSpec</h4>
+                    <table class="air_table order-column hover" style="width:100%" id="om_import_massspec_table" cellspacing=0>
+                        <thead>
+                            <tr>
+                                <th style="vertical-align: middle;">Samples</th>
+                                <th style="vertical-align: middle;">Convert to</th>
+                            </tr>
+                        </thead>
                         <tbody>
                         </tbody>
-                    </thead>
-                </table>    
-                <button type="button" id="om_import_variant" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2"><i class="fas fa-file-import"></i> Import from AirVariant</button>                
-                <hr>
-                <h5>AirMassSpec</h5>
-                <table class="air_table order-column hover" style="width:100%" id="om_import_massspec_table" cellspacing=0>
-                    <thead>
-                        <tr>
-                            <th style="vertical-align: middle;">Samples</th>
-                            <th style="vertical-align: middle;">Convert to</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
-                <div id="om_import_massspec_pvaluethreshold-container" class="row mt-2 mb-2">
-                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
-                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
+                    </table>
+                    <span id="om_import_massspec_span">No data available.</span>
+                    <div id="om_import_massspec_pvaluethreshold-container" class="row mt-4 mb-2">
+                        <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                            <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
+                        </div>
+                        <div class="col">
+                            <input type="text" class="textfield" value="0.05" id="om_import_massspec_pvaluethreshold" onkeypress="return isNumber(event)" />
+                        </div>
                     </div>
-                    <div class="col">
-                        <input type="text" class="textfield" value="0.05" id="om_import_massspec_pvaluethreshold" onkeypress="return isNumber(event)" />
-                    </div>
+                    <button type="button" id="om_import_massspec" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2"><i class="fas fa-file-import"></i> Import from AirMassSpec</button>
                 </div>
-                <button type="button" id="om_import_massspec" class="air_btn btn btn-block air_disabledbutton mt-4 mb-4"><i class="fas fa-file-import"></i> Import from AirMassSpec</button>
-
                 <div class="btn-group btn-group-justified mt-4 mb-4">
                     <div class="btn-group">
                         <button type="button" id="om_import_undo" class="air_btn btn mr-1" style="font-size: 14px;" ><i class="fas fa-undo"></i> Undo</button>
@@ -510,23 +515,12 @@ function createDifferentialAnalysisPanel()
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>  
-        <div class="row mt-1 mb-1" style="width: 220px; margin-left: calc(28%); border: 1px solid gray; border-radius: 25px; padding: 4px; font-weight: bold;">
-            <div class="col-auto">
-                <div class="wrapper">
-                    <button type="button" class="air_btn_info btn btn-secondary"
-                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
-                            data-content="Transcriptomics data allows for more accurate results by including information about transcription factor interactions.<br/>For other data types, this should definitely be disabled.">
-                        ?
-                    </button>
-                </div>
-            </div>
-            <div class="col">
-                <div class="cbcontainer">
-                    <input type="checkbox" class="air_checkbox" id="om_transcriptomics">
-                    <label class="air_checkbox" for="om_transcriptomics">Transcriptomics Data</label>
-                </div>
-            </div>
-        </div>    
+        <label class="air_label mt-1" style="font-weight: bold;">Type of Data:</label>
+        <select id="om_data_type" class="browser-default om_select custom-select mb-1" style="border: solid 1px; font-weight: bold;">
+            <option value="0" selected>Unspecified</option>
+            <option value="1">Transcriptomics</option>
+            <option value="2">Metabolomics</option>
+        </select> 
         <label class="air_label mt-1" style="font-weight: bold;">Sample:</label>
         <select id="om_select_sample" class="browser-default om_select custom-select mb-1" style="border: solid 1px; font-weight: bold;">
         </select>
@@ -2126,7 +2120,7 @@ async function om_createTable(numberofregulators) {
             });
         },
         "autoWidth": true,
-        "order": [[ globals.omics.samples.length + 2, "desc" ]],  
+        "order": [globals.omics.samples.length == 1? [2, "asc" ] : [globals.omics.samples.length + 2, "desc" ]],  
         "scrollX": true,
         "columns": columns,
         "columnDefs": columnsdefs,
@@ -2294,6 +2288,7 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype].MainRegulators = {};
         AIR.Phenotypes[phenotype]["includedelements"] = {};
         AIR.Phenotypes[phenotype]["genenumbers"] = {};
+        AIR.Phenotypes[phenotype]["slope"] = {};
 
         for (let element in AIR.Phenotypes[phenotype].values) {
             let SP = AIR.Phenotypes[phenotype].values[element];
@@ -2420,8 +2415,11 @@ async function om_PhenotypeSP() {
             let numberOfHigherScores = 0;
             let diff = Math.abs(positive_influences - negative_influences)
 
-            var degree = Math.atan(leastSquaresRegression(regr_data)) *  (180/Math.PI);
+            var m = leastSquaresRegression(regr_data)
+            var degree = Math.atan(m) *  (180/Math.PI);
             var score = Math.sign(degree) * Math.sign(activity) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+
+            AIR.Phenotypes[phenotype]["slope"][sample] = m;
 
             if(elements_with_FC.length == 0 ||  score <= 0)
             {
@@ -3168,20 +3166,23 @@ function readExpressionValues() {
                 continue;
             }
 
-            if(!globals.omics.ExpressionValues.hasOwnProperty(item))
-            {
-                globals.omics.ExpressionValues[item] = {}
-                globals.omics.ExpressionValues[item]["name"] = AIR.Molecules[item].name;
-                globals.omics.ExpressionValues[item]["normalized"] = {};
-                globals.omics.ExpressionValues[item]["nonnormalized"] = {}
-                globals.omics.ExpressionValues[item]["pvalues"] = {}
-                globals.omics.ExpressionValues[item]["custom"] = true;
-            }
-
             for (let sample in globals.omics.samples) {
                 let _values = itemExpression(item, sample)
-                globals.omics.ExpressionValues[item].nonnormalized[sample] = _values[0];
-                globals.omics.ExpressionValues[item].pvalues[sample] = _values[1];
+                if(_values)
+                {                    
+                    if(!globals.omics.ExpressionValues.hasOwnProperty(item))
+                    {
+                        globals.omics.ExpressionValues[item] = {}
+                        globals.omics.ExpressionValues[item]["name"] = AIR.Molecules[item].name;
+                        globals.omics.ExpressionValues[item]["normalized"] = {};
+                        globals.omics.ExpressionValues[item]["nonnormalized"] = {}
+                        globals.omics.ExpressionValues[item]["pvalues"] = {}
+                        globals.omics.ExpressionValues[item]["custom"] = true;
+                    }
+
+                    globals.omics.ExpressionValues[item].nonnormalized[sample] = _values[0];
+                    globals.omics.ExpressionValues[item].pvalues[sample] = _values[1];
+                }
             }
         }
 
@@ -3193,6 +3194,9 @@ function readExpressionValues() {
                 for(let subunit in AIR.Molecules[item].subunits)
                 {
                     let subunitvalues = itemExpression(AIR.Molecules[item].subunits[subunit], sample)
+                    if(!subunitvalues)
+                        continue;
+
                     let subunitvalue = subunitvalues[0];
                     let subunitpvalue = subunitvalues[1];
 
@@ -3205,15 +3209,16 @@ function readExpressionValues() {
                         sumpvalue = subunitpvalue;
                     }
                 }
-
-                return [( sum === Number.MAX_SAFE_INTEGER? 0 : sum), (sumpvalue == -1? 1: sumpvalue)] ;
+                if(sum === Number.MAX_SAFE_INTEGER)
+                    return false;
+                return [sum, (sumpvalue == -1? 1: sumpvalue)] ;
             }
             else if(globals.omics.ExpressionValues.hasOwnProperty(item))
             {
                 return [globals.omics.ExpressionValues[item]["nonnormalized"][sample], globals.omics.ExpressionValues[item]["pvalues"][sample]];
             }
             else {
-                return [0,1];
+                return false;
             }
         }
 
@@ -3366,7 +3371,7 @@ async function OM_PredictTargets() {
 async function calculateTargets() {
 
     
-    let transcriptomics = document.getElementById("om_transcriptomics").checked;
+    let datatype = parseFloat($("#om_data_type").val());
 
     let e_ids = [];
 
@@ -3598,9 +3603,24 @@ async function calculateTargets() {
                 }
 
                 let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-                let SP = transcriptomics? parseFloat(data[p].t) : parseFloat(data[p].i);
+                let SP = 0;
+                
+                switch (datatype) {
+                    case 0:
+                        SP = parseFloat(data[p].i);
+                        break;
+                    case 1:
+                        SP = parseFloat(data[p].t);
+                        break;
+                    case 2:
+                        SP = parseFloat(data[p].c);
+                        break;
+                    default:
+                        SP = 0;
+                        break;
+                }
 
-                if (value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
+                if (SP != 0 && value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
                     positiveSum += value * SP;
                     target_values[AIR.Molecules[p].name] = value * SP;
                 }
@@ -3887,6 +3907,10 @@ function om_createpopup(button, parameter) {
     $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
                     <div class="arrow" style="left: 9.375%;"></div>
                     <div id="om_chart_popover_content" class="popover-content">
+                        <div class="cbcontainer mt-1 mb-2 ml-2">
+                            <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
+                            <label class="air_checkbox" for="om_popup_showregression">Show Regression Line</label>
+                        </div>
                         <canvas class="popup_chart" id="om_popup_chart"></canvas>
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
@@ -3908,7 +3932,7 @@ function om_createpopup(button, parameter) {
     $btn.after($target);
     
     let targets = []
-
+    let ymin = 0, ymax = 0, xmin = 0, xmax = 0;
     for (let element in AIR.Phenotypes[phenotype].values) {
 
         if(!AIR.Phenotypes[phenotype].includedelements[sample].includes(element))
@@ -3975,6 +3999,15 @@ function om_createpopup(button, parameter) {
         {
             pstyle = 'triangle'
         }
+
+        if(FC < xmin)
+            xmin = FC;
+        if(FC > xmax)
+            xmax = FC;
+        if(SP < ymin)
+            ymin = SP;
+        if(SP > ymax)
+            ymax = SP;
             
         targets.push(
             {
@@ -3989,6 +4022,23 @@ function om_createpopup(button, parameter) {
                 hoverBackgroundColor: hex,
             }
         );
+    }
+
+    let m = AIR.Phenotypes[phenotype]["slope"][sample];
+    let y1 = null, y2 = 0, x1 = null, x2 = 0;
+    for (let _x = xmin; _x <= xmax; _x += 0.01) {
+        let _y = _x * m;
+
+        if(_y > ymin && _x > xmin && y1 == null)
+        {
+            y1 = _y;
+            x1 = _x;
+        }
+        if(_y < ymax && _x < xmax)
+        {
+            y2 = _y;
+            x2 = _x;
+        }
     }
 
     var outputCanvas = document.getElementById('om_popup_chart');
@@ -4123,6 +4173,40 @@ function om_createpopup(button, parameter) {
     $("#om_resultstable").parents(".dataTables_scrollBody").css({
         minHeight: (popupheight > 400? 400 : popupheight) + "px",
     });
+
+    
+    $('#om_popup_showregression').on('click', function() {
+
+        if(document.getElementById("om_popup_showregression").checked === true)
+        {
+            popupchart.data.datasets.push(
+                {
+                    data: [{
+                        x: x1,
+                        y: y1,
+                        r: 0,
+                    },
+                    {
+                        x: x2,
+                        y: y2,
+                        r: 0,
+                    }],
+                    type: 'line',
+                    fill: false,
+                    pointRadius: 0,
+                    backgroundColor: m < 0? "#FFCDCD" : "#009933",
+                    borderColor: m < 0? "#FFCDCD" : "#009933",
+                    borderWidth: 2,
+                }
+            );
+        }
+        else
+        {
+            popupchart.data.datasets.splice(-2)
+        }
+
+        popupchart.update();
+    })
 };
 
 function randomIDs(size, max, n){
@@ -4143,6 +4227,7 @@ function update_importVariantTable() {
 
     if(globals.variant.mutation_results && Object.keys(globals.variant.mutation_results).length > 0)
     {
+        $("#om_import_variant_span").remove();
         for(let _id in globals.variant.samples)
         {
             var sample = globals.variant.samples[_id];
@@ -4162,6 +4247,7 @@ function update_importMassSpecTable() {
 
     if(globals.massspec.results && Object.keys(globals.massspec.results).length > 0)
     {
+        $("#om_import_massspec_span").remove();
         tbody.append(`
             <tr>
                 <td>AirMassSpec</td>

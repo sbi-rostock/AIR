@@ -531,6 +531,14 @@ async function getMoleculeData(_key, type = "molecule", returndata = true, savei
                     {
                         data[e]["t"] = 0;
                     }
+                    if(data[e].hasOwnProperty("c") == false)
+                    {
+                        data[e]["c"] = 0;
+                    }
+                    else if(isNaN(data[e]["c"]))
+                    {
+                        data[e]["c"] = 0;
+                    }
                     if(data[e].hasOwnProperty("i") == false)
                     {
                         data[e]["i"] = 0;
