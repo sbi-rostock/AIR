@@ -3620,7 +3620,7 @@ async function calculateTargets() {
                         break;
                 }
 
-                if (SP != 0 && value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
+                if (value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
                     positiveSum += value * SP;
                     target_values[AIR.Molecules[p].name] = value * SP;
                 }
