@@ -51,18 +51,26 @@
   width: auto;
   list-style-type: none; }
 
-.triangle {
+.triangle, .triangle_down {
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-bottom: 13px solid;
+  
   display: inline-block;
   position: relative;
   vertical-align: middle;
   background-color: white;
   margin-right: 10px; 
   margin-bottom: 3px;
+}
+
+.triangle {
+  border-bottom: 13px solid;
+}
+
+.triangle_down {
+  border-top: 13px solid;
 }
 
 .triangle_small {
@@ -91,6 +99,7 @@
   margin-right: 10px;
   border-radius: 25px;
   vertical-align: middle; }
+
 
 .legendspan_small{
   display: inline-block;
@@ -164,6 +173,15 @@
     padding: 5px;
     margin: 0px;
 }
+
+.air_box_white {
+  border: 1px solid gray;
+  padding: 10px;
+  margin: 0px;
+  background-color: white;
+  border-radius: 20px;
+}
+
 .air_slider {
   -webkit-appearance: none;
   height: 15px;

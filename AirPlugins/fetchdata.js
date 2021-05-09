@@ -815,7 +815,7 @@ function createPopupCell(row, type, text, style, align, callback, callbackParame
     if(row != null)
         row.appendChild(cell);
 
-    return button;
+    return cell;
 }
 function createButtonCell(row, type, text, align) {
     var button = document.createElement('button'); // create text node
@@ -1420,13 +1420,15 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
 
                 // number of paths to p that include e
                 var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
+
+                /*
                 if(pathdata.modifiers.hasOwnProperty(e))
                 {
                     for(let m in pathdata.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
                     {
                         newpaths.filter(p => p.includes(m)).map(path => includedpaths.add(path));
                     }
-                }
+                }*/
 
                 influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
             };            
@@ -1468,7 +1470,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
     });
 }
 
-function pickHighest(obj, _num = 1, ascendend = true) {
+function pickHighest(obj, _num = 1, ascendend = true, key = null) {
 
     let num = _num;
     let requiredObj = {};
@@ -1477,9 +1479,9 @@ function pickHighest(obj, _num = 1, ascendend = true) {
        num = Object.keys(obj).length;
     };
 
-    if(ascendend)
+    if(!ascendend)
     {
-        Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach((key, ind) =>
+        Object.keys(obj).sort((a, b) => (key  == null? (obj[b] - obj[a]) : (obj[b][key] - obj[a][key])) ).forEach((key, ind) =>
         {
            if(ind < num){
               requiredObj[key] = obj[key];
@@ -1487,7 +1489,7 @@ function pickHighest(obj, _num = 1, ascendend = true) {
         });
     }
     else {
-        Object.keys(obj).sort((a, b) => obj[a] - obj[b]).forEach((key, ind) =>
+        Object.keys(obj).sort((a, b) => (key  == null? (obj[a] - obj[b]) : (obj[a][key] - obj[b][key]))).forEach((key, ind) =>
         {
            if(ind < num){
               requiredObj[key] = obj[key];
@@ -1624,4 +1626,7 @@ function leastSquaresRegression(data) {
     return gradient;
 }
 
-  
+function activaTab(tab){
+    $('.nav-tabs a[href="#' + tab + '"]').tab('show');
+};
+ 

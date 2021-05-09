@@ -1265,7 +1265,6 @@ function getInteractionPanel()
                     globals.xplore.phenotypetable.columns.adjust(); 
                     break;
             }
-            $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
             adjustPanels(globals.xplore.container);
         });
 

@@ -258,7 +258,7 @@ async function AirOmics(){
                             <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
                         </div>
                         <div class="col">
-                            <input type="text" class="textfield" value="0.05" id="om_import_massspec_pvaluethreshold" onkeypress="return isNumber(event)" />
+                            <input type="text" class="textfield" value="0.01" id="om_import_massspec_pvaluethreshold" onkeypress="return isNumber(event)" />
                         </div>
                     </div>
                     <button type="button" id="om_import_massspec" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2"><i class="fas fa-file-import"></i> Import from AirMassSpec</button>
@@ -330,6 +330,8 @@ async function AirOmics(){
     let t1 = performance.now()
     console.log("Call to AirOmics took " + (t1 - t0) + " milliseconds.")
 }
+
+
 
 function createDifferentialAnalysisPanel()
 {
@@ -535,6 +537,59 @@ function createDifferentialAnalysisPanel()
             <option value="4">Transcription Factors</option>
         </select>
         <hr>
+        <div class="row mt-2 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
+                            data-content="Number of targets combinations for which a combined score should be calculated. Increasing this value has drastic effect on calculation time and requires enabling memory storage.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col" style="width: 40%; padding-right: 0">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">#Target Combinations:</span>
+            </div>
+            <div class="col-auto" style="width: 7%; padding: 0">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;" id="om_targetcomb_value">1</span>
+            </div>
+            <div class="col-auto" style="width: 50%; padding-top: 5px; padding-right: 40px;">
+                <input type="range" style="width: 100%;" value="1" min="1" max="4" step="1" class="slider air_slider" id="om_targetcomb_slider">
+            </div>
+        </div>
+        <div id="om_target_pvaluethreshold-container" class="row mb-2">
+            <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Number of predicted targets:</span>
+            </div>
+            <div class="col">
+                <input type="text" class="textfield" value="100" id="om_target_targetnumber" onkeypress="return isNumber(event)" />
+            </div>
+        </div>
+        
+        <hr>
+        <div class="row mt-2 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
+                            data-content="Predicted targets are ranked by their accuracy, i.e., the correspondece to induce upregulated elements or inhibit downregulated elements and vice versa. Eliminating background noise in the dataset increases the accuracy.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col">
+                <h3 class="mb-2">Filter dataset:</h3>  
+            </div>
+        </div>
+
+        <div id="om_target_pvaluethreshold-container" class="row mb-2">
+            <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Abs logFC Threshold:</span>
+            </div>
+            <div class="col">
+                <input type="text" class="textfield" value="1.5" id="om_target_fcthreshold" onkeypress="return isNumber(event)" />
+            </div>
+        </div>
         <div id="om_target_pvaluethreshold-container" class="row mb-2">
             <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
@@ -543,7 +598,10 @@ function createDifferentialAnalysisPanel()
                 <input type="text" class="textfield" value="0.05" id="om_target_pvaluethreshold" onkeypress="return isNumber(event)" />
             </div>
         </div>
-        <div class="row mt-1 mb-1">
+
+        <hr>
+
+        <div class="row mt-2 mb-2">
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary"
@@ -555,12 +613,11 @@ function createDifferentialAnalysisPanel()
             </div>
             <div class="col">
                 <div class="cbcontainer">
-                    <input type="checkbox" class="air_checkbox" id="om_target_filtercontrary">
-                    <label class="air_checkbox" for="om_target_filtercontrary">Filter contrary FCs?</label>
+                    <input type="checkbox" class="air_checkbox" id="om_target_filtercontrary" checked>
+                    <label class="air_checkbox" for="om_target_filtercontrary">Filter contrary results?</label>
                 </div>
             </div>
         </div> 
-        <hr>
         <div class="air_alert alert alert-info mt-2">
             <span>During the first run, large amounts of data must be retrieved. The calculation time depends on your Internet bandwidth.</span>
             <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
@@ -587,6 +644,25 @@ function createDifferentialAnalysisPanel()
         <button type="button" id="om_btn_predicttarget" class="air_btn btn btn-block mt-1 mb-1">Predict Targets</button>   
         <hr>
     </div>`).appendTo('#om_tab');
+
+    $('#om_targetcomb_slider').on('input', function (e) {
+        $("#om_targetcomb_value").html($(this).val());
+        switch (parseFloat($(this).val())) {
+            case 1:
+                $("#om_target_targetnumber").val(100)
+                break;
+            case 2:
+                $("#om_target_targetnumber").val(50)
+                break;
+            case 3:
+                $("#om_target_targetnumber").val(20)
+                break;
+            case 4:
+                $("#om_target_targetnumber").val(10)
+                break;
+        }
+    });
+
     
     let sampleSelect = document.getElementById('om_select_sample');
 
@@ -638,7 +714,12 @@ function createDifferentialAnalysisPanel()
 
     $("#om_enrichr_progress").attr("aria-valuemax", Object.keys(globals.omics.samples).length);
 
-    $("#om_btn_predicttarget").on('click', function() {            
+    $("#om_btn_predicttarget").on('click', function() { 
+        if(parseFloat($('#om_targetcomb_slider').val()) > 1 && document.getElementById("om_target_usememory").checked == false)
+        {
+            alert("Storage in memory is required for calculation target combinations.")
+            return;
+        }           
         OM_PredictTargets();
     });
     $("#om_btn_enrichr").on('click', function() {            
@@ -680,10 +761,10 @@ function createDifferentialAnalysisPanel()
     globals.omics.targettab.append($(`
         <ul class="air_nav_tabs nav nav-tabs" role="tablist">
             <li class="air_nav_item nav-item" style="width: 50%;">
-                <a class="air_tab air_tab_sub active nav-link" id="om_target_chart-tab" data-toggle="tab" href="#om_target_chart" role="tab" aria-controls="om_target_chart" aria-selected="true">Chart</a>
+                <a class="air_tab air_tab_sub active nav-link om_target_tabs" id="om_target_chart-tab" data-toggle="tab" href="#om_target_chart" role="tab" aria-controls="om_target_chart" aria-selected="true">Chart</a>
             </li>
             <li class="air_nav_item nav-item" style="width: 50%;">
-                <a class="air_tab air_tab_sub nav-link" id="om_target_table-tab" data-toggle="tab" href="#om_target_table" role="tab" aria-controls="om_target_table" aria-selected="false">Table</a>
+                <a class="air_tab air_tab_sub nav-link om_target_tabs" id="om_target_table-tab" data-toggle="tab" href="#om_target_table" role="tab" aria-controls="om_target_table" aria-selected="false">Table</a>
             </li>
         </ul>
         <div class="tab-content air_tab_content">                    
@@ -692,9 +773,9 @@ function createDifferentialAnalysisPanel()
                     <canvas id="om_target_chart_canvas" style="height: 400px;"></canvas>
                 </div>
                 <div id="om_legend_target" class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Targets</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Targets</li>
-                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+                    <li class="legendli" style="color:#C00000; font-size:90%;"><span class="triangle" style="background-color:#FFFFFF"></span>positive Targets</li>
+                    <li class="legendli" style="margin-left:20px; color:#0070C0; font-size:90%;"><span class="triangle_down" style="background-color:#FFFFFF"></span>negative Targets</li>
+                    <li class="legendli" style="margin-left:20px; color:#a9a9a9; font-size:100%;"><span class="legendspan" style="background-color:#a9a9a9"></span>combined</li>
                 </div>
             </div>
             <div class="tab-pane air_sub_tab_pane mb-2" id="om_target_table" role="tabpanel" aria-labelledby="om_target_table-tab"> 
@@ -714,6 +795,11 @@ function createDifferentialAnalysisPanel()
         </div>
         <button id="om_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
         `));
+
+    $('.om_target_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        if(globals.omics.om_targettable)
+            globals.omics.om_targettable.columns.adjust();
+    });
 
     $('#om_btn_download_target').on('click', function() {
         air_download('PredictedKeyRegulators.txt', globals.omics.om_target_downloadtext)
@@ -828,7 +914,7 @@ function createDifferentialAnalysisPanel()
                         return [
                             "Name: " + label[0],
                             "FC: " + label[1], 
-                            "Regulators: " + label[2], 
+                            "Effect: " + label[2], 
                             "Sensitivity: " + expo(tooltipItem.yLabel, 3, 3),
                             "Specificity: " + expo(tooltipItem.xLabel, 3, 3),
                         ];
@@ -1475,11 +1561,25 @@ function om_detectfile(force_seperator) {
             index ++; 
         })
 
-        if(globals.omics.pvalue)
+        if ((globals.omics.columnheaders.length - 1)%2 != 0)
         {
-            if ((globals.omics.columnheaders.length - 1)%2 != 0)
-                return stopfile('Number of p-value columns is different from the sumber of sample columns!'); 
+            $('#om_checkbox_pvalue').prop('checked', false);
+            
         }
+        else
+        {
+            for(let _header of globals.omics.columnheaders)
+            {
+                if(_header.toLowerCase().includes("pvalue"))
+                {
+                    $('#om_checkbox_pvalue').prop('checked', true);
+                    break;
+                }
+            }
+
+        }
+
+        
         let columnSelect = document.getElementById('om_columnSelect');
 
         for(let i = 0; i < globals.omics.columnheaders.length;i++) {
@@ -1757,8 +1857,8 @@ async function om_createTable(numberofregulators) {
     }
     for (let phenotype in AIR.Phenotypes)
     {
-        var result_row = tbl.insertRow(tbl.rows.length);
-        var pname = AIR.Phenotypes[phenotype].name;
+        let result_row = tbl.insertRow(tbl.rows.length);
+        let pname = AIR.Phenotypes[phenotype].name;
 
         globals.omics.om_phenotype_downloadtext += `\n${pname}`;
         checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
@@ -1828,7 +1928,7 @@ async function om_createTable(numberofregulators) {
     }]
     let columns = [
         { "width": "8px" },
-        null];
+        { "width": "300px" }];
 
 
     for (let sample in globals.omics.samples) 
@@ -1853,7 +1953,7 @@ async function om_createTable(numberofregulators) {
     columns.push({ "width": "12px" });
     columns.push({ "width": "10px" });
     columns.push({ "width": "40px" });
-    columns.push({ "width": "50px" });
+    columns.push(null);
     
     var $pvalue_cell = $(createCell(headerrow, 'th', '# sign. samples', 'col-auto', 'col', 'center'));
     $pvalue_cell.attr("title", "Number of samples with a p-value < 0.05");
@@ -2144,7 +2244,12 @@ async function om_createTable(numberofregulators) {
                 else{
                     $('#om_table_modal_content').prepend($('#om_resultstable_wrapper'))
                     $('#om_resultstable_wrapper').css("background-color", "white");
-                    $('#om_table_modal_content').css("width", "100%");
+                    let width = 30 + 8 * globals.omics.samples.length
+                    if(width > 90)
+                    {
+                        width = 90;
+                    }
+                    $('#om_table_modal_content').css("width", width + "%");
                     modal.style.display = "block";
                 }
                 setTimeout(() => {
@@ -2364,7 +2469,7 @@ async function om_PhenotypeSP() {
                     SP = Math.abs(SP);
                 }
 
-                regr_data.push([FC,SP])
+                regr_data.push([FC,Math.abs(FC)*SP])
 
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
@@ -2413,8 +2518,6 @@ async function om_PhenotypeSP() {
             AIR.Phenotypes[phenotype].results[sample] = activity;
 
             let numberOfHigherScores = 0;
-            let diff = Math.abs(positive_influences - negative_influences)
-
             var m = leastSquaresRegression(regr_data)
             var degree = Math.atan(m) *  (180/Math.PI);
             var score = Math.sign(degree) * Math.sign(activity) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
@@ -2439,7 +2542,7 @@ async function om_PhenotypeSP() {
                     {
                         if(_id < SP_Values.length)
                         { 
-                            _regr_data.push([elements_with_FC[_id],SP_Values[_id]])
+                            _regr_data.push([elements_with_FC[_id],Math.abs(elements_with_FC[_id])*SP_Values[_id]])
                             _activity += (elements_with_FC[_id] * SP_Values[_id])
                         }
                     }
@@ -2708,6 +2811,12 @@ async function om_loadfile(imported) {
         }
 
         globals.omics.pvalue = document.getElementById("om_checkbox_pvalue").checked;
+
+        if(globals.omics.pValue && (globals.omics.columnheaders.length - 1)%2 != 0)
+        {
+            reject('Number of p-value columns is different from the sumber of sample columns!');
+            return;             
+        }
         var _transcript = parseFloat($("#om_transcriptSelect").val());   
 
         if(!globals.omics.pvalue && _transcript == 5)
@@ -3370,22 +3479,47 @@ async function OM_PredictTargets() {
 
 async function calculateTargets() {
 
-    
-    let datatype = parseFloat($("#om_data_type").val());
-
     let e_ids = [];
 
+    let fc_threshold = 0;
     let pvalue_threshold = 1;
 
     var sample = $('#om_select_sample').val(); 
 
     let filter = $('#om_target_filter option:selected').text();
 
+    let n = parseFloat($('#om_targetcomb_slider').val());
+    let usememory = (document.getElementById("om_target_usememory").checked == true? true : false);
+    let numberOfTargets = 100;
     globals.omics.om_target_downloadtext = `Sample: ${globals.omics.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity\tType\tRegulators`;
 
     let negativeCount = 0;
     let positiveCount = 0;
     let finishedelements_count = 0;                              
+
+    let _identifiedTargets = {};
+    
+    let max_fc = 0;
+    let spType = "i";
+    switch (parseFloat($("#om_data_type").val())) {
+        case 1:
+            spType = "t";
+            break;
+        case 2:
+            spType = "c";
+            break;
+    }
+
+    activaTab("om_target_chart");
+
+
+    if(globals.omics.om_targettable)
+        globals.omics.om_targettable.destroy();
+
+    $("#om_target_chart_table").replaceWith(`
+        <table class="air_table order-column hover nowrap  mt-2" style="width:100%" id="om_target_chart_table" cellspacing=0>
+        </table>
+    `);
 
     try 
     {
@@ -3396,12 +3530,24 @@ async function calculateTargets() {
             pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
             if(isNaN(pvalue_threshold))
             {
-                alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 1.")
+                alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 1.")
                 pvalue_threshold = 1;
             }
         }
+        numberOfTargets = parseFloat($("#om_target_targetnumber").val().replace(',', '.'))
+        if(isNaN(numberOfTargets))
+        {
+            alert("Only integer numbers are allowed as an input. Number of targets was set to 0.")
+            numberOfTargets = 100;
+        }
+        fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
+        if(isNaN(fc_threshold))
+        {
+            alert("Only (decimal) numbers are allowed as an FC threshold. FC threshold was set to 0.")
+            fc_threshold = 0;
+        }
+        fc_threshold = Math.abs(fc_threshold)
 
-        let max_fc = 0;
         for(let e in AIR.Molecules)
         {
             let fc = 0
@@ -3413,12 +3559,13 @@ async function calculateTargets() {
                 }
             } 
 
-            if(fc == 0)
+            if(Math.abs(fc) > Math.abs(fc_threshold))
             {
-                negativeCount += 1;
+                positiveCount += Math.abs(fc);
+                
             }
             else {
-                positiveCount += Math.abs(fc);
+                negativeCount += 1;
             }
 
             if(AIR.Molecules[e].emptySP == true)
@@ -3466,15 +3613,14 @@ async function calculateTargets() {
             e_ids.push(e);
         }
 
-        let molLength = e_ids.length;
+        let molLength = e_ids.length ;
         await updateProgress(0, molLength, "om_regulator");
              
         globals.omics.om_targetchart.data.datasets = [];
-        globals.omics.om_targettable.clear();
 
         setTimeout(function(){                                
             globals.omics.om_targetchart.update();
-            globals.omics.om_targettable.columns.adjust().draw();
+           
         }, 0);
 
         for (let e of e_ids) {
@@ -3491,64 +3637,85 @@ async function calculateTargets() {
 
                         if(targtetdata != null)
                         {
-                            var radius = 4 + 4 * (Math.abs(targtetdata.fc) / max_fc);
-                    
-                            var pstyle = 'circle';
-                            if(AIR.MapSpeciesLowerCase.includes(targtetdata.name.toLowerCase()) === false)
-                            {
-                                pstyle = 'triangle'
-                            }
-        
-                            let hex = targtetdata.positive? (targtetdata.fc >= 0? '#00BFC4' : '#d3d3d3') : (targtetdata.fc <= 0? '#F9766E' : '#d3d3d3');
-                            let result = {
-                                label: [targtetdata.name, expo(targtetdata.fc, 3, 3), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
-                                data: [{
-                                    x: expo(targtetdata.specificity, 3, 3),
-                                    y: expo(targtetdata.sensitivity, 3, 3),
-                                    r: radius
-                                }],
-                                backgroundColor:  hex ,
-                                hoverBackgroundColor: hex,
-                                pointStyle: pstyle,
-                            }
-                            globals.omics.om_targettable.row.add([
-                                getLinkIconHTML(targtetdata.name),
-                                targtetdata.positive? "positive" : "negative",
-                                expo(targtetdata.sensitivity, 3, 3),
-                                expo(targtetdata.specificity, 3, 3),
-                                expo(targtetdata.fc, 3, 3),
-                                targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", ")
-                            ])
-                            globals.omics.om_target_downloadtext += `\n${targtetdata.name}\t${targtetdata.specificity}\t${targtetdata.sensitivity}\t${targtetdata.positive? "positive" : "negative"}\t${targtetdata.regulators}`;
-                            globals.omics.om_targetchart.data.datasets.push(result); 
-
+                            _identifiedTargets[targtetdata.id[0]] = targtetdata;
+                            
                             //updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
-                        }
-                         
-
-                        if(finishedelements_count == molLength)
-                        {
-                            $("#om_target_chart_canvas").height(400);
-                            $("#om_regulator_progress").hide();
-                            $("#om_btn_predicttarget").html('Predict Targets');
-                            $("#airomics_tab_content").removeClass("air_disabledbutton");
-                                    
-                            globals.omics.om_targetchart.update();
-                            globals.omics.om_targettable.columns.adjust().draw();
                         }
 
                     }
-                    
+                                             
+                    await updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
                     setTimeout(function(){                                
                         globals.omics.om_targetchart.update();
-                    }, 0);   
-                    await updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
+                    }, 0);  
+
+                    if(last)
+                    {
+                        await updateProgress(0, 1, "om_regulator", `  Ranking Targets...`);
+                        _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets*2, ascendend = false, key = "accuracy");
+                        let identifiedTargets = Object.keys(pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity"));
+                        for (var i = 0; i < identifiedTargets.length - 1; i++)
+                        {
+                            await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`);
+
+                            setTimeout(async function(){ 
+                                await adddatatochart(_identifiedTargets[identifiedTargets[i]]);       
+                            });                     
+                            if(n > 1)
+                            {
+                                for (var j = i + 1; j < identifiedTargets.length; j++) {
+                                    if(n > 2)
+                                        for (var k = j + 1; k < identifiedTargets.length; k++) {
+                                            if(n > 3)
+                                                for (var m = k + 1; m < identifiedTargets.length; m++) {
+                                                    await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+                                                }
+                                            await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                        }
+                                    await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
+                                }
+                            }
+                        }
+                        
+                        /*
+                        let rankedTargets = Object.keys(_identifiedTargets).sort(function(a,b) {return _identifiedTargets[b].sensitivity - _identifiedTargets[a].sensitivity});
+
+                        let significantTargets = []
+
+                        await updateProgress(0, numberOfTargets, "om_regulator", `  Predicting Target 0/`+ numberOfTargets);
+                        for(let _target of rankedTargets)
+                        {
+                            
+                            if(significantTargets.length >= numberOfTargets)
+                            {
+                                break;
+                            } 
+                            let pvalue = await getpValue(_target, _identifiedTargets[_target].index, _identifiedTargets[_target].positive? 1 : -1);
+                            if(pvalue < 0.05)
+                            {
+                                _identifiedTargets[_target]["pvalue"] = pvalue;
+                                significantTargets.push(_target)
+                                await updateProgress(significantTargets.length, numberOfTargets, "om_regulator", `  Predicting Target ${significantTargets.length}/`+ numberOfTargets);
+                            }
+                        }
+                        for(let _target of significantTargets)
+                        {
+                            await adddatatochart(_identifiedTargets[_target]);
+                        }
+                        */
+                        $("#om_target_chart_canvas").height(400);
+                        $("#om_regulator_progress").hide();
+                        $("#om_btn_predicttarget").html('Predict Targets');
+                        $("#airomics_tab_content").removeClass("air_disabledbutton");
+                                
+                        globals.omics.om_targetchart.update();
+                    }                    
                 })
 
                 promises = [];
             }
 
-        }
+        }        
     }
     catch (error) 
     {    
@@ -3559,7 +3726,297 @@ async function calculateTargets() {
         $("#om_btn_predicttarget").html('Predict Targets');
         $("#airomics_tab_content").removeClass("air_disabledbutton");
         globals.omics.om_targetchart.update();
-        globals.omics.om_targettable.columns.adjust().draw();
+    }
+
+    var tbl = document.getElementById('om_target_chart_table');
+    var header = tbl.createTHead();
+    var headerrow = header.insertRow(0);
+
+    createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'Accuracy', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
+    //createCell(headerrow, 'th', 'Effect', 'col', 'col', 'left');
+
+    
+    globals.omics.om_targettable = $('#om_target_chart_table').DataTable({
+        "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+        "buttons": [
+            {
+                text: 'Copy',
+                className: 'air_dt_btn',
+                action: function () {
+                    copyContent(getDTExportString(globals.omics.om_targettable));
+                }
+            },
+            {
+                text: 'CSV',
+                className: 'air_dt_btn',
+                action: function () {
+                    air_download("Predicted_targets.csv", getDTExportString(globals.omics.om_targettable, seperator = ","))
+                }
+            },
+            {
+                text: 'TSV',
+                className: 'air_dt_btn',
+                action: function () {
+                    air_download("Predicted_targets.txt", getDTExportString(globals.omics.om_targettable))
+                }
+            }
+        ],   
+        "order": [[ 3, "desc" ]], 
+        "scrollX": true,
+        "autoWidth": true,
+        columns: [
+            null,
+            { "width": "15%" },
+            { "width": "15%" },
+            { "width": "15%" },
+            { "width": "15%" },
+            { "width": "10%" },
+            ],
+        columnDefs: [
+            {
+                targets: 0,
+                className: 'dt-right',
+                'max-width': '25%',
+            },
+            {
+                targets: 1,
+                className: 'dt-center'
+            },
+            {
+                targets: 2,
+                className: 'dt-center'
+            },
+            {
+                targets: 3,
+                className: 'dt-center'
+            },
+            {
+                targets: 4,
+                className: 'dt-center'
+            },
+            {
+                targets: 5,
+                className: 'dt-center'
+            },
+        ]
+    }).columns.adjust();
+
+    async function getpValue(_targets, index, activity)
+    {        
+        let regulators = await getRegulatorsForTarget(_targets.split(";"), index, spType)
+
+        let regr_data = [];
+        let elements_with_FC = [];
+        let SP_Values = [];
+
+        for (let p in regulators) 
+        {
+            let SP = regulators[p];
+
+            if(SP != 0)
+
+            SP_Values.push(SP);
+
+            if(!globals.omics.ExpressionValues.hasOwnProperty(p))
+            {
+                continue;
+            }
+
+            let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
+
+
+            if (Math.abs(value) > fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
+            {            
+                regr_data.push([value, value * Math.abs(SP)])
+                elements_with_FC.push(value);
+            }
+        }
+
+        let numberOfHigherScores = 0;
+        var m = leastSquaresRegression(regr_data)
+        var degree = Math.atan(m) *  (180/Math.PI);
+        var score = Math.sign(degree) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+
+        return 1/score;
+
+        if(elements_with_FC.length == 0 ||  score <= 0)
+        {
+            return 1;
+        }
+        else
+        {
+            for(let i = 0; i < 10000; i++)
+            {
+                SP_Values = shuffle(SP_Values);
+                elements_with_FC = shuffle(elements_with_FC);
+                
+                var _regr_data = [];
+                var _activity = 0;
+
+                for(let _id in elements_with_FC)
+                {
+                    if(_id < SP_Values.length)
+                    { 
+                        _regr_data.push([elements_with_FC[_id],SP_Values[_id]])
+                        _activity += (elements_with_FC[_id] * SP_Values[_id])
+                    }
+                }
+
+                var _degree = Math.atan(leastSquaresRegression(_regr_data)) *  (180/Math.PI);
+                var _score = Math.sign(_degree) * Math.sign(_activity) * (1 - (Math.abs((45 - Math.abs(_degree)) / 45)))
+
+                if(_score > 0 && Math.abs(_score) >= Math.abs(score))
+                {
+                    numberOfHigherScores ++;
+                }
+            }
+            return numberOfHigherScores / 10000;
+        }
+    }
+
+    async function analyzemultipletargets(targets)
+    {
+        let maxScore = 0;
+        let results = null;
+        let regr_data = [];
+
+        for (let index of targetCombinations(targets.length))
+        {          
+            let regulators = await getRegulatorsForTarget(targets, index, spType)
+                
+            let positiveSum = 0;
+            let negativeSum = 0;
+
+            let target_values = {};
+            for (let p in globals.omics.ExpressionValues) 
+            {
+                
+                let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
+                if (Math.abs(value) >= fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
+                {
+                    if(regulators.hasOwnProperty(p))
+                    {
+
+                        let SP = regulators[p];
+                        regr_data.push([value, Math.abs(value) * SP])     
+                        positiveSum += value * SP;
+                        target_values[p] = value * SP;
+                    }
+                    else
+                    {
+                        regr_data.push([value, 0]);
+                    }
+
+                }
+                else if (regulators.hasOwnProperty(p))
+                {
+
+                    let SP = regulators[p];
+                    negativeSum += (1 - Math.abs(SP));
+                }
+            }
+
+            let sensitivity = positiveSum / positiveCount;
+            let specificity = negativeSum / negativeCount;
+
+            if(sensitivity > 1)
+            {
+                sensitivity = 1;
+            }
+            else if(sensitivity < -1)
+            {
+                sensitivity = -1;
+            }
+
+
+            if(specificity > 0 && sensitivity != 0)
+            {
+                let positive = sensitivity > 0? true : false;
+                let positiveValue = sensitivity > 0? 1 : -1;
+                sensitivity = Math.abs(sensitivity);
+
+
+
+
+                let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+
+                var m = leastSquaresRegression(regr_data)
+                var degree = Math.atan(m) *  (180/Math.PI);
+                var score = Math.sign(degree) * (positive? 1 : -1) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+                
+                if(score <= maxScore)
+                    continue;
+                
+                maxScore = score;
+
+                results = 
+                {
+                    "accuracy": 100*score,
+                    "id": targets,
+                    "fc": 0,
+                    "index": index,
+                    "sensitivity": sensitivity,
+                    "name": targets.map(t => AIR.Molecules[t].name + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
+                    "linkname": targets.map(t => getLinkIconHTML(AIR.Molecules[t].name) + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
+                    "specificity": specificity,
+                    "regulators": regulatorValues.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0? "\u2193" : "\u2191")),
+                    "positive": index.every( v => v === index[0])? positive : null
+                };
+            } 
+        }
+
+        if(results != null)
+            adddatatochart(results);
+            //_identifiedTargets[targets.join(";")] = results;
+         
+    }
+
+    async function adddatatochart(targtetdata, colored = true)
+    {
+        return new Promise( 
+            async function(resolve, reject) {
+                var radius = (8 * targtetdata.accuracy / 100);
+                        
+                var pstyle = targtetdata.positive == null? 'circle' : 'triangle';
+
+                let hex = '#d3d3d3';
+                
+                if(colored)
+                    hex = targtetdata.positive == null? '#a9a9a9' : (targtetdata.positive? (targtetdata.fc >= 0? '#C00000' : '#d3d3d3') : (targtetdata.fc <= 0? '#0070C0' : '#d3d3d3'));
+
+                let result = {
+                    label: [targtetdata.name, expo(targtetdata.fc, 3, 3), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
+                    data: [{
+                        x: expo(targtetdata.specificity, 3, 3),
+                        y: expo(targtetdata.sensitivity, 3, 3),
+                        r: radius
+                    }],
+                    backgroundColor:  hex ,
+                    hoverBackgroundColor: hex,
+                    pointStyle: pstyle,
+                    rotation: targtetdata.positive? 0 : 60,
+                }
+                
+                var tbl = document.getElementById('om_target_chart_table');
+                let result_row = tbl.insertRow(tbl.rows.length);
+
+                createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);                
+                createPopupCell(result_row, 'td', targtetdata.positive == null? "mixed" : (targtetdata.positive? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, {"sample": sample, "id": targtetdata.id, "index": targtetdata.index, "spType": spType, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold}),
+                createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
+                createCell(result_row, 'td', expo(targtetdata.accuracy, 2, 2) + "%", 'col-auto', 'col', 'center', true);
+                createCell(result_row, 'td', expo(targtetdata.specificity, 3, 3), 'col-auto', 'col', 'center', true);
+                createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
+                //createCell(result_row, 'td', targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", "), 'col-auto', 'col', 'left', true);               
+
+                globals.omics.om_target_downloadtext += `\n${targtetdata.name}\t${targtetdata.specificity}\t${targtetdata.sensitivity}\t${targtetdata.positive? "positive" : "negative"}\t${targtetdata.regulators}`;
+                globals.omics.om_targetchart.data.datasets.push(result); 
+                resolve();
+        });
     }
 
     async function analyzeElement(e, last)
@@ -3568,6 +4025,7 @@ async function calculateTargets() {
         return new Promise(
             async function(resolve, reject) {
                 
+            let regr_data = [];
             let count = e_ids.indexOf(e);    
             let fc = globals.omics.ExpressionValues.hasOwnProperty(e)? globals.omics.ExpressionValues[e].nonnormalized[sample] : 0;
 
@@ -3578,7 +4036,7 @@ async function calculateTargets() {
 
             let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
             
-            let success = await getMoleculeData(e, type = "molecule", false, (document.getElementById("om_target_usememory").checked == true? true : false))
+            let success = await getMoleculeData(e, type = "molecule", false, usememory)
             if(!success)
             {
                 resolve({
@@ -3595,36 +4053,28 @@ async function calculateTargets() {
             let negativeSum = 0;
 
             let target_values = {};
-            for (let p in data) 
+
+
+            for (let p in globals.omics.ExpressionValues) 
             {
-                if(!globals.omics.ExpressionValues.hasOwnProperty(p))
-                {
-                    continue;
-                }
-
-                let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-                let SP = 0;
                 
-                switch (datatype) {
-                    case 0:
-                        SP = parseFloat(data[p].i);
-                        break;
-                    case 1:
-                        SP = parseFloat(data[p].t);
-                        break;
-                    case 2:
-                        SP = parseFloat(data[p].c);
-                        break;
-                    default:
-                        SP = 0;
-                        break;
-                }
+                let SP = data.hasOwnProperty(p)? data[p][spType] : 0;
+                let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
+                if (Math.abs(value) >= fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
+                {
+                    if(SP)
+                    {
+                        regr_data.push([value, Math.abs(value) * SP])     
+                        positiveSum += value * SP;
+                        target_values[p] = value * SP;
+                    }
+                    else
+                    {
+                        regr_data.push([value, 0]);
+                    }
 
-                if (value != 0 && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) {                            
-                    positiveSum += value * SP;
-                    target_values[AIR.Molecules[p].name] = value * SP;
                 }
-                else 
+                else if (SP)
                 {
                     negativeSum += (1 - Math.abs(SP));
                 }
@@ -3632,9 +4082,6 @@ async function calculateTargets() {
 
             let sensitivity = positiveSum / positiveCount;
             let specificity = negativeSum / negativeCount
-
-            //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
-
             if(specificity > 0 && sensitivity != 0)
             {
                 let positive = sensitivity > 0? true : false;
@@ -3651,19 +4098,33 @@ async function calculateTargets() {
 
                 let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
 
-                resolve({
-                    index: count,
-                    data : {
-                        "fc": fc,
-                        "sensitivity": sensitivity,
-                        "name": _name,
-                        "specificity": specificity,
-                        "regulators": regulators,
-                        "positive": positive
-                    },
-                    last: last
-                });
-                return;
+                var degree = Math.atan(leastSquaresRegression(regr_data)) *  (180/Math.PI);
+                var score = Math.sign(degree) * (positive? 1 : -1) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+
+                if(score < 0)
+                {
+                    resolve({
+                        data : null,
+                    });
+                }
+                else
+                {
+                    resolve({
+                        data : {
+                            "accuracy": 100*score,
+                            "id": [e],
+                            "fc": fc,
+                            "index": [1],
+                            "sensitivity": sensitivity,
+                            "name": _name,
+                            "linkname": getLinkIconHTML(_name),
+                            "specificity": specificity,
+                            "regulators": regulators.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
+                            "positive": positive
+                        },
+                    });
+                    return;
+                }
             }   
         
             resolve({
@@ -3674,6 +4135,54 @@ async function calculateTargets() {
             
         })  
     }
+
+    function targetCombinations(n)
+    {
+        let df = Array.from(Array(Math.pow(2, n)), () => []);
+
+        for (let i = 1; i <= n; i++) 
+        {
+            var j = 0
+            for (let _e = 1; _e <=  Math.pow(2, i - 1); _e++)
+                {
+                for (let k = 1; k <=  Math.pow(2, n - i); k++)
+                {
+                    df[j++].push(1)
+                }
+                
+                for (let k = 1; k <=  Math.pow(2, n - i); k++)
+                {
+                    df[j++].push(-1)
+                }
+            }
+        }
+
+        return df
+    }
+}
+
+
+async function getRegulatorsForTarget(targets, index, spType)
+{
+    let regulators = {};
+
+    for(let t in targets)
+    {
+        for (let p in AIR.MoleculeData[targets[t]]) 
+        {
+            if(!regulators.hasOwnProperty(p))
+            {
+                regulators[p] = parseFloat(AIR.MoleculeData[targets[t]][p][spType]) * index[t];
+            }
+            else
+            {
+                regulators[p] += parseFloat(AIR.MoleculeData[targets[t]][p][spType]) * index[t];
+            }
+        }
+
+    }  
+
+    return regulators;
 }
 
 async function enrichr() {
@@ -3877,11 +4386,13 @@ async function getEnrichr(elements, selectedenrichr) {
 }
 
 function om_createpopup(button, parameter) {
+
     var $target = $('#om_chart_popover');
     var $btn = $(button);
 
     let sample = parameter.sample
     let phenotype = parameter.phenotype
+
     if($target)
     {
         
@@ -4207,6 +4718,261 @@ function om_createpopup(button, parameter) {
 
         popupchart.update();
     })
+};
+
+async function om_createtargetpopup(button, parameter) {
+    
+    var $target = $('#om_target_chart_popover');
+    var $btn = $(button);
+
+    let sample = parameter.sample
+    let phenotype = parameter.phenotype
+
+    if($target)
+    {
+        
+        
+        $('#om_target_clickedpopupcell').css('background-color', 'transparent');
+        $('#om_target_clickedpopupcell').removeAttr('id');
+
+        if($target.siblings().is($btn))
+        {
+            $target.remove();
+            $("#om_target_table").parents(".dataTables_scrollBody").css({
+                minHeight: "0px",
+            });
+            return;
+        }   
+        $target.remove();
+
+    }
+
+    $(button).attr('id', 'om_target_clickedpopupcell');
+    $(button).css('background-color', 'lightgray');
+
+    $target = $(`<div id="om_target_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+                    <div class="arrow" style="left: 9.375%;"></div>
+                    <div id="om_target_chart_popover_content" class="popover-content">
+                        <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
+                        <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#009933"></span>
+                                Activates Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                Represses Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                Not diff. expressed</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="triangle_small"></span>
+                                External Link</li>
+                        </div>
+                    </div>
+                </div>`);
+
+    $btn.after($target);
+    
+    let targets = []
+
+    let regulators = await getRegulatorsForTarget(parameter.id, parameter.index, parameter.spType)
+
+    for (let element in globals.omics.ExpressionValues) {
+
+        let FC = globals.omics.ExpressionValues[element].nonnormalized[sample]
+        let pValue = 1;
+
+        if(isNaN(FC) || FC == 0 || Math.abs(FC) < parameter.fcthreshold)
+        {
+            continue;
+        }
+        if(globals.omics.pvalue)
+        {
+            pValue = globals.omics.ExpressionValues[element].pvalues[sample];   
+            if(isNaN(pValue))
+                pValue = 1;
+
+            if(pValue > parameter.pvalue_threshold)
+            {
+                continue;
+            }
+        }
+
+        let SP = regulators.hasOwnProperty(element)? regulators[element] : 0;
+
+        let hex = "#009933";
+        let rad = 4;
+
+        if(globals.omics.pvalue)
+        {
+            rad = 1 + (4 * (1 - pValue));
+        }
+
+        if((SP * FC) < 0)
+        {
+            hex = "#ffcccc";
+        }
+        else if((SP * FC) === 0)
+        {
+            hex = "#cccccc"
+        }
+
+
+        var pstyle = 'circle';
+        if(AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false)
+        {
+            pstyle = 'triangle'
+        }
+
+            
+        targets.push(
+            {
+                label: element,
+                data: [{
+                    x: FC,
+                    y: SP,
+                    r: rad
+                }],
+                pointStyle: pstyle,
+                backgroundColor: hex,
+                hoverBackgroundColor: hex,
+            }
+        );
+    }
+
+    var outputCanvas = document.getElementById('om_target_popup_chart');
+
+    var chartOptions = {
+        type: 'bubble',        
+        data: {
+            datasets: targets,
+        },
+        options: {
+            plugins: {
+                zoom: {
+                    // Container for pan options
+                    pan: {
+                        // Boolean to enable panning
+                        enabled: true,
+    
+                        // Panning directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow panning in the y direction
+                        mode: 'xy',
+                        rangeMin: {
+                            // Format of min pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+                        rangeMax: {
+                            // Format of max pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+            
+                        // On category scale, factor of pan velocity
+                        speed: 20,
+            
+                        // Minimal pan distance required before actually applying pan
+                        threshold: 10,
+            
+                    },
+    
+                    // Container for zoom options
+                    zoom: {
+                        // Boolean to enable zooming
+                        enabled: true,
+                        // Zooming directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow zooming in the y direction
+                        mode: 'xy',
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            hover: {
+                onHover: function(e) {
+                var point = this.getElementAtEvent(e);
+                if (point.length) e.target.style.cursor = 'pointer';
+                else e.target.style.cursor = 'default';
+                }
+            },
+            legend: {
+                display: false
+            },
+            layout: {
+                padding: {
+                top: 0
+                }
+            },
+            title: {
+                display: true,
+                text: "DCEs influenced by '" + parameter.id.map(t => AIR.Molecules[t].name).join(" & ") + "' in '" + globals.omics.samples[sample] + "'",
+                fontFamily: 'Helvetica',
+            },
+            scales: {
+                yAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Influence from Target'
+                    },
+                    ticks: {
+                        //beginAtZero: true,
+                    }
+                }],
+                xAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Fold Change in Data'
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var element = data.datasets[tooltipItem.datasetIndex].label || '';
+
+                        if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
+                        {                          
+                            return [
+                                'Name: ' + AIR.Molecules[element].name,
+                                'Influence: ' + expo(regulators[element],4,3),
+                                'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
+                                'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
+                            ];                     
+                        }
+                        else
+                            return "";
+                        
+                    }
+                }
+            }
+        }
+        
+    }; 
+
+    let popupchart = new Chart(outputCanvas, chartOptions);
+    document.getElementById('om_target_popup_chart').onclick = function (evt) {
+            var activePoint = popupchart.lastActive[0];
+            if (activePoint !== undefined) {
+                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
+                if(_id && AIR.Molecules.hasOwnProperty(_id))
+                {
+                    let name = AIR.Molecules[_id].name;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+            }
+    };
+    $target.show();
+
+    var popupheight = $("#om_target_chart_popover").height() + 50;
+    $("#om_target_table").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400? 400 : popupheight) + "px",
+    });
+
 };
 
 function randomIDs(size, max, n){
