@@ -93,6 +93,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
             }
             var t0 =  0;
             var t1 =  0;
+
             Chart = _chart;
             VCF = _vcf;
             JSZip = _jszip;
@@ -842,6 +843,8 @@ function checkBoxCell(row, type, text, data, align, prefix, _checked = false) {
     cell.appendChild(button);
     cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
     row.appendChild(cell);// append DIV to the table cell
+
+    return button
 }
 
 function createSliderCell(row, type, data) {
@@ -900,9 +903,10 @@ async function disablebutton(id, progress = false) {
                     <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
                 </div>`);
             }
+            
             $(".air_btn").each(function( pindex ) {
                 var airbtn = $(this)
-                airbtn.addClass("air_disabledbutton");
+                airbtn.addClass("air_temp_disabledbutton");
             });
             resolve(text)
         }, 0);
@@ -913,8 +917,9 @@ async function disablebutton(id, progress = false) {
 async function enablebtn(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
+            
             $(".air_btn").each(function( pindex ) {
-                $(this).removeClass("air_disabledbutton");
+                $(this).removeClass("air_temp_disabledbutton");
             });
             var $btn = $('#'+id);
             $btn.html(text);
@@ -947,7 +952,12 @@ function standarddeviation(_temparray) {
     });
     
     const n = array.length
+
+    if(n == 0)
+        return 0;
+
     const mean = array.reduce((a, b) => a + b) / n
+
     return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n)
 }
 
@@ -961,6 +971,9 @@ function mean(_temparray) {
             numbers.push(_e)
         }
     });
+
+    if(numbers.length == 0)
+        return 0;
     
     var total = 0, i;
     for (i = 0; i < numbers.length; i += 1) {
@@ -1226,6 +1239,23 @@ function shuffle(_array) {
     }
   
     return array;
+}
+function pickRandomElements(arr, n) {  
+
+    if(arr.length <= n)
+    {
+        return shuffle(arr);
+    }
+
+    var result = new Array(n),
+    len = arr.length,
+    taken = new Array(len);
+    while (n--) {
+        var x = Math.floor(Math.random() * len);
+        result[n] = arr[x in taken ? taken[x] : x];
+        taken[x] = --len in taken ? taken[len] : len;
+    }
+    return result;
 }
 
 function union(setA, setB) {
@@ -1630,3 +1660,32 @@ function activaTab(tab){
     $('.nav-tabs a[href="#' + tab + '"]').tab('show');
 };
  
+function GetZPercent(z) 
+  {
+    //z == number of standard deviations from the mean
+
+    //if z is greater than 6.5 standard deviations from the mean
+    //the number of significant digits will be outside of a reasonable 
+    //range
+    if ( z < -6.5)
+      return 0.0;
+    if( z > 6.5) 
+      return 1.0;
+
+    var factK = 1;
+    var sum = 0;
+    var term = 1;
+    var k = 0;
+    var loopStop = Math.exp(-23);
+    while(Math.abs(term) > loopStop) 
+    {
+      term = .3989422804 * Math.pow(-1,k) * Math.pow(z,k) / (2 * k + 1) / Math.pow(2,k) * Math.pow(z,k+1) / factK;
+      sum += term;
+      k++;
+      factK *= k;
+
+    }
+    sum += 0.5;
+
+    return sum;
+  }

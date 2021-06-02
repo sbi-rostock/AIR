@@ -1,3 +1,6 @@
+const { push } = require("core-js/core/array");
+const { parse } = require("path/posix");
+
 async function AirOmics(){    
     globals.omics = {
         enrichrtab: undefined,
@@ -34,7 +37,7 @@ async function AirOmics(){
         import_table: undefined,
         import_variant_table: undefined,
         import_massspec_table: undefined,
-
+        overlay_suffix: "",
         saved_importdata: [{}],
         current_import_index: 0,
         import_data: {},
@@ -378,6 +381,24 @@ function createDifferentialAnalysisPanel()
             <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_advancedsettings_panel">Advanced Settings</button>
             <div id="om_advancedsettings_panel" class="collapse air_box_lightgray">
 
+                <div class="row mb-3">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-content="If check, elements from submaps will be considered only. This will increase accuracy if many DCEs are available.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="checkbox_submap">
+                            <label class="air_checkbox" for="checkbox_submap">Use submap elements only</label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row mt-1 mb-1">
                     <div class="col-auto">
                         <div class="wrapper">
@@ -468,7 +489,7 @@ function createDifferentialAnalysisPanel()
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;"># of random Samples:</span>
                     </div>
                     <div class="col">
-                        <input type="text" class="textfield" value="10000" id="om_pheno_randomsampleNumber" onkeypress="return isNumber(event)" />
+                        <input type="text" class="textfield" value="1000" id="om_pheno_randomsampleNumber" onkeypress="return isNumber(event)" />
                     </div>
                 </div>
 
@@ -587,7 +608,7 @@ function createDifferentialAnalysisPanel()
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Abs logFC Threshold:</span>
             </div>
             <div class="col">
-                <input type="text" class="textfield" value="1.5" id="om_target_fcthreshold" onkeypress="return isNumber(event)" />
+                <input type="text" class="textfield" value="1.0" id="om_target_fcthreshold" onkeypress="return isNumber(event)" />
             </div>
         </div>
         <div id="om_target_pvaluethreshold-container" class="row mb-2">
@@ -1714,68 +1735,6 @@ async function Start(imported) {
     });
 }   
 
-$(document).on('change', '.om_clickCBinTable',function () {
-
-
-    var id = $(this).attr('data');
-
-
-    var chartresult = [];
-
-    for (let value in AIR.Phenotypes[id].norm_results)
-    {
-        chartresult.push({
-            y: AIR.Phenotypes[id].norm_results[value],
-            //x: globals.omics.samples[j - 1]
-        });
-    }
-
-
-    if ($(this).prop('checked') == true) {
-;
-        if(globals.omics.colors.length <= 0)
-        {
-            $(this).prop('checked', false);
-            alert('Deselect an item before adding a new one');
-            return;
-        }
-        var dataid = globals.omics.plevelchart_config.data.datasets.length;
-        var color = globals.omics.colors[0];
-
-        globals.omics.colors.shift();
-        globals.omics.pickedcolors.push(color);
-
-        globals.omics.plevelchart_config.data.datasets.push({
-            label: AIR.Phenotypes[id].name,
-            fill: false,
-            data: chartresult,
-            backgroundColor: color,
-            borderColor: color
-        });
-    }
-    else {
-        let datasettoRemove = undefined;
-        globals.omics.plevelchart_config.data.datasets.forEach(function (dataset) {
-            if (dataset.label === AIR.Phenotypes[id].name) {
-                datasettoRemove = dataset
-            }
-        });
-
-        if (datasettoRemove) {
-            var dataid = globals.omics.plevelchart_config.data.datasets.indexOf(datasettoRemove);
-            var color = globals.omics.pickedcolors[dataid];
-            globals.omics.colors.unshift(color);
-            globals.omics.pickedcolors.splice(dataid, 1);
-            globals.omics.plevelchart_config.data.datasets.splice(dataid, 1);
-        }
-
-    }
-
-    globals.omics.plevelchart.update();
-    var html = globals.omics.plevelchart.generateLegend().replace(/\"1-legend"/g, 'legend');
-    document.getElementById('om_legend').innerHTML = html;
-});
-
 function getRandomColor() {
     var letters = '0123456789ABCDEF';
     var color = '#';
@@ -1795,7 +1754,15 @@ async function om_createTable(numberofregulators) {
     $("#om_pheno_resultscontainer").replaceWith(
         /*html*/`
         <div id="om_pheno_resultscontainer">
+
             <hr>
+
+            <h4 class="mt-4 mb-4">3. Results</h4> 
+
+            <hr>
+
+            <h5 class="mt-4 mb-4" style="font-weight: bold;">Show on Map</h4> 
+            
             <div class="row mb-3">
                 <div class="col-auto">
                     <div class="wrapper">
@@ -1808,36 +1775,67 @@ async function om_createTable(numberofregulators) {
                 </div>
                 <div class="col">
                     <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="checkbox_submap">
-                        <label class="air_checkbox" for="checkbox_submap">Include values from the datafile?</label>
+                        <input type="checkbox" class="air_checkbox" id="checkbox_datavalues_overlay">
+                        <label class="air_checkbox" for="checkbox_datavalues_overlay">Include values from the datafile in visualization?</label>
                     </div>
+                </div>
+            </div>
+            <div id="om_overlay_pvalue_threshold-container" class="row mb-2">
+                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype p-value threshold:</span>
+                </div>
+                <div class="col">
+                    <input type="text" class="textfield" value="0.05" id="om_overlay_pvalue_threshold" onkeypress="return isNumber(event)" />
+                </div>
+            </div>
+
+            <div id="om_overlay_suffix-container" class="row mb-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Overlay suffix:</span>
+                </div>
+                <div class="col">
+                    <input type="text" class="textfield" value="" id="om_overlay_suffix"/>
                 </div>
             </div>
 
             <button type="button" id="om_addoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Create Overlays</button>
 
-            <button type="button" id="om_showonmapbtn"  class="air_btn_light btn btn-block mb-2">Show On Phenotype Submap</button>
+            <button type="button" id="om_showonmapbtn"  class="air_disabledbutton air_btn_light btn btn-block mb-2">Show On Phenotype Submap</button>
 
             <div class="btn-group btn-group-justified">
                 <div class="btn-group">
-                    <button type="button" id="om_showoverlaybtn" class="air_btn_light btn mr-1">Show Overlays</button>
+                    <button type="button" id="om_showoverlaybtn" class="air_disabledbutton air_btn_light btn mr-1">Show Overlays</button>
                 </div>
                 <div class="btn-group">
-                    <button type="button" id="om_hideoverlaybtn" class="air_btn_light btn ml-1">Hide Overlays</button>
+                    <button type="button" id="om_hideoverlaybtn" class="air_disabledbutton air_btn_light btn ml-1">Hide Overlays</button>
                 </div>
             </div>
             <button type="button" id="om_removeoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Remove Overlays</button>
 
             <hr>
 
-            <button type="button" id="om_addimagebtn"  class="btn-image air_btn_light btn btn-block mb-2 mt-2">Generate Image</button>
+            <button type="button" id="om_addimagebtn"  class="air_disabledbutton btn-image air_btn_light btn btn-block mb-2 mt-2">Generate Image</button>
 
             <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
             
             <hr>
 
+            <h5 class="mt-4 mb-4" style="font-weight: bold;">Overview</h5> 
+            
+            <div id="om_select_pvalue-container" class="row mb-2">
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
+                </div>
+                <div class="col">
+                    <select id="om_select_pvalue" class="browser-default om_select custom-select">
+                        <option value="1" selected>Distribution based</option>
+                        <option value="2">Enrichment</option>
+                        <option value="3">Absolute Enrichment</option>
+                        <option value="0">Highest p-value of all</option>
+                    </select>
+                </div>
+            </div>
             <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
-
             <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
             <div id="om_resultstable_container" class="mb-2">
                 <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
@@ -1847,6 +1845,36 @@ async function om_createTable(numberofregulators) {
         </div>
     `);
 
+    $("#om_select_pvalue").on('change', function (e) {
+        if(!globals.omics.resultsTable)
+            return;
+
+        globals.omics.resultsTable.rows().every( function ( rowIdx, tableLoop, rowLoop ) {
+            
+            var rowNode = this.node();
+            let id = $(rowNode).attr("data");
+            if(!id)
+            {
+                return;
+            }
+            $(rowNode).find("td").each(function (){
+                    if($(this).hasClass("om_resultvalue"))
+                    {
+                        let sample = $(this).attr("data");
+                        let pvalue = getPvalue(id, sample);
+                        $('span:first', this).html(`(${expo(pvalue)})`);
+                        $(this).attr("data-order", pvalue);
+                        if(pvalue < 0.05)
+                            $(this).css('background-color', '#ffcccb');
+                        else
+                        {
+                            $(this).css('background-color', 'transparent');
+                        }
+                    }                             
+            });
+        } );    
+    });
+
 
     globals.omics.pickedcolors = [];
 
@@ -1855,13 +1883,77 @@ async function om_createTable(numberofregulators) {
     for (let sample of globals.omics.samples) {
         globals.omics.om_phenotype_downloadtext += "\t" + sample + "\t" + sample + "_pvalue";
     }
+
     for (let phenotype in AIR.Phenotypes)
     {
         let result_row = tbl.insertRow(tbl.rows.length);
+        result_row.setAttribute('data', phenotype);
         let pname = AIR.Phenotypes[phenotype].name;
 
         globals.omics.om_phenotype_downloadtext += `\n${pname}`;
-        checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
+        let cbcell = checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
+        cbcell.onclick = function () {
+
+
+            var id = $(this).attr('data');
+        
+        
+            var chartresult = [];
+        
+            for (let value in AIR.Phenotypes[id].norm_results)
+            {
+                chartresult.push({
+                    y: AIR.Phenotypes[id].norm_results[value],
+                    //x: globals.omics.samples[j - 1]
+                });
+            }
+        
+        
+            if ($(this).prop('checked') == true) {
+        ;
+                if(globals.omics.colors.length <= 0)
+                {
+                    $(this).prop('checked', false);
+                    alert('Deselect an item before adding a new one');
+                    return;
+                }
+                var dataid = globals.omics.plevelchart_config.data.datasets.length;
+                var color = globals.omics.colors[0];
+        
+                globals.omics.colors.shift();
+                globals.omics.pickedcolors.push(color);
+        
+                globals.omics.plevelchart_config.data.datasets.push({
+                    label: AIR.Phenotypes[id].name,
+                    fill: false,
+                    data: chartresult,
+                    backgroundColor: color,
+                    borderColor: color
+                });
+            }
+            else {
+                let datasettoRemove = undefined;
+                globals.omics.plevelchart_config.data.datasets.forEach(function (dataset) {
+                    if (dataset.label === AIR.Phenotypes[id].name) {
+                        datasettoRemove = dataset
+                    }
+                });
+        
+                if (datasettoRemove) {
+                    var dataid = globals.omics.plevelchart_config.data.datasets.indexOf(datasettoRemove);
+                    var color = globals.omics.pickedcolors[dataid];
+                    globals.omics.colors.unshift(color);
+                    globals.omics.pickedcolors.splice(dataid, 1);
+                    globals.omics.plevelchart_config.data.datasets.splice(dataid, 1);
+                }
+        
+            }
+        
+            globals.omics.plevelchart.update();
+            var html = globals.omics.plevelchart.generateLegend().replace(/\"1-legend"/g, 'legend');
+            document.getElementById('om_legend').innerHTML = html;
+        };
+
         let phenocell = createButtonCell(result_row, 'th', "<b>" +  pname + "</b>", 'center');
         phenocell.onclick = function () {
             globals.omics.selected = [];
@@ -1870,13 +1962,15 @@ async function om_createTable(numberofregulators) {
 
         let genenumber = [];
         let pvalues = 0;
+        
         for (let sample in globals.omics.samples) {
+            let pvalue = getPvalue(phenotype, sample);
             globals.omics.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
-            globals.omics.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].pvalue[sample]}`;
-            createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(AIR.Phenotypes[phenotype].pvalue[sample]) + ")", 'col-auto om_resultvalue', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = AIR.Phenotypes[phenotype].pvalue[sample]);
-
+            globals.omics.om_phenotype_downloadtext += `\t${pvalue}`;
+            let samplecell = createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue) + ")", 'col-auto om_resultvalue', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = AIR.Phenotypes[phenotype].pvalue[sample]);
+            samplecell.setAttribute('data', sample);
             genenumber.push(AIR.Phenotypes[phenotype].genenumbers[sample]);
-            if(AIR.Phenotypes[phenotype].pvalue[sample] < 0.05)
+            if(pvalue < 0.05)
             {
                 pvalues++;
             }
@@ -2085,22 +2179,68 @@ async function om_createTable(numberofregulators) {
     });
     $('#om_addoverlaybtn').on('click', async function() {
         let text = await disablebutton('om_addoverlaybtn');
-        AddOverlaysPromise(globals.omics.samplesResults).finally(ao => {
-            $('.minerva-overlay-tab-link').click();
-            enablebtn('om_addoverlaybtn',text);
+        removeOverlays(globals.omics.samplesResults).finally(r => {
+            AddOverlaysPromise(globals.omics.samplesResults).finally(ao => {
+                $('.minerva-overlay-tab-link').click();
+                enablebtn('om_addoverlaybtn',text);
+
+                $("#om_showonmapbtn").removeClass("air_disabledbutton");
+                $("#om_addimagebtn").removeClass("air_disabledbutton");
+                $("#om_showoverlaybtn").removeClass("air_disabledbutton");
+                $("#om_hideoverlaybtn").removeClass("air_disabledbutton");
+            });
         });
     });
     $('#om_removeoverlaybtn').on('click', async function() {
         let text = await disablebutton('om_removeoverlaybtn');
         removeOverlays(globals.omics.samplesResults).finally(r => {
             enablebtn('om_removeoverlaybtn',text); 
+            
+            $("#om_showonmapbtn").addClass("air_disabledbutton");
+            $("#om_addimagebtn").addClass("air_disabledbutton");
+            $("#om_showoverlaybtn").addClass("air_disabledbutton");
+            $("#om_hideoverlaybtn").addClass("air_disabledbutton");
         });
     });
 
 
     $('.air_btn_info[data-toggle="popover"]').popover()
     $('#om_btn_download_pheno').on('click', function() {
-        air_download('PhenotypeActivity.txt', globals.omics.om_phenotype_downloadtext)
+
+        let om_phenotype_downloadtext = "Phenotype";
+        for (let sample of globals.omics.samples) {
+            om_phenotype_downloadtext += "\t" + sample + "\t" + sample + "_pvalue";
+        }
+        let single_pvalue = false
+
+        switch ($("#om_select_pvalue").val()) {
+            case "1":
+                single_pvalue = "pvalue";
+                break;
+            case "2":
+                single_pvalue = "en_pvalue";
+                break;
+            case "3":
+                single_pvalue = "abs_en_pvalue";
+                break;        
+            default:
+                break;
+        }
+
+        for (let phenotype in AIR.Phenotypes)
+        {
+            let pname = AIR.Phenotypes[phenotype].name;
+
+            om_phenotype_downloadtext += `\n${pname}`;
+
+            for (let sample in globals.omics.samples) {
+                let pvalue = single_pvalue? AIR.Phenotypes[phenotype][single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype]["pvalue"][sample],AIR.Phenotypes[phenotype]["en_pvalue"][sample],AIR.Phenotypes[phenotype]["abs_en_pvalue"][sample]);
+                om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
+                om_phenotype_downloadtext += `\t${pvalue}`;
+            }
+        }
+
+        air_download('PhenotypeActivity.txt', om_phenotype_downloadtext)
     });
 
 
@@ -2213,7 +2353,7 @@ async function om_createTable(numberofregulators) {
         "lengthMenu": [5, 6, 7, 8, 9, 10],
         rowCallback: function(row, data, index){
             $(row).find('td').each (function() {
-                if($(this).hasClass("om_resultvalue") && $(this).attr("data-order") < 0.05)
+                if($(this).hasClass("om_resultvalue") && (parseFloat($(this).attr("data-order")) < 0.05))
                 {
                     $(this).css('background-color', '#ffcccb');
                 }                     
@@ -2313,69 +2453,39 @@ async function om_PhenotypeSP() {
         globals.omics.numberOfRandomSamples = 1000;
     }
 
-    /*
-    async function statisticalAnalysis(phenotype, score, sample)
-    { 
-        return new Promise((resolve, reject) => {                
-            let elementvalues = phenotype_elementvalues[phenotype];
-            let numberOfHigherScores = 0;
-            let random_score;
-            for(let _sampleprobes of randomSamples[sample])
-            {
-                random_score = 0;
-                for(let _id of _sampleprobes)
-                {
-                    if (!isNaN(elementvalues[_id]))
-                    {
-                        random_score += elementvalues[_id]
-                    }
-                }
-
-                if(random_score >= score)
-                {
-                    numberOfHigherScores += 1;
-                }
-            }
-            resolve(numberOfHigherScores/randomSamples[sample].length);
-        }); 
-    }
-
-   
-    for (let sample in globals.omics.samples) {
-        await updateProgress(sample, globals.omics.samples.length, "om_pheno_analyzebtn", text=" Generating random samples ...");
-
-        randomSamples[sample] = [];
-
-        let probeNumber = (Object.keys(globals.omics.ExpressionValues).filter(function(e) 
-        {
-            let _fc = globals.omics.ExpressionValues[e].nonnormalized[sample]; 
-            let pvalue = globals.omics.ExpressionValues[e].pvalues[sample];
-
-            if(isNaN(pvalue))
-            {
-                pvalue = 1;
-            }
-
-            if(globals.omics.pvalue && pvalue >= pvalue_threshold)
-            {
-                return false;
-            }
-
-            return isNaN(_fc) == false && _fc != 0; 
-
-        })).length
-        
-        randomSamples[sample] = randomIDs(probeNumber, Object.keys(AIR.Molecules).length, globals.omics.numberOfRandomSamples);
-    }*/
 
     let count = 0;
     let elementarray = Object.keys(AIR.Molecules);
-    for (let phenotype in AIR.Phenotypes) {
 
-        
+    let elements_with_FC = {};
+    for (let sample in globals.omics.samples) {
+        elements_with_FC[sample] = {};
+        for (let element in globals.omics.ExpressionValues)
+        {
+            let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
+            if(!FC)
+            {
+                continue;
+            }
+
+            let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
+            if(isNaN(pvalue) || !pvalue)
+            {
+                pvalue = 1;
+            }
+            if(globals.omics.pvalue && (!pvalue || pvalue >= globals.omics.pvalue_threshold))
+            {
+                continue;
+            }
+            elements_with_FC[sample][element] = FC;
+        }
+    }
+    for (let phenotype in AIR.Phenotypes) {
 
         numberofregulators[phenotype] = 0;
         phenotype_elementvalues[phenotype] = {};
+        correct_SPs = {};
+
         for(let _id in elementarray)
         {
             phenotype_elementvalues[phenotype][_id] =  Math.abs(AIR.Phenotypes[phenotype].values[elementarray[_id]]);
@@ -2387,6 +2497,9 @@ async function om_PhenotypeSP() {
 
         AIR.Phenotypes[phenotype].results = {};
         AIR.Phenotypes[phenotype]["pvalue"] = {}
+        AIR.Phenotypes[phenotype]["en_pvalue"] = {}
+        AIR.Phenotypes[phenotype]["abs_en_pvalue"] = {}
+        AIR.Phenotypes[phenotype]["abs_level"] = {}
         AIR.Phenotypes[phenotype]["regression"] = {}
         AIR.Phenotypes[phenotype].norm_results = {};
         AIR.Phenotypes[phenotype].accuracy = 0;
@@ -2398,10 +2511,16 @@ async function om_PhenotypeSP() {
         for (let element in AIR.Phenotypes[phenotype].values) {
             let SP = AIR.Phenotypes[phenotype].values[element];
 
-            if (isNaN(SP) || SP === 0 || SP < i_threshold)
+            if (isNaN(SP) || SP === 0 || Math.abs(SP) < i_threshold)
             {
                 continue;
             }
+
+            if (document.getElementById("checkbox_submap").checked === true && AIR.Molecules[element].submap == false)
+            {
+                continue;
+            }
+            correct_SPs[element] = SP;
             numberofregulators[phenotype] += 1;
             accuracymax += Math.abs(SP);
         }
@@ -2414,83 +2533,52 @@ async function om_PhenotypeSP() {
 
         for (let sample in globals.omics.samples) {
 
-            var SP_Values = [];
             let activity = 0.0;
+            let abs_activity = 0.0;
             var accuracy = 0; 
 
             var negative_influences = 0;
             var positive_influences = 0;
 
             AIR.Phenotypes[phenotype].includedelements[sample] = [];
-            AIR.Phenotypes[phenotype].genenumbers[sample] = 0;
-
-            var elements_with_FC = [];
+            AIR.Phenotypes[phenotype].genenumbers[sample] = 0;                        
 
             var regr_data = [];
 
-            for (let element in AIR.Phenotypes[phenotype].values) {
+            for (let element in correct_SPs) {
 
-                let SP = parseFloat(AIR.Phenotypes[phenotype].values[element]);
-
-                if (!SP || isNaN(SP) || Math.abs(SP) < i_threshold)
-                {
-                    continue;  
-                }
-                SP_Values.push(SP);
                 AIR.Phenotypes[phenotype].includedelements[sample].push(element);
-
-                if(!globals.omics.ExpressionValues.hasOwnProperty(element))
-                {
-                    continue;
-                }
-                let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
-                if(!FC)
+                if(!elements_with_FC[sample].hasOwnProperty(element))
                 {
                     continue;
                 }
 
-                                
-                let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
+                let SP = correct_SPs[element];
+
+                let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];                        
+                let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];              
                 if(isNaN(pvalue) || !pvalue)
                 {
                     pvalue = 1;
                 }
-                if(globals.omics.pvalue && (!pvalue || pvalue >= globals.omics.pvalue_threshold))
-                {
-                    continue;
-                }
 
-                elements_with_FC.push(FC);
+
                 AIR.Phenotypes[phenotype].genenumbers[sample] += 1;
                 considered_elements.add(element); 
-
-                if (document.getElementById("om_checkbox_absolute").checked === true) {
-                    FC = Math.abs(FC);
-                    SP = Math.abs(SP);
-                }
 
                 regr_data.push([FC,Math.abs(FC)*SP])
 
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
                 {
-                    weightedInfluence = FC * SP * (1 - pvalue)
+                    weightedInfluence = FC * SP * (1 - (pvalue/globals.omics.pvalue_threshold))
                 }
                 else
                 {
                     weightedInfluence = FC * SP; 
                 }
                 activity += weightedInfluence;
-
-                if(weightedInfluence < 0)
-                {
-                    negative_influences += Math.abs(SP);
-                }
-                else if(weightedInfluence > 0)
-                {
-                    positive_influences += Math.abs(SP);
-                }
-
+                abs_activity += Math.abs(weightedInfluence);
                 accuracy += Math.abs(SP);
 
                 
@@ -2517,55 +2605,9 @@ async function om_PhenotypeSP() {
 
             AIR.Phenotypes[phenotype].results[sample] = activity;
 
-            let numberOfHigherScores = 0;
-            var m = leastSquaresRegression(regr_data)
-            var degree = Math.atan(m) *  (180/Math.PI);
-            var score = Math.sign(degree) * Math.sign(activity) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
-
-            AIR.Phenotypes[phenotype]["slope"][sample] = m;
-
-            if(elements_with_FC.length == 0 ||  score <= 0)
-            {
-                AIR.Phenotypes[phenotype].pvalue[sample] = 1;
-            }
-            else
-            {
-                for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
-                {
-                    SP_Values = shuffle(SP_Values);
-                    elements_with_FC = shuffle(elements_with_FC);
-                    
-                    var _regr_data = [];
-                    var _activity = 0;
-
-                    for(let _id in elements_with_FC)
-                    {
-                        if(_id < SP_Values.length)
-                        { 
-                            _regr_data.push([elements_with_FC[_id],Math.abs(elements_with_FC[_id])*SP_Values[_id]])
-                            _activity += (elements_with_FC[_id] * SP_Values[_id])
-                        }
-                    }
-
-                    var _degree = Math.atan(leastSquaresRegression(_regr_data)) *  (180/Math.PI);
-                    var _score = Math.sign(_degree) * Math.sign(_activity) * (1 - (Math.abs((45 - Math.abs(_degree)) / 45)))
-
-                    if(_score > 0 && Math.abs(_score) >= Math.abs(score))
-                    {
-                        numberOfHigherScores ++;
-                    }
-                }
-                AIR.Phenotypes[phenotype].pvalue[sample] = numberOfHigherScores / globals.omics.numberOfRandomSamples;
-            }
-
-            if(document.getElementById("om_checkbox_exclude_ns").checked === true && AIR.Phenotypes[phenotype].pvalue[sample] >= 0.05)
-            {
-                AIR.Phenotypes[phenotype].results[sample] = 0;
-            }
-
-
-            if(!score || score < 0)
-                score = 0;
+            var score = leastSquaresRegression(regr_data) 
+            AIR.Phenotypes[phenotype]["slope"][sample] = score;
+            AIR.Phenotypes[phenotype]["abs_level"][sample] = abs_activity;
 
             accuracyvalues.push(accuracy);
         }
@@ -2585,7 +2627,96 @@ async function om_PhenotypeSP() {
         }
     }
     
-    //FDR correction
+    count = 0;
+    let total_iterations = globals.omics.samples.length * Object.keys(AIR.Phenotypes).length;
+    
+    for (let sample in globals.omics.samples) {        
+
+        let FC_values = Object.values(elements_with_FC[sample]);
+        let shuffled_array = [];
+
+        for(let i = 0; i < globals.omics.numberOfRandomSamples; i++)
+        {
+            shuffled_array.push(pickRandomElements(elementarray, FC_values.length));
+        }
+
+        for(let phenotype in AIR.Phenotypes)
+        {
+            let score = AIR.Phenotypes[phenotype]["slope"][sample]
+            let en_score = AIR.Phenotypes[phenotype].results[sample]
+            let abs_en_score = AIR.Phenotypes[phenotype]["abs_level"][sample];
+            score = Math.abs(score) > 1 ? 1/score : score
+
+            await updateProgress(count++, total_iterations, "om_pheno_analyzebtn", text=" Calculate p-values..");
+
+            let random_scores = [];            
+            let random_en_scores = [];  
+            let random_abs_en_scores = [];  
+            for(let shuffled_elements of shuffled_array)
+            {           
+                var _regr_data = [];
+                var _en_score = 0;
+                var _abs_en_score = 0;
+                for(let i in FC_values)
+                {              
+                    let element = shuffled_elements[i];     
+                    if(AIR.Phenotypes[phenotype].values.hasOwnProperty(element))
+                    {
+                        let SP = parseFloat(AIR.Phenotypes[phenotype].values[element]);
+
+                        if (!SP || isNaN(SP) || Math.abs(SP) < i_threshold)
+                        {
+                            continue;  
+                        }
+                        if (document.getElementById("checkbox_submap").checked === true && AIR.Molecules[element].submap == false)
+                        {
+                            continue;
+                        }
+                        _en_score += FC_values[i] *SP;
+                        _abs_en_score += Math.abs(FC_values[i] *SP);
+                        _regr_data.push([FC_values[i], Math.abs(FC_values[i])*SP])
+                    }
+                }
+
+                var _score = leastSquaresRegression(_regr_data) 
+                _score = Math.abs(_score) > 1 ? 1/_score : _score
+
+                random_en_scores.push(_en_score)
+                random_abs_en_scores.push(_abs_en_score)
+                random_scores.push(_score)
+            }
+
+            let std = standarddeviation(random_scores)            
+            let z_score = std != 0? Math.abs(score - mean(random_scores))/std : 0;
+            let pvalue = (1 - GetZPercent(z_score));
+            if(isNaN(pvalue))
+                pvalue = 1;
+
+            AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
+
+            std = standarddeviation(random_en_scores)            
+            z_score = std != 0? Math.abs(en_score - mean(random_en_scores))/std : 0;
+            pvalue = (1 - GetZPercent(z_score));
+            if(isNaN(pvalue))
+                pvalue = 1;
+
+            AIR.Phenotypes[phenotype].en_pvalue[sample] = pvalue;
+
+            std = standarddeviation(random_abs_en_scores)            
+            z_score = std != 0? Math.abs(abs_en_score - mean(random_abs_en_scores))/std : 0;
+            pvalue = (1 - GetZPercent(z_score));
+            if(isNaN(pvalue))
+                pvalue = 1;
+
+            AIR.Phenotypes[phenotype].abs_en_pvalue[sample] = pvalue;
+
+            if(document.getElementById("om_checkbox_exclude_ns").checked === true && AIR.Phenotypes[phenotype].pvalue[sample] >= 0.05)
+            {
+                AIR.Phenotypes[phenotype].results[sample] = 0;
+            }
+        }
+    }
+
     /*
     for (let sample in globals.omics.samples)
     {
@@ -2605,8 +2736,8 @@ async function om_PhenotypeSP() {
             var adjp = corrected_pvalues[AIR.Phenotypes[phenotype].pvalue[sample]];
             AIR.Phenotypes[phenotype].pvalue[sample] = adjp > 1? 1 : adjp;
         }
-    }
-    */
+    }*/
+
     
     if ( !$( "#om_pheno_mapped_elements" ).length ) {
     
@@ -2629,12 +2760,17 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
     return new Promise((resolve, reject) => {
         function ajaxPostQuery(count) {
             return new Promise((resolve, reject) => {
+                
                 if (count <= samples.length) {
+                    
+                    let suffix = $("#om_overlay_suffix").val();
+                    globals.omics.overlay_suffix = suffix;
+
                     $.ajax({
                         method: 'POST',
                         url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-                        data: `content=name%09color${contentString(count-1)}&description=PhenotypeActivity&filename=${samples[count - 1]}.txt&name=${samples[count - 1]}&googleLicenseConsent=true`,
+                        data: `content=name%09color${contentString(count-1)}&description=PhenotypeActivity&filename=${samples[count - 1]+suffix}.txt&name=${samples[count - 1]+suffix}&googleLicenseConsent=true`,
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
                             ajaxPostQuery(count + 1).then(r =>
@@ -3076,9 +3212,23 @@ function contentString(ID) {
 
     let addednames = [];
     let output = '';
+
+    let pvalue_threshold = parseFloat($("#om_overlay_pvalue_threshold").val().replace(',', '.'))
+    if(isNaN(pvalue_threshold))
+    {
+        alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
+        pvalue_threshold = 1;
+    }
+
     for (let p in AIR.Phenotypes)
     {
         let _name = encodeURIComponent(AIR.Phenotypes[p].name);
+        let pvalue = getPvalue(p, ID);
+
+        if(pvalue > pvalue_threshold)
+        {
+            continue;
+        }
 
         if(addednames.includes(_name))
             continue;
@@ -3094,7 +3244,7 @@ function contentString(ID) {
 
     };
     
-    if (document.getElementById("checkbox_submap").checked === true) {
+    if (document.getElementById("checkbox_datavalues_overlay").checked === true) {
         for(let expression in globals.omics.ExpressionValues)
         {
             let _name = encodeURIComponent(globals.omics.ExpressionValues[expression].name);
@@ -3116,10 +3266,10 @@ function contentString(ID) {
     return output;
 }
 
-function getDataOverlays(samples, all = false) {
+function getDataOverlays(_samples, all = false) {
     return new Promise((resolve, reject) => {
         var overlays = minervaProxy.project.data.getDataOverlays();
-
+        let samples = _samples.map(s => s + globals.omics.overlay_suffix)
         if(all)
         {
             resolve(overlays);
@@ -3838,9 +3988,8 @@ async function calculateTargets() {
         }
 
         let numberOfHigherScores = 0;
-        var m = leastSquaresRegression(regr_data)
-        var degree = Math.atan(m) *  (180/Math.PI);
-        var score = Math.sign(degree) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+        var score = leastSquaresRegression(regr_data)
+        score = Math.abs(score) > 1? 1/score : score;
 
         return 1/score;
 
@@ -3903,7 +4052,7 @@ async function calculateTargets() {
                     {
 
                         let SP = regulators[p];
-                        regr_data.push([value, Math.abs(value) * SP])     
+                        regr_data.push([value, Math.abs(value) * (Math.abs(SP) > 1? Math.sign(SP) : SP) ])     
                         positiveSum += value * SP;
                         target_values[p] = value * SP;
                     }
@@ -3945,18 +4094,17 @@ async function calculateTargets() {
 
                 let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
 
-                var m = leastSquaresRegression(regr_data)
-                var degree = Math.atan(m) *  (180/Math.PI);
-                var score = Math.sign(degree) * (positive? 1 : -1) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+                var score = leastSquaresRegression(regr_data)
+                score = Math.abs(score) > 1? 1/score : score;
                 
-                if(score <= maxScore)
+                if(Math.sign(score) != positiveValue || score <= maxScore)
                     continue;
                 
                 maxScore = score;
 
                 results = 
                 {
-                    "accuracy": 100*score,
+                    "accuracy": 100*(Math.abs(score)),
                     "id": targets,
                     "fc": 0,
                     "index": index,
@@ -3980,7 +4128,7 @@ async function calculateTargets() {
     {
         return new Promise( 
             async function(resolve, reject) {
-                var radius = (8 * targtetdata.accuracy / 100);
+                var radius = 2 + (6 * targtetdata.accuracy / 100);
                         
                 var pstyle = targtetdata.positive == null? 'circle' : 'triangle';
 
@@ -4085,6 +4233,7 @@ async function calculateTargets() {
             if(specificity > 0 && sensitivity != 0)
             {
                 let positive = sensitivity > 0? true : false;
+                let positiveValue = sensitivity > 0? 1 : -1;
                 sensitivity = Math.abs(sensitivity);
                 
                 if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
@@ -4098,10 +4247,10 @@ async function calculateTargets() {
 
                 let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
 
-                var degree = Math.atan(leastSquaresRegression(regr_data)) *  (180/Math.PI);
-                var score = Math.sign(degree) * (positive? 1 : -1) * (1 - (Math.abs((45 - Math.abs(degree)) / 45)))
+                var score = leastSquaresRegression(regr_data)
+                score = Math.abs(score) > 1? 1/score : score;
 
-                if(score < 0)
+                if(Math.sign(score) != positiveValue )
                 {
                     resolve({
                         data : null,
@@ -4111,7 +4260,7 @@ async function calculateTargets() {
                 {
                     resolve({
                         data : {
-                            "accuracy": 100*score,
+                            "accuracy": 100*Math.abs(score),
                             "id": [e],
                             "fc": fc,
                             "index": [1],
@@ -4889,7 +5038,12 @@ async function om_createtargetpopup(button, parameter) {
             },
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 0
+            },
+            responsiveAnimationDuration: 0,
             hover: {
+                animationDuration: 0,
                 onHover: function(e) {
                 var point = this.getElementAtEvent(e);
                 if (point.length) e.target.style.cursor = 'pointer';
@@ -4972,7 +5126,7 @@ async function om_createtargetpopup(button, parameter) {
     $("#om_target_table").parents(".dataTables_scrollBody").css({
         minHeight: (popupheight > 400? 400 : popupheight) + "px",
     });
-
+    popupchart.update();
 };
 
 function randomIDs(size, max, n){
@@ -5303,4 +5457,23 @@ async function calculateshortestPath(sample, elementids,  _count, _totalIteratio
     }
 
     return count;
+}
+
+function getPvalue(phenotype, sample)
+{
+    switch ($("#om_select_pvalue").val()) {
+        case "1":
+            single_pvalue = "pvalue";
+            break;
+        case "2":
+            single_pvalue = "en_pvalue";
+            break;
+        case "3":
+            single_pvalue = "abs_en_pvalue";
+            break;        
+        default:
+            break;
+    }
+
+    return single_pvalue? AIR.Phenotypes[phenotype][single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype]["pvalue"][sample],AIR.Phenotypes[phenotype]["en_pvalue"][sample],AIR.Phenotypes[phenotype]["abs_en_pvalue"][sample]);
 }
