@@ -1757,7 +1757,7 @@ async function om_createTable(numberofregulators) {
 
             <hr>
 
-            <h4 class="mt-4 mb-4">3. Results</h4> 
+            <h4 class="mt-4 mb-4">Results</h4> 
 
             <hr>
 
@@ -1870,9 +1870,14 @@ async function om_createTable(numberofregulators) {
                         {
                             $(this).css('background-color', 'transparent');
                         }
+
+                        
                     }                             
             });
-        } );    
+            this.invalidate();
+        } ); 
+        
+        globals.omics.resultsTable.draw(false);
     });
 
 
