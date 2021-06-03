@@ -1,6 +1,3 @@
-const { push } = require("core-js/core/array");
-const { parse } = require("path/posix");
-
 async function AirOmics(){    
     globals.omics = {
         enrichrtab: undefined,
