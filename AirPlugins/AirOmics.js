@@ -1832,6 +1832,23 @@ async function om_createTable(numberofregulators) {
                     </select>
                 </div>
             </div>
+            <div class="row mb-2">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="om_cb_fdr">
+                        <label class="air_checkbox" for="om_cb_fdr">FDR Correction?</label>
+                    </div>
+                </div>
+            </div>
             <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
             <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
             <div id="om_resultstable_container" class="mb-2">
@@ -1842,7 +1859,7 @@ async function om_createTable(numberofregulators) {
         </div>
     `);
 
-    $("#om_select_pvalue").on('change', function (e) {
+    function updatepvalues() {
         if(!globals.omics.resultsTable)
             return;
 
@@ -1875,7 +1892,10 @@ async function om_createTable(numberofregulators) {
         } ); 
         
         globals.omics.resultsTable.draw(false);
-    });
+    }
+
+    $("#om_cb_fdr").on('click', updatepvalues);
+    $("#om_select_pvalue").on('change', updatepvalues);
 
 
     globals.omics.pickedcolors = [];
@@ -2501,6 +2521,9 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype]["pvalue"] = {}
         AIR.Phenotypes[phenotype]["en_pvalue"] = {}
         AIR.Phenotypes[phenotype]["abs_en_pvalue"] = {}
+        AIR.Phenotypes[phenotype]["adj_pvalue"] = {}
+        AIR.Phenotypes[phenotype]["adj_en_pvalue"] = {}
+        AIR.Phenotypes[phenotype]["adj_abs_en_pvalue"] = {}
         AIR.Phenotypes[phenotype]["abs_level"] = {}
         AIR.Phenotypes[phenotype]["regression"] = {}
         AIR.Phenotypes[phenotype].norm_results = {};
@@ -2509,6 +2532,7 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype]["includedelements"] = {};
         AIR.Phenotypes[phenotype]["genenumbers"] = {};
         AIR.Phenotypes[phenotype]["slope"] = {};
+        AIR.Phenotypes[phenotype]["norm_slope"] = {};
 
         for (let element in AIR.Phenotypes[phenotype].values) {
             let SP = AIR.Phenotypes[phenotype].values[element];
@@ -2546,6 +2570,7 @@ async function om_PhenotypeSP() {
             AIR.Phenotypes[phenotype].genenumbers[sample] = 0;                        
 
             var regr_data = [];
+            var norm_regr_data = [];
 
             for (let element in correct_SPs) {
 
@@ -2569,6 +2594,7 @@ async function om_PhenotypeSP() {
                 considered_elements.add(element); 
 
                 regr_data.push([FC,Math.abs(FC)*SP])
+                norm_regr_data.push([FC,Math.sign(FC)])
 
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
@@ -2605,10 +2631,14 @@ async function om_PhenotypeSP() {
             if (Math.abs(activity) > max)
                 max = Math.abs(activity);
 
-            AIR.Phenotypes[phenotype].results[sample] = activity;
 
-            var score = leastSquaresRegression(regr_data) 
+
+            var score = leastSquaresRegression(regr_data)
+            var norm_score = leastSquaresRegression(norm_regr_data)
+
+            AIR.Phenotypes[phenotype].results[sample] = activity;
             AIR.Phenotypes[phenotype]["slope"][sample] = score;
+            AIR.Phenotypes[phenotype]["norm_slope"][sample] = norm_score;
             AIR.Phenotypes[phenotype]["abs_level"][sample] = abs_activity;
 
             accuracyvalues.push(accuracy);
@@ -2645,6 +2675,8 @@ async function om_PhenotypeSP() {
         for(let phenotype in AIR.Phenotypes)
         {
             let score = AIR.Phenotypes[phenotype]["slope"][sample]
+            let norm_score = AIR.Phenotypes[phenotype]["norm_slope"][sample]
+
             let en_score = AIR.Phenotypes[phenotype].results[sample]
             let abs_en_score = AIR.Phenotypes[phenotype]["abs_level"][sample];
             score = Math.abs(score) > 1 ? 1/score : score
@@ -2681,6 +2713,7 @@ async function om_PhenotypeSP() {
                 }
 
                 var _score = leastSquaresRegression(_regr_data) 
+                _score = _score / norm_score;
                 _score = Math.abs(_score) > 1 ? 1/_score : _score
 
                 random_en_scores.push(_en_score)
@@ -2689,11 +2722,10 @@ async function om_PhenotypeSP() {
             }
 
             let std = standarddeviation(random_scores)            
-            let z_score = std != 0? Math.abs(score - mean(random_scores))/std : 0;
+            let z_score = std != 0? Math.abs((score/norm_score) - mean(random_scores))/std : 0;
             let pvalue = (1 - GetZPercent(z_score));
             if(isNaN(pvalue))
                 pvalue = 1;
-
             AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
 
             std = standarddeviation(random_en_scores)            
@@ -2719,26 +2751,44 @@ async function om_PhenotypeSP() {
         }
     }
 
-    /*
+    
     for (let sample in globals.omics.samples)
     {
-        var pvalues = []
-        for (let phenotype in AIR.Phenotypes) {
-            pvalues.push(AIR.Phenotypes[phenotype].pvalue[sample])
-        }
-        pvalues.sort((a, b) => a - b);
-        var corrected_pvalues = pvalues.reduce((acc,curr)=> (acc[curr]= 0,acc),{});
+        var m_pvalues = []
+        var en_pvalues = []
+        var abs_en_pvalues = []
 
-        for (let index = 1; index <= pvalues.length; index++) {
-            corrected_pvalues[pvalues[index]] = pvalues[index] * pvalues.length / index;            
-        }
+        var m_phenotypevalues = {}
+        var en_phenotypevalues = {}
+        var abs_en_phenotypevalues = {}
 
         for (let phenotype in AIR.Phenotypes) {
-
-            var adjp = corrected_pvalues[AIR.Phenotypes[phenotype].pvalue[sample]];
-            AIR.Phenotypes[phenotype].pvalue[sample] = adjp > 1? 1 : adjp;
+            m_pvalues.push(AIR.Phenotypes[phenotype].pvalue[sample])
+            en_pvalues.push(AIR.Phenotypes[phenotype].en_pvalue[sample])
+            abs_en_pvalues.push(AIR.Phenotypes[phenotype].abs_en_pvalue[sample])
         }
-    }*/
+
+        m_pvalues = m_pvalues.sort((a, b) => a - b);
+        en_pvalues = en_pvalues.sort((a, b) => a - b);
+        abs_en_pvalues = abs_en_pvalues.sort((a, b) => a - b);
+
+        for (let phenotype in AIR.Phenotypes) {
+            m_phenotypevalues[phenotype] = m_pvalues.indexOf(AIR.Phenotypes[phenotype].pvalue[sample])
+            en_phenotypevalues[phenotype] = en_pvalues.indexOf(AIR.Phenotypes[phenotype].en_pvalue[sample])
+            abs_en_phenotypevalues[phenotype] = abs_en_pvalues.indexOf(AIR.Phenotypes[phenotype].abs_en_pvalue[sample])
+        }
+
+        m_pvalues = getAdjPvalues(m_pvalues);
+        en_pvalues = getAdjPvalues(en_pvalues);
+        abs_en_pvalues = getAdjPvalues(abs_en_pvalues);
+
+        for (let phenotype in AIR.Phenotypes) {
+            AIR.Phenotypes[phenotype].adj_pvalue[sample] = m_pvalues[m_phenotypevalues[phenotype]];
+            AIR.Phenotypes[phenotype].adj_en_pvalue[sample] = en_pvalues[m_phenotypevalues[phenotype]];
+            AIR.Phenotypes[phenotype].adj_abs_en_pvalue[sample] = abs_en_pvalues[abs_en_phenotypevalues[phenotype]];
+        }
+
+    }
 
     
     if ( !$( "#om_pheno_mapped_elements" ).length ) {
@@ -5143,7 +5193,7 @@ function randomIDs(size, max, n){
 }   
 
 function update_importVariantTable() {
-
+    $('#om_import_variant').removeClass("air_disabledbutton")
     var tbody = $("#om_import_variant_table").children("tbody").first();
     tbody.empty();
 
@@ -5164,6 +5214,7 @@ function update_importVariantTable() {
 }
 
 function update_importMassSpecTable() {
+    $('#om_import_massspec').removeClass("air_disabledbutton")
     var tbody = $("#om_import_massspec_table").children("tbody").first();
     tbody.empty();
 
@@ -5325,7 +5376,8 @@ function updateImportTable(new_data = false) {
         
         $("#om_import_undo").removeClass("air_disabledbutton"); 
     }
-
+    
+    $("#om_initialize_import_btn").removeClass("air_disabledbutton");  
 }
 
 function numberOfUserProbes() {
@@ -5463,6 +5515,9 @@ async function calculateshortestPath(sample, elementids,  _count, _totalIteratio
 
 function getPvalue(phenotype, sample)
 {
+    let single_pvalue = false;
+    let prefix = document.getElementById("om_cb_fdr").checked == true? "adj_" : "";
+
     switch ($("#om_select_pvalue").val()) {
         case "1":
             single_pvalue = "pvalue";
@@ -5477,5 +5532,5 @@ function getPvalue(phenotype, sample)
             break;
     }
 
-    return single_pvalue? AIR.Phenotypes[phenotype][single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype]["pvalue"][sample],AIR.Phenotypes[phenotype]["en_pvalue"][sample],AIR.Phenotypes[phenotype]["abs_en_pvalue"][sample]);
+    return single_pvalue? AIR.Phenotypes[phenotype][prefix+single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype][prefix+"pvalue"][sample],AIR.Phenotypes[phenotype][prefix+"en_pvalue"][sample],AIR.Phenotypes[phenotype][prefix+"abs_en_pvalue"][sample]);
 }

@@ -1689,3 +1689,28 @@ function GetZPercent(z)
 
     return sum;
   }
+
+  
+  function getAdjPvalues(_pvalues)
+  {
+      let pvalues = _pvalues.sort((a, b) => b - a);
+      let n = pvalues.length
+      let values = pvalues.map((element, index)=> [element, n-index-1]);
+      let new_values = []
+      let new_pvalues = new Array(n);
+      for (let i in values) {
+          let rank = n - i
+          let pvalue = values[i][0]
+          new_values.push((n/rank) * pvalue)           
+      }
+      for (let i = 1; i < n; i++) {
+      if (new_values[i] < new_values[i+1])                                                           
+              new_values[i+1] = new_values[i]             
+      }
+      for (let i in values) {
+          let index = values[i][1]
+          new_pvalues[index] = new_values[i]          
+      }
+
+      return new_pvalues;
+  }
