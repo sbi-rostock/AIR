@@ -54,6 +54,8 @@ async function AirOmics(){
         },
 
         selectedDataType: "",
+
+        pvalue_labels: ["pvalue", "en_pvalue", "abs_en_pvalue"],
     }
     var t0 = performance.now();
     globals.omics.om_container = $('#airomics_tab_content');
@@ -537,8 +539,8 @@ function createDifferentialAnalysisPanel()
         </div>  
         <label class="air_label mt-1" style="font-weight: bold;">Type of Data:</label>
         <select id="om_data_type" class="browser-default om_select custom-select mb-1" style="border: solid 1px; font-weight: bold;">
-            <option value="0" selected>Unspecified</option>
-            <option value="1">Transcriptomics</option>
+            <option value="0">Unspecified</option>
+            <option value="1" selected>Transcriptomics</option>
             <option value="2">Metabolomics</option>
         </select> 
         <label class="air_label mt-1" style="font-weight: bold;">Sample:</label>
@@ -580,7 +582,7 @@ function createDifferentialAnalysisPanel()
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Number of predicted targets:</span>
             </div>
             <div class="col">
-                <input type="text" class="textfield" value="100" id="om_target_targetnumber" onkeypress="return isNumber(event)" />
+                <input type="text" class="textfield" value="" id="om_target_targetnumber" onkeypress="return isNumber(event)" />
             </div>
         </div>
         
@@ -667,7 +669,7 @@ function createDifferentialAnalysisPanel()
         $("#om_targetcomb_value").html($(this).val());
         switch (parseFloat($(this).val())) {
             case 1:
-                $("#om_target_targetnumber").val(100)
+                $("#om_target_targetnumber").val("")
                 break;
             case 2:
                 $("#om_target_targetnumber").val(50)
@@ -1758,6 +1760,52 @@ async function om_createTable(numberofregulators) {
 
             <hr>
 
+            <h5 class="mt-4 mb-4" style="font-weight: bold;">Overview</h5> 
+            
+            <div id="om_select_pvalue-container" class="row mb-2">
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
+                </div>
+                <div class="col">
+                    <select id="om_select_pvalue" class="browser-default om_select custom-select">                        
+                        <option value="2" selected>directed Enrichment-based</option>
+                        <option value="3">undirected Enrichment-based</option>
+                        <option value="1">Distribution-based</option>
+                        <option value="0">Highest p-value of all</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="om_cb_fdr">
+                        <label class="air_checkbox" for="om_cb_fdr">FDR Correction?</label>
+                    </div>
+                </div>
+            </div>
+            <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+            <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+            <div id="om_resultstable_container" class="mb-2">
+                <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
+            </div>
+
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_resultsgraph_panel">Results Graph:</button>
+            <div id="om_resultsgraph_panel" class="collapse air_box_lightgray">
+                <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
+                <div id="om_legend" class="chart-legend"></div>
+            </div>
+            
+            <hr>
+
             <h5 class="mt-4 mb-4" style="font-weight: bold;">Show on Map</h4> 
             
             <div class="row mb-3">
@@ -1815,47 +1863,6 @@ async function om_createTable(numberofregulators) {
 
             <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
             
-            <hr>
-
-            <h5 class="mt-4 mb-4" style="font-weight: bold;">Overview</h5> 
-            
-            <div id="om_select_pvalue-container" class="row mb-2">
-                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
-                </div>
-                <div class="col">
-                    <select id="om_select_pvalue" class="browser-default om_select custom-select">
-                        <option value="1" selected>Distribution based</option>
-                        <option value="2">Enrichment</option>
-                        <option value="3">Absolute Enrichment</option>
-                        <option value="0">Highest p-value of all</option>
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-2">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
-                                data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
-                            ?
-                        </button>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="om_cb_fdr">
-                        <label class="air_checkbox" for="om_cb_fdr">FDR Correction?</label>
-                    </div>
-                </div>
-            </div>
-            <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
-            <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
-            <div id="om_resultstable_container" class="mb-2">
-                <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
-            </div>
-            <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
-            <div id="om_legend" class="chart-legend"></div>
         </div>
     `);
 
@@ -1863,11 +1870,12 @@ async function om_createTable(numberofregulators) {
         if(!globals.omics.resultsTable)
             return;
 
+        let onlysignificant = document.getElementById("om_checkbox_exclude_ns").checked === true? true : false;
         globals.omics.resultsTable.rows().every( function ( rowIdx, tableLoop, rowLoop ) {
             
             var rowNode = this.node();
-            let id = $(rowNode).attr("data");
-            if(!id)
+            let phenotype = $(rowNode).attr("data");
+            if(!phenotype)
             {
                 return;
             }
@@ -1875,7 +1883,11 @@ async function om_createTable(numberofregulators) {
                     if($(this).hasClass("om_resultvalue"))
                     {
                         let sample = $(this).attr("data");
-                        let pvalue = getPvalue(id, sample);
+                        let pvalue = getPvalue(phenotype, sample);
+
+                        let level = onlysignificant && pvalue > 0.05? 0 : AIR.Phenotypes[phenotype].norm_results[sample];
+
+                        $('b:first', this).html(level);
                         $('span:first', this).html(`(${expo(pvalue)})`);
                         $(this).attr("data-order", pvalue);
                         if(pvalue < 0.05)
@@ -1895,16 +1907,17 @@ async function om_createTable(numberofregulators) {
     }
 
     $("#om_cb_fdr").on('click', updatepvalues);
+    $("#om_checkbox_exclude_ns").on('click', updatepvalues);
     $("#om_select_pvalue").on('change', updatepvalues);
-
+    $("#om_select_normalize").on('change', function () {
+        om_normalizePhenotypeValues().then(async function (pv) {
+            updatepvalues();
+        });
+    });
 
     globals.omics.pickedcolors = [];
 
     var tbl = document.getElementById('om_resultstable');
-    globals.omics.om_phenotype_downloadtext = "Phenotype";
-    for (let sample of globals.omics.samples) {
-        globals.omics.om_phenotype_downloadtext += "\t" + sample + "\t" + sample + "_pvalue";
-    }
 
     for (let phenotype in AIR.Phenotypes)
     {
@@ -1912,7 +1925,6 @@ async function om_createTable(numberofregulators) {
         result_row.setAttribute('data', phenotype);
         let pname = AIR.Phenotypes[phenotype].name;
 
-        globals.omics.om_phenotype_downloadtext += `\n${pname}`;
         let cbcell = checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
         cbcell.onclick = function () {
 
@@ -1986,10 +1998,9 @@ async function om_createTable(numberofregulators) {
         let pvalues = 0;
         
         for (let sample in globals.omics.samples) {
+
             let pvalue = getPvalue(phenotype, sample);
-            globals.omics.om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
-            globals.omics.om_phenotype_downloadtext += `\t${pvalue}`;
-            let samplecell = createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue) + ")", 'col-auto om_resultvalue', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = AIR.Phenotypes[phenotype].pvalue[sample]);
+            let samplecell = createPopupCell(result_row, 'td', "<b>" +  AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue, 2, 2) + ")", 'col-auto om_resultvalue', 'center', om_createpopup, {"sample": sample, "phenotype": phenotype}, order = pvalue);
             samplecell.setAttribute('data', sample);
             genenumber.push(AIR.Phenotypes[phenotype].genenumbers[sample]);
             if(pvalue < 0.05)
@@ -2233,21 +2244,7 @@ async function om_createTable(numberofregulators) {
         for (let sample of globals.omics.samples) {
             om_phenotype_downloadtext += "\t" + sample + "\t" + sample + "_pvalue";
         }
-        let single_pvalue = false
-
-        switch ($("#om_select_pvalue").val()) {
-            case "1":
-                single_pvalue = "pvalue";
-                break;
-            case "2":
-                single_pvalue = "en_pvalue";
-                break;
-            case "3":
-                single_pvalue = "abs_en_pvalue";
-                break;        
-            default:
-                break;
-        }
+        let onlysignificant = document.getElementById("om_checkbox_exclude_ns").checked === true? true : false;
 
         for (let phenotype in AIR.Phenotypes)
         {
@@ -2256,8 +2253,11 @@ async function om_createTable(numberofregulators) {
             om_phenotype_downloadtext += `\n${pname}`;
 
             for (let sample in globals.omics.samples) {
-                let pvalue = single_pvalue? AIR.Phenotypes[phenotype][single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype]["pvalue"][sample],AIR.Phenotypes[phenotype]["en_pvalue"][sample],AIR.Phenotypes[phenotype]["abs_en_pvalue"][sample]);
-                om_phenotype_downloadtext += `\t${AIR.Phenotypes[phenotype].norm_results[sample]}`;
+
+                let pvalue = getPvalue(phenotype, sample);
+                let level = onlysignificant && pvalue > 0.05? 0 : AIR.Phenotypes[phenotype].norm_results[sample];
+
+                om_phenotype_downloadtext += `\t${level}`;
                 om_phenotype_downloadtext += `\t${pvalue}`;
             }
         }
@@ -2446,33 +2446,31 @@ function getImageSource() {
 
 async function om_PhenotypeSP() {
 
-    let randomSamples = {};
     var _text = await disablebutton("om_pheno_analyzebtn" ,progress = true);
 
     let considered_elements = new Set()
-
-    let phenotype_elementvalues = {};
     globals.omics.pvalue_threshold = 1;
-
-    let numberofregulators = []
+    let numberofregulators = {}
 
     if(globals.omics.pvalue)
     {
         globals.omics.pvalue_threshold = parseFloat($("#om_pheno_pvaluethreshold").val().replace(',', '.'))
-        if(isNaN(globals.omics.pvalue_threshold))
+        if(isNaN(globals.omics.pvalue_threshold) || globals.omics.pvalue_threshold < 0)
         {
-            alert("Only (decimal) numbers are allowed as an p-value threshold. p-value was set to 1.")
-            globals.omics.pvalue_threshold = 1;
+            alert("Only positive (decimal) values are allowed as an p-value threshold. Threshold was set to 0.05.")
+            globals.omics.pvalue_threshold = 0.05;
+            $("#om_pheno_pvaluethreshold").val("0.05")
         }
     }
 
     let i_threshold = parseFloat($('#om_ithreshold_slider').val());
      
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
-    if(isNaN(globals.omics.numberOfRandomSamples))
+    if(isNaN(globals.omics.numberOfRandomSamples) || globals.omics.numberOfRandomSamples < 0)
     {
-        alert("Only numbers are allowed. n was set to 1000.")
+        alert("Only positive integer values numbers are allowed. n was set to 1000.")
         globals.omics.numberOfRandomSamples = 1000;
+        $('#om_pheno_randomsampleNumber').val("1000")
     }
 
 
@@ -2495,7 +2493,7 @@ async function om_PhenotypeSP() {
             {
                 pvalue = 1;
             }
-            if(globals.omics.pvalue && (!pvalue || pvalue >= globals.omics.pvalue_threshold))
+            if(globals.omics.pvalue && (!pvalue || pvalue > globals.omics.pvalue_threshold))
             {
                 continue;
             }
@@ -2505,13 +2503,7 @@ async function om_PhenotypeSP() {
     for (let phenotype in AIR.Phenotypes) {
 
         numberofregulators[phenotype] = 0;
-        phenotype_elementvalues[phenotype] = {};
         correct_SPs = {};
-
-        for(let _id in elementarray)
-        {
-            phenotype_elementvalues[phenotype][_id] =  Math.abs(AIR.Phenotypes[phenotype].values[elementarray[_id]]);
-        }
 
         await updateProgress(count++, (Object.keys(AIR.Phenotypes)).length, "om_pheno_analyzebtn", text=" Estimating phenotype levels.");
 
@@ -2526,7 +2518,6 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype]["adj_abs_en_pvalue"] = {}
         AIR.Phenotypes[phenotype]["abs_level"] = {}
         AIR.Phenotypes[phenotype]["regression"] = {}
-        AIR.Phenotypes[phenotype].norm_results = {};
         AIR.Phenotypes[phenotype].accuracy = 0;
         AIR.Phenotypes[phenotype].MainRegulators = {};
         AIR.Phenotypes[phenotype]["includedelements"] = {};
@@ -2551,11 +2542,7 @@ async function om_PhenotypeSP() {
             accuracymax += Math.abs(SP);
         }
 
-        let max = 0;
-
         var accuracyvalues = [];
-        var accuracyavg = 0;
-
 
         for (let sample in globals.omics.samples) {
 
@@ -2563,14 +2550,10 @@ async function om_PhenotypeSP() {
             let abs_activity = 0.0;
             var accuracy = 0; 
 
-            var negative_influences = 0;
-            var positive_influences = 0;
-
             AIR.Phenotypes[phenotype].includedelements[sample] = [];
             AIR.Phenotypes[phenotype].genenumbers[sample] = 0;                        
 
             var regr_data = [];
-            var norm_regr_data = [];
 
             for (let element in correct_SPs) {
 
@@ -2594,7 +2577,6 @@ async function om_PhenotypeSP() {
                 considered_elements.add(element); 
 
                 regr_data.push([FC,Math.abs(FC)*SP])
-                norm_regr_data.push([FC,Math.sign(FC)])
 
                 var weightedInfluence;
                 if (document.getElementById("om_checkbox_pheno_pvalue").checked === true)
@@ -2623,40 +2605,16 @@ async function om_PhenotypeSP() {
                 }
             }
 
-            //let _pvalue = ttest(negative_influences, positive_influences).pValue();
-
-            
-
-
-            if (Math.abs(activity) > max)
-                max = Math.abs(activity);
-
-
-
             var score = leastSquaresRegression(regr_data)
-            var norm_score = leastSquaresRegression(norm_regr_data)
 
             AIR.Phenotypes[phenotype].results[sample] = activity;
             AIR.Phenotypes[phenotype]["slope"][sample] = score;
-            AIR.Phenotypes[phenotype]["norm_slope"][sample] = norm_score;
             AIR.Phenotypes[phenotype]["abs_level"][sample] = abs_activity;
 
             accuracyvalues.push(accuracy);
         }
 
-        var sum = 0;
-        for( var a = 0; a < accuracyvalues.length; a++ ){
-            sum += accuracyvalues[a]; //don't forget to add the base
-        }
-
-        accuracyavg = sum/accuracyvalues.length;
-        if(accuracymax === 0)
-        {
-            AIR.Phenotypes[phenotype].accuracy = 0;
-        }
-        else{
-            AIR.Phenotypes[phenotype].accuracy = accuracyavg / accuracymax;
-        }
+        AIR.Phenotypes[phenotype].accuracy = accuracymax == 0? 0: (mean(accuracyvalues) / accuracymax);
     }
     
     count = 0;
@@ -2675,11 +2633,11 @@ async function om_PhenotypeSP() {
         for(let phenotype in AIR.Phenotypes)
         {
             let score = AIR.Phenotypes[phenotype]["slope"][sample]
-            let norm_score = AIR.Phenotypes[phenotype]["norm_slope"][sample]
+            score = Math.abs(score) > 1 ? 1/score : score
 
             let en_score = AIR.Phenotypes[phenotype].results[sample]
             let abs_en_score = AIR.Phenotypes[phenotype]["abs_level"][sample];
-            score = Math.abs(score) > 1 ? 1/score : score
+
 
             await updateProgress(count++, total_iterations, "om_pheno_analyzebtn", text=" Calculate p-values..");
 
@@ -2708,29 +2666,29 @@ async function om_PhenotypeSP() {
                         }
                         _en_score += FC_values[i] *SP;
                         _abs_en_score += Math.abs(FC_values[i] *SP);
-                        _regr_data.push([FC_values[i], Math.abs(FC_values[i])*SP])
+                        _regr_data.push([FC_values[i], Math.abs(FC_values[i]) * SP])
                     }
                 }
 
-                var _score = leastSquaresRegression(_regr_data) 
-                _score = _score / norm_score;
+                var _score = leastSquaresRegression(_regr_data);
                 _score = Math.abs(_score) > 1 ? 1/_score : _score
 
+                random_scores.push(_score)
                 random_en_scores.push(_en_score)
                 random_abs_en_scores.push(_abs_en_score)
-                random_scores.push(_score)
+                
             }
 
             let std = standarddeviation(random_scores)            
-            let z_score = std != 0? Math.abs((score/norm_score) - mean(random_scores))/std : 0;
-            let pvalue = (1 - GetZPercent(z_score));
+            let z_score = std != 0? Math.abs(score - mean(random_scores))/std : 0;
+            let pvalue = GetpValueFromZ(z_score);
             if(isNaN(pvalue))
                 pvalue = 1;
             AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
 
             std = standarddeviation(random_en_scores)            
             z_score = std != 0? Math.abs(en_score - mean(random_en_scores))/std : 0;
-            pvalue = (1 - GetZPercent(z_score));
+            pvalue = GetpValueFromZ(z_score);
             if(isNaN(pvalue))
                 pvalue = 1;
 
@@ -2738,16 +2696,11 @@ async function om_PhenotypeSP() {
 
             std = standarddeviation(random_abs_en_scores)            
             z_score = std != 0? Math.abs(abs_en_score - mean(random_abs_en_scores))/std : 0;
-            pvalue = (1 - GetZPercent(z_score));
+            pvalue = GetpValueFromZ(z_score, "right");
             if(isNaN(pvalue))
                 pvalue = 1;
 
             AIR.Phenotypes[phenotype].abs_en_pvalue[sample] = pvalue;
-
-            if(document.getElementById("om_checkbox_exclude_ns").checked === true && AIR.Phenotypes[phenotype].pvalue[sample] >= 0.05)
-            {
-                AIR.Phenotypes[phenotype].results[sample] = 0;
-            }
         }
     }
 
@@ -2784,7 +2737,7 @@ async function om_PhenotypeSP() {
 
         for (let phenotype in AIR.Phenotypes) {
             AIR.Phenotypes[phenotype].adj_pvalue[sample] = m_pvalues[m_phenotypevalues[phenotype]];
-            AIR.Phenotypes[phenotype].adj_en_pvalue[sample] = en_pvalues[m_phenotypevalues[phenotype]];
+            AIR.Phenotypes[phenotype].adj_en_pvalue[sample] = en_pvalues[en_phenotypevalues[phenotype]];
             AIR.Phenotypes[phenotype].adj_abs_en_pvalue[sample] = abs_en_pvalues[abs_en_phenotypevalues[phenotype]];
         }
 
@@ -3269,7 +3222,7 @@ function contentString(ID) {
     if(isNaN(pvalue_threshold))
     {
         alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
-        pvalue_threshold = 1;
+        pvalue_threshold = 0.05;
     }
 
     for (let p in AIR.Phenotypes)
@@ -3278,7 +3231,7 @@ function contentString(ID) {
         let pvalue = getPvalue(p, ID);
 
         if(pvalue > pvalue_threshold)
-        {
+        {   
             continue;
         }
 
@@ -3692,7 +3645,7 @@ async function calculateTargets() {
 
     let n = parseFloat($('#om_targetcomb_slider').val());
     let usememory = (document.getElementById("om_target_usememory").checked == true? true : false);
-    let numberOfTargets = 100;
+    let numberOfTargets = $("#om_target_targetnumber").val();
     globals.omics.om_target_downloadtext = `Sample: ${globals.omics.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity\tType\tRegulators`;
 
     let negativeCount = 0;
@@ -3723,6 +3676,12 @@ async function calculateTargets() {
         </table>
     `);
 
+    let elements_with_FC = {};
+
+    let shuffled_array = [];
+    let elementarray = Object.keys(AIR.Molecules);
+    let FC_values = [];
+
     try 
     {
         var promises = [];
@@ -3730,23 +3689,44 @@ async function calculateTargets() {
         if(globals.omics.pvalue)
         {
             pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
-            if(isNaN(pvalue_threshold))
+            if(isNaN(pvalue_threshold) || pvalue_threshold < 0)
             {
-                alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 1.")
-                pvalue_threshold = 1;
+                alert("Only positive (decimal) values are allowed as p-value threshold. Value was set to 1.")
+                pvalue_threshold = 0.05;
+                $("#om_target_pvaluethreshold").val("0.05")
             }
         }
-        numberOfTargets = parseFloat($("#om_target_targetnumber").val().replace(',', '.'))
-        if(isNaN(numberOfTargets))
+        if(numberOfTargets == "")
         {
-            alert("Only integer numbers are allowed as an input. Number of targets was set to 0.")
-            numberOfTargets = 100;
+            numberOfTargets = elementarray.length;
         }
-        fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
-        if(isNaN(fc_threshold))
+        else
         {
-            alert("Only (decimal) numbers are allowed as an FC threshold. FC threshold was set to 0.")
-            fc_threshold = 0;
+            numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
+            if(isNaN(numberOfTargets) || numberOfTargets < 0)
+            {
+                alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
+                numberOfTargets = elementarray.length;
+                switch (parseFloat($('#om_targetcomb_slider').val())) {
+                    case 2:
+                        numberOfTargets = 50;
+                        break;
+                    case 3:
+                        numberOfTargets = 20;
+                        break;
+                    case 4:
+                        numberOfTargets = 10;
+                        break;
+                }
+            }
+        }
+        $("#om_target_targetnumber").val(numberOfTargets)
+        fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
+        if(isNaN(fc_threshold) || fc_threshold < 0)
+        {
+            alert("Only positive (decimal) values are allowed as FC threshold. Value was set to 1.")
+            fc_threshold = 1;
+            $("#om_target_fcthreshold").val("1")
         }
         fc_threshold = Math.abs(fc_threshold)
 
@@ -3764,7 +3744,7 @@ async function calculateTargets() {
             if(Math.abs(fc) > Math.abs(fc_threshold))
             {
                 positiveCount += Math.abs(fc);
-                
+                elements_with_FC[e] = fc;
             }
             else {
                 negativeCount += 1;
@@ -3825,6 +3805,12 @@ async function calculateTargets() {
            
         }, 0);
 
+        FC_values = Object.values(elements_with_FC)
+        for(let i = 0; i < 1000; i++)
+        {
+            shuffled_array.push(pickRandomElements(elementarray, FC_values.length));
+        }
+
         for (let e of e_ids) {
 
             let last = (e == e_ids[e_ids.length - 1])
@@ -3847,22 +3833,20 @@ async function calculateTargets() {
                     }
                                              
                     await updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
-                    setTimeout(function(){                                
-                        globals.omics.om_targetchart.update();
-                    }, 0);  
 
                     if(last)
                     {
                         await updateProgress(0, 1, "om_regulator", `  Ranking Targets...`);
-                        _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets*2, ascendend = false, key = "accuracy");
-                        let identifiedTargets = Object.keys(pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity"));
+
+                        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+                        _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = true, key = "adj_pvalue");
+                        let identifiedTargets = Object.keys(_identifiedTargets);
+
                         for (var i = 0; i < identifiedTargets.length - 1; i++)
                         {
-                            await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`);
+                            await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`);     
 
-                            setTimeout(async function(){ 
-                                await adddatatochart(_identifiedTargets[identifiedTargets[i]]);       
-                            });                     
                             if(n > 1)
                             {
                                 for (var j = i + 1; j < identifiedTargets.length; j++) {
@@ -3870,41 +3854,36 @@ async function calculateTargets() {
                                         for (var k = j + 1; k < identifiedTargets.length; k++) {
                                             if(n > 3)
                                                 for (var m = k + 1; m < identifiedTargets.length; m++) {
-                                                    await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+                                                    let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+                                                    if(result)
+                                                    {
+                                                        _identifiedTargets[[i,j,k,m].join("_")] = result;
+                                                    }
                                                 }
-                                            await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                                let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                            if(result)
+                                            {
+                                                _identifiedTargets[[i,j,k].join("_")] = result;
+                                            }
                                         }
-                                    await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
+                                    let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
+                                    if(result)
+                                    {
+                                        _identifiedTargets[[i,j].join("_")] = result;
+                                    }
                                 }
                             }
                         }
+
+                        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+                        for(let target in _identifiedTargets)
+                        {
+                            if(_identifiedTargets[target].adj_pvalue > 0.05)
+                                continue;
+                            adddatatochart(_identifiedTargets[target]);     
+                        }
                         
-                        /*
-                        let rankedTargets = Object.keys(_identifiedTargets).sort(function(a,b) {return _identifiedTargets[b].sensitivity - _identifiedTargets[a].sensitivity});
-
-                        let significantTargets = []
-
-                        await updateProgress(0, numberOfTargets, "om_regulator", `  Predicting Target 0/`+ numberOfTargets);
-                        for(let _target of rankedTargets)
-                        {
-                            
-                            if(significantTargets.length >= numberOfTargets)
-                            {
-                                break;
-                            } 
-                            let pvalue = await getpValue(_target, _identifiedTargets[_target].index, _identifiedTargets[_target].positive? 1 : -1);
-                            if(pvalue < 0.05)
-                            {
-                                _identifiedTargets[_target]["pvalue"] = pvalue;
-                                significantTargets.push(_target)
-                                await updateProgress(significantTargets.length, numberOfTargets, "om_regulator", `  Predicting Target ${significantTargets.length}/`+ numberOfTargets);
-                            }
-                        }
-                        for(let _target of significantTargets)
-                        {
-                            await adddatatochart(_identifiedTargets[_target]);
-                        }
-                        */
                         $("#om_target_chart_canvas").height(400);
                         $("#om_regulator_progress").hide();
                         $("#om_btn_predicttarget").html('Predict Targets');
@@ -3936,8 +3915,8 @@ async function calculateTargets() {
 
     createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'Accuracy', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
     //createCell(headerrow, 'th', 'Effect', 'col', 'col', 'left');
@@ -3968,7 +3947,7 @@ async function calculateTargets() {
                 }
             }
         ],   
-        "order": [[ 3, "desc" ]], 
+        "order": [[ 2, "asc" ], [ 3, "desc" ]], 
         "scrollX": true,
         "autoWidth": true,
         columns: [
@@ -4008,118 +3987,61 @@ async function calculateTargets() {
         ]
     }).columns.adjust();
 
-    async function getpValue(_targets, index, activity)
+    async function getTargetpValue(targets, index, sensitivity)
     {        
-        let regulators = await getRegulatorsForTarget(_targets.split(";"), index, spType)
+        let regulators = await getRegulatorsForTarget(targets, index, spType);
 
-        let regr_data = [];
-        let elements_with_FC = [];
-        let SP_Values = [];
-
-        for (let p in regulators) 
-        {
-            let SP = regulators[p];
-
-            if(SP != 0)
-
-            SP_Values.push(SP);
-
-            if(!globals.omics.ExpressionValues.hasOwnProperty(p))
-            {
-                continue;
-            }
-
-            let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-
-
-            if (Math.abs(value) > fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
-            {            
-                regr_data.push([value, value * Math.abs(SP)])
-                elements_with_FC.push(value);
-            }
-        }
-
-        let numberOfHigherScores = 0;
-        var score = leastSquaresRegression(regr_data)
-        score = Math.abs(score) > 1? 1/score : score;
-
-        return 1/score;
-
-        if(elements_with_FC.length == 0 ||  score <= 0)
-        {
-            return 1;
-        }
-        else
-        {
-            for(let i = 0; i < 10000; i++)
-            {
-                SP_Values = shuffle(SP_Values);
-                elements_with_FC = shuffle(elements_with_FC);
-                
-                var _regr_data = [];
-                var _activity = 0;
-
-                for(let _id in elements_with_FC)
+        let _sensitivity_scors = [];
+        for(let shuffled_elements of shuffled_array)
+        {           
+            let _sensitivity = 0;
+            for(let i in FC_values)
+            {              
+                let element = shuffled_elements[i];     
+                if(regulators.hasOwnProperty(element))
                 {
-                    if(_id < SP_Values.length)
-                    { 
-                        _regr_data.push([elements_with_FC[_id],SP_Values[_id]])
-                        _activity += (elements_with_FC[_id] * SP_Values[_id])
-                    }
-                }
-
-                var _degree = Math.atan(leastSquaresRegression(_regr_data)) *  (180/Math.PI);
-                var _score = Math.sign(_degree) * Math.sign(_activity) * (1 - (Math.abs((45 - Math.abs(_degree)) / 45)))
-
-                if(_score > 0 && Math.abs(_score) >= Math.abs(score))
-                {
-                    numberOfHigherScores ++;
+                    _sensitivity += FC_values[i] *regulators[element];
                 }
             }
-            return numberOfHigherScores / 10000;
+
+            _sensitivity_scors.push(_sensitivity / positiveCount)
         }
+
+        let std = standarddeviation(_sensitivity_scors)            
+        let z_score = std != 0? Math.abs(sensitivity - mean(_sensitivity_scors))/std : 0;
+        let pvalue = GetpValueFromZ(z_score);
+        if(isNaN(pvalue))
+            pvalue = 1;
+            
+        return pvalue;
+        
     }
 
     async function analyzemultipletargets(targets)
     {
         let maxScore = 0;
         let results = null;
-        let regr_data = [];
 
         for (let index of targetCombinations(targets.length))
         {          
             let regulators = await getRegulatorsForTarget(targets, index, spType)
-                
+            let regr_data = [];
             let positiveSum = 0;
             let negativeSum = 0;
 
             let target_values = {};
-            for (let p in globals.omics.ExpressionValues) 
-            {
-                
-                let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-                if (Math.abs(value) >= fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
+            for (let p in AIR.Molecules) 
+            {                
+                let SP = regulators.hasOwnProperty(p)? regulators[p] : 0;
+                let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
+
+                if(SP * value != 0)
                 {
-                    if(regulators.hasOwnProperty(p))
-                    {
+                    target_values[p] = value * SP; 
+                }  
 
-                        let SP = regulators[p];
-                        regr_data.push([value, Math.abs(value) * (Math.abs(SP) > 1? Math.sign(SP) : SP) ])     
-                        positiveSum += value * SP;
-                        target_values[p] = value * SP;
-                    }
-                    else
-                    {
-                        regr_data.push([value, 0]);
-                    }
-
-                }
-                else if (regulators.hasOwnProperty(p))
-                {
-
-                    let SP = regulators[p];
-                    negativeSum += (1 - Math.abs(SP));
-                }
+                positiveSum += value * SP;
+                negativeSum += (1 - Math.abs(SP));
             }
 
             let sensitivity = positiveSum / positiveCount;
@@ -4141,22 +4063,17 @@ async function calculateTargets() {
                 let positiveValue = sensitivity > 0? 1 : -1;
                 sensitivity = Math.abs(sensitivity);
 
-
-
-
-                let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
-
-                var score = leastSquaresRegression(regr_data)
-                score = Math.abs(score) > 1? 1/score : score;
-                
-                if(Math.sign(score) != positiveValue || score <= maxScore)
+                if(sensitivity <= maxScore)
                     continue;
                 
-                maxScore = score;
+                maxScore = sensitivity;               
+                
+                let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+                
+
 
                 results = 
                 {
-                    "accuracy": 100*(Math.abs(score)),
                     "id": targets,
                     "fc": 0,
                     "index": index,
@@ -4171,16 +4088,25 @@ async function calculateTargets() {
         }
 
         if(results != null)
-            adddatatochart(results);
+        {          
+            results["pvalue"] = await getTargetpValue(results.id, results.index, results.sensitivity)
+            
+            return results;
+            //adddatatochart(results);
+        }
+        else
+        {
+            return false;
+        }
             //_identifiedTargets[targets.join(";")] = results;
-         
     }
 
     async function adddatatochart(targtetdata, colored = true)
     {
         return new Promise( 
             async function(resolve, reject) {
-                var radius = 2 + (6 * targtetdata.accuracy / 100);
+                
+                var radius = 2 + (6 * (1 - targtetdata.pvalue));
                         
                 var pstyle = targtetdata.positive == null? 'circle' : 'triangle';
 
@@ -4207,8 +4133,8 @@ async function calculateTargets() {
 
                 createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);                
                 createPopupCell(result_row, 'td', targtetdata.positive == null? "mixed" : (targtetdata.positive? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, {"sample": sample, "id": targtetdata.id, "index": targtetdata.index, "spType": spType, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold}),
+                createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
-                createCell(result_row, 'td', expo(targtetdata.accuracy, 2, 2) + "%", 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.specificity, 3, 3), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
                 //createCell(result_row, 'td', targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", "), 'col-auto', 'col', 'left', true);               
@@ -4225,7 +4151,6 @@ async function calculateTargets() {
         return new Promise(
             async function(resolve, reject) {
                 
-            let regr_data = [];
             let count = e_ids.indexOf(e);    
             let fc = globals.omics.ExpressionValues.hasOwnProperty(e)? globals.omics.ExpressionValues[e].nonnormalized[sample] : 0;
 
@@ -4255,29 +4180,18 @@ async function calculateTargets() {
             let target_values = {};
 
 
-            for (let p in globals.omics.ExpressionValues) 
-            {
-                
+            for (let p in AIR.Molecules) 
+            {                
                 let SP = data.hasOwnProperty(p)? data[p][spType] : 0;
-                let value = globals.omics.ExpressionValues[p].nonnormalized[sample];
-                if (Math.abs(value) >= fc_threshold && (!globals.omics.pvalue || globals.omics.ExpressionValues[p].pvalues[sample] <= pvalue_threshold)) 
-                {
-                    if(SP)
-                    {
-                        regr_data.push([value, Math.abs(value) * SP])     
-                        positiveSum += value * SP;
-                        target_values[p] = value * SP;
-                    }
-                    else
-                    {
-                        regr_data.push([value, 0]);
-                    }
+                let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
 
-                }
-                else if (SP)
-                {
-                    negativeSum += (1 - Math.abs(SP));
-                }
+                if(SP * value != 0)
+                { 
+                    target_values[p] = value * SP; 
+                }  
+
+                positiveSum += value * SP;
+                negativeSum += (1 - Math.abs(SP));
             }
 
             let sensitivity = positiveSum / positiveCount;
@@ -4285,7 +4199,6 @@ async function calculateTargets() {
             if(specificity > 0 && sensitivity != 0)
             {
                 let positive = sensitivity > 0? true : false;
-                let positiveValue = sensitivity > 0? 1 : -1;
                 sensitivity = Math.abs(sensitivity);
                 
                 if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
@@ -4299,33 +4212,22 @@ async function calculateTargets() {
 
                 let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
 
-                var score = leastSquaresRegression(regr_data)
-                score = Math.abs(score) > 1? 1/score : score;
-
-                if(Math.sign(score) != positiveValue )
-                {
-                    resolve({
-                        data : null,
-                    });
-                }
-                else
-                {
-                    resolve({
-                        data : {
-                            "accuracy": 100*Math.abs(score),
-                            "id": [e],
-                            "fc": fc,
-                            "index": [1],
-                            "sensitivity": sensitivity,
-                            "name": _name,
-                            "linkname": getLinkIconHTML(_name),
-                            "specificity": specificity,
-                            "regulators": regulators.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
-                            "positive": positive
-                        },
-                    });
-                    return;
-                }
+                resolve({
+                    data : {
+                        "pvalue": await getTargetpValue([e], [1], sensitivity),
+                        "id": [e],
+                        "fc": fc,
+                        "index": [1],
+                        "sensitivity": sensitivity,
+                        "name": _name,
+                        "linkname": getLinkIconHTML(_name),
+                        "specificity": specificity,
+                        "regulators": regulators.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
+                        "positive": positive
+                    },
+                });
+                return;
+                
             }   
         
             resolve({
@@ -5515,22 +5417,10 @@ async function calculateshortestPath(sample, elementids,  _count, _totalIteratio
 
 function getPvalue(phenotype, sample)
 {
-    let single_pvalue = false;
     let prefix = document.getElementById("om_cb_fdr").checked == true? "adj_" : "";
 
-    switch ($("#om_select_pvalue").val()) {
-        case "1":
-            single_pvalue = "pvalue";
-            break;
-        case "2":
-            single_pvalue = "en_pvalue";
-            break;
-        case "3":
-            single_pvalue = "abs_en_pvalue";
-            break;        
-        default:
-            break;
-    }
+    let _id = parseFloat($("#om_select_pvalue").val());
+    let pvalue_array = globals.omics.pvalue_labels.map(p => AIR.Phenotypes[phenotype][prefix+p][sample])
 
-    return single_pvalue? AIR.Phenotypes[phenotype][prefix+single_pvalue][sample] : Math.max(AIR.Phenotypes[phenotype][prefix+"pvalue"][sample],AIR.Phenotypes[phenotype][prefix+"en_pvalue"][sample],AIR.Phenotypes[phenotype][prefix+"abs_en_pvalue"][sample]);
+    return _id != 0? pvalue_array[_id-1] : Math.max(...pvalue_array);
 }

@@ -1660,18 +1660,8 @@ function activaTab(tab){
     $('.nav-tabs a[href="#' + tab + '"]').tab('show');
 };
  
-function GetZPercent(z) 
+function GetpValueFromZ(z, type = "twosided") 
   {
-    //z == number of standard deviations from the mean
-
-    //if z is greater than 6.5 standard deviations from the mean
-    //the number of significant digits will be outside of a reasonable 
-    //range
-    if ( z < -6.5)
-      return 0.0;
-    if( z > 6.5) 
-      return 1.0;
-
     var factK = 1;
     var sum = 0;
     var term = 1;
@@ -1687,7 +1677,15 @@ function GetZPercent(z)
     }
     sum += 0.5;
 
-    return sum;
+    switch (type) {
+        case "left":
+            return sum;
+        case "right":
+            return 1-sum;
+        case "twosided":
+            return (sum <= 0.5? (sum*2) : ((1 - sum) * 2));
+    }
+    
   }
 
   
@@ -1713,4 +1711,20 @@ function GetZPercent(z)
       }
 
       return new_pvalues;
+  }
+
+  async function getadjPvaluesForObject(_object, key, newkey = "adj_pvalue")
+  {
+    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]);
+    targetpvalues = targetpvalues.sort((a, b) => a - b);
+    let targetpvalues_index = {}
+    for(let tid in _object)
+    {
+        targetpvalues_index[tid] = targetpvalues.indexOf(_object[tid][key]);
+    }
+    targetpvalues = getAdjPvalues(targetpvalues);
+    for(let tid in _object)
+    {
+        _object[tid][newkey] = targetpvalues[targetpvalues_index[tid]];
+    }
   }
