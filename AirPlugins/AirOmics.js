@@ -2212,6 +2212,8 @@ async function om_createTable(numberofregulators) {
     });
     $('#om_addoverlaybtn').on('click', async function() {
         let text = await disablebutton('om_addoverlaybtn');
+        globals.omics.overlay_suffix = $("#om_overlay_suffix").val();
+
         removeOverlays(globals.omics.samplesResults).finally(r => {
             AddOverlaysPromise(globals.omics.samplesResults).finally(ao => {
                 $('.minerva-overlay-tab-link').click();
@@ -2767,15 +2769,12 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
             return new Promise((resolve, reject) => {
                 
                 if (count <= samples.length) {
-                    
-                    let suffix = $("#om_overlay_suffix").val();
-                    globals.omics.overlay_suffix = suffix;
 
                     $.ajax({
                         method: 'POST',
                         url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
 
-                        data: `content=name%09color${contentString(count-1)}&description=PhenotypeActivity&filename=${samples[count - 1]+suffix}.txt&name=${samples[count - 1]+suffix}&googleLicenseConsent=true`,
+                        data: `content=name%09color${contentString(count-1)}&description=PhenotypeActivity&filename=${samples[count - 1]+globals.omics.overlay_suffix}.txt&name=${samples[count - 1]+globals.omics.overlay_suffix}&googleLicenseConsent=true`,
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
                             ajaxPostQuery(count + 1).then(r =>
@@ -3947,7 +3946,7 @@ async function calculateTargets() {
                 }
             }
         ],   
-        "order": [[ 2, "asc" ], [ 3, "desc" ]], 
+        "order": [[ 3, "desc" ], [ 2, "asc" ]], 
         "scrollX": true,
         "autoWidth": true,
         columns: [

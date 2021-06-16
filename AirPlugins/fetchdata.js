@@ -1683,7 +1683,7 @@ function GetpValueFromZ(z, type = "twosided")
         case "right":
             return 1-sum;
         case "twosided":
-            return (sum <= 0.5? (sum*2) : ((1 - sum) * 2));
+            return (sum < 0.5? (sum*2) : ((1 - sum) * 2));
     }
     
   }
@@ -1715,16 +1715,20 @@ function GetpValueFromZ(z, type = "twosided")
 
   async function getadjPvaluesForObject(_object, key, newkey = "adj_pvalue")
   {
-    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]);
+    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]).filter(t => t != 0);
     targetpvalues = targetpvalues.sort((a, b) => a - b);
     let targetpvalues_index = {}
     for(let tid in _object)
     {
+        if(_object[tid][key] == 0)
+            continue;
         targetpvalues_index[tid] = targetpvalues.indexOf(_object[tid][key]);
     }
     targetpvalues = getAdjPvalues(targetpvalues);
     for(let tid in _object)
     {
+        if(_object[tid][key] == 0)
+            continue;
         _object[tid][newkey] = targetpvalues[targetpvalues_index[tid]];
     }
   }
