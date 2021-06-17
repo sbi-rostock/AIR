@@ -8,6 +8,7 @@ let JSZip;
 let FileSaver;
 let VCF;
 let ttest;
+let Decimal;
 
 Object.filter = (obj, predicate) => 
     Object.keys(obj)
@@ -78,7 +79,7 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf) {
+function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf, _decimal) {
 
     return new Promise((resolve, reject) => {
 
@@ -102,6 +103,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
             minervaProxy = _minerva;
             FILE_URL = _filepath;
             ttest = _ttest;
+            Decimal = _decimal;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -1659,23 +1661,34 @@ function leastSquaresRegression(data) {
 function activaTab(tab){
     $('.nav-tabs a[href="#' + tab + '"]').tab('show');
 };
- 
-function GetpValueFromZ(z, type = "twosided") 
-  {
-    var factK = 1;
-    var sum = 0;
-    var term = 1;
-    var k = 0;
-    var loopStop = Math.exp(-23);
-    while(Math.abs(term) > loopStop) 
-    {
-      term = .3989422804 * Math.pow(-1,k) * Math.pow(z,k) / (2 * k + 1) / Math.pow(2,k) * Math.pow(z,k+1) / factK;
-      sum += term;
-      k++;
-      factK *= k;
 
+function GetpValueFromZ(_z, type = "twosided") 
+{
+    z = new Decimal(_z);
+    var sum = new Decimal(0);
+    var factK = new Decimal(1);
+
+    var term = new Decimal(1);
+    var k = new Decimal(0);
+    
+    var loopstop = new Decimal("10E-40");
+    var minusone = new Decimal(-1);
+    var two = new Decimal(2);
+
+    while(term.abs().greaterThan(loopstop)) 
+    {
+        term = minusone.toPower(k).times(z.toPower(k)).times(z.toPower(k.plus(1))).dividedBy(k.times(2).plus(1).times(two.toPower(k)).times(factK))
+    	sum = sum.plus(term);
+    	k = k.plus(1);
+        factK =  factK.times(k);
     }
-    sum += 0.5;
+     
+    sum = parseFloat(sum.dividedBy((new Decimal(2*Math.PI)).sqrt()).plus(0.5).toExponential(20));
+    
+    if(sum < 0)
+        sum = -sum;
+    else if(sum > 1)
+        sum = 2 - sum;
 
     switch (type) {
         case "left":
@@ -1685,9 +1698,8 @@ function GetpValueFromZ(z, type = "twosided")
         case "twosided":
             return (sum < 0.5? (sum*2) : ((1 - sum) * 2));
     }
-    
-  }
 
+}
   
   function getAdjPvalues(_pvalues)
   {
@@ -1715,20 +1727,16 @@ function GetpValueFromZ(z, type = "twosided")
 
   async function getadjPvaluesForObject(_object, key, newkey = "adj_pvalue")
   {
-    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]).filter(t => t != 0);
+    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]);
     targetpvalues = targetpvalues.sort((a, b) => a - b);
     let targetpvalues_index = {}
     for(let tid in _object)
     {
-        if(_object[tid][key] == 0)
-            continue;
         targetpvalues_index[tid] = targetpvalues.indexOf(_object[tid][key]);
     }
     targetpvalues = getAdjPvalues(targetpvalues);
     for(let tid in _object)
     {
-        if(_object[tid][key] == 0)
-            continue;
         _object[tid][newkey] = targetpvalues[targetpvalues_index[tid]];
     }
   }

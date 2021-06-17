@@ -55,7 +55,7 @@ async function AirOmics(){
 
         selectedDataType: "",
 
-        pvalue_labels: ["pvalue", "en_pvalue", "abs_en_pvalue"],
+        pvalue_labels: ["pvalue", "en_pvalue"]//, "abs_en_pvalue"],
     }
     var t0 = performance.now();
     globals.omics.om_container = $('#airomics_tab_content');
@@ -1768,10 +1768,10 @@ async function om_createTable(numberofregulators) {
                 </div>
                 <div class="col">
                     <select id="om_select_pvalue" class="browser-default om_select custom-select">                        
-                        <option value="2" selected>directed Enrichment-based</option>
-                        <option value="3">undirected Enrichment-based</option>
+                        <option value="2" selected>Level-based</option>
                         <option value="1">Distribution-based</option>
-                        <option value="0">Highest p-value of all</option>
+                        <option value="3">Lowest p-value of both</option>
+                        <option value="0">Highest p-value of both</option>
                     </select>
                 </div>
             </div>
@@ -3678,7 +3678,19 @@ async function calculateTargets() {
     let elements_with_FC = {};
 
     let shuffled_array = [];
-    let elementarray = Object.keys(AIR.Molecules);
+    let elementarray = []
+    switch (spType) {
+        case "i":
+            elementarray = Object.keys(AIR.Molecules);
+            break;
+        case "t":
+            elementarray = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type));
+            break;
+        case "c":
+            elementarray = Object.keys(AIR.Molecules).filter(m => ["SIMPLE_MOLECULE"].includes(AIR.Molecules[m].type));
+            break;
+    }
+
     let FC_values = [];
 
     try 
@@ -3839,17 +3851,23 @@ async function calculateTargets() {
 
                         await getadjPvaluesForObject(_identifiedTargets, "pvalue")
 
-                        _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = true, key = "adj_pvalue");
-                        let identifiedTargets = Object.keys(_identifiedTargets);
+                        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.05) 
 
-                        for (var i = 0; i < identifiedTargets.length - 1; i++)
+
+                        if(n > 1)
                         {
-                            await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`);     
+                                                                                   
+                            _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = true, key = "sensitivity");
+                            let identifiedTargets = Object.keys(_identifiedTargets);
 
-                            if(n > 1)
+                            for (var i = 0; i < identifiedTargets.length - 1; i++)
                             {
+
+                                await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`); 
+
                                 for (var j = i + 1; j < identifiedTargets.length; j++) {
                                     if(n > 2)
+                                    {
                                         for (var k = j + 1; k < identifiedTargets.length; k++) {
                                             if(n > 3)
                                                 for (var m = k + 1; m < identifiedTargets.length; m++) {
@@ -3859,18 +3877,25 @@ async function calculateTargets() {
                                                         _identifiedTargets[[i,j,k,m].join("_")] = result;
                                                     }
                                                 }
-                                                let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
-                                            if(result)
+                                            else
                                             {
-                                                _identifiedTargets[[i,j,k].join("_")] = result;
-                                            }
+                                                let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                                if(result)
+                                                {
+                                                    _identifiedTargets[[i,j,k].join("_")] = result;
+                                                }
+                                            }                                            
                                         }
-                                    let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
-                                    if(result)
-                                    {
-                                        _identifiedTargets[[i,j].join("_")] = result;
                                     }
-                                }
+                                    else
+                                    {
+                                        let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
+                                        if(result)
+                                        {
+                                            _identifiedTargets[[i,j].join("_")] = result;
+                                        }
+                                    }
+                                }                                
                             }
                         }
 
@@ -3878,8 +3903,6 @@ async function calculateTargets() {
 
                         for(let target in _identifiedTargets)
                         {
-                            if(_identifiedTargets[target].adj_pvalue > 0.05)
-                                continue;
                             adddatatochart(_identifiedTargets[target]);     
                         }
                         
@@ -3914,6 +3937,7 @@ async function calculateTargets() {
 
     createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
+    createCell(headerrow, 'th', 'adj p-value', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
@@ -3946,7 +3970,7 @@ async function calculateTargets() {
                 }
             }
         ],   
-        "order": [[ 3, "desc" ], [ 2, "asc" ]], 
+        "order": [[ 4, "desc" ], [ 2, "asc" ]], 
         "scrollX": true,
         "autoWidth": true,
         columns: [
@@ -3955,6 +3979,7 @@ async function calculateTargets() {
             { "width": "15%" },
             { "width": "15%" },
             { "width": "15%" },
+            { "width": "10%" },
             { "width": "10%" },
             ],
         columnDefs: [
@@ -3983,36 +4008,40 @@ async function calculateTargets() {
                 targets: 5,
                 className: 'dt-center'
             },
+            {
+                targets: 6,
+                className: 'dt-center'
+            },
         ]
     }).columns.adjust();
 
-    async function getTargetpValue(targets, index, sensitivity)
-    {        
-        let regulators = await getRegulatorsForTarget(targets, index, spType);
+    async function getTargetpValue(targets, index, sensitivity, _regulators = null)
+    {      
+        let regulators = _regulators == null? await getRegulatorsForTarget(targets, index, spType) : _regulators;
 
         let _sensitivity_scors = [];
         for(let shuffled_elements of shuffled_array)
         {           
-            let _sensitivity = 0;
+            let _sensitivity = 0.0;
             for(let i in FC_values)
             {              
                 let element = shuffled_elements[i];     
                 if(regulators.hasOwnProperty(element))
                 {
-                    _sensitivity += FC_values[i] *regulators[element];
+                    _sensitivity += FC_values[i] * regulators[element];
                 }
             }
 
-            _sensitivity_scors.push(_sensitivity / positiveCount)
+            _sensitivity_scors.push(_sensitivity / positiveCount);
         }
 
-        let std = standarddeviation(_sensitivity_scors)            
-        let z_score = std != 0? Math.abs(sensitivity - mean(_sensitivity_scors))/std : 0;
+        let std = standarddeviation(_sensitivity_scors)  
+        if(!std || std == 0)
+            return 1;          
+        let z_score =  Math.abs(sensitivity - mean(_sensitivity_scors))/std;
         let pvalue = GetpValueFromZ(z_score);
-        if(isNaN(pvalue))
-            pvalue = 1;
-            
-        return pvalue;
+
+        return isNaN(pvalue)? 1 : pvalue;
         
     }
 
@@ -4040,7 +4069,11 @@ async function calculateTargets() {
                 }  
 
                 positiveSum += value * SP;
-                negativeSum += (1 - Math.abs(SP));
+
+                if(value == 0)
+                {
+                    negativeSum += (1 - Math.abs(SP));
+                }             
             }
 
             let sensitivity = positiveSum / positiveCount;
@@ -4133,6 +4166,7 @@ async function calculateTargets() {
                 createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);                
                 createPopupCell(result_row, 'td', targtetdata.positive == null? "mixed" : (targtetdata.positive? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, {"sample": sample, "id": targtetdata.id, "index": targtetdata.index, "spType": spType, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold}),
                 createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
+                createCell(result_row, 'td', expo(targtetdata.pvalue, 2, 2), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.specificity, 3, 3), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
@@ -4160,8 +4194,8 @@ async function calculateTargets() {
 
             let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
             
-            let success = await getMoleculeData(e, type = "molecule", false, usememory)
-            if(!success)
+            let data = await getMoleculeData(e, type = "molecule", true, usememory)
+            if(!data)
             {
                 resolve({
                     index: count,
@@ -4170,28 +4204,34 @@ async function calculateTargets() {
                 });
                 return;
             }
-                
-            let data = AIR.MoleculeData[e];
 
             let positiveSum = 0;
             let negativeSum = 0;
 
             let target_values = {};
-
+            let regulators = {};
 
             for (let p in AIR.Molecules) 
             {                
                 let SP = data.hasOwnProperty(p)? data[p][spType] : 0;
                 let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
 
+                if(SP != 0)
+                {
+                    regulators[p] = SP;
+                }
                 if(SP * value != 0)
                 { 
                     target_values[p] = value * SP; 
+                    positiveSum += value * SP;
                 }  
 
-                positiveSum += value * SP;
-                negativeSum += (1 - Math.abs(SP));
+                if(value == 0)
+                {
+                    negativeSum += (1 - Math.abs(SP));
+                }  
             }
+
 
             let sensitivity = positiveSum / positiveCount;
             let specificity = negativeSum / negativeCount
@@ -4209,11 +4249,11 @@ async function calculateTargets() {
                     return;
                 }
 
-                let regulators = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
-
+                let Ranked_DCEs = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+                let pvalue = await getTargetpValue([e], [1], sensitivity, regulators);
                 resolve({
                     data : {
-                        "pvalue": await getTargetpValue([e], [1], sensitivity),
+                        "pvalue": pvalue,
                         "id": [e],
                         "fc": fc,
                         "index": [1],
@@ -4221,7 +4261,7 @@ async function calculateTargets() {
                         "name": _name,
                         "linkname": getLinkIconHTML(_name),
                         "specificity": specificity,
-                        "regulators": regulators.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
+                        "regulators": Ranked_DCEs.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
                         "positive": positive
                     },
                 });
@@ -5421,5 +5461,15 @@ function getPvalue(phenotype, sample)
     let _id = parseFloat($("#om_select_pvalue").val());
     let pvalue_array = globals.omics.pvalue_labels.map(p => AIR.Phenotypes[phenotype][prefix+p][sample])
 
-    return _id != 0? pvalue_array[_id-1] : Math.max(...pvalue_array);
+    switch (_id) {
+        case 1:
+        case 2:   
+            return pvalue_array[_id-1];
+        case 0:
+            return Math.max(...pvalue_array);
+        case 3:
+            return Math.min(...pvalue_array);
+        default:
+            return 1;
+    }
 }
