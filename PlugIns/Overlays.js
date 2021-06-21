@@ -31,6 +31,8 @@ const globals = {
   defaultusers: ['anonymous', 'guest', 'guest user'],
   specialCharacters: ['+', '#', '*', '~', '%', '&', '$', '§', '"'],
   guestuser: ['airuser'],
+  pvalue: false,
+  seperator: "\t",
   user: undefined
 };
 let $ = window.$;
@@ -240,6 +242,9 @@ function initMainPageStructure() {
                 <input id="inputId" type="file" class="inputfile mb-2"/>
             </div>
         </div>`);
+      $('#inputId').on('change', function () {
+        om_detectfile(false);
+      });
       globals.container.append(`
                 <select id="TypeSelect" class="selecttype browser-default custom-select mb-2 mt-2">
                 <option value="0" selected>No normalization</option>
@@ -278,6 +283,42 @@ function initMainPageStructure() {
         $('#ol-negativecolorvalue').val($(this).val());
       });
       globals.container.append(`
+            <div id="ms_mzSelect-container" class="row mb-2 mt-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right;">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">File Type:</span>
+                </div>
+                <div class="col">
+                    <select id="om_filetypeSelect" class="browser-default selecttype custom-select">
+                        <option value="0" selected>TSV</option>
+                        <option value="1">CSV</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-4 mb-4">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="ol_info-btn btn btn-secondary"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Integrating p-Values"
+                                data-content="If checked, every second column will be mapped as a p-value for the previous sample column.<br/>">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="ol_checkbox" id="om_checkbox_pvalue">
+                        <label class="ol_checkbox_label" for="om_checkbox_pvalue">Data has p-values?</label>
+                    </div>
+                </div>
+            </div>
+            <div id="pvalue_threshold-container" class="row mb-2">
+                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype p-value threshold:</span>
+                </div>
+                <div class="col">
+                    <input type="text" class="textfield" value="0.05" id="pvalue_threshold" onkeypress="return isNumber(event)" />
+                </div>
+            </div>
             <div class="row mt-4 mb-2">
                 <div class="col-auto">
                     <div class="wrapper">
@@ -569,6 +610,24 @@ function loadfile(override) {
     }
 
     var resolvemessage = "";
+    globals.pvalue = document.getElementById("om_checkbox_pvalue").checked;
+
+    if (globals.pValue && (globals.columnheaders.length - 1) % 2 != 0) {
+      reject('Number of p-value columns is different from the sumber of sample columns!');
+      return;
+    }
+
+    let pvalue_threshold = 1;
+
+    if (globals.pvalue) {
+      pvalue_threshold = parseFloat($("#pvalue_threshold").val().replace(',', '.'));
+
+      if (isNaN(pvalue_threshold)) {
+        alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.");
+        pvalue_threshold = 0.05;
+      }
+    }
+
     var fileToLoad = document.getElementById("inputId").files[0];
 
     if (!fileToLoad) {
@@ -599,27 +658,32 @@ function loadfile(override) {
         if (firstline === true) {
           firstline = false;
           globals.samplestring = line;
-          globals.numberofSamples = line.split('\t').length - 1;
+          globals.numberofSamples = (line.split(globals.seperator).length - 1) / (globals.pvalue ? 2 : 1);
           var genename = true;
-          line.split('\t').forEach(s => {
+          let even_count = 0;
+          line.split(globals.seperator).forEach(s => {
             if (genename === false) {
-              var samplename = s;
-              globals.specialCharacters.forEach(c => {
-                samplename = samplename.replace(c, "");
-              });
-              samplename = samplename.trim();
+              even_count++;
 
-              if (!override) {
-                let originalname = samplename;
-                let j = 1;
+              if (even_count % 2 != 0 || globals.pvalue == false) {
+                var samplename = s;
+                globals.specialCharacters.forEach(c => {
+                  samplename = samplename.replace(c, "");
+                });
+                samplename = samplename.trim();
 
-                while (existingols.includes(samplename)) {
-                  samplename = originalname + "(" + j++ + ")";
+                if (!override) {
+                  let originalname = samplename;
+                  let j = 1;
+
+                  while (existingols.includes(samplename)) {
+                    samplename = originalname + "(" + j++ + ")";
+                  }
                 }
-              }
 
-              existingols.push(samplename);
-              globals.samples.push(samplename);
+                existingols.push(samplename);
+                globals.samples.push(samplename);
+              }
             } else genename = false;
           });
         } else {
@@ -632,7 +696,7 @@ function loadfile(override) {
             return;
           }
 
-          if (line.split('\t').length != globals.samples.length + 1) {
+          if (globals.pvalue && line.split(globals.seperator).length != globals.samples.length * 2 + 1 || globals.pvalue == false && line.split(globals.seperator).length > globals.samples.length + 1) {
             var linelengtherror = "Lines in the datafile may have been skipped because of structural issues.";
 
             if (resolvemessage.includes(linelengtherror) === false) {
@@ -642,7 +706,8 @@ function loadfile(override) {
             return;
           }
 
-          line.split('\t').forEach(element => {
+          let even_count = 0;
+          line.split(globals.seperator).forEach(element => {
             if (isname === true) {
               isname = false;
               let name = element.toLowerCase().trim();
@@ -658,23 +723,33 @@ function loadfile(override) {
                 globals.speciesinsamples.push(name);
               }
             } else {
+              even_count++;
+
               if (breakflag === false) {
                 var number = parseFloat(element.replace(",", ".").trim());
 
-                if (isNaN(number)) {
-                  var numbererror = "Some values could not be read as numbers.";
+                if (even_count % 2 != 0 || globals.pvalue == false) {
+                  if (isNaN(number)) {
+                    var numbererror = "Some values could not be read as numbers.";
 
-                  if (resolvemessage.includes(numbererror) === false) {
-                    if (resolvemessage != "") {
-                      resolvemessage += "\n";
+                    if (resolvemessage.includes(numbererror) === false) {
+                      if (resolvemessage != "") {
+                        resolvemessage += "\n";
+                      }
+
+                      resolvemessage += numbererror;
                     }
 
-                    resolvemessage += numbererror;
+                    expression.push(0);
+                  } else {
+                    expression.push(number);
                   }
+                }
 
-                  expression.push(0);
-                } else {
-                  expression.push(number);
+                if (even_count % 2 == 0 && globals.pvalue == true) {
+                  if (isNaN(number) || number > pvalue_threshold) {
+                    expression[expression.length - 1] = 0;
+                  }
                 }
               }
             }
@@ -741,7 +816,9 @@ function contentString(ID) {
 
   let output = '';
   globals.UsernormalizedExpressionValues.forEach(p => {
-    output += `%0A${p[0]}%09%23` + pickHex(p[ID]);
+    if (!isNaN(p[ID]) && p[ID] != 0) {
+      output += `%0A${p[0]}%09%23` + pickHex(p[ID]);
+    }
   });
   return output;
 }
@@ -1000,6 +1077,95 @@ function searchListener(entites) {
       if (e.constructor.name === 'Alias') str += `<div>${e.getName()} - ${e.getElementId()} - ${e._type}</div>`;
     });
   }
+}
+
+function om_detectfile(force_seperator) {
+  if (document.getElementById("inputId").files.length == 0) {
+    return false;
+  }
+
+  var fileToLoad = document.getElementById("inputId").files[0];
+  var fileReader = new FileReader();
+  fileReader.readAsText(fileToLoad, "UTF-8");
+
+  fileReader.onload = function (fileLoadedEvent) {
+    var success = false;
+    globals.columnheaders = [];
+    $("#om_columnSelect").empty();
+    var textFromFileLoaded = fileLoadedEvent.target.result;
+
+    if (textFromFileLoaded.trim() == "") {
+      return stopfile('The file appears to be empty.');
+    }
+
+    var firstline = textFromFileLoaded.split('\n')[0];
+
+    if (!force_seperator) {
+      if ((firstline.match(new RegExp(",", "g")) || []).length > (firstline.match(new RegExp("\t", "g")) || []).length) {
+        globals.seperator = ",";
+        $("#om_filetypeSelect").val(1);
+      } else {
+        globals.seperator = "\t";
+        $("#om_filetypeSelect").val(0);
+      }
+    }
+
+    var index = 0;
+    firstline.split(globals.seperator).forEach(entry => {
+      let header = entry;
+      globals.specialCharacters.forEach(c => {
+        header = header.replace(c, "");
+      });
+      globals.columnheaders.push(header.trim());
+      index++;
+    });
+
+    if ((globals.columnheaders.length - 1) % 2 != 0) {
+      $('#om_checkbox_pvalue').prop('checked', false);
+    } else {
+      for (let _header of globals.columnheaders) {
+        if (_header.toLowerCase().includes("pvalue")) {
+          $('#om_checkbox_pvalue').prop('checked', true);
+          break;
+        }
+      }
+    } //let columnSelect = document.getElementById('om_columnSelect');
+
+
+    for (let i = 0; i < globals.columnheaders.length; i++) {
+      if (globals.columnheaders.filter(item => item == globals.columnheaders[i]).length > 1) {
+        return stopfile('Headers in first line need to be unique!<br>Column ' + globals.columnheaders[i] + ' occured multiple times.');
+      } //columnSelect.options[columnSelect.options.length] = new Option(globals.columnheaders[i], i); 
+
+    }
+
+    ;
+
+    if (globals.columnheaders.length <= 1) {
+      return stopfile('Could not read Headers');
+    }
+
+    success = true;
+
+    function stopfile(alerttext) {
+      if (alerttext != "") alert(alerttext);
+      success = false;
+      return false;
+    }
+
+    return success;
+  };
+}
+
+function isNumber(evt) {
+  evt = evt ? evt : window.event;
+  var charCode = evt.which ? evt.which : evt.keyCode;
+
+  if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 44 && charCode != 46) {
+    return false;
+  }
+
+  return true;
 }
 },{"../css/styles.css":1}],3:[function(require,module,exports){
 'use strict';
