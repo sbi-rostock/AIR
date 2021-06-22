@@ -1671,25 +1671,27 @@ function GetpValueFromZ(_z, type = "twosided")
     var term = new Decimal(1);
     var k = new Decimal(0);
     
-    var loopstop = new Decimal("10E-40");
+    var loopstop = new Decimal("10E-50");
     var minusone = new Decimal(-1);
     var two = new Decimal(2);
+    var twotimespisqrt = (new Decimal(2*Math.PI)).sqrt()
 
     while(term.abs().greaterThan(loopstop)) 
     {
-        term = minusone.toPower(k).times(z.toPower(k)).times(z.toPower(k.plus(1))).dividedBy(k.times(2).plus(1).times(two.toPower(k)).times(factK))
+        term = minusone.toPower(k).times(z.toPower(k)).times(z.toPower(k.plus(1))).dividedBy(k.times(2).plus(1).times(two.toPower(k)).times(factK)).dividedBy(twotimespisqrt)
     	sum = sum.plus(term);
     	k = k.plus(1);
         factK =  factK.times(k);
     }
      
-    sum = parseFloat(sum.dividedBy((new Decimal(2*Math.PI)).sqrt()).plus(0.5).toExponential(20));
+    sum = parseFloat(sum.plus(0.5).toExponential(40));
+    
     
     if(sum < 0)
         sum = -sum;
     else if(sum > 1)
         sum = 2 - sum;
-
+    
     switch (type) {
         case "left":
             return sum;
