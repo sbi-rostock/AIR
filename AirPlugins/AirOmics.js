@@ -471,6 +471,14 @@ function createDifferentialAnalysisPanel()
                     </div>
                 </div>
                 
+                <div id="om_target_pvaluethreshold-container" class="row mb-1">
+                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Abs logFC Threshold:</span>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="textfield" value="1.0" id="om_pheno_fcthreshold" onkeypress="return isNumber(event)" />
+                    </div>
+                </div>
 
                 <hr>
 
@@ -927,8 +935,9 @@ function createDifferentialAnalysisPanel()
 
                         return [
                             "Name: " + label[0],
-                            "FC: " + label[1], 
-                            "Effect: " + label[2], 
+                            ... label[1] ? ["FC: " + label[1]] : [], 
+                            "p-value: " + + label[2], 
+                            "Effect: " + label[3], 
                             "Sensitivity: " + expo(tooltipItem.yLabel, 3, 3),
                             "Specificity: " + expo(tooltipItem.xLabel, 3, 3),
                         ];
@@ -2460,6 +2469,15 @@ async function om_PhenotypeSP() {
     }
 
     let i_threshold = parseFloat($('#om_ithreshold_slider').val());
+
+    let fc_threshold = parseFloat($("#om_pheno_fcthreshold").val().replace(',', '.'))
+    if(isNaN(fc_threshold) || fc_threshold < 0)
+    {
+        alert("Only positive (decimal) values are allowed as FC threshold. Value was set to 1.")
+        fc_threshold = 1;
+        $("#om_pheno_fcthreshold").val("1")
+    }
+    fc_threshold = Math.abs(fc_threshold)
      
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if(isNaN(globals.omics.numberOfRandomSamples) || globals.omics.numberOfRandomSamples < 0)
@@ -2498,6 +2516,12 @@ async function om_PhenotypeSP() {
             {
                 continue;
             }
+
+            if (Math.abs(FC) < fc_threshold)
+            {
+                continue;
+            }
+
             elements_with_FC[sample][element] = FC;
             
             switch (AIR.Molecules[element].type) {
@@ -2536,7 +2560,6 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype]["includedelements"] = {};
         AIR.Phenotypes[phenotype]["genenumbers"] = {};
         AIR.Phenotypes[phenotype]["slope"] = {};
-        AIR.Phenotypes[phenotype]["norm_slope"] = {};
 
         for (let element in AIR.Phenotypes[phenotype].values) {
             let SP = AIR.Phenotypes[phenotype].values[element];
@@ -2570,11 +2593,12 @@ async function om_PhenotypeSP() {
 
             for (let element in correct_SPs) {
 
-                AIR.Phenotypes[phenotype].includedelements[sample].push(element);
                 if(!elements_with_FC[sample].hasOwnProperty(element))
                 {
                     continue;
                 }
+
+                AIR.Phenotypes[phenotype].includedelements[sample].push(element);
 
                 let SP = correct_SPs[element];
 
@@ -2661,7 +2685,11 @@ async function om_PhenotypeSP() {
 
             let random_scores = [];            
             let random_en_scores = [];  
-            let random_abs_en_scores = [];  
+            let random_abs_en_scores = [];
+            
+            let unequal_signs = Math.sign(en_score) != Math.sign(score);
+
+
             for(let shuffled_elements of shuffled_arrays)
             {           
                 var _regr_data = [];
@@ -2688,8 +2716,11 @@ async function om_PhenotypeSP() {
                     }
                 }
 
-                var _score = leastSquaresRegression(_regr_data);
-                _score = Math.abs(_score) > 1 ? 1/_score : _score
+                if(!unequal_signs)
+                {
+                    var _score = leastSquaresRegression(_regr_data);
+                    _score = Math.abs(_score) > 1 ? 1/_score : _score
+                }
 
                 random_scores.push(_score)
                 random_en_scores.push(_en_score)
@@ -2697,15 +2728,22 @@ async function om_PhenotypeSP() {
                 
             }
 
-            let std = standarddeviation(random_scores)            
-            let z_score = std != 0? Math.abs(score - mean(random_scores))/std : 0;
-            let pvalue = GetpValueFromZ(z_score);
-            if(isNaN(pvalue))
-                pvalue = 1;
-            AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
+            if(!unequal_signs)
+            {
+                let std = standarddeviation(random_scores)            
+                let z_score = std != 0? (score - mean(random_scores))/std : 0;
+                let pvalue = GetpValueFromZ(z_score);
+                if(isNaN(pvalue))
+                    pvalue = 1;
+                AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
+            }
+            else
+            {
+                AIR.Phenotypes[phenotype].pvalue[sample] = 0.99
+            }
 
             std = standarddeviation(random_en_scores)            
-            z_score = std != 0? Math.abs(en_score - mean(random_en_scores))/std : 0;
+            z_score = std != 0? (en_score - mean(random_en_scores))/std : 0;
             pvalue = GetpValueFromZ(z_score);
             if(isNaN(pvalue))
                 pvalue = 1;
@@ -2713,12 +2751,14 @@ async function om_PhenotypeSP() {
             AIR.Phenotypes[phenotype].en_pvalue[sample] = pvalue;
 
             std = standarddeviation(random_abs_en_scores)            
-            z_score = std != 0? Math.abs(abs_en_score - mean(random_abs_en_scores))/std : 0;
+            z_score = std != 0? (abs_en_score - mean(random_abs_en_scores))/std : 0;
             pvalue = GetpValueFromZ(z_score, "right");
             if(isNaN(pvalue))
                 pvalue = 1;
 
             AIR.Phenotypes[phenotype].abs_en_pvalue[sample] = pvalue;
+            
+
         }
     }
 
@@ -3062,6 +3102,11 @@ async function om_loadfile(imported) {
                     let entries = line.split(globals.omics.seperator);
                     let probeid = entries[headerid].toLowerCase();
 
+                    if(probeid.toLowerCase().includes("glucosylsphingosine"))
+                    {
+                        console.log(probeid)
+                        console.log(Object.keys(AIR.ElementNames[globals.omics.selectedmapping]).filter(m => m.toLowerCase().includes("glucosylsphingosine")))
+                    }
                     if(AIR.ElementNames[globals.omics.selectedmapping].hasOwnProperty(probeid))
                     {
                         let molecule_id = AIR.ElementNames[globals.omics.selectedmapping][probeid];
@@ -3223,7 +3268,7 @@ async function om_loadfile(imported) {
 
         };
 
-        fileReader.readAsText(fileToLoad, "UTF-8");
+        fileReader.readAsText(fileToLoad, 'ISO-8859-1');
     });
 
 }
@@ -3956,7 +4001,7 @@ async function calculateTargets() {
     createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'adj p-value', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
+    //createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
     createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
@@ -3988,7 +4033,7 @@ async function calculateTargets() {
                 }
             }
         ],   
-        "order": [[ 4, "desc" ], [ 2, "asc" ]], 
+        "order": [[ 3, "desc" ], [ 2, "asc" ]], 
         "scrollX": true,
         "autoWidth": true,
         columns: [
@@ -3996,7 +4041,7 @@ async function calculateTargets() {
             { "width": "15%" },
             { "width": "15%" },
             { "width": "15%" },
-            { "width": "15%" },
+            //{ "width": "15%" },
             { "width": "10%" },
             { "width": "10%" },
             ],
@@ -4026,10 +4071,10 @@ async function calculateTargets() {
                 targets: 5,
                 className: 'dt-center'
             },
-            {
-                targets: 6,
-                className: 'dt-center'
-            },
+            // {
+            //     targets: 6,
+            //     className: 'dt-center'
+            // },
         ]
     }).columns.adjust();
 
@@ -4056,7 +4101,7 @@ async function calculateTargets() {
         let std = standarddeviation(_sensitivity_scors)  
         if(!std || std == 0)
             return 1;          
-        let z_score =  Math.abs(sensitivity - mean(_sensitivity_scors))/std;
+        let z_score =  (sensitivity - mean(_sensitivity_scors))/std;
         let pvalue = GetpValueFromZ(z_score);
 
         return isNaN(pvalue)? 1 : pvalue;
@@ -4166,7 +4211,7 @@ async function calculateTargets() {
                     hex = targtetdata.positive == null? '#a9a9a9' : (targtetdata.positive? (targtetdata.fc >= 0? '#C00000' : '#d3d3d3') : (targtetdata.fc <= 0? '#0070C0' : '#d3d3d3'));
 
                 let result = {
-                    label: [targtetdata.name, expo(targtetdata.fc, 3, 3), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
+                    label: [targtetdata.name, targtetdata.fc != 0 ? expo(targtetdata.fc, 3, 3) : false, expo(targtetdata.adj_pvalue, 2, 2), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
                     data: [{
                         x: expo(targtetdata.specificity, 3, 3),
                         y: expo(targtetdata.sensitivity, 3, 3),
@@ -4184,7 +4229,7 @@ async function calculateTargets() {
                 createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);                
                 createPopupCell(result_row, 'td', targtetdata.positive == null? "mixed" : (targtetdata.positive? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, {"sample": sample, "id": targtetdata.id, "index": targtetdata.index, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold}),
                 createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
-                createCell(result_row, 'td', expo(targtetdata.pvalue, 2, 2), 'col-auto', 'col', 'center', true);
+                //createCell(result_row, 'td', expo(targtetdata.pvalue, 2, 2), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.specificity, 3, 3), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
