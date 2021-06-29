@@ -712,6 +712,7 @@ async function getConsequences()
 
     set_cons_table()
     $('#gv_impactselect-container').removeClass("air_disabledbutton")
+    $('#om_import_variant').removeClass("air_disabledbutton")
     $("#gv_getConsequences").html('Predict Variant Consequences').removeClass("air_disabledbutton");
     enablebtn("gv_getConsequences", _text)
     async function getMutations(m, sample)
@@ -1124,7 +1125,7 @@ async function buildIndexDatabase()
         }
             
         if(_id % 1000 == 0)
-            await updateProgress(_id, globals.variant.transcripts.length, "gv_readfile", " Buiilding index database...")
+            await updateProgress(_id, globals.variant.transcripts.length, "gv_readfile", " Building index database...")
     }
 }
 

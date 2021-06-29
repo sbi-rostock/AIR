@@ -8,6 +8,7 @@ let JSZip;
 let FileSaver;
 let VCF;
 let ttest;
+let Decimal;
 
 Object.filter = (obj, predicate) => 
     Object.keys(obj)
@@ -78,7 +79,7 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf) {
+function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszip, _filesaver, _vcf, _decimal) {
 
     return new Promise((resolve, reject) => {
 
@@ -93,6 +94,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
             }
             var t0 =  0;
             var t1 =  0;
+
             Chart = _chart;
             VCF = _vcf;
             JSZip = _jszip;
@@ -101,6 +103,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
             minervaProxy = _minerva;
             FILE_URL = _filepath;
             ttest = _ttest;
+            Decimal = _decimal;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -815,7 +818,7 @@ function createPopupCell(row, type, text, style, align, callback, callbackParame
     if(row != null)
         row.appendChild(cell);
 
-    return button;
+    return cell;
 }
 function createButtonCell(row, type, text, align) {
     var button = document.createElement('button'); // create text node
@@ -842,6 +845,8 @@ function checkBoxCell(row, type, text, data, align, prefix, _checked = false) {
     cell.appendChild(button);
     cell.setAttribute('style', 'text-align: ' + align + '; vertical-align: middle;');// append DIV to the table cell
     row.appendChild(cell);// append DIV to the table cell
+
+    return button
 }
 
 function createSliderCell(row, type, data) {
@@ -900,9 +905,10 @@ async function disablebutton(id, progress = false) {
                     <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
                 </div>`);
             }
+            
             $(".air_btn").each(function( pindex ) {
                 var airbtn = $(this)
-                airbtn.addClass("air_disabledbutton");
+                airbtn.addClass("air_temp_disabledbutton");
             });
             resolve(text)
         }, 0);
@@ -913,8 +919,9 @@ async function disablebutton(id, progress = false) {
 async function enablebtn(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
+            
             $(".air_btn").each(function( pindex ) {
-                $(this).removeClass("air_disabledbutton");
+                $(this).removeClass("air_temp_disabledbutton");
             });
             var $btn = $('#'+id);
             $btn.html(text);
@@ -947,7 +954,12 @@ function standarddeviation(_temparray) {
     });
     
     const n = array.length
+
+    if(n == 0)
+        return 0;
+
     const mean = array.reduce((a, b) => a + b) / n
+
     return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n)
 }
 
@@ -961,6 +973,9 @@ function mean(_temparray) {
             numbers.push(_e)
         }
     });
+
+    if(numbers.length == 0)
+        return 0;
     
     var total = 0, i;
     for (i = 0; i < numbers.length; i += 1) {
@@ -1227,6 +1242,23 @@ function shuffle(_array) {
   
     return array;
 }
+function pickRandomElements(arr, n) {  
+
+    if(arr.length <= n)
+    {
+        return shuffle(arr);
+    }
+
+    var result = new Array(n),
+    len = arr.length,
+    taken = new Array(len);
+    while (n--) {
+        var x = Math.floor(Math.random() * len);
+        result[n] = arr[x in taken ? taken[x] : x];
+        taken[x] = --len in taken ? taken[len] : len;
+    }
+    return result;
+}
 
 function union(setA, setB) {
     let _union = new Set(setA)
@@ -1420,13 +1452,15 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
 
                 // number of paths to p that include e
                 var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
+
+                /*
                 if(pathdata.modifiers.hasOwnProperty(e))
                 {
                     for(let m in pathdata.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
                     {
                         newpaths.filter(p => p.includes(m)).map(path => includedpaths.add(path));
                     }
-                }
+                }*/
 
                 influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
             };            
@@ -1468,7 +1502,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
     });
 }
 
-function pickHighest(obj, _num = 1, ascendend = true) {
+function pickHighest(obj, _num = 1, ascendend = true, key = null) {
 
     let num = _num;
     let requiredObj = {};
@@ -1477,9 +1511,9 @@ function pickHighest(obj, _num = 1, ascendend = true) {
        num = Object.keys(obj).length;
     };
 
-    if(ascendend)
+    if(!ascendend)
     {
-        Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach((key, ind) =>
+        Object.keys(obj).sort((a, b) => (key  == null? (obj[b] - obj[a]) : (obj[b][key] - obj[a][key])) ).forEach((key, ind) =>
         {
            if(ind < num){
               requiredObj[key] = obj[key];
@@ -1487,7 +1521,7 @@ function pickHighest(obj, _num = 1, ascendend = true) {
         });
     }
     else {
-        Object.keys(obj).sort((a, b) => obj[a] - obj[b]).forEach((key, ind) =>
+        Object.keys(obj).sort((a, b) => (key  == null? (obj[a] - obj[b]) : (obj[a][key] - obj[b][key]))).forEach((key, ind) =>
         {
            if(ind < num){
               requiredObj[key] = obj[key];
@@ -1624,4 +1658,104 @@ function leastSquaresRegression(data) {
     return gradient;
 }
 
+function activaTab(tab){
+    $('.nav-tabs a[href="#' + tab + '"]').tab('show');
+};
+
+function GetpValueFromZ(_z, type = "twosided") 
+{
+	if(_z < -14)
+    {
+    	_z = -14
+    }
+    else if(_z > 14)
+    {
+    	_z = 14
+    }
+    
+	Decimal.set({precision: 100});
+	
+    let z = new Decimal(_z);
+    var sum = new Decimal(0);
+
+    var term = new Decimal(1);
+    var k = new Decimal(0);
+    
+    var loopstop = new Decimal("10E-50");
+    var minusone = new Decimal(-1);
+    var two = new Decimal(2);
+    
+    let pi = new Decimal("3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148086513282306647")
+
+    while(term.abs().greaterThan(loopstop)) 
+    {
+        term = new Decimal(1)
+        
+        for (let i = 1; i <= k; i++) {
+          term = term.times(z).times(z.dividedBy(two.times(i)))
+				}
+        
+        term = term.times(minusone.toPower(k)).dividedBy(k.times(2).plus(1))		
+        sum = sum.plus(term);
+    		k = k.plus(1);
+    }
+         
+    
+    sum = sum.times(z).dividedBy(two.times(pi).sqrt()).plus(0.5);
+    
+    if(sum.lessThan(0))
+        sum = sum.abs();
+    else if(sum.greaterThan(1))
+        sum = two.minus(sum);
+    
+    switch (type) {
+        case "left":
+            return parseFloat(sum.toExponential(40));
+        case "right":
+            return parseFloat((new Decimal(1).minus(sum)).toExponential(40));
+        case "twosided":
+            return sum.lessThan(0.5)? parseFloat(sum.times(two).toExponential(40)) : parseFloat((new Decimal(1).minus(sum).times(two)).toExponential(40))
+            
+    }
+
+}
   
+  function getAdjPvalues(_pvalues)
+  {
+      let pvalues = _pvalues.sort((a, b) => b - a);
+      let n = pvalues.length
+      let values = pvalues.map((element, index)=> [element, n-index-1]);
+      let new_values = []
+      let new_pvalues = new Array(n);
+      for (let i in values) {
+          let rank = n - i
+          let pvalue = values[i][0]
+          new_values.push((n/rank) * pvalue)           
+      }
+      for (let i = 1; i < n; i++) {
+      if (new_values[i] < new_values[i+1])                                                           
+              new_values[i+1] = new_values[i]             
+      }
+      for (let i in values) {
+          let index = values[i][1]
+          new_pvalues[index] = new_values[i]          
+      }
+
+      return new_pvalues;
+  }
+
+  async function getadjPvaluesForObject(_object, key, newkey = "adj_pvalue")
+  {
+    let targetpvalues =  Object.keys(_object).map(t => _object[t][key]);
+    targetpvalues = targetpvalues.sort((a, b) => a - b);
+    let targetpvalues_index = {}
+    for(let tid in _object)
+    {
+        targetpvalues_index[tid] = targetpvalues.indexOf(_object[tid][key]);
+    }
+    targetpvalues = getAdjPvalues(targetpvalues);
+    for(let tid in _object)
+    {
+        _object[tid][newkey] = targetpvalues[targetpvalues_index[tid]];
+    }
+  }
