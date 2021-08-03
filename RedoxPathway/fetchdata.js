@@ -192,7 +192,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                             
                                                             $("#stat_spinner").before(`
                                                             <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
-                                                                <span>The AirPlugins are still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                                <span>The RedoxPathway-Plugins are still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
                                                                 <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                                                                     <span aria-hidden="true">&times;</span>
                                                                 </button>

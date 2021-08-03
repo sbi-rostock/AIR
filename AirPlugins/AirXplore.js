@@ -1416,8 +1416,8 @@ function getTargetPanel() {
         globals.xplore.targetpanel.append('<canvas id="xp_chart_target"></canvas>');
         globals.xplore.targetpanel.append(/*html*/`
             <div class="d-flex justify-content-center mt-2">
-                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#00BFC4"></span>positive Targets</li>
-                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#F9766E"></span>negative Targets</li>
+                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#C00000"></span>positive Targets</li>
+                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#0070C0"></span>negative Targets</li>
                     <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>
             <div class="btn-group btn-group-justified">
@@ -2640,11 +2640,11 @@ function XP_PredictTargets() {
         }
 
         //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
-        var hex = '#00BFC4';
+        var hex = '#C00000';
         var regType = "positive";
         if(negativeSensitivity > positiveSensitivity)
         {
-            hex = '#F9766E';
+            hex = '#0070C0';
             regType = "negative"
             sensitivity = negativeSensitivity;
         }

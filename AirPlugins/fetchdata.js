@@ -189,7 +189,6 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                         readCentralityValues().then(r => {
                                                             t1 = performance.now()
                                                             console.log("Call to centralities took " + (t1 - t0) + " milliseconds.");
-                                                            
                                                             $("#stat_spinner").before(`
                                                             <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
                                                                 <span>The AirPlugins are still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
@@ -247,12 +246,23 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                         function readServerValues() {
                             return new Promise((resolve, reject) => {
                                 let promises = [];
-                                for (let p in AIR.Phenotypes) 
-                                {
+                                for (let _p in AIR.Phenotypes) 
+                                {                                    
                                     promises.push(
-                                        getMoleculeData(p, type="phenotype").then(
-                                            data => {
+                                        getMoleculeData(_p, type="phenotype").then(
+                                            r => {
                                                 let sum = 0;
+                                                let data = r.value;
+                                                if(r.key == "m304")
+                                                {
+                                                    let fdahpfipwa;
+                                                }
+                                                if(!data)
+                                                {
+                                                    console.log(r.key + " is missing");
+                                                    return;
+                                                }
+                                                let p = r.key
                                                 if(data.hasOwnProperty("i"))
                                                 {
                                                     for (let m in data.i)
@@ -278,16 +288,28 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                                         
                                                     }
                                                 }
+                                                if(data.hasOwnProperty("r"))
+                                                {
+                                                    for (let m of data.r)
+                                                    {
+                                                        if(AIR.Molecules.hasOwnProperty(m))
+                                                        {
+                                                            AIR.Phenotypes[p].SubmapElements.push(m);
+                                                        }
+                                                        
+                                                    }
+                                                }
                                                 AIR.Phenotypes[p]["sumSP"] = sum;
                                         }).catch(e => {
-                                            console.log("Could not read phenotype " + p + " from server.");
+                                            console.log("Could not read phenotype " + _p + " from server.");
+                                            console.log(e);
                                         })
                                     )
                                 };
                                 Promise.all(promises).then(r =>    
                                 {
                                     resolve('');       
-                                }).catch(e => {
+                                }).catch(error => {
                                     console.log(error + " errors in fetching data.");
                                     reject(error);
                                 });
@@ -335,6 +357,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
                                         AIR.Phenotypes[element]["value"] = 0;
                                         AIR.Phenotypes[element]["SPs"] = {};
                                         AIR.Phenotypes[element]["MainRegulators"] = {};
+                                        AIR.Phenotypes[element]["SubmapElements"] = [];
                                     }
                                     if(AIR.Molecules[element].type === "HYPOTH_PHENOTYPE")
                                     {
@@ -452,25 +475,30 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart,  _ttest, _jszi
 }
 
 
-function getValue(key, replacecomma = true)
+async function getValue(key, replacecomma = true)
 {
     return new Promise(
        (resolve, reject) => {
             minervaProxy.pluginData.getGlobalParam(key).then(
+
                 response => {
                     let output = JSON.parse(response).value;
                     if(replacecomma == true)
                     {
-                        output = replaceAll(output, ",", ".");
+                        //output = replaceAll(output, ",", ".");
                     }
                     output = replaceAll(output, "y", '"},"');
                     output = replaceAll(output, "x", '":{"');
                     output = replaceAll(output, "z", '":"');
                     output = replaceAll(output, "q", '","');
                     output = replaceAll(output, '"-.', '"-0.');
-                    resolve(output);
+                    resolve({
+                        key: key,
+                        value: output
+                    });
             }).catch(e => {
-                reject(e)
+                console.log(key + " not found.")
+                reject()
             });
         });
 
@@ -483,10 +511,17 @@ async function getMoleculeData(_key, type = "molecule", returndata = true, savei
 
     return new Promise(
        (resolve, reject) => {
+            if(_key == "m304")
+            {
+                console.log("test")
+            }
             if(AIR.MoleculeData.hasOwnProperty(key))
             {
                 let data = AIR.MoleculeData[key];
-                resolve(returndata? data : true);
+                resolve(returndata? {
+                    key: key,
+                    value: data
+                } : true);
             }
             else {
                 if(AIR.Molecules.hasOwnProperty(key) && AIR.Molecules[key].emptySP == true)
@@ -499,21 +534,28 @@ async function getMoleculeData(_key, type = "molecule", returndata = true, savei
                         let data = {};
                         if(phenotype == false)
                         {
-                            data = fillData(JSON.parse(response));
+                            data = fillData(JSON.parse(response.value));
                         }
                         else 
                         {
-                            data = JSON.parse(response)
+                            data = JSON.parse(response.value)
                         }
 
                         if(saveinmemory)
                         {
-                            AIR.MoleculeData[key] = data;
+                            AIR.MoleculeData[response.key] = data;
                         }
-                        
-                        resolve(returndata? data : true);
+
+                        resolve(returndata? {
+                            key: response.key,
+                            value: data
+                        } : true);
                     }).catch(e => {
-                        resolve(returndata? {} : false);
+                        console.log("Error on key '" + key + "': " + e)
+                        resolve(returndata? {
+                            key: key,
+                            value: {}
+                        } : false);
                     });
                 }
             }
@@ -772,10 +814,10 @@ function createCustomLinkCell(row, type, text, style, scope, align, nowrap = fal
     return _a;
 }
 
-function createCell(row, type, text, style, scope, align, nowrap = false, order = "") {
+function createCell(row, type, text, classes, scope, align, nowrap = false, order = "") {
     var cell = document.createElement(type); // create text node
     cell.innerHTML = text;                    // append text node to the DIV
-    cell.setAttribute('class', style);
+    cell.setAttribute('class', classes);
     if(order)
     {
         cell.setAttribute("data-order", order);
@@ -1271,9 +1313,9 @@ function union(setA, setB) {
 function findPhenotypePath(element, phenotype, perturbedElements = [], visualize = true)
 {
            
-    getMoleculeData(phenotype, type = "path").then(pathdata => {
+    getMoleculeData(phenotype, type = "path").then(r => {
         
-            
+        let pathdata = r.value;
         let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
     
         var pathsfromelement = newpaths.filter(p => p.startsWith(element + "_"));
@@ -1738,7 +1780,7 @@ function GetpValueFromZ(_z, type = "twosided")
       }
       for (let i in values) {
           let index = values[i][1]
-          new_pvalues[index] = new_values[i]          
+          new_pvalues[index] = (new_values[i] > 1? 1 : new_values[i])
       }
 
       return new_pvalues;
@@ -1759,3 +1801,13 @@ function GetpValueFromZ(_z, type = "twosided")
         _object[tid][newkey] = targetpvalues[targetpvalues_index[tid]];
     }
   }
+
+function sort_object(obj, absolute = false, reverse = false) {
+    items = Object.keys(obj).map(function(key) {
+        return [key, obj[key]];
+    });
+    items.sort(function(first, second) {
+            return absolute? (Math.abs(first[1]) - Math.abs(second[1])) : (first[1] - second[1]);
+    });
+    return(items.reverse())
+} 
