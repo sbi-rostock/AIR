@@ -486,7 +486,7 @@ function AddOverlaysPromise() {
           $.ajax({
             method: 'POST',
             url: minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/overlays/',
-            data: `content=name%09color${contentString(count)}&description=PhenotypeActivity&filename=${globals.samples[count - 1]}.txt&name=${globals.samples[count - 1]}&googleLicenseConsent=true`,
+            data: `content=name%09color${contentString(count)}&description=${globals.samples[count - 1]}&filename=${globals.samples[count - 1]}.txt&name=${globals.samples[count - 1]}&googleLicenseConsent=true`,
             cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
             success: response => {
               ajaxPostQuery(count + 1).then(r => resolve(response));
