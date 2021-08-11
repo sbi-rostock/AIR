@@ -405,7 +405,7 @@ async function createDifferentialAnalysisPanel()
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
                     </div>
                     <div class="col">
-                        <input type="text" class="textfield" value="0.01" id="om_pheno_pvaluethreshold"/>
+                        <input type="text" class="textfield" value="0.05" id="om_pheno_pvaluethreshold"/>
                     </div>
                 </div>
                 
@@ -3125,6 +3125,8 @@ async function om_loadfile(imported) {
                     {
                         let molecule_id = AIR.ElementNames[globals.omics.selectedmapping][probeid];
 
+                        if(AIR.Molecules[molecule_id].type == "FAMILY" || AIR.Molecules[molecule_id].type == "COMPLEX")
+                            return;
                         
 
                         if (!_tempdata.hasOwnProperty(molecule_id))
