@@ -6,7 +6,6 @@ async function AirOmics(){
         resultscontainer: undefined,
         downloadtext: '',
         om_phenotype_downloadtext: '',
-        om_target_downloadtext: '',
         om_targetchart: null,
         om_targettable: null,
         pvalue: false,
@@ -227,7 +226,7 @@ async function AirOmics(){
             </div>
             <div class="tab-pane air_sub_tab_pane mb-2" id="om_data_import" role="tabpanel" aria-labelledby="om_data_import-tab">
                 <div id="om_import_variant_container" class="air_box_white">
-                    <h4>AirVariant</h4>
+                    <h4>Variant</h4>
                     <table class="air_table order-column hover" style="width:100%" id="om_import_variant_table" cellspacing=0>
                         <thead>
                             <tr>
@@ -243,7 +242,7 @@ async function AirOmics(){
                 </div>
                 <hr>
                 <div id="om_import_massspec_container" class="air_box_white">
-                    <h4>AirMassSpec</h4>
+                    <h4>MassSpec</h4>
                     <table class="air_table order-column hover" style="width:100%" id="om_import_massspec_table" cellspacing=0>
                         <thead>
                             <tr>
@@ -594,12 +593,12 @@ async function createDifferentialAnalysisPanel()
         <hr>
         <label class="air_label mt-1">Regulator Type Filter:</label>
         <select id="om_target_filter" class="browser-default om_select custom-select mb-1">
-            <option value="0" selected>All Elements</option>
+            <option value="0">All Elements</option>
             <option value="1">Proteins</option>
             <option value="5">Receptors</option>
             <option value="2">miRNAs</option>
             <option value="3">lncRNAs</option>
-            <option value="4">Transcription Factors</option>
+            <option value="4" selected>Transcription Factors</option>
         </select>
         <hr>
         <div class="row mt-2 mb-2">
@@ -867,7 +866,7 @@ async function createDifferentialAnalysisPanel()
     });
 
     $('#om_btn_download_target').on('click', function() {
-        air_download('PredictedKeyRegulators.txt', globals.omics.om_target_downloadtext)
+        air_download("TargetPrediction.txt", getDTExportString(globals.omics.om_targettable))
     });
 
     var outputCanvas = document.getElementById('om_target_chart_canvas');
@@ -1639,16 +1638,13 @@ function om_detectfile(force_seperator) {
             index ++; 
         })
 
-        if ((globals.omics.columnheaders.length - 1)%2 != 0)
-        {
-            $('#om_checkbox_pvalue').prop('checked', false);
-            
-        }
-        else
+        $('#om_checkbox_pvalue').prop('checked', false);
+        
+        if ((globals.omics.columnheaders.length - 1)%2 == 0)
         {
             for(let _header of globals.omics.columnheaders)
             {
-                if(_header.toLowerCase().includes("pvalue"))
+                if(["pval", "p.val", "p-val"].some(x => _header.toLowerCase().includes(x)))
                 {
                     $('#om_checkbox_pvalue').prop('checked', true);
                     break;
@@ -3328,7 +3324,7 @@ function contentString(ID) {
     if (document.getElementById("checkbox_datavalues_overlay").checked === true) {
         for(let expression in globals.omics.ExpressionValues)
         {
-            let _name = encodeURIComponent(globals.omics.ExpressionValues[expression].name);
+            let _name = globals.omics.ExpressionValues[expression].name;
 
             if(addednames.includes(_name))
                 continue;
@@ -3336,7 +3332,7 @@ function contentString(ID) {
             
             let _value = globals.omics.ExpressionValues[expression].normalized[ID];
             let hex = rgbToHex((1 - Math.abs(_value)) * 255);
-            output += `%0A${encodeURIComponent(_name)}`;
+            output += `%0A${_name}`;
             if (_value > 0)
                 output += '%09%23ff' + hex + hex;
             else if (_value < 0)
@@ -3707,308 +3703,254 @@ async function OM_PredictTargets() {
 
     await calculateTargets();
 }
-
 async function calculateTargets() {
-
-    let e_ids = [];
 
     let fc_threshold = 0;
     let pvalue_threshold = 1;
 
     var sample = $('#om_select_sample').val(); 
-
-    let filter = $('#om_target_filter option:selected').text();
-
     let n = parseFloat($('#om_targetcomb_slider').val());
     let usememory = (document.getElementById("om_target_usememory").checked == true? true : false);
     let numberOfTargets = $("#om_target_targetnumber").val();
-    globals.omics.om_target_downloadtext = `Sample: ${globals.omics.samples[sample]}\nFilter: ${filter}\n\nElement\tSpecificity\tSensitivity\tType\tRegulators`;
 
     let negativeCount = 0;
     let positiveCount = 0;
-    let finishedelements_count = 0;                              
-
-    let _identifiedTargets = {};
-    
-    let max_fc = 0;
 
     activaTab("om_target_chart");
 
-
     if(globals.omics.om_targettable)
         globals.omics.om_targettable.destroy();
-
     $("#om_target_chart_table").replaceWith(`
         <table class="air_table order-column hover nowrap  mt-2" style="width:100%" id="om_target_chart_table" cellspacing=0>
         </table>
     `);
 
-    let elements_with_FC = {};
+    if(globals.omics.pvalue)
+    {
+        pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
+        if(isNaN(pvalue_threshold) || pvalue_threshold < 0)
+        {
+            alert("Only positive (decimal) values are allowed as p-value threshold. Value was set to 1.")
+            pvalue_threshold = 0.05;
+            $("#om_target_pvaluethreshold").val("0.05")
+        }
+    }
+    fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
+    if(isNaN(fc_threshold) || fc_threshold < 0)
+    {
+        alert("Only positive (decimal) values are allowed as FC threshold. Value was set to 1.")
+        fc_threshold = 1;
+        $("#om_target_fcthreshold").val("1")
+    }
+    fc_threshold = Math.abs(fc_threshold)
 
-    let shuffled_arrays = [];
-
-    let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
+    let elements_with_FC = getFilteredExpression(sample, fc_threshold, pvalue_threshold)
+    let FC_values = Object.values(elements_with_FC)
+    let possible_targets = []
+    let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "PROTEIN")
+    let elementarray_rnas = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "RNA")
     let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
-
+    let shuffled_arrays = []
     let typeNumbersinSamples = {
         "protein": 0,
-        "metabolite": 0
+        "metabolite": 0,
+        "rna": 0
     }
 
-    let FC_values = [];
-
-    try 
+    for(let e in AIR.Molecules)
     {
-        var promises = [];
-
-        if(globals.omics.pvalue)
+        if(elements_with_FC.hasOwnProperty(e))
         {
-            pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
-            if(isNaN(pvalue_threshold) || pvalue_threshold < 0)
-            {
-                alert("Only positive (decimal) values are allowed as p-value threshold. Value was set to 1.")
-                pvalue_threshold = 0.05;
-                $("#om_target_pvaluethreshold").val("0.05")
+            positiveCount += Math.abs(elements_with_FC[e]);
+            switch (AIR.Molecules[e].type) {
+                case "SIMPLE_MOLECULE":
+                    typeNumbersinSamples.metabolite += 1;
+                    break;
+            
+                case "RNA":
+                    typeNumbersinSamples.rna += 1;
+                case "PROTEIN": 
+                    typeNumbersinSamples.protein += 1; 
+                    break;
             }
         }
-        fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
-        if(isNaN(fc_threshold) || fc_threshold < 0)
-        {
-            alert("Only positive (decimal) values are allowed as FC threshold. Value was set to 1.")
-            fc_threshold = 1;
-            $("#om_target_fcthreshold").val("1")
+        else {
+            negativeCount += 1;
         }
-        fc_threshold = Math.abs(fc_threshold)
 
-        for(let e in AIR.Molecules)
+        if(AIR.Molecules[e].emptySP == true)
         {
-            let fc = 0
-            if(globals.omics.ExpressionValues.hasOwnProperty(e))
-            {
-                if (!globals.omics.pvalue || globals.omics.ExpressionValues[e].pvalues[sample] <= pvalue_threshold)
-                {
-                    fc = globals.omics.ExpressionValues[e].nonnormalized[sample]
-                }
-            } 
+            continue;
+        }
 
-            if(Math.abs(fc) > Math.abs(fc_threshold))
-            {
-                positiveCount += Math.abs(fc);
-                elements_with_FC[e] = fc;
+        let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
+        
+        if (_type.toLowerCase() === "phenotype") {
+            continue;
+        }
 
-                switch (AIR.Molecules[e].type) {
-                    case "PROTEIN":
-                    case "RNA": 
-                        typeNumbersinSamples.protein += 1;
-                        break;
-                    case "SIMPLE_MOLECULE": 
-                        typeNumbersinSamples.metabolite += 1;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else {
-                negativeCount += 1;
-            }
-
-            if(AIR.Molecules[e].emptySP == true)
-            {
-                continue;
-            }
-
-            let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
-
-            if (_type.toLowerCase() === "phenotype") {
-                continue;
-            }
-
-            let typevalue = $('#om_target_filter').val();
-            if (typevalue == 1) {
+        switch (parseFloat($('#om_target_filter').val())) 
+        {
+            case 1:
                 if (_type != "PROTEIN") {
                     continue;
                 }
-            }
-            if (typevalue == 2) {
+                break;
+            case 2:
                 if (_subtype != "miRNA") {
                     continue;
                 }
-            }
-            if (typevalue == 3) {
+                break;
+            case 3:
                 if (_subtype != "lncRNA") {
                     continue;
                 }
-            }
-            if (typevalue == 4) {
+                break;
+            case 4:
                 if (_subtype != "TF") {
                     continue;
                 }
-            } 
-            if (typevalue == 5) {
+                break;
+            case 5:
                 if (_subtype != "RECEPTOR") {
                     continue;
                 }
-            }    
-
-            if(Math.abs(fc) > max_fc)
-            {
-                max_fc = Math.abs(fc);
-            }
-            e_ids.push(e);
-        }
-
-        if(numberOfTargets == "")
-        {
-            numberOfTargets = Object.keys(AIR.Molecules).length;
-        }
-        else
-        {
-            numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
-            if(isNaN(numberOfTargets) || numberOfTargets < 0)
-            {
-                alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
-                numberOfTargets = Object.keys(AIR.Molecules).length;
-                switch (parseFloat($('#om_targetcomb_slider').val())) {
-                    case 2:
-                        numberOfTargets = 50;
-                        break;
-                    case 3:
-                        numberOfTargets = 20;
-                        break;
-                    case 4:
-                        numberOfTargets = 10;
-                        break;
-                }
-            }
-        }
-        $("#om_target_targetnumber").val(numberOfTargets)
-
-        let molLength = e_ids.length ;
-        await updateProgress(0, molLength, "om_regulator");
-             
-        globals.omics.om_targetchart.data.datasets = [];
-
-        setTimeout(function(){                                
-            globals.omics.om_targetchart.update();
-           
-        }, 0);
-
-        FC_values = Object.values(elements_with_FC)
-        for(let i = 0; i < 1000; i++)
-        {
-            let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
-            shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite))
-            shuffled_arrays.push(shuffled_array)
-        }
-
-        for (let e of e_ids) {
-
-            let last = (e == e_ids[e_ids.length - 1])
-            promises.push(analyzeElement(e, last))
-            if(promises.length >= 100 || last)
-            {
-                await Promise.allSettled(promises).then(async function(targets) {
-                    for(let _data of targets)
-                    {     
-                        finishedelements_count++;                              
-                        let targtetdata = _data.value.data;
-
-                        if(targtetdata != null)
-                        {
-                            _identifiedTargets[targtetdata.id[0]] = targtetdata;
-                            
-                            //updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
-                        }
-
-                    }
-                                             
-                    await updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
-
-                    if(last)
-                    {
-                        await updateProgress(0, 1, "om_regulator", `  Ranking Targets...`);
-
-                        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
-
-                        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.05) 
-
-
-                        if(n > 1)
-                        {
-                                                                                   
-                            _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity");
-                            let identifiedTargets = Object.keys(_identifiedTargets);
-
-                            for (var i = 0; i < identifiedTargets.length - 1; i++)
-                            {
-
-                                await updateProgress(i, identifiedTargets.length, "om_regulator", `  Finalizing ranking of targets  ${i}/${identifiedTargets.length}`); 
-
-                                for (var j = i + 1; j < identifiedTargets.length; j++) {
-                                    if(n > 2)
-                                    {
-                                        for (var k = j + 1; k < identifiedTargets.length; k++) {
-                                            if(n > 3)
-                                                for (var m = k + 1; m < identifiedTargets.length; m++) {
-                                                    let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
-                                                    if(result)
-                                                    {
-                                                        _identifiedTargets[[i,j,k,m].join("_")] = result;
-                                                    }
-                                                }
-                                            else
-                                            {
-                                                let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
-                                                if(result)
-                                                {
-                                                    _identifiedTargets[[i,j,k].join("_")] = result;
-                                                }
-                                            }                                            
-                                        }
-                                    }
-                                    else
-                                    {
-                                        let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
-                                        if(result)
-                                        {
-                                            _identifiedTargets[[i,j].join("_")] = result;
-                                        }
-                                    }
-                                }                                
-                            }
-                        }
-
-                        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
-
-                        for(let target in _identifiedTargets)
-                        {
-                            adddatatochart(_identifiedTargets[target]);     
-                        }
-                        
-                        $("#om_target_chart_canvas").height(400);
-                        $("#om_regulator_progress").hide();
-                        $("#om_btn_predicttarget").html('Predict Targets');
-                        $("#airomics_tab_content").removeClass("air_disabledbutton");
-                                
-                        globals.omics.om_targetchart.update();
-                    }                    
-                })
-
-                promises = [];
-            }
-
-        }        
+                break;
+            default:
+                break;
+        } 
+        
+        possible_targets.push(e)
     }
-    catch (error) 
-    {    
-        alert("Failed to analyze targets. Please try again, reload the page or contact the developers.")    
-        console.log(error)
+
+    for(let i = 0; i < 1000; i++)
+    {
+        let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
+        shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite))
+        shuffled_array.push(...pickRandomElements(elementarray_rnas, typeNumbersinSamples.rna))
+        shuffled_arrays.push(shuffle(shuffled_array))
+    }
+
+    if(numberOfTargets == "")
+    {
+        numberOfTargets = Object.keys(AIR.Molecules).length;
+    }
+    else
+    {
+        numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
+        if(isNaN(numberOfTargets) || numberOfTargets < 0)
+        {
+            alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
+            numberOfTargets = Object.keys(AIR.Molecules).length;
+            switch (parseFloat($('#om_targetcomb_slider').val())) {
+                case 2:
+                    numberOfTargets = 30;
+                    break;
+                case 3:
+                    numberOfTargets = 15;
+                    break;
+                case 4:
+                    numberOfTargets = 5;
+                    break;
+            }
+        }
+    }
+    $("#om_target_targetnumber").val(numberOfTargets)
+
+    let molLength = possible_targets.length ;
+    await updateProgress(0, molLength, "om_regulator");
+            
+    globals.omics.om_targetchart.data.datasets = [];
+
+    setTimeout(function(){                                
+        globals.omics.om_targetchart.update();
+        
+    }, 0);
+
+    if(possible_targets.length == 0)
+    {
         $("#om_target_chart_canvas").height(400);
         $("#om_regulator_progress").hide();
         $("#om_btn_predicttarget").html('Predict Targets');
         $("#airomics_tab_content").removeClass("air_disabledbutton");
-        globals.omics.om_targetchart.update();
     }
+    else
+    {
+        let _identifiedTargets = {}
+        let count = 0
+        for (let e of possible_targets) {  
+            if((count++) % 20 == 0)                                          
+                await updateProgress(count, molLength, "om_regulator", `  Analyzing Element ${count}/${molLength}`);
+            let _results = await analyzetargets([e]);
+            if(_results)
+            {
+                _identifiedTargets[e] = _results
+            }
+        }
+        await updateProgress(0, molLength, "om_regulator", `  Ranking and filtering targets ...`);
+        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.001) 
+
+        if(n > 1)
+        {                                                
+            _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity");
+            let identifiedTargets = Object.keys(_identifiedTargets);
+
+            for (var i = 0; i < identifiedTargets.length - 1; i++)
+            {
+
+                await updateProgress(i, identifiedTargets.length, "om_regulator", `  Iterating target combinations  ${i}/${identifiedTargets.length}`); 
+
+                for (var j = i + 1; j < identifiedTargets.length; j++) {
+                    if(n > 2)
+                    {
+                        for (var k = j + 1; k < identifiedTargets.length; k++) {
+                            if(n > 3)
+                                for (var m = k + 1; m < identifiedTargets.length; m++) {
+                                    let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+                                    if(result)
+                                    {
+                                        _identifiedTargets[[i,j,k,m].join("_")] = result;
+                                    }
+                                }
+                            else
+                            {
+                                let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                if(result)
+                                {
+                                    _identifiedTargets[[i,j,k].join("_")] = result;
+                                }
+                            }                                            
+                        }
+                    }
+                    else
+                    {
+                        let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j]])
+                        if(result)
+                        {
+                            _identifiedTargets[[i,j].join("_")] = result;
+                        }
+                    }
+                }                                
+            }
+        }
+
+        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+        for(let target in _identifiedTargets)
+        {
+            adddatatochart(_identifiedTargets[target]);     
+        }
+        
+        $("#om_target_chart_canvas").height(400);
+        $("#om_regulator_progress").hide();
+        $("#om_btn_predicttarget").html('Predict Targets');
+        $("#airomics_tab_content").removeClass("air_disabledbutton");
+                
+        globals.omics.om_targetchart.update();
+                              
+    }     
 
     var tbl = document.getElementById('om_target_chart_table');
     var header = tbl.createTHead();
@@ -4094,66 +4036,30 @@ async function calculateTargets() {
         ]
     }).columns.adjust();
 
-    async function getTargetpValue(targets, index, sensitivity, _regulators = null)
-    {      
-        let regulators = _regulators == null? await getRegulatorsForTarget(targets, index) : _regulators;
-
-        let _sensitivity_scors = [];
-        for(let shuffled_elements of shuffled_arrays)
-        {           
-            let _sensitivity = 0.0;
-            for(let i in FC_values)
-            {              
-                let element = shuffled_elements[i];     
-                if(regulators.hasOwnProperty(element))
-                {
-                    _sensitivity += FC_values[i] * regulators[element];
-                }
-            }
-
-            _sensitivity_scors.push(_sensitivity / positiveCount);
-        }
-
-        let std = standarddeviation(_sensitivity_scors)  
-        if(!std || std == 0)
-            return 1;          
-        let z_score =  (sensitivity - mean(_sensitivity_scors))/std;
-        let pvalue = GetpValueFromZ(z_score);
-
-        return isNaN(pvalue)? 1 : pvalue;
-        
-    }
-
-    async function analyzemultipletargets(targets)
+    async function analyzetargets(targets)
     {
         let maxScore = 0;
+        let maxregulators = null;
         let results = null;
 
         for (let index of targetCombinations(targets.length))
         {          
-            let regulators = await getRegulatorsForTarget(targets, index)
-            let regr_data = [];
+            let regulators = await getRegulatorsForTarget(targets, index, usememory)
             let positiveSum = 0;
             let negativeSum = 0;
-
-            let target_values = {};
+            
             for (let p in AIR.Molecules) 
             {                
                 let SP = regulators.hasOwnProperty(p)? regulators[p] : 0;
-                let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
-
-                if(SP * value != 0)
+                if (elements_with_FC.hasOwnProperty(p))
                 {
-                    target_values[p] = value * SP; 
-                }  
-
-                positiveSum += value * SP;
-
-                if(value == 0)
+                    positiveSum += elements_with_FC[p] * SP;
+                }
+                else
                 {
                     negativeSum += (1 - Math.abs(SP));
-                }             
-            }
+                }           
+            } 
 
             let sensitivity = positiveSum / positiveCount;
             let specificity = negativeSum / negativeCount;
@@ -4167,7 +4073,6 @@ async function calculateTargets() {
                 sensitivity = -1;
             }
 
-
             if(specificity > 0 && sensitivity != 0)
             {
                 let positive = sensitivity > 0? true : false;
@@ -4175,13 +4080,12 @@ async function calculateTargets() {
                 sensitivity = Math.abs(sensitivity);
 
                 if(sensitivity <= maxScore)
-                    continue;
+                    continue;                                            
                 
+ 
+                // let pvalue = await fishers(_TargetsInDeGs, _TargetsNotInDEGs, _nonTargetsInDEGs, _nonTargetsNotInDEGs)
+                maxregulators = regulators;
                 maxScore = sensitivity;               
-                
-                let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
-                
-
 
                 results = 
                 {
@@ -4192,24 +4096,45 @@ async function calculateTargets() {
                     "name": targets.map(t => AIR.Molecules[t].name + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
                     "linkname": targets.map(t => getLinkIconHTML(AIR.Molecules[t].name) + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
                     "specificity": specificity,
-                    "regulators": regulatorValues.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0? "\u2193" : "\u2191")),
                     "positive": index.every( v => v === index[0])? positive : null
                 };
             } 
         }
 
-        if(results != null)
-        {          
-            results["pvalue"] = await getTargetpValue(results.id, results.index, results.sensitivity)
-            
-            return results;
-            //adddatatochart(results);
-        }
-        else
+        if(results == null)
         {
             return false;
         }
-            //_identifiedTargets[targets.join(";")] = results;
+        else
+        {
+            let _sensitivity_scors = [];
+            for(let shuffled_elements of shuffled_arrays)
+            {           
+                let _sensitivity = 0.0;
+                for(let i in FC_values)
+                {              
+                    let element = shuffled_elements[i];     
+                    if(maxregulators.hasOwnProperty(element))
+                    {
+                        _sensitivity += FC_values[i] * maxregulators[element];
+                    }
+                }
+
+                _sensitivity_scors.push(_sensitivity / positiveCount);
+            }
+
+            let std = standarddeviation(_sensitivity_scors)  
+            
+            let pvalue = 1
+            if(std && std != 0)
+            {
+                let z_score =  (results["sensitivity"] - mean(_sensitivity_scors))/std;                
+                pvalue = GetpValueFromZ(z_score);
+            }      
+            
+            results["pvalue"] =  isNaN(pvalue)? 1 : pvalue;
+            return results;
+        }                   
     }
 
     async function adddatatochart(targtetdata, colored = true)
@@ -4227,7 +4152,7 @@ async function calculateTargets() {
                     hex = targtetdata.positive == null? '#a9a9a9' : (targtetdata.positive? (targtetdata.fc >= 0? '#C00000' : '#d3d3d3') : (targtetdata.fc <= 0? '#0070C0' : '#d3d3d3'));
 
                 let result = {
-                    label: [targtetdata.name, targtetdata.fc != 0 ? expo(targtetdata.fc, 3, 3) : false, expo(targtetdata.adj_pvalue, 2, 2), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
+                    label: [targtetdata.name, targtetdata.fc != 0 ? expo(targtetdata.fc, 3, 3) : false, expo(targtetdata.adj_pvalue, 2, 2)].join(";"),
                     data: [{
                         x: expo(targtetdata.specificity, 3, 3),
                         y: expo(targtetdata.sensitivity, 3, 3),
@@ -4251,116 +4176,17 @@ async function calculateTargets() {
                 createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
                 //createCell(result_row, 'td', targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", "), 'col-auto', 'col', 'left', true);               
 
-                globals.omics.om_target_downloadtext += `\n${targtetdata.name}\t${targtetdata.specificity}\t${targtetdata.sensitivity}\t${targtetdata.positive? "positive" : "negative"}\t${targtetdata.regulators}`;
                 globals.omics.om_targetchart.data.datasets.push(result); 
                 resolve();
         });
     }
 
-    async function analyzeElement(e, last)
-    {        
-
-        return new Promise(
-            async function(resolve, reject) {
-                
-            let count = e_ids.indexOf(e);    
-            let fc = globals.omics.ExpressionValues.hasOwnProperty(e)? globals.omics.ExpressionValues[e].nonnormalized[sample] : 0;
-
-            if(isNaN(fc) || !fc)
-            {
-                fc = 0;
-            }
-
-            let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
-            
-            let data = (await getMoleculeData(e, type = "molecule", true, usememory)).value
-            if(!data)
-            {
-                resolve({
-                    index: count,
-                    data : null,
-                    last: last
-                });
-                return;
-            }
-
-            let positiveSum = 0;
-            let negativeSum = 0;
-
-            let target_values = {};
-            let regulators = {};
-
-            for (let p in AIR.Molecules) 
-            {                
-                let spType = getSPtype(p);
-
-                let SP = data.hasOwnProperty(p)? data[p][spType] : 0;
-                let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
-
-                if(SP != 0)
-                {
-                    regulators[p] = SP;
-                }
-                if(SP * value != 0)
-                { 
-                    target_values[p] = value * SP; 
-                    positiveSum += value * SP;
-                }  
-
-                if(value == 0)
-                {
-                    negativeSum += (1 - Math.abs(SP));
-                }  
-            }
-
-
-            let sensitivity = positiveSum / positiveCount;
-            let specificity = negativeSum / negativeCount
-            if(specificity > 0 && sensitivity != 0)
-            {
-                let positive = sensitivity > 0? true : false;
-                sensitivity = Math.abs(sensitivity);
-                
-                if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
-                    resolve({
-                        index: count,
-                        data : null,
-                        last: last
-                    });
-                    return;
-                }
-
-                let Ranked_DCEs = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
-                let pvalue = await getTargetpValue([e], [1], sensitivity, regulators);
-                resolve({
-                    data : {
-                        "pvalue": pvalue,
-                        "id": [e],
-                        "fc": fc,
-                        "index": [1],
-                        "sensitivity": sensitivity,
-                        "name": _name,
-                        "linkname": getLinkIconHTML(_name),
-                        "specificity": specificity,
-                        "regulators": Ranked_DCEs.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
-                        "positive": positive
-                    },
-                });
-                return;
-                
-            }   
-        
-            resolve({
-                index: count,
-                data : null,
-                last: last
-            });
-            
-        })  
-    }
-
     function targetCombinations(n)
     {
+        if (n == 1)
+        {
+            return [[1]];
+        }
         let df = Array.from(Array(Math.pow(2, n)), () => []);
 
         for (let i = 1; i <= n; i++) 
@@ -4384,31 +4210,723 @@ async function calculateTargets() {
     }
 }
 
-
-async function getRegulatorsForTarget(targets, index)
+async function getRegulatorsForTarget(targets, index, usememory = true)
 {
     let regulators = {};
 
     for(let t in targets)
     {
-        for (let p in AIR.MoleculeData[targets[t]]) 
+        let _data = (await getMoleculeData(targets[t], "molecule", true, usememory)).value;
+        
+        for (let p in _data) 
         {
-            let spType = getSPtype(p);
-
-            if(!regulators.hasOwnProperty(p))
-            {
-                regulators[p] = parseFloat(AIR.MoleculeData[targets[t]][p][spType]) * index[t];
-            }
-            else
-            {
-                regulators[p] += parseFloat(AIR.MoleculeData[targets[t]][p][spType]) * index[t];
-            }
+            if(_data[p]["i"] != 0)
+                if(!regulators.hasOwnProperty(p))
+                {
+                    regulators[p] = _data[p]["i"] * index[t];
+                }
+                else
+                {
+                    regulators[p] += _data[p]["i"]  * index[t];
+                }
         }
-
     }  
 
     return regulators;
 }
+
+// async function old_calculateTargets() {
+
+//     let e_ids = [];
+
+//     let fc_threshold = 0;
+//     let pvalue_threshold = 1;
+
+//     var sample = $('#om_select_sample').val(); 
+
+//     let filter = $('#om_target_filter option:selected').text();
+
+//     let n = parseFloat($('#om_targetcomb_slider').val());
+//     let usememory = (document.getElementById("om_target_usememory").checked == true? true : false);
+//     let numberOfTargets = $("#om_target_targetnumber").val();
+
+//     let negativeCount = 0;
+//     let positiveCount = 0;
+//     let finishedelements_count = 0;                              
+
+//     let _identifiedTargets = {};
+    
+//     let max_fc = 0;
+
+//     activaTab("om_target_chart");
+
+
+//     if(globals.omics.om_targettable)
+//         globals.omics.om_targettable.destroy();
+
+//     $("#om_target_chart_table").replaceWith(`
+//         <table class="air_table order-column hover nowrap  mt-2" style="width:100%" id="om_target_chart_table" cellspacing=0>
+//         </table>
+//     `);
+
+//     let elements_with_FC = {};
+
+//     let shuffled_arrays = [];
+
+//     let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
+//     let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
+
+//     let typeNumbersinSamples = {
+//         "protein": 0,
+//         "metabolite": 0
+//     }
+
+//     let FC_values = [];
+
+//     try 
+//     {
+//         var promises = [];
+
+//         if(globals.omics.pvalue)
+//         {
+//             pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
+//             if(isNaN(pvalue_threshold) || pvalue_threshold < 0)
+//             {
+//                 alert("Only positive (decimal) values are allowed as p-value threshold. Value was set to 1.")
+//                 pvalue_threshold = 0.05;
+//                 $("#om_target_pvaluethreshold").val("0.05")
+//             }
+//         }
+//         fc_threshold = parseFloat($("#om_target_fcthreshold").val().replace(',', '.'))
+//         if(isNaN(fc_threshold) || fc_threshold < 0)
+//         {
+//             alert("Only positive (decimal) values are allowed as FC threshold. Value was set to 1.")
+//             fc_threshold = 1;
+//             $("#om_target_fcthreshold").val("1")
+//         }
+//         fc_threshold = Math.abs(fc_threshold)
+
+//         for(let e in AIR.Molecules)
+//         {
+//             let fc = 0
+//             if(globals.omics.ExpressionValues.hasOwnProperty(e))
+//             {
+//                 if (!globals.omics.pvalue || globals.omics.ExpressionValues[e].pvalues[sample] <= pvalue_threshold)
+//                 {
+//                     fc = globals.omics.ExpressionValues[e].nonnormalized[sample]
+//                 }
+//             } 
+
+//             if(Math.abs(fc) > Math.abs(fc_threshold))
+//             {
+//                 positiveCount += Math.abs(fc);
+//                 elements_with_FC[e] = fc;
+
+//                 switch (AIR.Molecules[e].type) {
+//                     case "PROTEIN":
+//                     case "RNA": 
+//                         typeNumbersinSamples.protein += 1;
+//                         break;
+//                     case "SIMPLE_MOLECULE": 
+//                         typeNumbersinSamples.metabolite += 1;
+//                         break;
+//                     default:
+//                         break;
+//                 }
+//             }
+//             else {
+//                 negativeCount += 1;
+//             }
+
+//             if(AIR.Molecules[e].emptySP == true)
+//             {
+//                 continue;
+//             }
+
+//             let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
+
+//             if (_type.toLowerCase() === "phenotype") {
+//                 continue;
+//             }
+
+//             let typevalue = $('#om_target_filter').val();
+//             if (typevalue == 1) {
+//                 if (_type != "PROTEIN") {
+//                     continue;
+//                 }
+//             }
+//             if (typevalue == 2) {
+//                 if (_subtype != "miRNA") {
+//                     continue;
+//                 }
+//             }
+//             if (typevalue == 3) {
+//                 if (_subtype != "lncRNA") {
+//                     continue;
+//                 }
+//             }
+//             if (typevalue == 4) {
+//                 if (_subtype != "TF") {
+//                     continue;
+//                 }
+//             } 
+//             if (typevalue == 5) {
+//                 if (_subtype != "RECEPTOR") {
+//                     continue;
+//                 }
+//             }    
+
+//             if(Math.abs(fc) > max_fc)
+//             {
+//                 max_fc = Math.abs(fc);
+//             }
+//             e_ids.push(e);
+//         }
+
+//         if(numberOfTargets == "")
+//         {
+//             numberOfTargets = Object.keys(AIR.Molecules).length;
+//         }
+//         else
+//         {
+//             numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
+//             if(isNaN(numberOfTargets) || numberOfTargets < 0)
+//             {
+//                 alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
+//                 numberOfTargets = Object.keys(AIR.Molecules).length;
+//                 switch (parseFloat($('#om_targetcomb_slider').val())) {
+//                     case 2:
+//                         numberOfTargets = 30;
+//                         break;
+//                     case 3:
+//                         numberOfTargets = 15;
+//                         break;
+//                     case 4:
+//                         numberOfTargets = 5;
+//                         break;
+//                 }
+//             }
+//         }
+//         $("#om_target_targetnumber").val(numberOfTargets)
+
+//         let molLength = e_ids.length ;
+//         await updateProgress(0, molLength, "om_regulator");
+             
+//         globals.omics.om_targetchart.data.datasets = [];
+
+//         setTimeout(function(){                                
+//             globals.omics.om_targetchart.update();
+           
+//         }, 0);
+
+//         FC_values = Object.values(elements_with_FC)
+//         for(let i = 0; i < 1000; i++)
+//         {
+//             let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
+//             shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite))
+//             shuffled_arrays.push(shuffled_array)
+//         }
+//         if(e_ids.length == 0)
+//         {
+//             $("#om_target_chart_canvas").height(400);
+//             $("#om_regulator_progress").hide();
+//             $("#om_btn_predicttarget").html('Predict Targets');
+//             $("#airomics_tab_content").removeClass("air_disabledbutton");
+//         }
+//         else
+//         {
+//             for (let e of e_ids) {
+
+//                 let last = (e == e_ids[e_ids.length - 1])
+//                 promises.push(analyzeElement(e, last))
+//                 if(promises.length >= 100 || last)
+//                 {
+//                     await Promise.allSettled(promises).then(async function(targets) {
+//                         for(let _data of targets)
+//                         {     
+//                             finishedelements_count++;                              
+//                             let targtetdata = _data.value.data;
+
+//                             if(targtetdata != null)
+//                             {
+//                                 _identifiedTargets[targtetdata.id[0]] = targtetdata;
+                                
+//                                 //updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
+//                             }
+
+//                         }
+                                                
+//                         await updateProgress(finishedelements_count, molLength, "om_regulator", `  Analyzing Element ${finishedelements_count}/${molLength}`);
+
+//                         if(last)
+//                         {
+//                             await updateProgress(0, 1, "om_regulator", `  Ranking and filtering Targets...`);
+
+//                             await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+//                             _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.001) 
+
+
+//                             if(n > 1)
+//                             {
+                                                                                    
+//                                 _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity");
+//                                 let identifiedTargets = Object.keys(_identifiedTargets);
+
+//                                 for (var i = 0; i < identifiedTargets.length - 1; i++)
+//                                 {
+
+//                                     await updateProgress(i, identifiedTargets.length, "om_regulator", `  Iterating target combinations  ${i}/${identifiedTargets.length}`); 
+
+//                                     for (var j = i + 1; j < identifiedTargets.length; j++) {
+//                                         if(n > 2)
+//                                         {
+//                                             for (var k = j + 1; k < identifiedTargets.length; k++) {
+//                                                 if(n > 3)
+//                                                     for (var m = k + 1; m < identifiedTargets.length; m++) {
+//                                                         let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+//                                                         if(result)
+//                                                         {
+//                                                             _identifiedTargets[[i,j,k,m].join("_")] = result;
+//                                                         }
+//                                                     }
+//                                                 else
+//                                                 {
+//                                                     let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+//                                                     if(result)
+//                                                     {
+//                                                         _identifiedTargets[[i,j,k].join("_")] = result;
+//                                                     }
+//                                                 }                                            
+//                                             }
+//                                         }
+//                                         else
+//                                         {
+//                                             let result = await analyzemultipletargets([identifiedTargets[i], identifiedTargets[j]])
+//                                             if(result)
+//                                             {
+//                                                 _identifiedTargets[[i,j].join("_")] = result;
+//                                             }
+//                                         }
+//                                     }                                
+//                                 }
+//                             }
+
+//                             await getadjPvaluesForObject(_identifiedTargets, "pvalue")
+
+//                             for(let target in _identifiedTargets)
+//                             {
+//                                 adddatatochart(_identifiedTargets[target]);     
+//                             }
+                            
+//                             $("#om_target_chart_canvas").height(400);
+//                             $("#om_regulator_progress").hide();
+//                             $("#om_btn_predicttarget").html('Predict Targets');
+//                             $("#airomics_tab_content").removeClass("air_disabledbutton");
+                                    
+//                             globals.omics.om_targetchart.update();
+//                         }                    
+//                     })
+
+//                     promises = [];
+//                 }
+
+//             }   
+//         }     
+//     }
+//     catch (error) 
+//     {    
+//         alert("Failed to analyze targets. Please try again, reload the page or contact the developers.")    
+//         console.log(error)
+//         $("#om_target_chart_canvas").height(400);
+//         $("#om_regulator_progress").hide();
+//         $("#om_btn_predicttarget").html('Predict Targets');
+//         $("#airomics_tab_content").removeClass("air_disabledbutton");
+//         globals.omics.om_targetchart.update();
+//     }
+
+//     var tbl = document.getElementById('om_target_chart_table');
+//     var header = tbl.createTHead();
+//     var headerrow = header.insertRow(0);
+
+//     createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
+//     createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
+//     createCell(headerrow, 'th', 'adj p-value', 'col', 'col', 'center');
+//     //createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
+//     createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
+//     createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
+//     createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
+//     //createCell(headerrow, 'th', 'Effect', 'col', 'col', 'left');
+
+    
+//     globals.omics.om_targettable = $('#om_target_chart_table').DataTable({
+//         "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+//         "buttons": [
+//             {
+//                 text: 'Copy',
+//                 className: 'air_dt_btn',
+//                 action: function () {
+//                     copyContent(getDTExportString(globals.omics.om_targettable));
+//                 }
+//             },
+//             {
+//                 text: 'CSV',
+//                 className: 'air_dt_btn',
+//                 action: function () {
+//                     air_download("Predicted_targets.csv", getDTExportString(globals.omics.om_targettable, seperator = ","))
+//                 }
+//             },
+//             {
+//                 text: 'TSV',
+//                 className: 'air_dt_btn',
+//                 action: function () {
+//                     air_download("Predicted_targets.txt", getDTExportString(globals.omics.om_targettable))
+//                 }
+//             }
+//         ],   
+//         "order": [[ 3, "desc" ], [ 2, "asc" ]], 
+//         "scrollX": true,
+//         "autoWidth": true,
+//         columns: [
+//             null,
+//             { "width": "15%" },
+//             { "width": "15%" },
+//             { "width": "15%" },
+//             //{ "width": "15%" },
+//             { "width": "10%" },
+//             { "width": "10%" },
+//             ],
+//         columnDefs: [
+//             {
+//                 targets: 0,
+//                 className: 'dt-right',
+//                 'max-width': '25%',
+//             },
+//             {
+//                 targets: 1,
+//                 className: 'dt-center'
+//             },
+//             {
+//                 targets: 2,
+//                 className: 'dt-center'
+//             },
+//             {
+//                 targets: 3,
+//                 className: 'dt-center'
+//             },
+//             {
+//                 targets: 4,
+//                 className: 'dt-center'
+//             },
+//             {
+//                 targets: 5,
+//                 className: 'dt-center'
+//             },
+//             // {
+//             //     targets: 6,
+//             //     className: 'dt-center'
+//             // },
+//         ]
+//     }).columns.adjust();
+
+//     async function getTargetpValue(targets, index, sensitivity, _regulators = null)
+//     {      
+//         let regulators = _regulators == null? await getRegulatorsForTarget(targets, index) : _regulators;
+
+//         let _sensitivity_scors = [];
+//         for(let shuffled_elements of shuffled_arrays)
+//         {           
+//             let _sensitivity = 0.0;
+//             for(let i in FC_values)
+//             {              
+//                 let element = shuffled_elements[i];     
+//                 if(regulators.hasOwnProperty(element))
+//                 {
+//                     _sensitivity += FC_values[i] * regulators[element];
+//                 }
+//             }
+
+//             _sensitivity_scors.push(_sensitivity / positiveCount);
+//         }
+
+//         let std = standarddeviation(_sensitivity_scors)  
+//         if(!std || std == 0)
+//             return 1;          
+//         let z_score =  (sensitivity - mean(_sensitivity_scors))/std;
+//         let pvalue = GetpValueFromZ(z_score);
+
+//         return isNaN(pvalue)? 1 : pvalue;
+        
+//     }
+
+//     async function analyzemultipletargets(targets)
+//     {
+//         let maxScore = 0;
+//         let results = null;
+
+//         for (let index of targetCombinations(targets.length))
+//         {          
+//             let regulators = await getRegulatorsForTarget(targets, index)
+//             let regr_data = [];
+//             let positiveSum = 0;
+//             let negativeSum = 0;
+
+//             let target_values = {};
+//             for (let p in AIR.Molecules) 
+//             {                
+//                 let SP = regulators.hasOwnProperty(p)? regulators[p] : 0;
+//                 let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
+
+//                 if(SP * value != 0)
+//                 {
+//                     target_values[p] = value * SP; 
+//                 }  
+
+//                 positiveSum += value * SP;
+
+//                 if(value == 0)
+//                 {
+//                     negativeSum += (1 - Math.abs(SP));
+//                 }             
+//             }
+
+//             let sensitivity = positiveSum / positiveCount;
+//             let specificity = negativeSum / negativeCount;
+
+//             if(sensitivity > 1)
+//             {
+//                 sensitivity = 1;
+//             }
+//             else if(sensitivity < -1)
+//             {
+//                 sensitivity = -1;
+//             }
+
+
+//             if(specificity > 0 && sensitivity != 0)
+//             {
+//                 let positive = sensitivity > 0? true : false;
+//                 let positiveValue = sensitivity > 0? 1 : -1;
+//                 sensitivity = Math.abs(sensitivity);
+
+//                 if(sensitivity <= maxScore)
+//                     continue;
+                
+//                 maxScore = sensitivity;               
+                
+//                 let regulatorValues = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+                
+
+
+//                 results = 
+//                 {
+//                     "id": targets,
+//                     "fc": 0,
+//                     "index": index,
+//                     "sensitivity": sensitivity,
+//                     "name": targets.map(t => AIR.Molecules[t].name + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
+//                     "linkname": targets.map(t => getLinkIconHTML(AIR.Molecules[t].name) + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
+//                     "specificity": specificity,
+//                     "regulators": regulatorValues.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0? "\u2193" : "\u2191")),
+//                     "positive": index.every( v => v === index[0])? positive : null
+//                 };
+//             } 
+//         }
+
+//         if(results != null)
+//         {          
+//             results["pvalue"] = await getTargetpValue(results.id, results.index, results.sensitivity)
+            
+//             return results;
+//             //adddatatochart(results);
+//         }
+//         else
+//         {
+//             return false;
+//         }
+//             //_identifiedTargets[targets.join(";")] = results;
+//     }
+
+//     async function adddatatochart(targtetdata, colored = true)
+//     {
+//         return new Promise( 
+//             async function(resolve, reject) {
+                
+//                 var radius = 2 + (6 * (1 - targtetdata.pvalue));
+                        
+//                 var pstyle = targtetdata.positive == null? 'circle' : 'triangle';
+
+//                 let hex = '#d3d3d3';
+                
+//                 if(colored)
+//                     hex = targtetdata.positive == null? '#a9a9a9' : (targtetdata.positive? (targtetdata.fc >= 0? '#C00000' : '#d3d3d3') : (targtetdata.fc <= 0? '#0070C0' : '#d3d3d3'));
+
+//                 let result = {
+//                     label: [targtetdata.name, targtetdata.fc != 0 ? expo(targtetdata.fc, 3, 3) : false, expo(targtetdata.adj_pvalue, 2, 2), targtetdata.regulators.slice(0, 5).join(", ")].join(";"),
+//                     data: [{
+//                         x: expo(targtetdata.specificity, 3, 3),
+//                         y: expo(targtetdata.sensitivity, 3, 3),
+//                         r: radius
+//                     }],
+//                     backgroundColor:  hex ,
+//                     hoverBackgroundColor: hex,
+//                     pointStyle: pstyle,
+//                     rotation: targtetdata.positive? 0 : 60,
+//                 }
+                
+//                 var tbl = document.getElementById('om_target_chart_table');
+//                 let result_row = tbl.insertRow(tbl.rows.length);
+
+//                 createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);                
+//                 createPopupCell(result_row, 'td', targtetdata.positive == null? "mixed" : (targtetdata.positive? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, {"sample": sample, "id": targtetdata.id, "index": targtetdata.index, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold}),
+//                 createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
+//                 //createCell(result_row, 'td', expo(targtetdata.pvalue, 2, 2), 'col-auto', 'col', 'center', true);
+//                 createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
+//                 createCell(result_row, 'td', expo(targtetdata.specificity, 3, 3), 'col-auto', 'col', 'center', true);
+//                 createCell(result_row, 'td', expo(targtetdata.fc, 3, 3), 'col-auto', 'col', 'center', true);
+//                 //createCell(result_row, 'td', targtetdata.regulators.map(r => getLinkIconHTML(r)).join(", "), 'col-auto', 'col', 'left', true);               
+
+//                 globals.omics.om_targetchart.data.datasets.push(result); 
+//                 resolve();
+//         });
+//     }
+
+//     async function analyzeElement(e, last)
+//     {        
+
+//         return new Promise(
+//             async function(resolve, reject) {
+                
+//             let count = e_ids.indexOf(e);    
+//             let fc = globals.omics.ExpressionValues.hasOwnProperty(e)? globals.omics.ExpressionValues[e].nonnormalized[sample] : 0;
+
+//             if(isNaN(fc) || !fc)
+//             {
+//                 fc = 0;
+//             }
+
+//             let {name:_name, type:_type, subtype:_subtype, phenotypes:_sp} = AIR.Molecules[e];
+            
+//             let data = (await getMoleculeData(e, type = "molecule", true, usememory)).value
+//             if(!data)
+//             {
+//                 resolve({
+//                     index: count,
+//                     data : null,
+//                     last: last
+//                 });
+//                 return;
+//             }
+
+//             let positiveSum = 0;
+//             let negativeSum = 0;
+
+//             let target_values = {};
+//             let regulators = {};
+
+//             let _TargetsInDeGs = 0
+//             let _TargetsNotInDEGs = 0
+//             let _nonTargetsInDEGs = 0
+//             let _nonTargetsNotInDEGs = 0
+
+//             for (let p in AIR.Molecules) 
+//             {                
+//                 let spType = getSPtype(p);
+
+//                 let SP = data.hasOwnProperty(p)? data[p][spType] : 0;
+//                 let value = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
+
+//                 if(SP != 0)
+//                 {
+//                     regulators[p] = SP;
+//                 }
+//                 else
+//                 {
+
+//                 }
+//                 if(SP * value != 0)
+//                 { 
+//                     target_values[p] = value * SP; 
+//                     positiveSum += value * SP;
+//                 }  
+
+//                 if(value == 0)
+//                 {
+//                     negativeSum += (1 - Math.abs(SP));
+//                 }  
+//             }
+
+
+//             let sensitivity = positiveSum / positiveCount;
+//             let specificity = negativeSum / negativeCount
+//             if(specificity > 0 && sensitivity != 0)
+//             {
+//                 let positive = sensitivity > 0? true : false;
+//                 sensitivity = Math.abs(sensitivity);
+                
+//                 if (fc != 0 && document.getElementById("om_target_filtercontrary").checked === true && Math.sign(fc) != Math.sign(sensitivity)) {
+//                     resolve({
+//                         index: count,
+//                         data : null,
+//                         last: last
+//                     });
+//                     return;
+//                 }
+
+//                 let Ranked_DCEs = Object.keys(pickHighest(Object.filter(target_values, t => (positive? target_values[t] > 0 : target_values[t] < 0)), _num = 10, ascendend = positive? true : false));
+//                 let pvalue = fishers()  //await getTargetpValue([e], [1], sensitivity, regulators);
+//                 resolve({
+//                     data : {
+//                         "pvalue": pvalue,
+//                         "id": [e],
+//                         "fc": fc,
+//                         "index": [1],
+//                         "sensitivity": sensitivity,
+//                         "name": _name,
+//                         "linkname": getLinkIconHTML(_name),
+//                         "specificity": specificity,
+//                         "regulators": Ranked_DCEs.map(r => AIR.Molecules[r].name + (globals.omics.ExpressionValues[r].nonnormalized[sample] < 0?  "\u2193" : "\u2191")),
+//                         "positive": positive
+//                     },
+//                 });
+//                 return;
+                
+//             }   
+        
+//             resolve({
+//                 index: count,
+//                 data : null,
+//                 last: last
+//             });
+            
+//         })  
+//     }
+
+//     function targetCombinations(n)
+//     {
+//         let df = Array.from(Array(Math.pow(2, n)), () => []);
+
+//         for (let i = 1; i <= n; i++) 
+//         {
+//             var j = 0
+//             for (let _e = 1; _e <=  Math.pow(2, i - 1); _e++)
+//                 {
+//                 for (let k = 1; k <=  Math.pow(2, n - i); k++)
+//                 {
+//                     df[j++].push(1)
+//                 }
+                
+//                 for (let k = 1; k <=  Math.pow(2, n - i); k++)
+//                 {
+//                     df[j++].push(-1)
+//                 }
+//             }
+//         }
+
+//         return df
+//     }
+// }
+
 
 async function enrichr() {
 
@@ -4652,10 +5170,10 @@ function om_createpopup(button, parameter) {
                         <canvas class="popup_chart" id="om_popup_chart"></canvas>
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#009933"></span>
+                                <span class="legendspan_small" style="background-color:#C00000"></span>
                                 Activates Phenotype</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                <span class="legendspan_small" style="background-color:#0070C0"></span>
                                 Represses Phenotype</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="legendspan_small" style="background-color:#cccccc"></span>
@@ -4686,11 +5204,11 @@ function om_createpopup(button, parameter) {
 
             if((SP * FC) < 0)
             {
-                hex = "#ffcccc";
+                hex = "#0070C0";
             }
             else if((SP * FC) > 0)
             {
-                hex = "#009933"
+                hex = "#C00000"
             }
         }
 
@@ -4896,8 +5414,8 @@ function om_createpopup(button, parameter) {
                     type: 'line',
                     fill: false,
                     pointRadius: 0,
-                    backgroundColor: m < 0? "#FFCDCD" : "#009933",
-                    borderColor: m < 0? "#FFCDCD" : "#009933",
+                    backgroundColor: m < 0? "#0070C0" : "#C00000",
+                    borderColor: m < 0? "#0070C0" : "#C00000",
                     borderWidth: 2,
                 }
             );
@@ -4947,11 +5465,11 @@ async function om_createtargetpopup(button, parameter) {
                         <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#009933"></span>
-                                Activates Phenotype</li>
+                                <span class="legendspan_small" style="background-color:#0070C0"></span>
+                                Congruent Relation</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
-                                Represses Phenotype</li>
+                                <span class="legendspan_small" style="background-color:#C00000"></span>
+                                Opposite Relation</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="legendspan_small" style="background-color:#cccccc"></span>
                                 Not diff. expressed</li>
@@ -4991,7 +5509,7 @@ async function om_createtargetpopup(button, parameter) {
 
         let SP = regulators.hasOwnProperty(element)? regulators[element] : 0;
 
-        let hex = "#009933";
+        let hex = "#cccccc";
         let rad = 4;
 
         if(globals.omics.pvalue)
@@ -5001,11 +5519,11 @@ async function om_createtargetpopup(button, parameter) {
 
         if((SP * FC) < 0)
         {
-            hex = "#ffcccc";
+            hex = "#0070C0";
         }
-        else if((SP * FC) === 0)
+        else if((SP * FC) > 0)
         {
-            hex = "#cccccc"
+            hex = "#C00000"
         }
 
 
