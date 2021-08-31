@@ -568,22 +568,6 @@ async function getMoleculeData(_key, type = "molecule", returndata = true, savei
                     {
                         data[e]["s"] = 0;
                     }
-                    if(data[e].hasOwnProperty("t") == false)
-                    {
-                        data[e]["t"] = 0;
-                    }
-                    else if(isNaN(data[e]["t"]))
-                    {
-                        data[e]["t"] = 0;
-                    }
-                    if(data[e].hasOwnProperty("c") == false)
-                    {
-                        data[e]["c"] = 0;
-                    }
-                    else if(isNaN(data[e]["c"]))
-                    {
-                        data[e]["c"] = 0;
-                    }
                     if(data[e].hasOwnProperty("i") == false)
                     {
                         data[e]["i"] = 0;
@@ -1164,7 +1148,7 @@ function indexOfLargest(_temparray, absolute = false) {
 
 async function updateProgress(value, max, progressbar, text = "") {
     return new Promise(resolve => {
-        let percentage = Math.ceil(value * 100 / max);
+        let percentage = (max == 0? 0 : Math.ceil(value * 100 / max));
         setTimeout(function(){  
             $("#" + progressbar+"_progress").width(percentage + "%");
             $("#"+progressbar+"_progress_label").html(percentage + " %" + text);
@@ -1452,7 +1436,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
             }
 
             let regulators = new Set();
-            Object.keys(pathdata.paths).map(path => path.split("_").map(e => regulators.add(e)));
+            Object.keys(pathdata.value.paths).map(path => path.split("_").map(e => regulators.add(e)));
             regulators = Array.from(regulators);
 
             if(perturbedElements.every(e => regulators.includes(e) == false))
@@ -1467,7 +1451,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
 
             
             let newregulators = regulators.filter(e => perturbedElements.includes(e) == false)
-            let newpaths = Object.keys(pathdata.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+            let newpaths = Object.keys(pathdata.value.paths).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
 
             for(let e of newregulators)
             {
@@ -1487,7 +1471,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
                 //find shortest path type from e to p
                 let minlength = epatharrays.reduce((a, b) => a.length <= b.length ? a : b).length
                 var filteredpaths = epaths.filter(path => path.split("_").length == minlength);
-                var objetvalues = Object.values(Object.filter(pathdata.paths, path => filteredpaths.includes(path)));
+                var objetvalues = Object.values(Object.filter(pathdata.value.paths, path => filteredpaths.includes(path)));
                 var type = Math.min.apply(null, objetvalues);
 
                 influencevalues.SPs[e] = minlength * type;
@@ -1496,9 +1480,9 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
                 var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
 
                 /*
-                if(pathdata.modifiers.hasOwnProperty(e))
+                if(pathdata.value.modifiers.hasOwnProperty(e))
                 {
-                    for(let m in pathdata.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
+                    for(let m in pathdata.value.modifiers[e].filter(path => perturbedElements.every(e => path.split("_").includes(e) == false)))
                     {
                         newpaths.filter(p => p.includes(m)).map(path => includedpaths.add(path));
                     }
@@ -1507,32 +1491,32 @@ async function getPerturbedInfluences(phenotype, perturbedElements) {
                 influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length)
             };            
 
-            for(let e in pathdata.regulators)
-            {
-                if(newregulators.includes(e) || perturbedElements.includes(e))
-                {
-                    continue;
-                }
+            // for(let e in pathdata.value.regulators)
+            // {
+            //     if(newregulators.includes(e) || perturbedElements.includes(e))
+            //     {
+            //         continue;
+            //     }
                 
-                for(let connectedSP in pathdata.regulators[e])
-                {
-                    for(let t of pathdata.regulators[e][connectedSP])
-                    {
-                        if(perturbedElements.includes(t))
-                        {
-                            continue;
-                        }                            
-                        if(influencevalues.values.hasOwnProperty(t))
-                        {
-                            influencevalues.values[e] = influencevalues.values[t] / (Math.abs(connectedSP) + 1) * Math.sign(connectedSP);
-                        }
-                        if(influencevalues.SPs.hasOwnProperty(t))
-                        {
-                            influencevalues.SPs[e] = (Math.abs(influencevalues.SPs[t]) + 1) * Math.sign(influencevalues.SPs[t]) * Math.sign(connectedSP);
-                        }
-                    }
-                }                
-            }
+            //     for(let connectedSP in pathdata.value.regulators[e])
+            //     {
+            //         for(let t of pathdata.value.regulators[e][connectedSP])
+            //         {
+            //             if(perturbedElements.includes(t))
+            //             {
+            //                 continue;
+            //             }                            
+            //             if(influencevalues.values.hasOwnProperty(t))
+            //             {
+            //                 influencevalues.values[e] = influencevalues.values[t] / (Math.abs(connectedSP) + 1) * Math.sign(connectedSP);
+            //             }
+            //             if(influencevalues.SPs.hasOwnProperty(t))
+            //             {
+            //                 influencevalues.SPs[e] = (Math.abs(influencevalues.SPs[t]) + 1) * Math.sign(influencevalues.SPs[t]) * Math.sign(connectedSP);
+            //             }
+            //         }
+            //     }                
+            // }
 
             let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
             Object.keys(influencevalues.values).map(function(key, index) {
@@ -1703,6 +1687,22 @@ function leastSquaresRegression(data) {
 function activaTab(tab){
     $('.nav-tabs a[href="#' + tab + '"]').tab('show');
 };
+
+
+  
+async function fishers(a, b, c, d)
+{
+    function factorialize(num) {
+        var factorial = new Decimal(1) ;
+        for (var i = 2; i <= num; i++) {
+            factorial = factorial.times(i);
+        }
+
+        return factorial;
+    }
+
+    return parseFloat(factorialize(a+b).times(factorialize(c+d)).times(factorialize(a+c)).times(factorialize(b+d)).dividedBy(factorialize(a).times(factorialize(b)).times(factorialize(c)).times(factorialize(d)).times(factorialize(a+b+c+d))).toExponential(40))
+}
 
 function GetpValueFromZ(_z, type = "twosided") 
 {
