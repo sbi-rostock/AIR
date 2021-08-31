@@ -4090,7 +4090,7 @@ async function calculateTargets() {
                 results = 
                 {
                     "id": targets,
-                    "fc": 0,
+                    "fc": mean(targets.map(t => (elements_with_FC.hasOwnProperty(t)? elements_with_FC[t] : 0))),
                     "index": index,
                     "sensitivity": sensitivity,
                     "name": targets.map(t => AIR.Molecules[t].name + (index[targets.indexOf(t)]*positiveValue == -1? "\u2193" : "\u2191")).join(' & '),
