@@ -19,7 +19,7 @@ var ttest = require('ttest');
 require('datatables.net-buttons')(window, $); 
 
 
-var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = False;
+var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
 //var URL = "http://localhost:3000/Energie/"; var filetesting = true;
 
 const pluginName = 'EnErGie';
