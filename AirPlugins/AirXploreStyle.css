@@ -87,9 +87,9 @@
   margin-bottom: 3px;
 }
 
-.popup_chart {
-  width: 450px !important;
-  height:250px !important;
+.popover-content {
+  width: 500px !important;
+  height:300px !important;
 }
 
 .legendspan {

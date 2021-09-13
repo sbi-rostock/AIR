@@ -210,7 +210,7 @@ async function AirOmics(){
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Type of Data:</span>
                     </div>
                     <div class="col">
-                        <select id="om_analysistypeSelect" class="browser-default om_select custom-select">
+                        <select id="om_analysistypeSelect" class="air_disabledbutton browser-default om_select custom-select">
                             <option value="0" selected>Differential</option>
                             <option value="1">Non-differential (Beta)</option>
                         </select>
@@ -581,12 +581,6 @@ async function createDifferentialAnalysisPanel()
         updateConsideredElements();
     });
     globals.omics.targettab = $(`<div class="tab-pane air_sub_tab_pane mb-2" id="om_target" role="tabpanel" aria-labelledby="om_target-tab">
-        <div class="air_alert alert alert-warning mb-4">
-            <span>This requires much more computationally intensive calculations that need to fetch a larger amount of data. The calculation speed mainly depends on your internet bandwidth.<br/>We also recommend having at least 1 GB of RAM available.</span>
-            <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>  
         <label class="air_label mt-1" style="font-weight: bold;">Sample:</label>
         <select id="om_select_sample" class="browser-default om_select custom-select mb-1" style="border: solid 1px; font-weight: bold;">
         </select>
@@ -681,30 +675,7 @@ async function createDifferentialAnalysisPanel()
                     <label class="air_checkbox" for="om_target_filtercontrary">Filter contrary results?</label>
                 </div>
             </div>
-        </div> 
-        <div class="air_alert alert alert-info mt-2">
-            <span>During the first run, large amounts of data must be retrieved. The calculation time depends on your Internet bandwidth.</span>
-            <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div> 
-        <div class="row mt-2 mb-4">
-            <div class="col-auto">
-                <div class="wrapper">
-                    <button type="button" class="air_btn_info btn btn-secondary"
-                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Storing Data"
-                            data-content="If checked, data required for the target prediction will be safed in memory after the first execution. Turn off if only low memory but a high bandwidth is available.">
-                        ?
-                    </button>
-                </div>
-            </div>
-            <div class="col">
-                <div class="cbcontainer">
-                    <input type="checkbox" class="air_checkbox" id="om_target_usememory" checked>
-                    <label class="air_checkbox" for="om_target_usememory">Store data in memory</label>
-                </div>
-            </div>
-        </div>
+        </div>  
         <button type="button" id="om_btn_predicttarget" class="air_btn btn btn-block mt-1 mb-1">Predict Targets</button>   
         <hr>
     </div>`).appendTo('#om_tab');
@@ -778,12 +749,7 @@ async function createDifferentialAnalysisPanel()
 
     $("#om_enrichr_progress").attr("aria-valuemax", Object.keys(globals.omics.samples).length);
 
-    $("#om_btn_predicttarget").on('click', function() { 
-        if(parseFloat($('#om_targetcomb_slider').val()) > 1 && document.getElementById("om_target_usememory").checked == false)
-        {
-            alert("Storage in memory is required for calculation target combinations.")
-            return;
-        }           
+    $("#om_btn_predicttarget").on('click', function() {         
         OM_PredictTargets();
     });
     $("#om_btn_enrichr").on('click', function() {            
@@ -878,6 +844,27 @@ async function createDifferentialAnalysisPanel()
         },
         options: {
             plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var label = context.label.split(";");
+    
+                            if(label.length < 3)
+                                return "";
+    
+                            return [
+                                "Name: " + label[0],
+                                ... label[1] ? ["FC: " + label[1]] : [], 
+                                "p-value: " + + label[2], 
+                                "Sensitivity: " + expo(context.dataset.data[0].y, 3, 3),
+                                "Specificity: " + expo(context.dataset.data[0].x, 3, 3),
+                            ];
+                        }
+                    }
+                },
+                legend: {
+                    display: false
+                },
                 zoom: {
                     // Container for pan options
                     pan: {
@@ -908,10 +895,12 @@ async function createDifferentialAnalysisPanel()
     
                     // Container for zoom options
                     zoom: {
-                        // Boolean to enable zooming
-                        enabled: true,
-                        // Zooming directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow zooming in the y direction
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
                         mode: 'xy',
                     }
                 }
@@ -925,15 +914,16 @@ async function createDifferentialAnalysisPanel()
                 animationDuration: 0
             },
             responsiveAnimationDuration: 0,
-            hover: {
-                onHover: function(e) {
-                    var point = this.getElementAtEvent(e);
-                    if (point.length) e.target.style.cursor = 'pointer';
-                    else e.target.style.cursor = 'default';
-                    }
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
-            legend: {
-                display: false
+            onClick: (event, chartElement) => {
+                if(chartElement[0])
+                {
+                    let name = globals.omics.om_targetchart.data.datasets[chartElement[0].datasetIndex].label;
+                    selectElementonMap(name, true);  
+                    xp_setSelectedElement(name);    
+                }
             },
             layout: {
                 padding: {
@@ -948,73 +938,49 @@ async function createDifferentialAnalysisPanel()
                 fontStyle: 'bold'
             },
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         display: true,
-                        labelString: 'Sensitivity'
+                        text: 'Sensitivity'
                     },
                     ticks: {
-                        beginAtZero: true,
-                    }
-                }],
-                xAxes: [{
-                    scaleLabel: {
+                        //beginAtZero: true,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                          if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                      }
+                },
+                x: 
+                {
+                    title: {
                         display: true,
-                        labelString: 'Specificity'
+                        text: 'Specificity'
                     },
                     ticks: {
                         //beginAtZero: false,
-                    }
-                }]
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var label = data.datasets[tooltipItem.datasetIndex].label.split(";");
-
-                        if(label.length < 3)
-                            return "";
-
-                        return [
-                            "Name: " + label[0],
-                            ... label[1] ? ["FC: " + label[1]] : [], 
-                            "p-value: " + + label[2], 
-                            "Effect: " + label[3], 
-                            "Sensitivity: " + expo(tooltipItem.yLabel, 3, 3),
-                            "Specificity: " + expo(tooltipItem.xLabel, 3, 3),
-                        ];
-                    }
-                }
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                        if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
             }
         }
         
     }; 
 
-    globals.omics.om_targetchart = new Chart(outputCanvas, chartOptions);            
-
-    outputCanvas.onclick = function (evt) {
-
-        if(globals.omics.om_targetchart)
-        {
-            // => activePoints is an array of points on the canvas that are at the same position as the click event.
-            var activePoint = globals.omics.om_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-
-            if (activePoint !== undefined) {
-                let name = globals.omics.om_targetchart.data.datasets[activePoint._datasetIndex].label;
-                if(name)
-                {
-                    name = name.split(";")[0];
-                }
-                else
-                {
-                    return;
-                }
-                selectElementonMap(name, true);
-                xp_setSelectedElement(name);
-            }
-        }
-        // Calling update now animates element from oldValue to newValue.
-    };       
+    globals.omics.om_targetchart = new Chart(outputCanvas, chartOptions);                  
 
     $("#om_target_chart_canvas").height(400);
 
@@ -1346,12 +1312,36 @@ function createScAnalysisPanel()
         
                         // Container for zoom options
                         zoom: {
-                            // Boolean to enable zooming
-                            enabled: true,
-                            // Zooming directions. Remove the appropriate direction to disable 
-                            // Eg. 'y' would only allow zooming in the y direction
+                            wheel: {
+                                enabled: true,
+                            },
+                            pinch: {
+                                enabled: true
+                            },
                             mode: 'xy',
                         }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                var label = context.label.split(";");
+    
+                                if(label.length < 5)
+                                    return "";  
+    
+                                return ([
+                                    "Name: " + label[0],
+                                    "Type: " + label[1],
+                                    globals.omics.abbreviations[xvalue] + ": " + label[2], 
+                                    globals.omics.abbreviations[yvalue] + ": " + label[3], 
+                                ]).concat(cvalue != "n"? [
+                                    globals.omics.abbreviations[cvalue] + ": " + label[4],
+                                ] : []);             
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
                     }
                 },
                 responsive: true,
@@ -1363,15 +1353,16 @@ function createScAnalysisPanel()
                     animationDuration: 0
                 },
                 responsiveAnimationDuration: 0,
-                hover: {
-                    onHover: function(e) {
-                        var point = this.getElementAtEvent(e);
-                        if (point.length) e.target.style.cursor = 'pointer';
-                        else e.target.style.cursor = 'default';
-                        }
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
                 },
-                legend: {
-                    display: false
+                onClick: (event, chartElement) => {
+                    if(chartElement[0])
+                    {
+                        let name = globals.omics.sc_chart.data.datasets[chartElement[0].datasetIndex].label;
+                        selectElementonMap(name, true);  
+                        xp_setSelectedElement(name);    
+                    }
                 },
                 layout: {
                     padding: {
@@ -1386,63 +1377,48 @@ function createScAnalysisPanel()
                     fontStyle: 'bold'
                 },
                 scales: {
-                    yAxes: [{
-                        scaleLabel: {
+                    y: {
+                        title: {
                             display: true,
-                            labelString: "log2 FC " + globals.omics.abbreviations[yvalue]
+                            text: "log2 FC " + globals.omics.abbreviations[yvalue]
                         },
-                    }],
-                    xAxes: [{
-                        scaleLabel: {
+                        ticks: {
+                            //beginAtZero: true,
+                        },
+                        grid: {
+                            drawBorder: false,
+                            color: function(context) {
+                              if (context.tick.value == 0)
+                                    return '#000000';
+                                else
+                                    return "#D3D3D3";
+                            },
+                          }
+                    },
+                    x: 
+                    {
+                        title: {
                             display: true,
-                            labelString: "log2 FC " + globals.omics.abbreviations[xvalue]
+                            text: "log2 FC " + globals.omics.abbreviations[xvalue]
                         },
-                    }]
+                        ticks: {
+                            //beginAtZero: false,
+                        },
+                        grid: {
+                            drawBorder: false,
+                            color: function(context) {
+                            if (context.tick.value == 0)
+                                    return '#000000';
+                                else
+                                    return "#D3D3D3";
+                            },
+                        },
+                    },
                 },
-                tooltips: {
-                    callbacks: {
-                        label: function (tooltipItem, data) {
-                            var label = data.datasets[tooltipItem.datasetIndex].label.split(";");
-
-                            if(label.length < 5)
-                                return "";  
-
-                            return ([
-                                "Name: " + label[0],
-                                "Type: " + label[1],
-                                globals.omics.abbreviations[xvalue] + ": " + label[2], 
-                                globals.omics.abbreviations[yvalue] + ": " + label[3], 
-                            ]).concat(cvalue != "n"? [
-                                globals.omics.abbreviations[cvalue] + ": " + label[4],
-                            ] : []);             
-                        }
-                    }
-                }
             }
         }; 
 
-        globals.omics.sc_chart = new Chart(outputCanvas, chartOptions); 
-
-        outputCanvas.onclick = function (evt) {
-
-            if(globals.omics.sc_chart)
-            {
-                // => activePoints is an array of points on the canvas that are at the same position as the click event.
-                var activePoint = globals.omics.sc_chart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-    
-                if (activePoint !== undefined) {
-                    let name = globals.omics.sc_chart.data.datasets[activePoint._datasetIndex].label.split(";")[0];
-
-                    if(name)
-                    {
-                        selectElementonMap(name, true);
-                        xp_setSelectedElement(name);
-                    }
-
-                }
-            }
-            // Calling update now animates element from oldValue to newValue.
-        };       
+        globals.omics.sc_chart = new Chart(outputCanvas, chartOptions);       
     
         let typevalue = $('#om_sc_selecttype').val();
         
@@ -2332,6 +2308,26 @@ async function om_createTable(param) {
 
         type: 'line',
         options: {
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function (context) {
+                            //Return value for title
+                            return context.label || '';
+                        },
+                        label: function (context) {
+                            var label = tooltipItem.xLabel;
+                            label += "; ";
+                            label += tooltipItem.yLabel;
+    
+                            return label;
+                        }
+                    }
+                }
+            },
             legendCallback: function (chart) {
                 var text = [];
                 text.push(`<div class='phenotypelegend  d-flex justify-content-center mt-2'>
@@ -2349,9 +2345,6 @@ async function om_createTable(param) {
                             </div>`);
                 return text.join("");
             },
-            legend: {
-                display: false,
-            },
             title: {
                 display: false,
                 text: 'Phenotype Activity',
@@ -2360,29 +2353,45 @@ async function om_createTable(param) {
                 fontStyle: 'bold'
             },
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         fontStyle: 'bold',
-                        display: false,
-                        labelString: 'Level',
+                        display: true,
+                        text: 'Level',
                         fontStyle: "bold"
                     },
                     ticks: {
-                        suggestedMin: -1,
-                        suggestedMax: 1
+                        min: -1,
+                        max: 1
                     },
-                    gridLines: {
-                        color: "transparent",
-                        display: true,
+                    grid: {
                         drawBorder: false,
-                        zeroLineColor: "#ccc",
-                        zeroLineWidth: 1
-                    }
-                }],
-                xAxes: [{
+                        color: function(context) {
+                          if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                      }
+                },
+                x: 
+                {
                     type: 'category',
-                    scaleLabel: {
-                        fontStyle: "bold"
+                    title: {
+                        display: true,
+                        text: "Sample"
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                        if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
                     },
                     labels: globals.omics.samples,
                     ticks: {
@@ -2392,23 +2401,8 @@ async function om_createTable(param) {
                     gridLines: {
                         drawOnChartArea: false
                     }
-                }],
+                },
             },
-            tooltips: {
-                callbacks: {
-                    title: function (tooltipItems, data) {
-                        //Return value for title
-                        return data.datasets[tooltipItems[0].datasetIndex].label || '';
-                    },
-                    label: function (tooltipItem, data) {
-                        var label = tooltipItem.xLabel;
-                        label += "; ";
-                        label += tooltipItem.yLabel;
-
-                        return label;
-                    }
-                }
-            }
         }
 
     }
@@ -3710,7 +3704,6 @@ async function calculateTargets() {
 
     var sample = $('#om_select_sample').val(); 
     let n = parseFloat($('#om_targetcomb_slider').val());
-    let usememory = (document.getElementById("om_target_usememory").checked == true? true : false);
     let numberOfTargets = $("#om_target_targetnumber").val();
 
     let negativeCount = 0;
@@ -3823,7 +3816,7 @@ async function calculateTargets() {
         possible_targets.push(e)
     }
 
-    for(let i = 0; i < 1000; i++)
+    for(let i = 0; i < 500; i++)
     {
         let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
         shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite))
@@ -3890,7 +3883,7 @@ async function calculateTargets() {
         await updateProgress(0, molLength, "om_regulator", `  Ranking and filtering targets ...`);
         await getadjPvaluesForObject(_identifiedTargets, "pvalue")
 
-        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.001) 
+        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.05) 
 
         if(n > 1)
         {                                                
@@ -4044,7 +4037,7 @@ async function calculateTargets() {
 
         for (let index of targetCombinations(targets.length))
         {          
-            let regulators = await getRegulatorsForTarget(targets, index, usememory)
+            let regulators = await getRegulatorsForTarget(targets, index)
             let positiveSum = 0;
             let negativeSum = 0;
             
@@ -4210,24 +4203,24 @@ async function calculateTargets() {
     }
 }
 
-async function getRegulatorsForTarget(targets, index, usememory = true)
+async function getRegulatorsForTarget(targets, index)
 {
     let regulators = {};
 
     for(let t in targets)
     {
-        let _data = (await getMoleculeData(targets[t], "molecule", true, usememory)).value;
+        let _data = await getInfluencesForElement(targets[t]);
         
         for (let p in _data) 
         {
-            if(_data[p]["i"] != 0)
+            if(_data[p] != 0)
                 if(!regulators.hasOwnProperty(p))
                 {
-                    regulators[p] = _data[p]["i"] * index[t];
+                    regulators[p] = _data[p] * index[t];
                 }
                 else
                 {
-                    regulators[p] += _data[p]["i"]  * index[t];
+                    regulators[p] += _data[p]  * index[t];
                 }
         }
     }  
@@ -5167,7 +5160,6 @@ function om_createpopup(button, parameter) {
                             <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
                             <label class="air_checkbox" for="om_popup_showregression">Show Regression Line</label>
                         </div>
-                        <canvas class="popup_chart" id="om_popup_chart"></canvas>
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="legendspan_small" style="background-color:#C00000"></span>
@@ -5182,6 +5174,9 @@ function om_createpopup(button, parameter) {
                                 <span class="triangle_small"></span>
                                 External Link</li>
                         </div>
+                        <div style="height: 80%">
+                            <canvas class="popup_chart" id="om_popup_chart"></canvas>
+                        </div>
                     </div>
                 </div>`);
 
@@ -5193,14 +5188,14 @@ function om_createpopup(button, parameter) {
 
         let SP = parameter.FilteredRegulators[phenotype][element];
         let hex = "#cccccc";
-        let rad = 2;
+        let rad = 3;
         let FC = 0
 
         if(parameter.FilteredElements[sample].hasOwnProperty(element))
         {
             FC = parameter.FilteredElements[sample][element];
 
-            rad = 4
+            rad = 6
 
             if((SP * FC) < 0)
             {
@@ -5268,6 +5263,9 @@ function om_createpopup(button, parameter) {
         },
         options: {
             plugins: {
+                legend: {
+                    display: false
+                },
                 zoom: {
                     // Container for pan options
                     pan: {
@@ -5298,25 +5296,48 @@ function om_createpopup(button, parameter) {
     
                     // Container for zoom options
                     zoom: {
-                        // Boolean to enable zooming
-                        enabled: true,
-                        // Zooming directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow zooming in the y direction
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
                         mode: 'xy',
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var element = context.label || '';
+    
+                            if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
+                            {                          
+                                return [
+                                    'Name: ' + AIR.Molecules[element].name,
+                                    'Influence: ' + expo(AIR.Phenotypes[phenotype].values[element],4,3),
+                                    'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
+                                    'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
+                                ];                     
+                            }
+                            else
+                                return "";
+                            
+                        }
                     }
                 }
             },
             responsive: true,
             maintainAspectRatio: false,
-            hover: {
-                onHover: function(e) {
-                var point = this.getElementAtEvent(e);
-                if (point.length) e.target.style.cursor = 'pointer';
-                else e.target.style.cursor = 'default';
-                }
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
-            legend: {
-                display: false
+            onClick: (event, chartElement) => {
+                if(chartElement[0])
+                {
+                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+                    selectElementonMap(name, true);  
+                    xp_setSelectedElement(name);    
+                }
             },
             layout: {
                 padding: {
@@ -5329,64 +5350,49 @@ function om_createpopup(button, parameter) {
                 fontFamily: 'Helvetica',
             },
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         display: true,
-                        labelString: 'Influence on Phenotype'
+                        text: 'Influence on Phenotype'
                     },
                     ticks: {
-                        suggestedMin:-1,    
-                        suggestedMax:1,
-                    }
-                }],
-                xAxes: [{
-                    scaleLabel: {
+                        //beginAtZero: true,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                          if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                      }
+                },
+                x: 
+                {
+                    title: {
                         display: true,
-                        labelString: 'Fold Change in Data'
+                        text: 'Fold Change in Data'
                     },
                     ticks: {
-                        suggestedMin:-1,    
-                        suggestedMax:1,
-                    }
-                }]
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var element = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                        if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
-                        {                          
-                            return [
-                                'Name: ' + AIR.Molecules[element].name,
-                                'Influence: ' + expo(AIR.Phenotypes[phenotype].values[element],4,3),
-                                'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
-                                'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
-                            ];                     
-                        }
-                        else
-                            return "";
-                        
-                    }
-                }
+                        //beginAtZero: false,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                        if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
             }
         }
         
     }; 
 
     let popupchart = new Chart(outputCanvas, chartOptions);
-    document.getElementById('om_popup_chart').onclick = function (evt) {
-            var activePoint = popupchart.lastActive[0];
-            if (activePoint !== undefined) {
-                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
-                if(_id && AIR.Molecules.hasOwnProperty(_id))
-                {
-                    let name = AIR.Molecules[_id].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            }
-    };
     $target.show();
 
     var popupheight = $("#om_chart_popover").height() + 50;
@@ -5460,9 +5466,8 @@ async function om_createtargetpopup(button, parameter) {
     $(button).css('background-color', 'lightgray');
 
     $target = $(`<div id="om_target_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
-                    <div class="arrow" style="left: 9.375%;"></div>
                     <div id="om_target_chart_popover_content" class="popover-content">
-                        <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
+                        
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="legendspan_small" style="background-color:#0070C0"></span>
@@ -5476,6 +5481,9 @@ async function om_createtargetpopup(button, parameter) {
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="triangle_small"></span>
                                 External Link</li>
+                        </div>
+                        <div style="height: 80%">
+                            <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
                         </div>
                     </div>
                 </div>`);
@@ -5510,12 +5518,7 @@ async function om_createtargetpopup(button, parameter) {
         let SP = regulators.hasOwnProperty(element)? regulators[element] : 0;
 
         let hex = "#cccccc";
-        let rad = 4;
-
-        if(globals.omics.pvalue)
-        {
-            rad = 1 + (4 * (1 - pValue));
-        }
+        let rad = 6;
 
         if((SP * FC) < 0)
         {
@@ -5588,11 +5591,36 @@ async function om_createtargetpopup(button, parameter) {
     
                     // Container for zoom options
                     zoom: {
-                        // Boolean to enable zooming
-                        enabled: true,
-                        // Zooming directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow zooming in the y direction
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
                         mode: 'xy',
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var element = context.label || '';
+    
+                            if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
+                            {                          
+                                return [
+                                    'Name: ' + AIR.Molecules[element].name,
+                                    'Influence: ' + expo(regulators[element],4,3),
+                                    'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
+                                    'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
+                                ];                     
+                            }
+                            else
+                                return "";
+                            
+                        }
                     }
                 }
             },
@@ -5602,16 +5630,16 @@ async function om_createtargetpopup(button, parameter) {
                 duration: 0
             },
             responsiveAnimationDuration: 0,
-            hover: {
-                animationDuration: 0,
-                onHover: function(e) {
-                var point = this.getElementAtEvent(e);
-                if (point.length) e.target.style.cursor = 'pointer';
-                else e.target.style.cursor = 'default';
-                }
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
-            legend: {
-                display: false
+            onClick: (event, chartElement) => {
+                if(chartElement[0])
+                {
+                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+                    selectElementonMap(name, true);  
+                    xp_setSelectedElement(name);    
+                }
             },
             layout: {
                 padding: {
@@ -5624,62 +5652,49 @@ async function om_createtargetpopup(button, parameter) {
                 fontFamily: 'Helvetica',
             },
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         display: true,
-                        labelString: 'Influence from Target'
+                        text: 'Influence from Target'
                     },
                     ticks: {
                         //beginAtZero: true,
-                    }
-                }],
-                xAxes: [{
-                    scaleLabel: {
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                          if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                      }
+                },
+                x: 
+                {
+                    title: {
                         display: true,
-                        labelString: 'Fold Change in Data'
+                        text: 'Fold Change in Data'
                     },
                     ticks: {
                         //beginAtZero: false,
-                    }
-                }]
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var element = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                        if(element && globals.omics.ExpressionValues.hasOwnProperty(element))
-                        {                          
-                            return [
-                                'Name: ' + AIR.Molecules[element].name,
-                                'Influence: ' + expo(regulators[element],4,3),
-                                'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample],4,3),
-                                'p-value: ' + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
-                            ];                     
-                        }
-                        else
-                            return "";
-                        
-                    }
-                }
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function(context) {
+                        if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
             }
         }
         
     }; 
 
     let popupchart = new Chart(outputCanvas, chartOptions);
-    document.getElementById('om_target_popup_chart').onclick = function (evt) {
-            var activePoint = popupchart.lastActive[0];
-            if (activePoint !== undefined) {
-                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
-                if(_id && AIR.Molecules.hasOwnProperty(_id))
-                {
-                    let name = AIR.Molecules[_id].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            }
-    };
     $target.show();
 
     var popupheight = $("#om_target_chart_popover").height() + 50;
@@ -5907,116 +5922,7 @@ async function calculateshortestPath(sample, elementids,  _count, _totalIteratio
     await updateProgress(count, _totalIterations, _progressbutton, text=_progressText);
 
 
-    let elements = {};
-
-    for(let e of elementids)
-    {
-        elements[e] = [];
-    }
-
-    for(var s of elementids)
-    {
-        ElementCentrality = AIR.Molecules[s].Centrality;
-        ElementCentrality.Betweenness[sample] = 0;
-        ElementCentrality.Closeness[sample] = 0; 
-        ElementCentrality.Indegree[sample] = 0;
-        ElementCentrality.Outdegree[sample] = 0;   
-        ElementCentrality.Degree[sample] = 0; 
-    }
-
-    for(let inter of AIR.Interactions)
-    {
-        if(!elementids.includes(inter.source) || !elementids.includes(inter.target))            
-        {
-            continue;
-        }
-        
-        elements[inter.source].push(inter.target);
-     
-        ElementCentrality = AIR.Molecules[inter.source].Centrality;
-        ElementCentrality.Outdegree[sample] += 1; 
-        ElementCentrality.Degree[sample] += 1;
-
-        ElementCentrality = AIR.Molecules[inter.target].Centrality;
-        ElementCentrality.Indegree[sample] += 1; 
-        ElementCentrality.Degree[sample] += 1;
-    }
-
-    elements = Object.fromEntries(Object.entries(elements).filter(([_, v]) => v.length > 0));
-
-    var neighbour, e, visited, queue, dist, spcount;
-    var localBetweenness = {};
-
-
-    for(var s of elementids)
-    {
-        visited = [s] 
-        queue = [s] 
-        dist = {};
-        spcount = {};
-        localBetweenness = {}
-
-        dist[s] = 0;
-        spcount[s] = 0;
-
-        while(queue.length > 0)
-        {
-            e = queue.shift();
-            
-            localBetweenness[e] = []
-            for(var _neighbour in elements[e])
-            {
-                neighbour = elements[e][_neighbour]
-            
-                if(!visited.includes(neighbour))
-                {
-                    visited.push(neighbour);
-                    dist[neighbour] = dist[e] + 1;
-                    spcount[neighbour] = 1;
-                    queue.push(neighbour);
-
-                    localBetweenness[e].push(neighbour);
-                }
-                else if(dist[neighbour] == dist[e] + 1)
-                {
-                    spcount[neighbour] += 1;
-                    localBetweenness[e].push(neighbour);
-                }
-            }
-        }
-        for(var t in dist)
-        {
-            if(dist[t] > 0)
-            {
-                AIR.Molecules[s].Centrality.Closeness[sample] += 1/dist[t]
-            }
-        }
-        for(var k in localBetweenness)
-        {        
-            if(k != s)
-            {
-                for(var t of getSPNodes(k))
-                {
-                    AIR.Molecules[k].Centrality.Betweenness[sample] += 1/spcount[t]
-                }
-            }
-        }
-        await updateProgress(count++, _totalIterations, _progressbutton, text=_progressText);
-    }
-
-    function getSPNodes(node)
-    {
-        let _array = [];
-        if(localBetweenness.hasOwnProperty(node))
-        {          
-            _array = localBetweenness[node]
-            for(var t of localBetweenness[node])
-            {
-                _array = _array.concat(getSPNodes(t));
-            }
-        }
-        return _array;
-    }
+    
 
     return count;
 }

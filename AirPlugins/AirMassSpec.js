@@ -1039,6 +1039,16 @@ async function drawChart() {
         },
         options: {
             plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: false,
+                    text: 'Predicted Targets',
+                    fontFamily: 'Helvetica',
+                    fontColor: '#6E6EC8',
+                    fontStyle: 'bold'
+                },
                 zoom: {
                     // Container for pan options
                     pan: {
@@ -1069,13 +1079,45 @@ async function drawChart() {
     
                     // Container for zoom options
                     zoom: {
-                        // Boolean to enable zooming
-                        enabled: true,
-                        // Zooming directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow zooming in the y direction
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
                         mode: 'xy',
                     }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var label = context.dataset.label || '';
+                            
+                            let _id = parseFloat(label)
+                            if(isNaN(_id))
+                            {
+                                let labels = label.split(";")
+                                return [
+                                    labels[0],
+                                    'm/z: ' + labels[1],
+                                    'Rt: ' + labels[2],
+                                    'CCS: ' + labels[3]
+                                ];
+                            }
+                            let entry = globals.massspec.raw_values[_id];
+    
+                            return [
+                                'm/z: ' + entry.m,
+                                'Rt: ' + entry.r,
+                                'CCS: ' + entry.c,
+                                'FC: ' + entry.fc,
+                            ];
+                        }
+                    }
                 }
+            },
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
             responsive: true,
             maintainAspectRatio: false,                    
@@ -1086,60 +1128,24 @@ async function drawChart() {
                 animationDuration: 0
             },
             responsiveAnimationDuration: 0,
-            legend: {
-                display: false
-            },
             layout: {
                 padding: {
                 top: 15
                 }
             },
-            title: {
-                display: false,
-                text: 'Predicted Targets',
-                fontFamily: 'Helvetica',
-                fontColor: '#6E6EC8',
-                fontStyle: 'bold'
-            },
+            
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         display: true,
-                        labelString: globals.massspec.abbreviations[ms_Yvalue()]
+                        text: globals.massspec.abbreviations[ms_Yvalue()]
                     },
-                }],
-                xAxes: [{
-                    scaleLabel: {
+                },
+                x: {
+                    title: {
                         display: true,
-                        labelString: globals.massspec.abbreviations[ms_Xvalue()]
+                        text: globals.massspec.abbreviations[ms_Xvalue()]
                     },
-                }]
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var label = data.datasets[tooltipItem.datasetIndex].label || '';
-                        
-                        let _id = parseFloat(label)
-                        if(isNaN(_id))
-                        {
-                            let labels = label.split(";")
-                            return [
-                                labels[0],
-                                'm/z: ' + labels[1],
-                                'Rt: ' + labels[2],
-                                'CCS: ' + labels[3]
-                            ];
-                        }
-                        let entry = globals.massspec.raw_values[_id];
-
-                        return [
-                            'm/z: ' + entry.m,
-                            'Rt: ' + entry.r,
-                            'CCS: ' + entry.c,
-                            'FC: ' + entry.fc,
-                        ];
-                    }
                 }
             }
         }

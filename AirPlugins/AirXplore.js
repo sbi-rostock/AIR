@@ -21,8 +21,11 @@ function AirXplore(){
         pe_data: [{}],
         pe_data_index: 0,
         pe_influenceScores: {},
-
+        pe_pathchart: undefined,
+        pe_kochart: undefined,
         selected_element: "",
+        centralitychartData: [],
+        kochartdata: [],
     }
 
     globals.xplore["container"] = document.getElementById("airxplore_tab_content")
@@ -86,19 +89,19 @@ function Initiate() {
     return new Promise((resolve, reject) => {
         $(`
         <div id="xp_hide_container" style="display: none;">
-        <button class="air_collapsible mt-4">Interactions</button>
+        <button class="air_collapsible mt-4">Data Exploration</button>
             <div id="xp_panel_interaction" class="air_collapsible_content">
 
             </div>
-        <button class="air_collapsible mt-2">in silico perturbation</button>
+        <button class="air_collapsible mt-2">Downstream Enrichment</button>
             <div id="xp_panel_phenotypes" class="air_collapsible_content">
 
             </div>
-        <button class="air_collapsible mt-2">identify downstream targets</button>
+        <button class="air_collapsible mt-2">Upstream Enrichment</button>
             <div id="xp_panel_targets" class="air_collapsible_content">
 
             </div>
-        <button class="air_collapsible mt-2">Export Data</button>
+        <button class="air_collapsible mt-2">Data Export</button>
             <div id="xp_panel_export" class="air_collapsible_content">
 
             </div>
@@ -185,7 +188,8 @@ function getExportPanel()
                 <button id="xp_btn_download_datazip_txt" type="button" class="air_btn btn mr-2"><i class="fa fa-download"></i> TSV</button>
                 <button id="xp_btn_download_datazip_json" type="button" class="air_btn btn"><i class="fa fa-download"></i> JSON (raw data)</button>
             </div>
-            <button id="xp_btn_download_gmt" class="air_btn btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download phenotype gene sets as GMT</button>
+            <button id="xp_btn_download_gmt" class="air_btn btn mb-2" style="width:100%"> <i class="fa fa-download"></i> Download phenotype gene sets as GMT</button>
+            <button id="xp_btn_download_json" class="air_btn btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download all phenotype regulators as JSON</button>
             <h4>Phenotype specific subnetworks:<h4>
             <select id="xp_select_export_phenotype" class="browser-default xp_select custom-select mt-2"></select>
             <div class="btn-group mt-2" role="group">
@@ -206,7 +210,26 @@ function getExportPanel()
             phenotypeSelect.options[phenotypeSelect.options.length] = new Option(p, i); 
             i++;
         };
+        $('#xp_btn_download_json').on('click', function() {
 
+            let output = {}
+            for (let p in AIR.Phenotypes)
+            {
+                output[AIR.Molecules[p].name] = {}
+
+                for(let e in AIR.Phenotypes[p].values)
+                {
+                    if(AIR.Phenotypes[p].values[e] == 0)
+                    {
+                        continue
+                    }
+
+                    output[AIR.Molecules[p].name][AIR.Molecules[e].name] = AIR.Phenotypes[p].values[e]
+                }
+            }
+            let downloadtext = JSON.stringify(output)
+            air_download('AIR_PhenotypeRegulators.json', downloadtext)
+        });
 
         $('#xp_btn_download_gmt').on('click', function() {
 
@@ -382,7 +405,8 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
 
     await recalculateInfluenceScores();
     await setPeTable();
-    await xp_EstimatePhenotypes();
+    xp_EstimatePhenotypes();
+    xp_updatePathgraph()
 });
 
 async function xp_EstimatePhenotypes()
@@ -423,7 +447,7 @@ async function xp_EstimatePhenotypes()
                 let _influene = parseFloat(phenotypeValues[e]);
                 max_influence += Math.abs(_influene);
 
-                if(_data.hasOwnProperty(e))
+                if(_data.hasOwnProperty(e) && !_data[e].perturbed)
                 {
                     let fc = _data[e].value;
 
@@ -506,7 +530,8 @@ async function recalculateInfluenceScores()
         globals.xplore.pe_influenceScores[p] = _perturbedElements.length > 0? await getPerturbedInfluences(p, _perturbedElements) : {values: AIR.Phenotypes[p].values, SPs: AIR.Phenotypes[p].SPs};
     }
     enablediv('airxplore_tab_content');
-    xp_updatePhenotypeTable()
+    xp_updatePhenotypeTable();
+    xp_EstimatePhenotypes();
 }
 
 async function setPeTable()
@@ -525,7 +550,11 @@ async function setPeTable()
             var row = tbl.insertRow(tbl.rows.length);
 
             createCell(row, 'td', getLinkIconHTML(AIR.Molecules[e].name), 'col', '', 'right');
-            checkBoxCell(row, 'td', "", e, 'center', "xp_pe_", _checked = globals.xplore.pe_data[globals.xplore.pe_data_index][e].perturbed);
+            let cbcell = checkBoxCell(row, 'td', "", e, 'center', "xp_pe_", _checked = globals.xplore.pe_data[globals.xplore.pe_data_index][e].perturbed);
+            if(AIR.Molecules[e].submap == false)
+            {
+                cbcell.classList.add("air_disabledbutton");
+            }
             createCell(row, 'td', getFontfromValue(globals.xplore.pe_data[globals.xplore.pe_data_index][e].value), 'col slidervalue', '', 'center').setAttribute('id', 'ESliderValue' + e);
             var slider = createSliderCell(row, 'td', e);
             slider.setAttribute('id', 'ESlider' + e);
@@ -541,7 +570,7 @@ async function setPeTable()
 
                 globals.xplore.pe_element_table.rows( $("#ESliderValue" + e).closest("tr")).invalidate().draw();
                 xp_EstimatePhenotypes()
-
+                xp_updatePathgraph()
             }
 
             let delete_btn = createButtonCell(row, 'td', '<i class="fas fa-trash"></i>', "center");
@@ -565,6 +594,7 @@ async function setPeTable()
 
                 await setPeTable()
                 await xp_EstimatePhenotypes();
+                xp_updatePathgraph()
                 adjustPanels(globals.xplore.container);
             };
         }
@@ -590,7 +620,7 @@ async function setPeTable()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.pe_element_table))
+                        air_download("InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.pe_element_table))
                     }
                 }
             ],   
@@ -663,45 +693,85 @@ async function getPhenotypePanel()
                 </table>
             </div>
             <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
-            <h4 class="mb-4">Resulting phenotype levels:</h4>
+            <h4 class="mb-4">Downstream Impact:</h4>
+            <ul  id="xp_pe_tab_pane" class="air_nav_tabs nav nav-tabs mt-4" role="tablist">
+                <li class="air_nav_item nav-item" style="width: 33%;">
+                    <a class="air_tab air_tab_sub active nav-link" id="xp_pe_result_pheno-tab" data-toggle="tab" href="#xp_pe_result_pheno" role="tab" aria-controls="xp_pe_result_pheno" aria-selected="true">Phenotypes</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 33%;">
+                    <a class="air_tab air_tab_sub nav-link" id="xp_pe_result_element-tab" data-toggle="tab" href="#xp_pe_result_element" role="tab" aria-controls="xp_pe_result_element" aria-selected="false">Paths</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 32%;">
+                    <a class="air_tab air_tab_sub nav-link" id="xp_pe_result_ko-tab" data-toggle="tab" href="#xp_pe_result_ko" role="tab" aria-controls="xp_pe_result_ko" aria-selected="false">KO Impact</a>
+                </li>
+            </ul>
+            <div class="tab-content air_tab_content">
+                <div class="tab-pane show active air_sub_tab_pane mb-2" id="xp_pe_result_pheno" role="tabpanel" aria-labelledby="xp_pe_result_pheno-tab">
+                    <div class="row mt-2 mb-4">
+                        <div class="col-auto">
+                            <div class="wrapper">
+                                <button type="button" class="air_btn_info btn btn-secondary"
+                                        data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
+                                        data-content="If checked, phenotype levels will be normalized by the max absolute values.">
+                                    ?
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="cbcontainer">
+                                <input type="checkbox" class="air_checkbox" id="xp_normalize_phen">
+                                <label class="air_checkbox" for="xp_normalize_phen">Normalize Phenotypes</label>
+                            </div>
+                        </div>
+                    </div>    
 
-            <div class="row mt-2 mb-4">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
-                                data-content="If checked, phenotype levels will be normalized by the max absolute values.">
-                            ?
-                        </button>
+                    <div class="air_table_background">
+                        <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th style="vertical-align: middle;">Phenotype</th>
+                                    <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
+                                    <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Saturation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="xp_normalize_phen">
-                        <label class="air_checkbox" for="xp_normalize_phen">Normalize Phenotypes</label>
+                <div class="tab-pane air_sub_tab_pane mb-2" id="xp_pe_result_element" role="tabpanel" aria-labelledby="xp_pe_result_element-tab">
+                    <select id="xp_pe_result_path_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>
+                    <div class="mb-4 mt-4" style="height:300px;overflow-y:scroll; position:relative">
+                        <div id="xp_pe_result_path_canvasContainer" style="height:0px">
+                            <canvas id="xp_pe_result_path_chart"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>    
-
-            <div class="air_table_background">
-                <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th style="vertical-align: middle;">Phenotype</th>
-                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
-                            <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Saturation</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
+                <div class="tab-pane air_sub_tab_pane mb-2" id="xp_pe_result_ko" role="tabpanel" aria-labelledby="xp_pe_result_ko-tab">
+                    <select id="xp_pe_result_ko_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>
+                    <button id="xp_pe_ko_btn" type="button" class="air_btn btn btn-block mb-4 mt-2">Analyze</button>
+                    <div class="mb-4 mt-4" style="height:300px;overflow-y:scroll; position:relative">
+                        <div id="xp_pe_result_ko_canvasContainer" style="height:0px">
+                            <canvas id="xp_pe_result_ko_chart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>`);
 
+        var pathphenoSelect = document.getElementById('xp_pe_result_path_select');
+        var kophenoSelect = document.getElementById('xp_pe_result_ko_select');
+        $('#xp_pe_result_path_select').on('change', xp_updatePathgraph)
+        $('#xp_pe_ko_btn').on('click', xp_updateKOgraph)
+        
+
+        i = 0;
+
         $("#xp_pe_selectedelement_btn").tooltip();
-        $("#xp_pe_element_input").keyup(function(event) {
-            if (event.keyCode === 13) {
-                $("#xp_pe_element_btn").click();
+        $("#xp_pe_element_input").on('keypress',function(ev) {
+            var keycode = (ev.keyCode ? ev.keyCode : ev.which);
+            if (keycode == '13') {
+                $("#xp_pe_element_btn").trigger("click");
             }
         });
 
@@ -716,6 +786,133 @@ async function getPhenotypePanel()
             adjustPanels(globals.xplore.container);
         } );
 
+        var outputCanvas = document.getElementById('xp_pe_result_path_chart').getContext('2d');
+        globals.xplore.pe_pathchart = new Chart(outputCanvas, {
+            type: 'bar',
+            data: {
+            },
+            options: {
+                plugins: {
+                    title: {
+                        display: false,
+                        text: 'Elements included in Paths',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
+                    },
+                    legend: {
+                        display: false
+                    },
+                },
+
+                scales: {
+                    y: {
+                        ticks:
+                        {
+                            mirror: true,
+                            z: 2,
+                            color: "#000000",
+                        },
+                        stacked: true
+                    },
+                    x: {
+                        position: "top",
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Percentage'
+                        },
+                        ticks: {
+                            callback: function (value, index, values) {
+                                return value + '%';
+                            },
+                            stepSize: 20
+                        },
+                        min: 0,
+                        max: 100,
+                        stacked: true
+                    }
+                },
+
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                hover: {
+                    animationDuration: 0
+                },
+                responsiveAnimationDuration: 0,
+                indexAxis: 'y',
+            }
+        });
+
+        var outputCanvas = document.getElementById('xp_pe_result_ko_chart').getContext('2d');
+        globals.xplore.pe_kochart = new Chart(outputCanvas, {
+            type: 'bar',
+            data: {
+            },
+            options: {
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Changes in Centrality',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
+                    },
+                    legend: {
+                        display: true
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return ([
+                                    ["Influence", "Betweenness", "Closeness"][context.datasetIndex] + ": " + expo(context.raw) + "%",
+                                    "OG Value: " + expo(globals.xplore.kochartdata[context.dataIndex][4 + 2 * context.datasetIndex]),
+                                    "KO Value: " + expo(globals.xplore.kochartdata[context.dataIndex][5 + 2 * context.datasetIndex])
+                                ])
+                            }
+                        }
+                    },
+                },
+
+                scales: {
+                    y: {
+                        ticks:
+                        {
+                            mirror: true,
+                            z: 3,
+                            color: "#000000"
+                        }
+                    },
+                    x: {
+                        position: "top",
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Percentage change in centrality'
+                        },
+                        ticks: {
+                            callback: function (value, index, values) {
+                                return value + '%';
+                            },
+                        },
+                    }
+                },
+
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                hover: {
+                    animationDuration: 0
+                },
+                responsiveAnimationDuration: 0,
+                indexAxis: 'y',
+            }
+        });
 
         globals.xplore.pe_results_table = $('#xp_table_pe_results').DataTable({
             "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
@@ -738,7 +935,7 @@ async function getPhenotypePanel()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.xplore.pe_results_table))
+                        air_download("InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.xplore.pe_results_table))
                     }
                 }
             ],
@@ -773,10 +970,15 @@ async function getPhenotypePanel()
         } );
 
 
-        for(let p in AIR.Phenotypes)
+        for(let phenotype in AIR.Phenotypes)
         {
+            var p = AIR.Phenotypes[phenotype].name;
+    
+            pathphenoSelect.options[pathphenoSelect.options.length] = new Option(p, phenotype); 
+            kophenoSelect.options[kophenoSelect.options.length] = new Option(p, phenotype); 
+
             globals.xplore.pe_results_table.row.add([
-                getLinkIconHTML(AIR.Phenotypes[p].name),
+                getLinkIconHTML(p),
                 `<div id="xp_pe_value_${p}">0</div>`,
                 `<div id="xp_pe_accuracy_${p}">0</div>`
             ])
@@ -803,7 +1005,8 @@ async function getPhenotypePanel()
             
             await recalculateInfluenceScores();
             await setPeTable()
-            await xp_EstimatePhenotypes();
+            xp_EstimatePhenotypes();
+            xp_updatePathgraph()
         })
 
         $('#xp_import_redo').on('click', async function() {
@@ -823,7 +1026,9 @@ async function getPhenotypePanel()
 
             await recalculateInfluenceScores();
             await setPeTable()
-            await xp_EstimatePhenotypes();
+            xp_EstimatePhenotypes();
+            xp_updateKOgraph()
+            xp_updatePathgraph()
         })
         
         $('#xp_pe_selectedelement_btn').on('click', async function() {
@@ -933,7 +1138,15 @@ async function getPhenotypePanel()
             xp_EstimatePhenotypes()
         });
 
-
+        $('.xp_pe_tab_pane[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            var target = $(e.target).attr("href") // activated tab
+            switch(target) {
+                case "#xp_pe_result_pheno":
+                    globals.xplore.pe_results_table.columns.adjust(); 
+                    break;
+            }
+            adjustPanels(globals.xplore.container);
+        });
         globals.xplore.targetpanel.append('<div class="mb-4"></div>');
 
         resolve('');
@@ -1070,7 +1283,7 @@ function getInteractionPanel()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.regulationtable))
+                        air_download("InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.regulationtable))
                     }
                 }
             ], 
@@ -1119,7 +1332,7 @@ function getInteractionPanel()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.targettable))
+                        air_download("InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.targettable))
                     }
                 }
             ], 
@@ -1169,7 +1382,7 @@ function getInteractionPanel()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.hpotable))
+                        air_download("InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.hpotable))
                     }
                 }
             ], 
@@ -1219,7 +1432,7 @@ function getInteractionPanel()
                     text: 'TSV',
                     className: 'air_dt_btn',
                     action: function () {
-                        air_download(download_string + "InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.phenotypetable))
+                        air_download("InSilicoPerturb_ElementsSettings_tsv.txt", getDTExportString(globals.xplore.phenotypetable))
                     }
                 }
             ], 
@@ -1269,11 +1482,11 @@ function getInteractionPanel()
         });
 
 
-        $("#xp_select_interaction_type").change(function(){
+        $("#xp_select_interaction_type").on("change", function(){
             getData(onlyRegulators = true, onlyHPO = false);
         });
 
-        $("#xp_select_interaction_hpo").change(function(){
+        $("#xp_select_interaction_hpo").on("change", function(){
             getData(onlyRegulators = false, onlyHPO = true);
         });
 
@@ -1451,62 +1664,68 @@ function getTargetPanel() {
                 datasets: []
             },
             options: {
-                hover: {
-                    onHover: function(e) {
-                    var point = this.getElementAtEvent(e);
-                    if (point.length) e.target.style.cursor = 'pointer';
-                    else e.target.style.cursor = 'default';
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                var label = context.label || '';
+    
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed.x;
+                                label += "; ";
+                                label += context.parsed.y;
+                                return label;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false,
+                    },
+                    title: {
+                        display: false,
+                        text: 'Predicted Targets',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
                     }
                 },
-                legend: {
-                    display: false
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                },
+                onClick: (event, chartElement) => {
+                    if(chartElement[0])
+                    {
+                        let name = globals.xplore.xp_targetchart.data.datasets[chartElement[0].datasetIndex].label;
+                        selectElementonMap(name, true);  
+                        xp_setSelectedElement(name);    
+                    }
                 },
                 layout: {
                     padding: {
                     top: 15
                     }
                 },
-                title: {
-                    display: false,
-                    text: 'Predicted Targets',
-                    fontFamily: 'Helvetica',
-                    fontColor: '#6E6EC8',
-                    fontStyle: 'bold'
-                },
                 scales: {
-                    yAxes: [{
-                        scaleLabel: {
+                    y: {
+                        title: {
                             display: true,
-                            labelString: 'Sensitivity'
+                            text: 'Sensitivity'
                         },
                         ticks: {
                             beginAtZero: false,
                             //suggestedMax: 1
                         }
-                    }],
-                    xAxes: [{
-                        scaleLabel: {
+                    },
+                    x: {
+                        title: {
                             display: true,
-                            labelString: 'Specificity'
+                            text: 'Specificity'
                         },
                         ticks: {
                             beginAtZero: false,
                             //suggestedMax: 1
-                        }
-                    }]
-                },
-                tooltips: {
-                    callbacks: {
-                        label: function (tooltipItem, data) {
-                            var label = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                            if (label) {
-                                label += ': ';
-                            }
-                            label += tooltipItem.xLabel;
-                            label += "; ";
-                            label += tooltipItem.yLabel;
-                            return label;
                         }
                     }
                 }
@@ -1514,20 +1733,6 @@ function getTargetPanel() {
             
         });
 
-
-        document.getElementById('xp_chart_target').onclick = function (evt) {
-
-            // => activePoints is an array of points on the canvas that are at the same position as the click event.
-            var activePoint = globals.xplore.xp_targetchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-
-            if (activePoint !== undefined) {
-                let name = globals.xplore.xp_targetchart.data.datasets[activePoint._datasetIndex].label;
-                selectElementonMap(name, true);  
-                xp_setSelectedElement(name);          
-            }
-
-            // Calling update now animates element from oldValue to newValue.
-        };
 
         resolve('');
     });
@@ -2300,7 +2505,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 }
             }
-            if (onlyRegulators === false && ENABLE_API_CALLS == false) {
+            if (onlyRegulators === false && ENABLE_API_CALLS == true) {
 
                 globals.xplore.hpotable.clear();
                 let response = await getHPO(elementid)
@@ -2848,55 +3053,61 @@ function xp_createpopup(button, phenotype) {
     
                     // Container for zoom options
                     zoom: {
-                        // Boolean to enable zooming
-                        enabled: true,
-                        // Zooming directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow zooming in the y direction
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
                         mode: 'xy',
                     }
+                },
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: "Regulators for '" +AIR.Phenotypes[phenotype].name,
+                    fontFamily: 'Helvetica',
                 }
             },
             responsive: true,
             maintainAspectRatio: false,
-            hover: {
-                onHover: function(e) {
-                var point = this.getElementAtEvent(e);
-                if (point.length) e.target.style.cursor = 'pointer';
-                else e.target.style.cursor = 'default';
-                }
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
-            legend: {
-                display: false
+            onClick: (event, chartElement) => {
+                if(chartElement[0])
+                {
+                    let name = popupchart.data.datasets[chartElement[0].datasetIndex].label;
+                    selectElementonMap(name, true);  
+                    xp_setSelectedElement(name);    
+                }
             },
             layout: {
                 padding: {
                 top: 0
                 }
             },
-            title: {
-                display: true,
-                text: "Regulators for '" +AIR.Phenotypes[phenotype].name,
-                fontFamily: 'Helvetica',
-            },
             scales: {
-                yAxes: [{
-                    scaleLabel: {
+                y: {
+                    title: {
                         display: true,
-                        labelString: 'Influence on Phenotype'
+                        text: 'Influence on Phenotype'
                     },
                     ticks: {
                         //beginAtZero: true,
                     }
-                }],
-                xAxes: [{
-                    scaleLabel: {
+                },
+                x: {
+                    title: {
                         display: true,
-                        labelString: 'User set Fold Change'
+                        text: 'User set Fold Change'
                     },
                     ticks: {
                         //beginAtZero: false,
                     }
-                }]
+                }
             },
             tooltips: {
                 callbacks: {
@@ -2922,18 +3133,7 @@ function xp_createpopup(button, phenotype) {
     }; 
 
     let popupchart = new Chart(outputCanvas, chartOptions);
-    document.getElementById('xp_popup_chart').onclick = function (evt) {
-            var activePoint = popupchart.lastActive[0];
-            if (activePoint !== undefined) {
-                let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
-                if(_id && AIR.Molecules.hasOwnProperty(_id))
-                {
-                    let name = AIR.Molecules[_id].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            }
-    };
+
     $target.show();
 
     var popupheight = $("#xp_chart_popover").height() + 50;
@@ -2941,3 +3141,176 @@ function xp_createpopup(button, phenotype) {
         minHeight: (popupheight > 400? 400 : popupheight) + "px",
     });
 };
+
+async function xp_updatePathgraph()
+{
+    globals.xplore.pe_pathchart.data = {}
+    let phenotype = $("#xp_pe_result_path_select").val()
+    let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
+    let fcelements = Object.keys(_data);
+
+    let ko_elements = perturbedElements();
+    let pathsfromelement = await getPathsConnectedToElement(phenotype, ko_elements, false, false, false)
+    let epaths = Object.keys(pathsfromelement).filter(p => fcelements.includes(p.split("_")[0]));
+
+
+    var re = new RegExp("_", 'g')
+
+    let results = {}
+    for (let path of epaths) {
+        for (let e of path.split(re)) {
+            if(!results.hasOwnProperty(e))
+            {
+                results[e] = {"pos": 0, "neg": 0};                
+            }
+            results[e][epaths[path] == -1? "neg" : "pos"] += 1;
+        }
+    }
+
+    let chartdata = []
+
+    for (let e in results) {
+
+        if (results[e] == 0 || e == phenotype || fcelements.includes(e))
+            continue
+
+        chartdata.push(
+            [
+                AIR.Molecules[e].name,
+                results[e]["pos"] + results[e]["neg"],
+                results[e]["pos"],
+                results[e]["neg"]
+            ]);
+
+    }
+
+    chartdata = chartdata.sort(function (a, b) {
+        return b[1] - a[1];
+    });
+
+    globals.xplore.pathChartData = chartdata;
+
+    globals.xplore.pe_pathchart.data = {
+        labels: chartdata.map(p => p[0]),
+        datasets:
+            [
+                {
+                    label: "Percentage of positive Paths",
+                    data: chartdata.map(p => expo(p[2] * 100 / epaths.length)),
+                    backgroundColor: "#007bff"
+                },
+                {
+                    label: "Percentage of negative Paths",
+                    data: chartdata.map(p => expo(p[3] * 100 / epaths.length)),
+                    backgroundColor: "#FF0000"
+                }
+            ]
+
+    }
+
+    document.getElementById("xp_pe_result_path_canvasContainer").style.height = (50 + 40 * chartdata.length).toString() + "px";
+
+
+    globals.xplore.pe_pathchart.update();
+    adjustPanels(globals.xplore.container);
+}
+
+async function xp_updateKOgraph()
+{
+    let text = await disablebutton("xp_pe_ko_btn", true)
+    let phenotype = $("#xp_pe_result_ko_select").val()
+    var chartData = []
+    globals.xplore.pe_kochart.data = {}
+    globals.xplore.kochartdata = []
+
+    let ko_elements = perturbedElements();
+
+    if (!phenotype || ko_elements.length == 0) {
+        document.getElementById("xp_pe_result_ko_canvasContainer").style.height = (70 * chartData.length) < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+        globals.centralityChart.update();
+        return;
+    }
+
+    var normalpaths = Object.keys(await getPathsConnectedToElement(phenotype, [], false, false, false))
+    var kopaths = normalpaths.filter(p => ko_elements.every(ko => p.includes(ko + "_") == false && p.includes("_" + ko) == false))
+
+    let pathelements = Array.from(new Set([].concat.apply([], normalpaths.map(m => m.split("_")) )));
+    await updateProgress(0, pathelements.length, "xp_pe_ko_btn", " analyzing centralities ...")
+    let count = 1
+    let re = new RegExp("_", "g")
+    for (let e of pathelements) {
+
+        if(count % 100 == 0)
+            await updateProgress(count, pathelements.length, "xp_pe_ko_btn", " analyzing centralities ...")
+
+        count++
+
+        if (ko_elements.includes(e) || phenotype == e) {
+            continue;
+        }
+
+        let betw = normalpaths.filter(p => p.includes("_" + e + "_")).length;
+        let ko_betw = kopaths.filter(p => p.includes("_" + e + "_")).length;
+
+        let betw_log2 = (betw == 0 ? 0 : ((betw - ko_betw) * 100 / betw));
+
+        let infl = AIR.Phenotypes[phenotype].values.hasOwnProperty(e) ? AIR.Phenotypes[phenotype].values[e] : 0;
+        let ko_infl = globals.xplore.pe_influenceScores[phenotype].values.hasOwnProperty(e) ? globals.xplore.pe_influenceScores[phenotype].values[e] : 0;
+
+        let infl_log2 = (infl == 0 ? 0 : ((infl - ko_infl) * 100));
+
+        let clos = normalpaths.filter(p => p.startsWith(e + "_")).map(p => (p.match(re) || []).length)
+        clos = clos.length == 0 ? 0 : (1 / Math.min(...clos));
+        let ko_clos = kopaths.filter(p => p.startsWith(e + "_")).map(p => (p.match(re) || []).length)
+        ko_clos = ko_clos.length == 0 ? 0 : (1 / Math.min(...ko_clos));
+
+        let clos_log2 = (clos == 0 ? 0 : ((clos - ko_clos) * 100 / clos))
+
+        if (clos_log2 != 0 || betw_log2 != 0) {
+            chartData.push([
+                e,
+                -infl_log2,
+                -betw_log2,
+                -clos_log2,
+                infl,
+                ko_infl,
+                betw,
+                ko_betw,
+                clos,
+                ko_clos
+            ])
+        }
+    }
+
+    chartData = chartData.sort(function (a, b) {
+        return Math.max(...[Math.abs(b[1]), Math.abs(b[2]), Math.abs(b[3])]) - Math.max(...[Math.abs(a[1]), Math.abs(a[2]), Math.abs(a[3])]);
+    });
+
+    globals.xplore.kochartdata = chartData
+
+    globals.xplore.pe_kochart.data = {
+        labels: chartData.map(p => AIR.Molecules[p[0]].name),
+        datasets: [
+            {
+                label: "Influence",
+                data: chartData.map(p => p[1]),
+                backgroundColor: "#FF0000",
+            },
+            {
+                label: "Betweenness",
+                data: chartData.map(p => p[2]),
+                backgroundColor: "#007bff",
+            },
+            {
+                label: "Closeness",
+                data: chartData.map(p => p[3]),
+                backgroundColor: "#00FF00",
+            }
+        ]
+
+    }
+
+    document.getElementById("xp_pe_result_ko_canvasContainer").style.height = (70 * chartData.length) < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+    globals.xplore.pe_kochart.update();
+    await enablebtn("xp_pe_ko_btn", text)
+}
