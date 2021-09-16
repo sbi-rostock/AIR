@@ -16,12 +16,11 @@ var VCF = require('@gmod/vcf');
 
 var ttest = require('ttest');
 
-require('datatables.net-buttons')(window, $); 
+require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
 
 
-var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
-//var URL = "http://localhost:3000/Energie/"; var filetesting = true;
-
+var URL = "http://localhost:3000/Energie/";
+var filetesting = false;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -68,9 +67,22 @@ var globals = {
   xp_path_table: undefined,
   user: undefined,
   pathchart: undefined,
+  pathChartData: {
+    source: "",
+    through: "",
+    target: "",
+    data: []
+  },
   centralityChart: undefined,
   centralitychartData: [],
-  ko_elements: []
+  centralitypathchart: undefined,
+  ko_elements: [],
+  optimizetotalchart: undefined,
+  optimizechart: undefined,
+  xp_targetchart: undefined,
+  targetphenotypetable: undefined,
+  targetpanel: undefined,
+  xp_target_downloadtext: ""
 };
 const centralities = ["Betweenness", "Closeness", "Degree", "Indegree", "Outdegree"];
 
@@ -171,73 +183,186 @@ async function initMainPageStructure() {
         </div>
     </div>`).appendTo(container);
   readDataFiles().finally(async function (data) {
+    $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
+    await getPhenotypeInfluences(true);
+    $("#air_init_btn").remove();
     container.append(`
-            <h4 class="mb-2 mt-4">Select perturbed elements:</h4>   
-            <input type="text" list="xp_elementnames" style="width: 55%" class="textfield" id="xp_pe_element_input" placeholder="Type in elements seperated by comma"/>
-            <datalist id="xp_elementnames" style="height:5.1em;overflow:hidden">
-            </datalist>
-            <button type="button" id="xp_pe_element_btn" style="width: 40%" class="air_btn btn mr-1">Add Element</button>
-
-            <div class="btn-group btn-group-justified mt-4 mb-4">
-                <div class="btn-group">
-                    <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
+            <button class="air_collapsible mt-4">Interaction Path Identification</button>
+            <div id="xp_panel_interaction" class="air_collapsible_content">
+                <div class="row mt-4 mb-2">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                    data-content="If checked, only the shortest paths will be considered. If unchecked, calculations may take a few seconds.<br/>">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_allpaths">
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_allpaths">Only shortest paths?</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="btn-group">
-                    <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
+                <div class="row mt-2 mb-2">
+                    <div class="col-auto mb-2">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                    data-content="If checked, perturbed paths will be excluded.<br/>">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_considerko" checked>
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_considerko">Consider KO perturbations from below?</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-2 mb-2">
+                    <div class="col-auto mb-4">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
+                                    data-content="If checked, perturbed paths will be excluded.<br/>">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_reentry">
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_reentry">Allow compartment reentry?</label>
+                        </div>
+                    </div>
+                </div>
+                <div><span>From</span></div>
+                <div>
+                <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" placeholder="Type in name"/>
+                <datalist id="xp_path_elementnames_source" style="height:5.1em;overflow:hidden">
+                </datalist>
+                </div>
+                <div>
+                    <span style="display: inline-block;width: 20%">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_through" checked>
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_through">Through</label>
+                    </span>
+                    <span style="display: inline-block;width: 50%">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_notthrough">
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_notthrough">not Through</label>
+                    </span>
+                </div>
+                <div>
+                    <input type="text" list="xp_path_elementnames_through" style="width: 70%" class="textfield mb-2" id="xp_path_element_through" placeholder="Type in name (not required)"/>
+                    <datalist id="xp_path_elementnames_through" style="height:5.1em;overflow:hidden">
+                    </datalist>
+                </div>
+                <div><span>To</span></div>
+                <input type="text" list="xp_path_elementnames_target" style="width: 70%" class="textfield mb-2" id="xp_path_element_target" value="sarcopenia_muscle"/>
+                <datalist id="xp_path_elementnames_target" style="height:5.1em;overflow:hidden">
+                </datalist>
+
+                <button type="button" id="xp_path_btn" class="air_btn btn btn-block mt-2 mb-2">Show Paths</button>
+                <hr>
+                <h4 class="mt-4 mb-2">Path List:</h4>
+                <div class="air_table_background">
+                    <table id="xp_path_table" cellspacing="0" class="air_table table table-sm" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th style="vertical-align: middle;"></th>
+                                <th style="vertical-align: middle;">Length</th>
+                                <th style="vertical-align: middle;">Impact</th>
+                                <th style="vertical-align: left;">Path</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+                <hr>
+                <h4 class="mt-4 mb-2">Elements in Paths:</h4>
+                <div class="mb-4 mt-2" style="height:500px;overflow-y:scroll; position:relative">
+                    <div id="canvasContainer" style="height:0px">
+                        <canvas id="xp_chart_path"></canvas>
+                    </div>
                 </div>
             </div>
-            <table id="xp_table_pe_elements" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
-                <thead>
-                    <tr>
-                        <th style="vertical-align: middle;">Element</th>
-                        <th style="vertical-align: middle;">Knockout</th>
-                        <th style="vertical-align: middle;">FC</th>
-                        <th style="vertical-align: middle;"></th>
-                        <th style="vertical-align: middle;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
+            <button class="air_collapsible mt-2">in silico Perturbation</button>
+            <div id="xp_panel_phenotypes" class="air_collapsible_content">
+                <input type="text" list="xp_elementnames" style="width: 55%" class="textfield mt-4" id="xp_pe_element_input" placeholder="Type in elements seperated by comma"/>
+                <datalist id="xp_elementnames" style="height:5.1em;overflow:hidden">
+                </datalist>
+                <button type="button" id="xp_pe_element_btn" style="width: 40%" class="air_btn btn mr-1">Add Element</button>
 
-            <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
+                <div class="btn-group btn-group-justified mt-4 mb-4">
+                    <div class="btn-group">
+                        <button type="button" id="xp_import_undo" class="air_disabledbutton air_btn btn mr-1"><i class="fas fa-undo"></i> Undo</button>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" id="xp_import_redo" class="air_disabledbutton air_btn btn ml-1"><i class="fas fa-redo"></i> Redo</button>
+                    </div>
+                </div>
+                <div class="air_table_background">
+                    <table id="xp_table_pe_elements" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th style="vertical-align: middle;">Element</th>
+                                <th style="vertical-align: middle;">Knockout (KO)</th>
+                                <th style="vertical-align: middle;">FC</th>
+                                <th style="vertical-align: middle;"></th>
+                                <th style="vertical-align: middle;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+                <button id="xp_pe_reset_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Reset</button>
 
-            <ul class="air_nav_tabs nav nav-tabs" role="tablist">
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab air_tab_sub active nav-link" id="xp_pheno-tab" data-toggle="tab" href="#xp_pheno" role="tab" aria-controls="xp_pheno" aria-selected="true">Effect Predictor</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab air_tab_sub nav-link" id="xp_path-tab" data-toggle="tab" href="#xp_path" role="tab" aria-controls="xp_path" aria-selected="false">Interaction Paths</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab air_tab_sub nav-link" id="xp_centrality-tab" data-toggle="tab" href="#xp_centrality" role="tab" aria-controls="xp_centrality" aria-selected="false">Centrality</a>
-                </li>
-            </ul>
-            <div class="tab-content air_tab_content" id="xp_tab">
+                <ul class="air_nav_tabs nav nav-tabs" role="tablist">
+                    <li class="air_nav_item nav-item" style="width: calc(100% / 3)">
+                        <a class="air_tab air_tab_sub active nav-link" id="xp_pheno-tab" data-toggle="tab" href="#xp_pheno" role="tab" aria-controls="xp_pheno" aria-selected="true">FC effects</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: calc(100% / 3)">
+                        <a class="air_tab air_tab_sub nav-link" id="xp_centrality-tab" data-toggle="tab" href="#xp_centrality" role="tab" aria-controls="xp_centrality" aria-selected="false">KO effects</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: calc(100% / 3)">
+                        <a class="air_tab air_tab_sub nav-link" id="xp_optimize-tab" data-toggle="tab" href="#xp_optimize" role="tab" aria-controls="xp_optimize" aria-selected="false">Knock out all</a>
+                    </li>
+                </ul>
+                <div class="tab-content air_tab_content" id="xp_tab">
+
+                </div>
+            </div>
+            <button class="air_collapsible mt-2">Upstream Enrichment</button>
+            <div id="xp_panel_targets" class="air_collapsible_content">
 
             </div>
-        `); //await calculateshortestPath([])
-
-    for (let p in AIR.Phenotypes) {
-      let influencevalues = await getPhenotypeInfluences(p, []);
-      globals.pe_influenceScores[p] = {
-        vales: influencevalues.values,
-        SPs: influencevalues.SPs
-      };
-      AIR.Phenotypes[p].values = influencevalues.values;
-      AIR.Phenotypes[p].SPs = influencevalues.SPs;
-    }
-
+        `);
+    $('#xp_hide_container .collapse').collapse();
     await getPhenotypePanel();
     await getPathPanel();
     await getCentralityPanel();
+    await getOptimizePanel();
+    await getTargetPanel();
 
     for (let element of Object.keys(AIR.Molecules).map(e => AIR.Molecules[e].name).sort()) {
       $("#xp_elementnames").append('<option value="' + element + '">');
-      $("#xp_path_elementnames").append('<option value="' + element + '">');
+      $("#xp_path_elementnames_source").append('<option value="' + element + '">');
+      $("#xp_path_elementnames_through").append('<option value="' + element + '">');
+      $("#xp_path_elementnames_target").append('<option value="' + element + '">');
+      $("#xp_cent_elementnames_target").append('<option value="' + element + '">');
+      $("#xp_cent_elementnames_source").append('<option value="' + element + '">');
+      $("#xp_opt_elementnames_target").append('<option value="' + element + '">');
+      $("#xp_opt_elementnames_source").append('<option value="' + element + '">');
     }
 
     for (let p in AIR.Phenotypes) {
+      AIR.Phenotypes[p]["value"] = 0;
       globals.pe_results_table.row.add([getLinkIconHTML(AIR.Phenotypes[p].name), `<div id="xp_pe_value_${p}">0</div>`, `<div id="xp_pe_accuracy_${p}">0</div>`]);
       $("#xp_path_phenotypes").append('<option value="' + p + '">' + AIR.Phenotypes[p].name + '</option>');
       $("#xp_cent_phenotypes").append('<option value="' + p + '">' + AIR.Phenotypes[p].name + '</option>');
@@ -245,6 +370,24 @@ async function initMainPageStructure() {
 
     globals.pe_results_table.columns.adjust().draw();
     globals.pe_element_table.columns.adjust().draw();
+    var coll = document.getElementById("sarco_plugincontainer").getElementsByClassName("air_collapsible");
+    var i;
+
+    for (i = 0; i < coll.length; i++) {
+      coll[i].addEventListener("click", function () {
+        this.classList.toggle("active");
+        var content = this.nextElementSibling;
+
+        if (content.style.maxHeight) {
+          content.style.maxHeight = null;
+        } else {
+          content.style.maxHeight = content.scrollHeight + 1 + "px";
+        }
+      });
+    } // coll[0].click();
+
+
+    adjustPanels();
     document.getElementById("stat_spinner").remove();
   });
 }
@@ -315,21 +458,731 @@ function focusOnSelected() {
   }
 }
 
+function getTargetPanel() {
+  return new Promise((resolve, reject) => {
+    globals.targetpanel = $("#xp_panel_targets");
+    globals.targetpanel.append('<h4 class="mt-4 mb-4">Select phenotype levels:</h4>');
+    var tbl = undefined;
+
+    if (document.getElementById('xp_table_target_phenotype')) {
+      $('#xp_table_target_phenotype').DataTable().destroy();
+      tbl = document.getElementById('xp_table_target_phenotype');
+      tbl.parentElement.removeChild(tbl);
+    }
+
+    tbl = document.createElement("table");
+    tbl.setAttribute('class', 'air_table table table-sm mt-4 mb-4');
+    tbl.setAttribute('style', 'width:100%');
+    tbl.setAttribute('id', 'xp_table_target_phenotype');
+    tbl.setAttribute('cellspacing', '0');
+
+    for (let p in AIR.Phenotypes) {
+      var row = tbl.insertRow(tbl.rows.length);
+      let pname = AIR.Phenotypes[p].name;
+      createCell(row, 'td', getLinkIconHTML(pname), 'col', '', 'right');
+      createCell(row, 'td', `<font data-order="1"><b>0<b></font>`, 'col slidervalue', '', 'center').setAttribute('id', 'PSliderValue' + p);
+      var slider = createSliderCell(row, 'td', p);
+      slider.setAttribute('id', 'PSlider' + p);
+
+      slider.oninput = function () {
+        let value = this.value;
+        $("#PSliderValue" + p).each(function () {
+          var invalue = parseFloat(value);
+          var output = `<font data-order="1"><b>${invalue}<b></font>`;
+
+          if (invalue < 0) {
+            output = `<font color="blue" data-order="2"><b>${invalue}<b></font>`;
+          }
+
+          if (invalue > 0) {
+            output = `<font color="red" data-order="0"><b>${invalue}<b></font>`;
+          }
+
+          jQuery(this)[0].innerHTML = output;
+          AIR.Phenotypes[p].value = invalue;
+        });
+      };
+
+      slider.onchange = function () {
+        XP_PredictTargets();
+      };
+    }
+
+    let header = tbl.createTHead();
+    var headerrow = header.insertRow(0);
+    createCell(headerrow, 'th', 'Phenotype', 'col', '', 'right');
+    createCell(headerrow, 'th', 'logFC', 'col', '', 'center');
+    createCell(headerrow, 'th', 'Select FC', 'col-2', '', 'center');
+
+    var _div = document.createElement("div");
+
+    _div.setAttribute('class', "air_table_background");
+
+    _div.appendChild(tbl);
+
+    globals.targetpanel.append(_div);
+    globals.targetphenotypetable = $('#xp_table_target_phenotype').DataTable({
+      //"scrollX": true,
+      //"autoWidth": true,
+      "table-layout": "fixed",
+      // ***********add this
+      "word-wrap": "break-word",
+      "columns": [{
+        "width": "40%"
+      }, {
+        "width": "10%"
+      }, {
+        "width": "50%"
+      }]
+    });
+    $(globals.targetphenotypetable.table().container()).addClass('air_datatable');
+    globals.targetphenotypetable.on('click', 'a', function () {
+      selectElementonMap(this.innerHTML, false);
+    });
+    globals.targetpanel.append(
+    /*html*/
+    `
+            <button type="button" class="btn-reset air_btn btn btn-block mb-2 mt-4">Reset</button>
+            
+            <hr>
+            <h4 class="mt-4 mb-4">Identified targets:</h4>
+            <select id="xp_select_target_type" class="browser-default xp_select custom-select mb-2 mt-2">
+                <option value="0" selected>All Elements</option>
+                <option value="1">Proteins</option>
+                <option value="2">miRNAs</option>
+                <option value="3">lncRNAs</option>
+                <option value="4">Transcription Factors</option>
+            </select>
+
+        `);
+    $(".dropdown-toggle").dropdown();
+    $('#xp_select_target_type').change(function () {
+      XP_PredictTargets();
+    });
+    globals.targetpanel.find('.btn-reset').on('click', () => {
+      globals.targetphenotypetable.rows().every(function () {
+        var row = this.nodes().to$();
+        row.find('.air_slider').val(0);
+        row.find('.slidervalue')[0].innerHTML = `<font data-order="1"><b>0<b></font>`;
+      });
+      globals.targetphenotypetable.draw(false);
+
+      for (let p in AIR.Phenotypes) {
+        AIR.Phenotypes[p].value = 0;
+      }
+
+      globals.xp_targetchart.data.datasets = [];
+      globals.xp_targetchart.update();
+    });
+    globals.targetpanel.append('<canvas id="xp_chart_target"></canvas>');
+    globals.targetpanel.append(
+    /*html*/
+    `
+            <div class="d-flex justify-content-center mt-2">
+                    <li class="legendli" style="color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#C00000"></span>positive Targets</li>
+                    <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#0070C0"></span>negative Targets</li>
+                    <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
+            </div>
+            <div class="btn-group btn-group-justified">
+                <div class="btn-group">
+                    <button id="xp_btn_download_target" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> as .txt</button>
+                </div>
+                <div class="btn-group">
+                    <button id="xp_btn_download_chart" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> as .png</button>
+                </div>
+            </div>
+            `);
+    $('#xp_btn_download_target').on('click', function () {
+      air_download('PredictedPhenotypeRegulators.txt', globals.xp_target_downloadtext);
+    });
+    $('#xp_btn_download_chart').on('click', function () {
+      var a = document.createElement('a');
+      a.href = globals.xp_targetchart.toBase64Image();
+      a.download = 'AIR_predictedTargets.png'; // Trigger the download
+
+      a.click();
+      a.remove();
+    });
+    var outputCanvas = document.getElementById('xp_chart_target').getContext('2d');
+    globals.xp_targetchart = new Chart(outputCanvas, {
+      type: 'bubble',
+      data: {
+        datasets: []
+      },
+      options: {
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                var label = context.label || '';
+
+                if (label) {
+                  label += ': ';
+                }
+
+                label += context.parsed.x;
+                label += "; ";
+                label += context.parsed.y;
+                return label;
+              }
+            }
+          },
+          legend: {
+            display: false
+          },
+          title: {
+            display: false,
+            text: 'Predicted Targets',
+            fontFamily: 'Helvetica',
+            fontColor: '#6E6EC8',
+            fontStyle: 'bold'
+          }
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
+        onClick: (event, chartElement) => {
+          if (chartElement[0]) {
+            let name = globals.xp_targetchart.data.datasets[chartElement[0].datasetIndex].label;
+            selectElementonMap(name, true);
+            xp_setSelectedElement(name);
+          }
+        },
+        layout: {
+          padding: {
+            top: 15
+          }
+        },
+        scales: {
+          y: {
+            title: {
+              display: true,
+              text: 'Sensitivity'
+            },
+            ticks: {
+              beginAtZero: false //suggestedMax: 1
+
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Specificity'
+            },
+            ticks: {
+              beginAtZero: false //suggestedMax: 1
+
+            }
+          }
+        }
+      }
+    });
+    resolve('');
+  });
+}
+
+function XP_PredictTargets() {
+  var targets = [];
+  let promises = [];
+  let filter = $('#xp_select_target_type option:selected').text();
+  globals.xp_target_downloadtext = `Filter: ${filter}\n\nSelected phenotype values:`;
+
+  for (let p in AIR.Phenotypes) {
+    globals.xp_target_downloadtext += `\n${AIR.Phenotypes[p].name}\t${AIR.Phenotypes[p].value}`;
+  }
+
+  globals.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivit\type';
+
+  for (let e in AIR.Molecules) {
+    let {
+      name: _name,
+      subtype: _type
+    } = AIR.Molecules[e];
+
+    if (_type.toLowerCase() === "phenotype") {
+      continue;
+    }
+
+    let typevalue = $('#xp_select_target_type').val();
+
+    if (typevalue == 1) {
+      if (_type != "PROTEIN" && _type != "TF") {
+        continue;
+      }
+    }
+
+    if (typevalue == 2) {
+      if (_type != "miRNA") {
+        continue;
+      }
+    }
+
+    if (typevalue == 3) {
+      if (_type != "lncRNA") {
+        continue;
+      }
+    }
+
+    if (typevalue == 4) {
+      if (_type != "TF") {
+        continue;
+      }
+    }
+
+    let positiveSum = 0;
+    let positiveinhibitorySum = 0;
+    let positiveCount = 0;
+    let negativeSum = 0;
+    let negativeCount = 0;
+
+    for (let p in globals.pe_influenceScores) {
+      let value = AIR.Phenotypes[p].value;
+      let SP = 0;
+
+      if (globals.pe_influenceScores[p].values.hasOwnProperty(e) == true) {
+        SP = globals.pe_influenceScores[p].values[e];
+      }
+
+      if (value != 0) {
+        positiveSum += value * SP;
+        positiveinhibitorySum -= value * SP;
+        positiveCount += Math.abs(value);
+      } else {
+        negativeSum += 1 - Math.abs(SP);
+        negativeCount++;
+      }
+    }
+
+    let positiveSensitivity = 0;
+    let negativeSensitivity = 0;
+
+    if (positiveCount > 0) {
+      positiveSensitivity = Math.round((positiveSum / positiveCount + Number.EPSILON) * 100) / 100;
+      negativeSensitivity = Math.round((positiveinhibitorySum / positiveCount + Number.EPSILON) * 100) / 100;
+    }
+
+    if (positiveSensitivity <= 0 && negativeSensitivity <= 0) {
+      continue;
+    }
+
+    let sensitivity = positiveSensitivity;
+    let specificity = 0;
+
+    if (negativeCount > 0) {
+      specificity = Math.round((negativeSum / negativeCount + Number.EPSILON) * 100) / 100;
+    } //var hex = pickHex([255, 140, 140], [110, 110, 200], (positiveresult + negativeresult) / 2);
+
+
+    var hex = '#C00000';
+    var regType = "positive";
+
+    if (negativeSensitivity > positiveSensitivity) {
+      hex = '#0070C0';
+      regType = "negative";
+      sensitivity = negativeSensitivity;
+    }
+
+    var radius = (sensitivity + specificity) / 2 * 8;
+    var pstyle = 'circle';
+
+    if (AIR.MapSpeciesLowerCase.includes(_name.toLowerCase()) === false) {
+      pstyle = 'triangle';
+    }
+
+    if (radius < 3) {
+      radius = 4;
+    }
+
+    targets.push({
+      label: _name,
+      data: [{
+        x: specificity,
+        y: sensitivity,
+        r: radius
+      }],
+      backgroundColor: hex,
+      hoverBackgroundColor: hex,
+      pointStyle: pstyle
+    });
+    globals.xp_target_downloadtext += `\n${_name}\t${specificity}\t${sensitivity}\t${regType}`;
+  }
+
+  Promise.all(promises).finally(r => {
+    globals.xp_targetchart.data.datasets = targets;
+    globals.xp_targetchart.update();
+  });
+}
+
+async function getOptimizePanel() {
+  return new Promise((resolve, reject) => {
+    $("#xp_tab").append(`
+        <div class="tab-pane air_sub_tab_pane" id="xp_optimize" role="tabpanel" aria-labelledby="xp_optimize-tab">
+            <div class="mt-4">
+                <span style="display: inline-block;width: 49.5%">From</span>
+                <span style="display: inline-block;width: 49%">To</span>
+            </div>
+            <div class="mb-4">
+                <input type="text" list="xp_opt_elementnames_source" style="width: 49%" class="textfield mr-1" id="xp_opt_element_source" placeholder="Type in name"/>
+                <datalist id="xp_opt_elementnames_source" style="height:5.1em;overflow:hidden">
+                </datalist>
+                <input type="text" list="xp_opt_elementnames_target" style="width: 49%" class="textfield" id="xp_opt_element_target" value="sarcopenia_muscle"/>
+                <datalist id="xp_opt_elementnames_target" style="height:5.1em;overflow:hidden">
+                </datalist>
+            </div>
+            <button type="button" id="xp_opt_btn" class="air_btn btn btn-block mt-2 mb-2">Predict maximized KO impact</button>
+            <div class="mb-4 mt-4" style="height:160px">
+                <canvas id="xp_chart_optimizetotal"></canvas>
+            </div>
+            <div class="mb-5 mt-4" style="height:600px;overflow-y:scroll; position:relative">
+                <div id="opt_canvasContainer" style="height:0px">
+                    <canvas id="xp_chart_optimize"></canvas>
+                </div>
+            </div>
+        </div>`);
+    $('#xp_opt_btn').on('click', getOptimizedKO);
+    var outputCanvas = document.getElementById('xp_chart_optimizetotal').getContext('2d');
+    globals.optimizetotalchart = new Chart(outputCanvas, {
+      type: 'bar',
+      data: {},
+      options: {
+        plugins: {
+          title: {
+            display: true,
+            text: 'Total paths ditribution',
+            fontFamily: 'Helvetica',
+            fontColor: '#6E6EC8',
+            fontStyle: 'bold'
+          },
+          legend: {
+            display: true
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return context.dataset.label + ": " + expo(Math.abs(context.raw)) + "%";
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              mirror: true,
+              z: 2,
+              color: "#000000"
+            },
+            stacked: true
+          },
+          x: {
+            position: "top",
+            type: 'linear',
+            title: {
+              display: false,
+              text: 'Percentage'
+            },
+            ticks: {
+              callback: function (value, index, values) {
+                return Math.abs(value) + '%';
+              },
+              stepSize: 20
+            },
+            min: -100,
+            max: 100,
+            stacked: true
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 0
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
+        indexAxis: 'y'
+      }
+    });
+    outputCanvas = document.getElementById('xp_chart_optimize').getContext('2d');
+    globals.optimizechart = new Chart(outputCanvas, {
+      type: 'bar',
+      data: {},
+      options: {
+        plugins: {
+          title: {
+            display: true,
+            text: 'Percentage point increase in either directions after the respective knockout',
+            fontFamily: 'Helvetica',
+            fontColor: '#6E6EC8',
+            fontStyle: 'bold'
+          },
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return context.dataset.label + ": +" + expo(Math.abs(context.raw)) + "%";
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              mirror: true,
+              z: 2,
+              color: "#000000"
+            },
+            stacked: true
+          },
+          x: {
+            position: "top",
+            type: 'linear',
+            title: {
+              display: false,
+              text: 'Percentage'
+            },
+            ticks: {
+              callback: function (value, index, values) {
+                return "+" + Math.abs(value) + '%';
+              }
+            },
+            stacked: true
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 0
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
+        indexAxis: 'y'
+      }
+    });
+    resolve();
+  });
+}
+
+async function getOptimizedKO() {
+  let text = await disablebutton("xp_opt_btn", true);
+  let count = 0;
+  await updateProgress(0, 1, "xp_opt_btn", " ... Calculating new topology");
+  let source = $("#xp_opt_element_source").val().split(',')[0];
+  let target = $("#xp_opt_element_target").val().split(',')[0];
+  var chartData = [];
+  globals.optimizetotalchart.data = {};
+  globals.optimizechart.data = {};
+
+  if (AIR.ElementNames.fullname.hasOwnProperty(source.toLowerCase().trim())) {
+    source = AIR.ElementNames.fullname[source.toLowerCase().trim()];
+  } else {
+    source = false;
+  }
+
+  if (AIR.ElementNames.fullname.hasOwnProperty(target.toLowerCase().trim())) {
+    target = AIR.ElementNames.fullname[target.toLowerCase().trim()];
+  } else {
+    target = false;
+  }
+
+  if (!target || source == target) {
+    document.getElementById("opt_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+    globals.optimizechart.update();
+    globals.optimizetotalchart.update();
+    enablebtn("xp_opt_btn", text);
+    adjustPanels();
+    return;
+  }
+
+  var allpaths = await BSFfromTarget(target, [], true, false, false);
+  await updateProgress(1, 3, "xp_opt_btn", " ... Calculating new topology");
+  var re = new RegExp("_", "g");
+
+  if (source) {
+    allpaths = Object.filter(allpaths, p => p.startsWith(source + "_"));
+  } else {
+    $("#xp_cent_element_source").val("");
+  }
+
+  var pathvalues = {
+    pos: 0,
+    neg: 0
+  };
+  var evalues = {};
+
+  for (var e in AIR.Molecules) {
+    evalues[e] = {
+      pos: 0,
+      neg: 0,
+      total: 0
+    };
+  }
+
+  for (var [path, value] of Object.entries(allpaths)) {
+    var splitted = path.split(re);
+
+    if (!consistentCompartments(splitted)) {
+      continue;
+    }
+
+    pathvalues[value == -1 ? "neg" : "pos"] += 1;
+
+    for (var e of splitted) {
+      evalues[e][value == -1 ? "neg" : "pos"] += 1;
+      evalues[e].total += 1;
+    }
+  }
+
+  pathvalues["total"] = pathvalues.pos + pathvalues.neg;
+  var totalratio = 2 * (pathvalues.pos / pathvalues.total) - 1;
+  var neg_percentage = pathvalues.neg * 100 / pathvalues.total;
+  var pos_percentage = pathvalues.pos * 100 / pathvalues.total;
+
+  for (var e in AIR.Molecules) {
+    if (e == source || e == target) continue;
+    var e_pos_percentage = (pathvalues.pos - evalues[e].pos) * 100 / (pathvalues.total - evalues[e].total);
+    var diff = e_pos_percentage - pos_percentage;
+
+    if (diff == 0) {
+      continue;
+    }
+
+    chartData.push([e, diff, evalues[e].pos, evalues[e].neg, evalues[e].total]);
+  }
+
+  chartData = chartData.sort(function (a, b) {
+    return Math.abs(b[1]) - Math.abs(a[1]);
+  });
+  globals.optimizetotalchart.data = {
+    labels: ["Total"],
+    datasets: [{
+      label: "Negative Paths",
+      data: [-neg_percentage],
+      barThickness: 30,
+      backgroundColor: "#4da3ff"
+    }, {
+      label: "Positive Paths",
+      data: [pos_percentage],
+      barThickness: 30,
+      backgroundColor: "#ff4d4d"
+    }]
+  };
+  globals.optimizechart.data = {
+    labels: chartData.map(d => strikeThrough(AIR.Molecules[d[0]].name)),
+    datasets: [{
+      label: "Negative Paths",
+      data: chartData.map(d => d[1] < 0 ? d[1] : 0),
+      barThickness: 30,
+      backgroundColor: "#4da3ff"
+    }, {
+      label: "Positive Paths",
+      data: chartData.map(d => d[1] > 0 ? d[1] : 0),
+      barThickness: 30,
+      backgroundColor: "#ff4d4d"
+    }]
+  };
+  document.getElementById("opt_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+  globals.optimizechart.update();
+  globals.optimizetotalchart.update();
+  enablebtn("xp_opt_btn", text);
+  adjustPanels();
+  globals.optimizechart.scales.x.min = -Math.max(...chartData.map(d => Math.abs(d[1])));
+  globals.optimizechart.scales.x.max = -globals.optimizechart.scales.x.min;
+}
+
 async function getCentralityPanel() {
   return new Promise((resolve, reject) => {
     $("#xp_tab").append(`
 
         <div class="tab-pane air_sub_tab_pane" id="xp_centrality" role="tabpanel" aria-labelledby="xp_centrality-tab">
-            <select id="xp_cent_phenotypes" class="browser-default xp_select custom-select mt-4 mb-4">
-            </select>
+            <div class="mt-4">
+                <span style="display: inline-block;width: 49.5%">From</span>
+                <span style="display: inline-block;width: 49%">To</span>
+            </div>
+            <div class="mb-4">
+                <input type="text" list="xp_cent_elementnames_source" style="width: 49%" class="textfield mr-1" id="xp_cent_element_source" placeholder="Type in name"/>
+                <datalist id="xp_cent_elementnames_source" style="height:5.1em;overflow:hidden">
+                </datalist>
+                <input type="text" list="xp_cent_elementnames_target" style="width: 49%" class="textfield" id="xp_cent_element_target" value="sarcopenia_muscle"/>
+                <datalist id="xp_cent_elementnames_target" style="height:5.1em;overflow:hidden">
+                </datalist>
+            </div>
+            <button type="button" id="xp_cent_btn" class="air_btn btn btn-block mt-2 mb-2">Calculate Centrality</button>
+            <div class="mb-4 mt-4" style="height:220px">
+                <canvas id="xp_chart_centralitypath"></canvas>
+            </div>
             <div class="mb-4 mt-4" style="height:600px;overflow-y:scroll; position:relative">
                 <div id="cent_canvasContainer" style="height:0px">
                     <canvas id="xp_chart_centrality"></canvas>
                 </div>
             </div>
         </div>`);
-    $('#xp_cent_phenotypes').on('change', getCentralityFC);
-    var outputCanvas = document.getElementById('xp_chart_centrality').getContext('2d');
+    $('#xp_cent_btn').on('click', getCentralityFC);
+    var outputCanvas = document.getElementById('xp_chart_centralitypath').getContext('2d');
+    globals.centralitypathchart = new Chart(outputCanvas, {
+      type: 'bar',
+      data: {},
+      options: {
+        plugins: {
+          title: {
+            display: true,
+            text: 'Total paths ditribution',
+            fontFamily: 'Helvetica',
+            fontColor: '#6E6EC8',
+            fontStyle: 'bold'
+          },
+          legend: {
+            display: true
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return context.dataset.label + ": " + expo(Math.abs(context.raw)) + "%";
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              mirror: true,
+              z: 2,
+              color: "#000000"
+            },
+            stacked: true
+          },
+          x: {
+            position: "top",
+            type: 'linear',
+            title: {
+              display: true,
+              text: 'Percentage'
+            },
+            ticks: {
+              callback: function (value, index, values) {
+                return Math.abs(value) + '%';
+              },
+              stepSize: 20
+            },
+            min: -100,
+            max: 100,
+            stacked: true
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 0
+        },
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        },
+        indexAxis: 'y'
+      }
+    });
+    outputCanvas = document.getElementById('xp_chart_centrality').getContext('2d');
     globals.centralityChart = new Chart(outputCanvas, {
       type: 'bar',
       data: {},
@@ -337,7 +1190,7 @@ async function getCentralityPanel() {
         plugins: {
           title: {
             display: true,
-            text: 'Changes in Centrality',
+            text: 'Changes in element centralities',
             fontFamily: 'Helvetica',
             fontColor: '#6E6EC8',
             fontStyle: 'bold'
@@ -370,7 +1223,9 @@ async function getCentralityPanel() {
         scales: {
           y: {
             ticks: {
-              mirror: true
+              mirror: true,
+              z: 3,
+              color: "#000000"
             }
           },
           x: {
@@ -392,9 +1247,6 @@ async function getCentralityPanel() {
         animation: {
           duration: 0
         },
-        hover: {
-          animationDuration: 0
-        },
         responsiveAnimationDuration: 0,
         indexAxis: 'y'
       }
@@ -404,37 +1256,116 @@ async function getCentralityPanel() {
 }
 
 async function getCentralityFC() {
-  let phenotype = $("#xp_cent_phenotypes").val();
-  let ko_elements = perturbedElements();
+  let text = await disablebutton("xp_cent_btn", true);
+  let count = 0;
+  await updateProgress(0, 1, "xp_cent_btn", " ... Calculating new topology");
+  let source = $("#xp_cent_element_source").val().split(',')[0];
+  let target = $("#xp_cent_element_target").val().split(',')[0];
   var chartData = [];
   globals.centralityChart.data = {};
+  globals.centralitypathchart.data = {};
   globals.centralitychartData = [];
 
-  if (ko_elements.length == 0) {
+  if (AIR.ElementNames.fullname.hasOwnProperty(source.toLowerCase().trim())) {
+    source = AIR.ElementNames.fullname[source.toLowerCase().trim()];
+  } else {
+    source = false;
+  }
+
+  if (AIR.ElementNames.fullname.hasOwnProperty(target.toLowerCase().trim())) {
+    target = AIR.ElementNames.fullname[target.toLowerCase().trim()];
+  } else {
+    target = false;
+  }
+
+  let ko_elements = perturbedElements();
+
+  if (!target || source == target || ko_elements.length == 0) {
     document.getElementById("cent_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
     globals.centralityChart.update();
+    globals.centralitypathchart.update();
+    enablebtn("xp_cent_btn", text);
+    adjustPanels();
     return;
   }
 
-  var kopaths = Object.keys(await getPathsConnectedToElement(phenotype, ko_elements, false, false));
-  var normalpaths = Object.keys(await getPathsConnectedToElement(phenotype, [], false, false));
+  var allpaths = await BSFfromTarget(target, [], true, false, false);
+  await updateProgress(1, 3, "xp_cent_btn", " ... Calculating new topology");
+  var re = new RegExp("_", "g");
 
-  for (let e in AIR.Molecules) {
-    if (ko_elements.includes(e) || phenotype == e) {
+  if (source) {
+    allpaths = Object.filter(allpaths, p => p.startsWith(source + "_"));
+  } else {
+    $("#xp_cent_element_source").val("");
+  }
+
+  var normalpathvalues = {
+    pos: 0,
+    neg: 0
+  };
+  var kopathvalues = {
+    pos: 0,
+    neg: 0
+  };
+  var elementsinpaths = {};
+  var ko_elementsinpaths = {};
+
+  for (var [path, value] of Object.entries(allpaths)) {
+    var splitted = path.split(re);
+
+    if (!consistentCompartments(splitted)) {
       continue;
     }
 
-    let betw = normalpaths.filter(p => p.includes("_" + e + "_")).length;
-    let ko_betw = kopaths.filter(p => p.includes("_" + e + "_")).length;
-    let betw_log2 = betw == 0 ? 0 : (betw - ko_betw) * 100 / betw;
-    let infl = AIR.Phenotypes[phenotype].values.hasOwnProperty(e) ? AIR.Phenotypes[phenotype].values[e] : 0;
-    let ko_infl = globals.pe_influenceScores[phenotype].values.hasOwnProperty(e) ? globals.pe_influenceScores[phenotype].values[e] : 0;
-    let infl_log2 = betw == 0 ? 0 : (infl - ko_infl) * 100 / infl;
-    let clos = normalpaths.filter(p => p.startsWith(e + "_")).map(p => (p.match(/_/g) || []).length);
-    clos = clos.length == 0 ? 0 : 1 / Math.min(...clos);
-    let ko_clos = kopaths.filter(p => p.startsWith(e + "_")).map(p => (p.match(/_/g) || []).length);
-    ko_clos = ko_clos.length == 0 ? 0 : 1 / Math.min(...ko_clos);
-    let clos_log2 = clos == 0 ? 0 : (clos - ko_clos) * 100 / clos;
+    var is_ko = ko_elements.some(ko => splitted.includes(ko) == true);
+
+    for (var e of splitted) {
+      if (!elementsinpaths.hasOwnProperty(e)) {
+        elementsinpaths[e] = [];
+        ko_elementsinpaths[e] = [];
+      }
+
+      elementsinpaths[e].push([splitted, value]);
+      normalpathvalues[value == -1 ? "neg" : "pos"] += 1;
+
+      if (!is_ko) {
+        kopathvalues[value == -1 ? "neg" : "pos"] += 1;
+        ko_elementsinpaths[e].push([splitted, value]);
+      }
+    }
+  }
+
+  await updateProgress(2, 3, "xp_cent_btn", " ... Calculating new topology");
+  allpaths = {};
+  var maxlength = Object.keys(elementsinpaths).length;
+
+  for (var e of Object.keys(elementsinpaths)) {
+    if (count % 30 == 0) await updateProgress(2 + maxlength + count, 3 * maxlength, "xp_cent_btn", " ... Calculating new topology");
+    count++;
+
+    if (ko_elements.includes(e) || target == e) {
+      continue;
+    }
+
+    var betw = elementsinpaths[e].filter(p => p[0][0] != e).map(p => p[0]).length;
+    var ko_betw = ko_elementsinpaths[e].filter(p => p[0][0] != e).map(p => p[0]).length;
+    var betw_log2 = betw == 0 ? 0 : (betw - ko_betw) * 100 / betw;
+    var epaths = elementsinpaths[e].filter(p => p[0][0] == e).map(p => p[1]);
+    var ko_epath = ko_elementsinpaths[e].filter(p => p[0][0] == e).map(p => p[1]);
+    var infl, ko_infl;
+
+    if (AIR.Phenotypes.hasOwnProperty(target)) {
+      infl = AIR.Phenotypes[target].values.hasOwnProperty(e) ? AIR.Phenotypes[target].values[e] : 0;
+      ko_infl = globals.pe_influenceScores[target].values.hasOwnProperty(e) ? globals.pe_influenceScores[target].values[e] : 0;
+    } else {
+      infl = 2 * epaths.filter(p => p == 1).length / epaths.length - 1;
+      ko_infl = 2 * ko_epath.filter(p => p == 1).length / ko_epath.length - 1;
+    }
+
+    var infl_log2 = (infl - ko_infl) * 100;
+    var clos = epaths.length;
+    var ko_clos = ko_epath.length;
+    var clos_log2 = clos == 0 ? 0 : (clos - ko_clos) * 100 / clos;
 
     if (clos_log2 != 0 || betw_log2 != 0) {
       chartData.push([e, -infl_log2, -betw_log2, -clos_log2, infl, ko_infl, betw, ko_betw, clos, ko_clos]);
@@ -448,86 +1379,55 @@ async function getCentralityFC() {
   globals.centralityChart.data = {
     labels: chartData.map(p => AIR.Molecules[p[0]].name),
     datasets: [{
-      label: "Influence",
+      label: "Impact",
       data: chartData.map(p => p[1]),
       backgroundColor: "#FF0000"
     }, {
       label: "Betweenness",
       data: chartData.map(p => p[2]),
-      backgroundColor: "#0000FF"
+      backgroundColor: "#4da3ff"
     }, {
       label: "Closeness",
       data: chartData.map(p => p[3]),
       backgroundColor: "#00FF00"
     }]
   };
+
+  var _total = normalpathvalues.pos + normalpathvalues.neg;
+
+  globals.centralitypathchart.data = {
+    labels: ["Before Knockout", "After Knockout"],
+    datasets: [{
+      label: "Positive Paths",
+      data: [normalpathvalues.pos * 100 / _total, kopathvalues.pos * 100 / _total],
+      barThickness: 30,
+      backgroundColor: "#ff4d4d"
+    }, {
+      label: "Negative Paths",
+      data: [-normalpathvalues.neg * 100 / _total, -kopathvalues.neg * 100 / _total],
+      barThickness: 30,
+      backgroundColor: "#4da3ff"
+    }]
+  };
+  enablebtn("xp_cent_btn", text);
   document.getElementById("cent_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+  globals.centralitypathchart.update();
   globals.centralityChart.update();
+  adjustPanels();
 }
 
 async function getPathPanel() {
   return new Promise((resolve, reject) => {
-    $("#xp_tab").append(`
-        <div class="tab-pane air_sub_tab_pane" id="xp_path" role="tabpanel" aria-labelledby="xp_path-tab">
-            <h4 class="mb-4">Highlight Path to Phenotype:</h4>   
-            <div class="mb-2">
-                <input type="text" list="xp_path_elementnames" style="width: 40%" class="textfield mr-1" id="xp_path_element" placeholder="Type in elements seperated by comma"/>
-                <datalist id="xp_path_elementnames" style="height:5.1em;overflow:hidden">
-                </datalist>
-                <select id="xp_path_phenotypes" class="browser-default xp_select custom-select mr-1" style="width: 40%" >
-                </select>
-                <button type="button" id="xp_path_btn" style="font-size:12px; width: 15%" class="air_btn btn ml-1">Show Path</button>
-            </div>
-            <div class="row mt-2 mb-4">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                data-content="If checked, every second column will be mapped as a p-value for the previous sample column.<br/>">
-                            ?
-                        </button>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="xp_cb_allpaths">
-                        <label class="air_checkbox air_checkbox_label" for="xp_cb_allpaths">Show all Paths?</label>
-                    </div>
-                </div>
-            </div>
-            <table id="xp_path_table" cellspacing="0" class="air_table table table-sm" style="width:100%">
-                <thead>
-                    <tr>
-                        <th style="vertical-align: middle;"></th>
-                        <th style="vertical-align: middle;">Length</th>
-                        <th style="vertical-align: middle;">Impact</th>
-                        <th style="vertical-align: left;">Path</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-            <div class="mb-4 mt-4" style="height:300px;overflow-y:scroll; position:relative">
-                <div id="canvasContainer" style="height:0px">
-                    <canvas id="xp_chart_path"></canvas>
-                </div>
-            </div>
-        </div>`);
     $("#xp_path_element").keyup(function (event) {
       if (event.keyCode === 13) {
         $("#xp_path_btn").click();
       }
-
-      chartdata = chartdata.sort(function (a, b) {
-        return b[1] - a[1];
-      });
-      globals.pathchart.data = {
-        labels: chartdata.map(p => p[0]),
-        datasets: [{
-          label: "Percentage",
-          data: chartdata.map(p => p[1])
-        }]
-      };
+    });
+    $("#xp_cb_through").change(function () {
+      $("#xp_cb_notthrough").prop("checked", !this.checked);
+    });
+    $("#xp_cb_notthrough").change(function () {
+      $("#xp_cb_through").prop("checked", !this.checked);
     });
     globals.xp_path_table = $('#xp_path_table').DataTable({
       "lengthMenu": [5, 6, 7, 8, 9, 10],
@@ -555,6 +1455,7 @@ async function getPathPanel() {
       }]
     }); //.columns.adjust().draw(true);;
 
+    $(globals.xp_path_table.table().container()).addClass('air_datatable');
     var outputCanvas = document.getElementById('xp_chart_path').getContext('2d');
     globals.pathchart = new Chart(outputCanvas, {
       type: 'bar',
@@ -562,21 +1463,39 @@ async function getPathPanel() {
       options: {
         plugins: {
           title: {
-            display: true,
+            display: false,
             text: 'Elements included in Paths',
             fontFamily: 'Helvetica',
             fontColor: '#6E6EC8',
             fontStyle: 'bold'
           },
           legend: {
-            display: false
+            display: true
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                var _data = globals.pathChartData.data[context.dataIndex];
+
+                if (context.dataIndex == 0) {
+                  return ["Total paths: " + _data[1] + " (" + expo(_data[1] * 100 / _data[8]) + "%)", "   of these positive: " + _data[2] + " (" + expo(_data[2] * 100 / _data[1]) + "%)", "   of these negative: " + _data[3] + " (" + expo(_data[3] * 100 / _data[1]) + "%)"];
+                }
+
+                var indexincrease = context.datasetIndex;
+                var typeText = context.datasetIndex == 0 ? ["Positive", "++", "Pos-Pos Paths (→→)", "--", "Neg-Neg Paths (⊣⊣)"] : ["Negative", "+-", "Pos-Neg Paths (→⊣)", "-+", "Neg-Pos Paths (⊣→)"];
+                return [typeText[0] + " Paths: " + _data[2 + indexincrease] + " (" + expo(_data[2 + indexincrease] * 100 / _data[1]) + "%)", "(Total Paths: " + _data[1] + " (" + expo(_data[1] * 100 / _data[8]) + "%))", "", typeText[2] + ": " + _data[4 + indexincrease] + " (" + expo(_data[4 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[1] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[1] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[1] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[1] + "out"].map(e => "    " + AIR.Molecules[e].name)] : []), "", typeText[4] + ": " + _data[6 + indexincrease] + " (" + expo(_data[6 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[3] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[3] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[3] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[3] + "out"].map(e => "    " + AIR.Molecules[e].name)] : [])];
+              }
+            }
           }
         },
         scales: {
           y: {
             ticks: {
-              mirror: true
-            }
+              mirror: true,
+              z: 2,
+              color: "#000000"
+            },
+            stacked: true
           },
           x: {
             position: "top",
@@ -592,7 +1511,8 @@ async function getPathPanel() {
               stepSize: 20
             },
             min: 0,
-            max: 100
+            max: 100,
+            stacked: true
           }
         },
         responsive: true,
@@ -600,118 +1520,210 @@ async function getPathPanel() {
         animation: {
           duration: 0
         },
-        hover: {
-          animationDuration: 0
+        onHover: (event, chartElement) => {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
         },
-        responsiveAnimationDuration: 0,
         indexAxis: 'y'
       }
     });
 
-    outputCanvas.onclick = function (evt) {
+    document.getElementById('xp_chart_path').onclick = async function (evt) {
       if (globals.pathchart) {
-        // => activePoints is an array of points on the canvas that are at the same position as the click event.
-        var activePoint = globals.pathchart.lastActive[0]; //.getElementsAtEvent(evt)[0];
-
-        if (activePoint !== undefined) {
-          let name = globals.pathchart.data.datasets[activePoint._datasetIndex].label;
-          selectElementonMap(name, true);
-          getData(name);
-        }
-      } // Calling update now animates element from oldValue to newValue.
-
+        var activePoints = globals.pathchart.getElementsAtEventForMode(evt, 'point', globals.pathchart.options);
+        var firstPoint = activePoints[0];
+        $("#xp_path_element_source").val(AIR.Molecules[globals.pathChartData.source].name);
+        $("#xp_path_element_through").val(globals.pathChartData.data[firstPoint.index][0]);
+        $("#xp_path_element_target").val(AIR.Molecules[globals.pathChartData.target].name) & "#xp_cb_through".prop("checked", true) & "#xp_cb_notthrough".prop("checked", false);
+        await updatePathData();
+        globals.xp_path_table.search(firstPoint.datasetIndex == 0 ? "positive" : "negative").draw();
+      }
     };
 
-    $('#xp_path_btn').on('click', async function () {
-      minervaProxy.project.map.getHighlightedBioEntities().then(async function (highlighted) {
-        minervaProxy.project.map.hideBioEntity(highlighted).then(async function (pv) {
-          globals.pathchart.data.datasets = [];
-          let element = $("#xp_path_element").val().split(',')[0];
-          globals.xp_path_table.clear();
+    $('#xp_path_btn').on('click', updatePathData);
+    resolve();
+  });
+}
 
-          if (AIR.ElementNames.fullname.hasOwnProperty(element.toLowerCase().trim())) {
-            element = AIR.ElementNames.fullname[element.toLowerCase().trim()];
-          } else {
-            document.getElementById("canvasContainer").style.height = "0px";
-            globals.pathchart.update();
-            globals.xp_path_table.columns.adjust().draw();
-            return;
-          }
+async function updatePathData() {
+  return new Promise((resolve, reject) => {
+    minervaProxy.project.map.getHighlightedBioEntities().then(async function (highlighted) {
+      minervaProxy.project.map.hideBioEntity(highlighted).then(async function (pv) {
+        globals.xp_path_table.search("");
+        globals.pathchart.data.datasets = [];
+        globals.xp_path_table.clear();
+        let source = $("#xp_path_element_source").val().split(',')[0];
+        let through = $("#xp_path_element_through").val().split(',')[0];
+        let target = $("#xp_path_element_target").val().split(',')[0];
 
-          let phenotype = $("#xp_path_phenotypes").val();
-          let ko_elements = perturbedElements();
-          var pathsfromelement = await getPathsConnectedToElement(phenotype, ko_elements, document.getElementById("xp_cb_allpaths").checked ? true : false, true);
-          let epaths = Object.keys(pathsfromelement).filter(p => p.startsWith(element + "+") || p.startsWith(element + "-"));
+        if (AIR.ElementNames.fullname.hasOwnProperty(source.toLowerCase().trim())) {
+          source = AIR.ElementNames.fullname[source.toLowerCase().trim()];
+        } else {
+          source = false;
+        }
 
-          if (epaths.length > 0) {
-            let _additionalelements = ko_elements.reduce((accumulator, currentValue) => {
-              accumulator[currentValue] = "#a9a9a9";
-              return accumulator;
-            }, {});
+        if (AIR.ElementNames.fullname.hasOwnProperty(target.toLowerCase().trim())) {
+          target = AIR.ElementNames.fullname[target.toLowerCase().trim()];
+        } else {
+          target = false;
+        }
 
-            let shortestpath = epaths.reduce((a, b) => (a.match(/[+-]/g) || []).length <= (b.match(/[+-]/g) || []).length ? a : b);
-            shortestpath = shortestpath.split(/([+-])/g);
-            let cutpath = {};
+        if (AIR.ElementNames.fullname.hasOwnProperty(through.toLowerCase().trim())) {
+          through = AIR.ElementNames.fullname[through.toLowerCase().trim()];
+        } else {
+          through = false;
+        }
 
-            for (let i = 0; i < shortestpath.length - 1; i += 2) {
-              cutpath[shortestpath[i] + "_" + shortestpath[i + 2]] = shortestpath[i + 1] == "+" ? "#00ff00" : "#ff0000";
-            }
-
-            highlightPath(cutpath, "#0000ff", _additionalelements, false);
-          }
-
-          let chartdata = [];
-
-          for (let e in AIR.Molecules) {
-            if (e == element || e == phenotype) continue;
-            let pathswithe = epaths.filter(p => p.includes(e + "+") || p.includes(e + "-"));
-
-            if (pathswithe.length > 0) {
-              chartdata.push([AIR.Molecules[e].name, pathswithe.length * 100 / epaths.length]);
-            }
-          }
-
-          chartdata = chartdata.sort(function (a, b) {
-            return b[1] - a[1];
-          });
-          globals.pathchart.data = {
-            labels: chartdata.map(p => p[0]),
-            datasets: [{
-              label: "Percentage",
-              data: chartdata.map(p => p[1])
-            }]
-          };
-          document.getElementById("canvasContainer").style.height = (50 + 40 * chartdata.length).toString() + "px";
-
-          for (let path of epaths) {
-            let newpath = '<div style="white-space: pre">';
-
-            for (let e of path.split(/([+-])/g)) {
-              switch (e) {
-                case "+":
-                  newpath += '<span style="color:blue;font-weight:bold"> → </span>';
-                  break;
-
-                case "-":
-                  newpath += '<span style="color:red;font-weight:bold"> ⊣ </span>';
-                  break;
-
-                default:
-                  newpath += getLinkIconHTML(e, true);
-                  break;
-              }
-            }
-
-            newpath += "</div>";
-            globals.xp_path_table.row.add(['<a href="#" class="xp_path_entry" data="' + path + '"><span class="fas fa-eye"></a>', (path.match(/[+-]/g) || []).length, pathsfromelement[path] == -1 ? '<span style="color:red">negative</span>' : '<span style="color:blue">positive</span>', newpath]);
-          }
-
+        if (!source || !target || source == target || source == through || target == through) {
+          document.getElementById("canvasContainer").style.height = "0px";
           globals.pathchart.update();
           globals.xp_path_table.columns.adjust().draw();
+          resolve();
+          return;
+        }
+
+        let ko_elements = perturbedElements();
+        let pathsfromelement = (await BSFfromTarget(target, document.getElementById("xp_cb_considerko").checked ? ko_elements : [], document.getElementById("xp_cb_allpaths").checked ? false : true, true, true))[source];
+        let epaths = Object.keys(pathsfromelement);
+        var re = new RegExp("([+-])", 'g');
+        var sre = new RegExp("[+-]");
+
+        if (!$("#xp_cb_reentry").prop("checked")) {
+          epaths = epaths.filter(p => consistentCompartments(p.split(sre)));
+        }
+
+        if (through) {
+          let through_regExp = new RegExp(through + "[+-]");
+
+          if ($("#xp_cb_through").prop("checked")) {
+            epaths = epaths.filter(p => p.match(through_regExp));
+          } else {
+            epaths = epaths.filter(p => !p.match(through_regExp));
+          }
+        }
+
+        var numberofinclusions = {};
+
+        for (var e in AIR.Molecules) {
+          numberofinclusions[e] = {
+            total: 0,
+            negative: 0,
+            positive: 0,
+            "++": 0,
+            "--": 0,
+            "+-": 0,
+            "-+": 0,
+            topregulators: {
+              "++in": {},
+              "--in": {},
+              "+-in": {},
+              "-+in": {},
+              "++out": {},
+              "--out": {},
+              "+-out": {},
+              "-+out": {}
+            }
+          };
+        }
+
+        for (var path of epaths) {
+          var newpath = '<div style="white-space: pre">';
+          var length = 0;
+          var relation = 1;
+          var crossedElements = {};
+
+          for (var e of path.split(re)) {
+            switch (e) {
+              case "+":
+                newpath += '<span style="color:blue;font-weight:bold"> → </span>';
+                length += 1;
+                break;
+
+              case "-":
+                newpath += '<span style="color:red;font-weight:bold"> ⊣ </span>';
+                length += 1;
+                relation *= -1;
+                break;
+
+              default:
+                newpath += AIR.Molecules[e].name; //getLinkIconHTML(e, false)
+
+                numberofinclusions[e].total += 1;
+                var type = pathsfromelement[path] == -1 ? "negative" : "positive";
+                var subtype = (relation == -1 ? "-" : "+") + (pathsfromelement[path] * relation == 1 ? "+" : "-");
+                numberofinclusions[e][type] += 1;
+                numberofinclusions[e][subtype] += 1;
+                subtype = subtype + "in";
+
+                if (e != target) {
+                  for (var _e in crossedElements) {
+                    var type = (crossedElements[_e] == -1 ? "-" : "+") + (pathsfromelement[path] * relation == 1 ? "+" : "-") + "out";
+
+                    if (!numberofinclusions[_e].topregulators[type].hasOwnProperty(e)) {
+                      numberofinclusions[_e].topregulators[type][e] = 1;
+                    } else {
+                      numberofinclusions[_e].topregulators[type][e] += 1;
+                    }
+
+                    if (_e != source) {
+                      if (!numberofinclusions[e].topregulators[subtype].hasOwnProperty(_e)) {
+                        numberofinclusions[e].topregulators[subtype][_e] = 1;
+                      } else {
+                        numberofinclusions[e].topregulators[subtype][_e] += 1;
+                      }
+                    }
+                  }
+                }
+
+                crossedElements[e] = relation;
+                break;
+            }
+          }
+
+          newpath += "</div>";
+          globals.xp_path_table.row.add(['<a href="#" class="xp_path_entry" data="' + path + '"><span class="fas fa-eye"></a>', length, pathsfromelement[path] == -1 ? '<span style="color:red">negative</span>' : '<span style="color:blue">positive</span>', newpath]);
+        }
+
+        let chartdata = [["Total", epaths.length, epaths.filter(p => pathsfromelement[p] == 1).length, epaths.filter(p => pathsfromelement[p] == -1).length, 0, 0, 0, 0, epaths.length, {}]];
+
+        for (let e in numberofinclusions) {
+          if (numberofinclusions[e].total == 0 || e == source || e == target) continue;
+          var topregulators = {};
+
+          for (var type in numberofinclusions[e].topregulators) {
+            topregulators[type] = Object.keys(pickHighest(numberofinclusions[e].topregulators[type], 3, false));
+          }
+
+          chartdata.push([AIR.Molecules[e].name, numberofinclusions[e].total, numberofinclusions[e].positive, numberofinclusions[e].negative, numberofinclusions[e]["++"], numberofinclusions[e]["+-"], numberofinclusions[e]["--"], numberofinclusions[e]["-+"], epaths.length, topregulators]);
+        }
+
+        chartdata = chartdata.sort(function (a, b) {
+          return b[1] - a[1];
         });
+        globals.pathChartData = {
+          source: source,
+          through: through,
+          target: target,
+          data: chartdata
+        };
+        globals.pathchart.data = {
+          labels: chartdata.map(p => p[0]),
+          datasets: [{
+            label: "Percentage of positive Paths",
+            data: chartdata.map(p => expo(p[2] * 100 / epaths.length)),
+            backgroundColor: "#ff4d4d"
+          }, {
+            label: "Percentage of negative Paths",
+            data: chartdata.map(p => expo(p[3] * 100 / epaths.length)),
+            backgroundColor: "#4da3ff"
+          }]
+        };
+        document.getElementById("canvasContainer").style.height = (50 + 40 * chartdata.length).toString() + "px";
+        globals.pathchart.update();
+        globals.xp_path_table.columns.adjust().draw();
+        adjustPanels();
+        resolve();
       });
     });
-    resolve();
   });
 }
 
@@ -753,6 +1765,7 @@ async function getPhenotypePanel() {
       // ***********add this
       "word-wrap": "break-word"
     });
+    $(globals.pe_element_table.table().container()).addClass('air_datatable');
     globals.pe_results_table = $('#xp_table_pe_results').DataTable({
       "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
       buttons: [{
@@ -1191,8 +2204,7 @@ function getData(elementname) {
   }
 
   if (elementid) {
-    $("#xp_pe_element_input").val(AIR.Molecules[elementid].name);
-    $("#xp_path_element").val(AIR.Molecules[elementid].name);
+    $("#xp_pe_element_input").val(AIR.Molecules[elementid].name); //$("#xp_path_element").val(AIR.Molecules[elementid].name)
 
     if (globals.pe_influenceScores.hasOwnProperty(elementid)) {
       let elementsToHighlight = {};
@@ -1274,7 +2286,6 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
   $("#xp_import_redo").addClass("air_disabledbutton");
   $("#xp_import_undo").removeClass("air_disabledbutton");
   await recalculateInfluenceScores();
-  getCentralityFC();
 });
 
 async function xp_EstimatePhenotypes() {
@@ -1326,6 +2337,7 @@ async function xp_EstimatePhenotypes() {
     }
 
     globals.pe_results_table.columns.adjust().draw();
+    adjustPanels();
     ColorElements(elementsToHighlight);
     resolve();
   });
@@ -1362,13 +2374,7 @@ async function recalculateInfluenceScores() {
     $("#xp_knockout_warning").remove();
   }
 
-  for (let p in AIR.Phenotypes) {
-    globals.pe_influenceScores[p] = _perturbedElements.length > 0 ? await getPhenotypeInfluences(p, _perturbedElements) : {
-      values: AIR.Phenotypes[p].values,
-      SPs: AIR.Phenotypes[p].SPs
-    };
-  }
-
+  await getPhenotypeInfluences();
   globals.ko_elements = _perturbedElements;
   await xp_EstimatePhenotypes(); //enablediv('airxplore_tab_content');
 
@@ -1462,6 +2468,7 @@ async function setPeTable() {
         "width": "10%"
       }]
     }).columns.adjust().draw();
+    $(globals.pe_element_table.table().container()).addClass('air_datatable');
     /*
     for(let btn of createdtButtons(this, download_string))
     {
@@ -1615,7 +2622,7 @@ function expo(x, f = 2, e = 1) {
 
 async function findPhenotypePath(element, phenotype, hideprevious = true) {
   let ko_elements = perturbedElements();
-  var pathsfromelement = await getPathsConnectedToElement(phenotype, ko_elements);
+  var pathsfromelement = await BSFfromTarget(phenotype, ko_elements);
   let epaths = Object.keys(pathsfromelement).filter(p => p.startsWith(element + "_"));
 
   if (epaths.length > 0) {
@@ -1741,13 +2748,74 @@ function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hi
   });
 }
 
-async function getPathsConnectedToElement(element, ko_elements = [], allpaths = false, interactiontype = false) {
+async function DFSfromTarget(element, allowreentry, ko_elements = []) {
+  let results = {};
+  let allpaths = 0;
   let paths = {};
   let elements = {};
   let elementids = Object.keys(AIR.Molecules);
 
   for (let e of elementids) {
     elements[e] = {};
+    paths[e] = {};
+    results[e] = {
+      betw: 0,
+      clos: 0,
+      pos: 0,
+      neg: 0
+    };
+  }
+
+  for (let inter of AIR.Interactions) {
+    if (ko_elements.includes(inter.source) || ko_elements.includes(inter.target) || inter.type == 0) {
+      continue;
+    }
+
+    elements[inter.target][inter.source] = inter.type;
+  }
+
+  elements = Object.filter(elements, e => Object.keys(elements[e]).length > 0);
+
+  async function dfs(e, visited, type, leftcompartments, currentcompartment) {
+    var _leftcompartment = false;
+
+    for (var neighbour in elements[e]) {
+      if (visited.includes(neighbour)) continue;
+
+      if (!allowreentry && !AIR.Molecules[neighbour].secreted) {
+        if (leftcompartments.includes(AIR.Molecules[neighbour].compartment)) {
+          continue;
+        } else {
+          if (AIR.Molecules[neighbour].compartment != currentcompartment) {
+            _leftcompartment = true;
+          }
+        }
+      }
+
+      var newtype = type * elements[e][neighbour];
+      results[neighbour].clos += 1;
+      results[neighbour][newtype == -1 ? "neg" : "pos"] += 1;
+      allpaths += 1;
+
+      for (var _e of visited) results[_e].betw += 1;
+
+      await dfs(neighbour, visited.concat(neighbour), newtype, _leftcompartment ? leftcompartments.concat(currentcompartment) : leftcompartments, AIR.Molecules[neighbour].compartment);
+    }
+  }
+
+  await dfs(element, [element], 1, [], AIR.Molecules[element].compartment);
+  return [results, allpaths];
+}
+
+async function BSFfromTarget(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false) {
+  let paths = {};
+  var re = interactiontype ? new RegExp("[+-]") : new RegExp("_");
+  let elements = {};
+  let elementids = Object.keys(AIR.Molecules);
+
+  for (let e of elementids) {
+    elements[e] = {};
+    paths[e] = {};
   }
 
   for (let inter of AIR.Interactions) {
@@ -1760,35 +2828,43 @@ async function getPathsConnectedToElement(element, ko_elements = [], allpaths = 
 
   elements = Object.fromEntries(Object.entries(elements).filter(([_, v]) => Object.keys(v).length > 0));
   var neighbour, e, visited, queue, dist, spcount;
-  var localBetweenness = {};
   var visited = [element];
   var queue = [element];
   var dist = {};
   var spcount = {};
-  var localBetweenness = {};
   dist[element] = 0;
   spcount[element] = 0;
-  paths[element] = 1;
+  paths[element][element] = 1;
 
   while (queue.length > 0) {
     e = queue.shift();
-    localBetweenness[e] = [];
 
     for (var neighbour in elements[e]) {
-      if (!visited.includes(allpaths ? e + "_" + neighbour : neighbour)) {
-        visited.push(allpaths ? e + "_" + neighbour : neighbour);
+      if (!visited.includes(neighbour)) {
+        visited.push(neighbour);
         dist[neighbour] = dist[e] + 1;
         queue.push(neighbour);
-        localBetweenness[e].push(neighbour);
+        spcount[neighbour] = 1;
 
-        for (let p of Object.keys(paths).filter(p => p.endsWith(e))) {
-          paths[p + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + neighbour] = paths[p] * elements[e][neighbour];
+        for (let p in paths[e]) {
+          paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
         }
-      } else if (dist[neighbour] == dist[e] + 1) {
-        localBetweenness[e].push(neighbour);
+      } else {
+        if (dist[neighbour] == dist[e] + 1) {
+          spcount[neighbour] = +1;
 
-        for (let p of Object.keys(paths).filter(p => p.endsWith(e))) {
-          paths[p + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + neighbour] = paths[p] * elements[e][neighbour];
+          for (let p in paths[e]) {
+            if (!p.split(re).includes(neighbour)) paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
+          }
+        }
+
+        if (allpaths && !visited.includes(e + "_" + neighbour)) {
+          visited.push(e + "_" + neighbour);
+          queue.push(neighbour);
+
+          for (let p in paths[e]) {
+            if (!p.split(re).includes(neighbour)) paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
+          }
         }
       }
     }
@@ -1796,57 +2872,151 @@ async function getPathsConnectedToElement(element, ko_elements = [], allpaths = 
 
   let output = {};
 
-  for (let p in paths) {
-    if (interactiontype) {
-      output[p.split(/([+-])/g).reverse().join("")] = paths[p];
-    } else {
-      output[p.split("_").reverse().join("_")] = paths[p];
+  if (sorted) {
+    return paths;
+  } else {
+    for (let e in paths) {
+      for (let p in paths[e]) {
+        output[p] = paths[e][p];
+      }
     }
-  }
 
-  return output;
+    return output;
+  }
 }
 
-async function getPhenotypeInfluences(phenotype, perturbedElements) {
-  let influencevalues = {
-    values: {},
-    SPs: {}
-  };
-  let paths = await getPathsConnectedToElement(phenotype, perturbedElements, false, false);
-  let newpaths = Object.keys(paths);
-  let newregulators = new Set();
+async function getPhenotypeInfluences(force = false) {
+  let text = await disablebutton("air_init_btn", true);
+  let count = 0;
+  await updateProgress(0, 1, "air_init_btn", " Calculating Influence Scores");
+  let ko_elements = perturbedElements();
+  let sarco = Object.keys(AIR.Phenotypes).filter(e => AIR.Molecules[e].name == "sarcopenia_muscle")[0];
+  let allpaths;
+  var re = new RegExp("_");
 
-  for (let p of newpaths) {
-    for (let _e of p.split("_")) newregulators.add(_e);
-  }
-
-  newregulators = Array.from(newregulators);
-
-  for (let e of newregulators) {
-    var epaths = newpaths.filter(p => p.startsWith(e + "_"));
-    var epatharrays = epaths.map(path => path.split("_"));
-
-    if (epaths.length == 0) {
-      continue;
+  if (ko_elements.length == 0 && !force) {
+    for (var p in AIR.phenotypes) {
+      globals.pe_influenceScores[p] = {
+        values: AIR.phenotypes[p].values,
+        SPs: AIR.phenotypes[p].SPs
+      };
     }
 
-    var elementsonpaths = new Set();
-    epatharrays.map(path => path.map(e => elementsonpaths.add(e)));
-    let minlength = epatharrays.reduce((a, b) => a.length <= b.length ? a : b).length;
-    var filteredpaths = epaths.filter(path => path.split("_").length == minlength);
-    var objetvalues = Object.values(Object.filter(paths, path => filteredpaths.includes(path)));
-    var type = Math.min.apply(null, objetvalues);
-    influencevalues.SPs[e] = minlength * type;
-    var includedpaths = new Set(newpaths.filter(p => p.includes("_" + e + "_")));
-    influencevalues.values[e] = type * (includedpaths.size / newpaths.length + elementsonpaths.size / newregulators.length);
+    return;
   }
 
-  ;
-  let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
-  Object.keys(influencevalues.values).map(function (key, index) {
-    influencevalues.values[key] /= maxvalue;
-  });
-  return influencevalues;
+  allpaths = await BSFfromTarget(sarco, [], true, false, true);
+
+  if (ko_elements.length > 0) {
+    for (var e in allpaths) allpaths[e] = Object.filter(allpaths[e], k => ko_elements.some(e => k.split(re).includes(e)));
+  }
+
+  let maxlength = Object.keys(AIR.Phenotypes).length + Object.keys(allpaths).length;
+  var phenotypevalues = {};
+
+  for (var p in AIR.Phenotypes) {
+    var typesum = Object.values(allpaths[p]).reduce((a, b) => a + b, 0);
+    typesum = typesum != 0 ? Math.sign(typesum) : -1;
+    phenotypevalues[p] = {
+      type: typesum,
+      paths: 0,
+      elements: new Set(),
+      regulators: {},
+      regex: new RegExp("_" + p + "(_|$)")
+    };
+
+    for (var e in AIR.Molecules) {
+      phenotypevalues[p].regulators[e] = {
+        elements: new Set(),
+        paths: 0,
+        type: 1,
+        sumtype: 0,
+        min: Infinity
+      };
+    }
+  }
+
+  for (var e in allpaths) {
+    if (count % 50 == 0) await updateProgress(count, maxlength, "air_init_btn", " Calculating Influence Scores");
+    count++;
+    var phenotypes = Object.keys(phenotypevalues).filter(p => p != e);
+
+    for (var [path, value] of Object.entries(allpaths[e])) {
+      let elements = path.split(re);
+      if (!consistentCompartments(elements)) continue;
+
+      for (var p of phenotypes) {
+        var i = elements.indexOf(p);
+
+        if (i > 0) {
+          phenotypevalues[p].paths += 1;
+          phenotypevalues[p].regulators[e].sumtype += value * phenotypevalues[p].type;
+
+          if (i < phenotypevalues[p].regulators[e].min) {
+            phenotypevalues[p].regulators[e].min = i;
+            phenotypevalues[p].regulators[e].type = value * phenotypevalues[p].type;
+          } else if (i == phenotypevalues[p].regulators[e].min) {
+            phenotypevalues[p].regulators[e].type = Math.min(phenotypevalues[p].regulators[e].type, value * phenotypevalues[p].type);
+          }
+
+          for (var _e of elements.slice(0, i)) {
+            phenotypevalues[p].elements.add(_e);
+            phenotypevalues[p].regulators[e].elements.add(_e);
+            phenotypevalues[p].regulators[_e].paths += 1;
+          }
+        }
+      }
+    }
+  }
+
+  allpaths = {};
+
+  for (let p in AIR.Phenotypes) {
+    let influencevalues = {
+      values: {},
+      SPs: {}
+    };
+    await updateProgress(count++, maxlength, "air_init_btn", " Calculating Influence Scores");
+
+    if (phenotypevalues.hasOwnProperty(p)) {
+      phenotypevalues[p].regulators = Object.filter(phenotypevalues[p].regulators, k => phenotypevalues[p].regulators[k].min != Infinity);
+
+      for (let e in phenotypevalues[p].regulators) {
+        var _type = 0;
+
+        if (AIR.Molecules[e].compartment == AIR.Molecules[p].compartment) {
+          _type = phenotypevalues[p].regulators[e].type;
+        } else {
+          _type = phenotypevalues[p].regulators[e].sumtype != 0 ? Math.sign(phenotypevalues[p].regulators[e].sumtype) : -1;
+        }
+
+        var value = _type * (phenotypevalues[p].regulators[e].paths / phenotypevalues[p].paths + phenotypevalues[p].regulators[e].elements.size / phenotypevalues[p].elements.size);
+
+        if (!value) {
+          continue;
+        }
+
+        influencevalues.SPs[e] = phenotypevalues[p].type;
+        influencevalues.values[e] = value;
+      }
+
+      ;
+      let maxvalue = Math.max(...Object.values(influencevalues.values).map(v => Math.abs(v)));
+      Object.keys(influencevalues.values).map(key => influencevalues.values[key] /= maxvalue);
+    }
+
+    globals.pe_influenceScores[p] = {
+      values: influencevalues.values,
+      SPs: influencevalues.SPs
+    };
+
+    if (force) {
+      AIR.Phenotypes[p].values = influencevalues.values;
+      AIR.Phenotypes[p].SPs = influencevalues.SPs;
+    }
+  }
+
+  await enablebtn("air_init_btn", text);
 }
 
 function rgbToHex(rgb) {
@@ -1970,21 +3140,20 @@ function xp_createpopup(button, phenotype) {
           },
           // Container for zoom options
           zoom: {
-            // Boolean to enable zooming
-            enabled: true,
-            // Zooming directions. Remove the appropriate direction to disable 
-            // Eg. 'y' would only allow zooming in the y direction
+            wheel: {
+              enabled: true
+            },
+            pinch: {
+              enabled: true
+            },
             mode: 'xy'
           }
         }
       },
       responsive: true,
       maintainAspectRatio: false,
-      hover: {
-        onHover: function (e) {
-          var point = this.getElementAtEvent(e);
-          if (point.length) e.target.style.cursor = 'pointer';else e.target.style.cursor = 'default';
-        }
+      onHover: (event, chartElement) => {
+        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
       },
       legend: {
         display: false
@@ -2054,6 +3223,122 @@ function xp_createpopup(button, phenotype) {
 }
 
 ;
+
+function adjustPanels() {
+  var coll = document.getElementById("sarco_plugincontainer").getElementsByClassName("air_collapsible");
+
+  for (var i = 0; i < coll.length; i++) {
+    var content = coll[i].nextElementSibling;
+
+    if (content.style.maxHeight) {
+      content.style.maxHeight = content.scrollHeight + 1 + "px";
+    }
+  }
+}
+
+async function disablebutton(id, progress = false) {
+  var promise = new Promise(function (resolve, reject) {
+    setTimeout(() => {
+      var $btn = $('#' + id);
+      let text = $btn.html();
+
+      if (progress == false) {
+        $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+      } else {
+        $btn.empty().append(`<div class="air_progress position-relative mb-4">
+                    <div id= "${id}_progress" class="air_progress_value"></div>
+                    <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
+                </div>`);
+      }
+
+      $(".air_btn").each(function (pindex) {
+        var airbtn = $(this);
+        airbtn.addClass("air_temp_disabledbutton");
+      });
+      resolve(text);
+    }, 0);
+  });
+  return promise;
+}
+
+async function enablebtn(id, text) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      $(".air_btn").each(function (pindex) {
+        $(this).removeClass("air_temp_disabledbutton");
+      });
+      var $btn = $('#' + id);
+      $btn.html(text);
+      resolve('');
+    }, 0);
+  });
+}
+
+async function updateProgress(value, max, progressbar, text = "") {
+  return new Promise(resolve => {
+    let percentage = max == 0 ? 0 : Math.ceil(value * 100 / max);
+    setTimeout(function () {
+      $("#" + progressbar + "_progress").width(percentage + "%");
+      $("#" + progressbar + "_progress_label").html(percentage + " %" + text);
+      resolve('');
+    }, 0);
+  });
+}
+
+function pickHighest(obj, _num = 0, ascendend = true, key = null) {
+  let num = _num;
+  let requiredObj = {};
+
+  if (!num || num > Object.keys(obj).length) {
+    num = Object.keys(obj).length;
+  }
+
+  ;
+
+  if (!ascendend) {
+    Object.keys(obj).sort((a, b) => key == null ? obj[b] - obj[a] : obj[b][key] - obj[a][key]).forEach((key, ind) => {
+      if (ind < num) {
+        requiredObj[key] = obj[key];
+      }
+    });
+  } else {
+    Object.keys(obj).sort((a, b) => key == null ? obj[a] - obj[b] : obj[a][key] - obj[b][key]).forEach((key, ind) => {
+      if (ind < num) {
+        requiredObj[key] = obj[key];
+      }
+    });
+  }
+
+  return requiredObj;
+}
+
+;
+
+function consistentCompartments(path) {
+  if (path.length == 0) return false;
+  let currentcompartment = AIR.Molecules[path[0]].compartment;
+  let leftcompartments = [];
+
+  for (var e of path) {
+    if (AIR.Molecules[e].secreted) {
+      continue;
+    }
+
+    var ecompartment = AIR.Molecules[e].compartment;
+    if (leftcompartments.includes(ecompartment)) return false;
+
+    if (currentcompartment != ecompartment) {
+      leftcompartments.push(currentcompartment);
+      currentcompartment = ecompartment;
+    }
+  }
+
+  return true;
+}
+
+function strikeThrough(text) {
+  return text.split('').map(char => char + '\u0336').join('');
+}
 },{"@gmod/vcf":11,"chart.js":21,"datatables.net-buttons":22,"file-saver":29,"jszip":32,"ttest":36}],2:[function(require,module,exports){
 function _arrayLikeToArray(arr, len) {
   if (len == null || len > arr.length) len = arr.length;
