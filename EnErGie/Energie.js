@@ -16,11 +16,11 @@ var VCF = require('@gmod/vcf');
 
 var ttest = require('ttest');
 
-require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
+require('datatables.net-buttons')(window, $); 
 
+var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
+//var URL = "http://localhost:3000/Energie/"; var filetesting = true;
 
-var URL = "http://localhost:3000/Energie/";
-var filetesting = false;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
