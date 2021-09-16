@@ -18,7 +18,8 @@ var ttest = require('ttest');
 
 require('datatables.net-buttons')(window, $); 
 
-var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false;
+var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
+
 //var URL = "http://localhost:3000/Energie/"; var filetesting = true;
 
 const pluginName = 'EnErGie';
@@ -167,7 +168,7 @@ async function initMainPageStructure() {
   $("<link/>", {
     rel: "stylesheet",
     type: "text/css",
-    href: URL + "xp_style.css"
+    href: (filetesting ? URL : cssURL) + "xp_style.css"
   }).appendTo("head");
   $("#air_plugincontainer").parents(".tab-pane").css({
     "overflow": "hidden"
