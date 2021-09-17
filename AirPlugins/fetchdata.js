@@ -290,7 +290,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 for(let inter of AIR.Interactions)
                                 {
                                     AIR.Molecules[inter.source].Targets[inter.target] = inter.type;
-                                    AIR.Molecules[inter.target].Targets[inter.source] = inter.type;
+                                    AIR.Molecules[inter.target].Sources[inter.source] = inter.type;
 
                                     if(inter.subtype == "cat" || inter.subtype == "tf")
                                     {

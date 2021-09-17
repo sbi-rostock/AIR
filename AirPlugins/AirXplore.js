@@ -3227,7 +3227,7 @@ async function xp_updateKOgraph()
 
     if (!phenotype || ko_elements.length == 0) {
         document.getElementById("xp_pe_result_ko_canvasContainer").style.height = (70 * chartData.length) < 600 ? "600px" : (70 * chartData.length).toString() + "px";
-        globals.centralityChart.update();
+        globals.xplore.pe_kochart.update();
         return;
     }
 
