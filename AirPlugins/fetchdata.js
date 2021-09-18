@@ -68,6 +68,8 @@ const globals = {
     phenotypeMapID: undefined,
     phenotypeImageMapID: undefined,
 
+    submaps: {},
+
     container: undefined,
     om_container: undefined,
     gv_container: undefined,
@@ -127,6 +129,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                             case "PhenotypeMap":
                                 globals.phenotypeImageMapID = model.getId();
                                 break;
+                            case "Map":
+                                break;
+                            default:
+                                globals.submaps[model.getId()] = modelname;
                         }
                     }
                 });
@@ -145,7 +151,11 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 let namelower = name.toLowerCase();
                                 AIR.MapSpeciesLowerCase.push(namelower);
                                 AIR.MapSpecies.push(name);
-                                AIR.MapElements[namelower] = e;
+
+                                if(!AIR.MapElements.hasOwnProperty(namelower))
+                                    AIR.MapElements[namelower] = []
+                                
+                                AIR.MapElements[namelower].push(e);
                             }
                             if (e.constructor.name === 'Reaction') {
                                 AIR.MapReactions.push({
@@ -632,7 +642,7 @@ function selectElementonMap(element, external) {
     globals.selected = [];
 
     if (AIR.MapElements.hasOwnProperty(namelower)) {
-        globals.selected.push(AIR.MapElements[namelower]);
+        globals.selected.push(AIR.MapElements[namelower][0]);
         focusOnSelected();
     }
     else if (external) {
@@ -946,26 +956,42 @@ function air_download(filename, data) {
 }
 
 function getElementContent(elements, seperator) {
-    let element_content = "Name" + seperator + "Type" + seperator + "Subunits" + seperator + "IDs";
+    let element_content = "Name" + seperator + "Type";
+
+    let idset = new Set();
+    output = {}
 
     for (let e in elements) {
-        element_content += "\n";
-        element_content += AIR.Molecules[e].name.replace(seperator, "");
-        element_content += seperator + AIR.Molecules[e].type.replace(seperator, "");
-
-        let subunits = [];
-        for (let s in AIR.Molecules[e].subunits) {
-            subunits.push(AIR.Molecules[AIR.Molecules[e].subunits[s]].name)
+        var lowername = AIR.Molecules[e].name.toLowerCase();
+        output[e] = {
+            name: AIR.Molecules[e].name.replace(seperator, ""),
+            type: AIR.Molecules[e].type.replace(seperator, ""),
+            subunits: AIR.Molecules[e].subunits.map(s => AIR.Molecules[s].name.replace(seperator, "")).join(seperator.includes(",")? "; " : ", "),
+            submaps: (AIR.MapElements.hasOwnProperty(lowername)? AIR.MapElements[lowername].map(m => globals.submaps[m._modelId]).join(seperator.includes(",")? "; " : ", ") : "")
         }
-        element_content += seperator + subunits.join(" | ").replace(seperator, "");
 
-        let ids = [];
         for (let s in AIR.Molecules[e].ids) {
             if (s != "name") {
-                ids.push(s + ":" + AIR.Molecules[e].ids[s])
+                idset.add(s)
+                output[e][s] = (AIR.Molecules[e].ids[s]? AIR.Molecules[e].ids[s].replace(seperator, "") : "");
             }
         }
-        element_content += seperator + ids.join(" | ").replace(seperator, "");
+    }
+    idset = Array.from(idset)
+    for(var id of idset)
+    {
+        element_content += seperator + id;
+    }
+    element_content += seperator + "Subunits" + seperator.submaps
+
+    for(var e in output)
+    {
+        element_content += "\n" + output[e].name + seperator + output[e].type;
+        for(var id of idset)
+        {
+            element_content += seperator +  (output[e].hasOwnProperty(id)? output[e][id] : "");
+        }
+        element_content += seperator + output[e].subunits + seperator + output[e].submaps
     }
 
     return element_content;
