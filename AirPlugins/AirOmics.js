@@ -1936,6 +1936,10 @@ async function om_createTable(param) {
         globals.omics.resultsTable.draw(false);
     }
 
+    if(!globals.phenotypeMapID)
+    {
+        $("#om_showonmapbtn").addClass("air_disabledbutton")
+    }
     $("#om_cb_fdr").on('click', updatepvalues);
     $("#om_checkbox_exclude_ns").on('click', updatepvalues);
     $("#om_select_pvalue").on('change', updatepvalues);

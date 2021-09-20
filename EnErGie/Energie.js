@@ -16,12 +16,11 @@ var VCF = require('@gmod/vcf');
 
 var ttest = require('ttest');
 
-require('datatables.net-buttons')(window, $); 
+require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
 
-var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
 
-//var URL = "http://localhost:3000/Energie/"; var filetesting = true;
-
+var URL = "http://localhost:3000/Energie/";
+var filetesting = true;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -194,8 +193,8 @@ async function initMainPageStructure() {
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                    data-content="If checked, only the shortest paths will be considered. If unchecked, calculations may take a few seconds.<br/>">
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Shortest Paths"
+                                    data-content="If checked, only the shortest path between the selected elements will be shown.<br/>">
                                 ?
                             </button>
                         </div>
@@ -211,8 +210,8 @@ async function initMainPageStructure() {
                     <div class="col-auto mb-2">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                    data-content="If checked, perturbed paths will be excluded.<br/>">
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Knocked out elements"
+                                    data-content="If checked, paths will not include any of the knocked out elements specified in the in silico perturbation tool below.<br/>">
                                 ?
                             </button>
                         </div>
@@ -228,8 +227,8 @@ async function initMainPageStructure() {
                     <div class="col-auto mb-4">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Overlays"
-                                    data-content="If checked, perturbed paths will be excluded.<br/>">
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Reenter Compartments"
+                                    data-content="If checked, paths will not enter the same compartment twice after leaving, except for direct reentry (i.e. paracrin signaling).">
                                 ?
                             </button>
                         </div>
@@ -241,6 +240,24 @@ async function initMainPageStructure() {
                         </div>
                     </div>
                 </div>
+                <div class="row mt-2 mb-2">
+                    <div class="col-auto mb-4">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Weighting"
+                                    data-content="If this option is enabled, the number of paths is weighted according to the number of compartments through which the paths pass.<br/>Attention: If checked, the absolute number of path in the graph tooltips will not reflect the actual number.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="xp_cb_weighted">
+                            <label class="air_checkbox air_checkbox_label" for="xp_cb_weighted">Weight paths by number of compartments?</label>
+                        </div>
+                    </div>
+                </div>
+                
                 <div><span>From</span></div>
                 <div>
                 <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" placeholder="Type in name"/>
@@ -276,6 +293,7 @@ async function initMainPageStructure() {
                             <tr>
                                 <th style="vertical-align: middle;"></th>
                                 <th style="vertical-align: middle;">Length</th>
+                                <th style="vertical-align: middle;">Type</th>
                                 <th style="vertical-align: middle;">Impact</th>
                                 <th style="vertical-align: left;">Path</th>
                             </tr>
@@ -345,6 +363,7 @@ async function initMainPageStructure() {
             </div>
         `);
     $('#xp_hide_container .collapse').collapse();
+    $('.air_btn_info[data-toggle="popover"]').popover();
     await getPhenotypePanel();
     await getPathPanel();
     await getCentralityPanel();
@@ -973,8 +992,6 @@ async function getOptimizedKO() {
   let source = $("#xp_opt_element_source").val().split(',')[0];
   let target = $("#xp_opt_element_target").val().split(',')[0];
   var chartData = [];
-  globals.optimizetotalchart.data = {};
-  globals.optimizechart.data = {};
 
   if (AIR.ElementNames.fullname.hasOwnProperty(source.toLowerCase().trim())) {
     source = AIR.ElementNames.fullname[source.toLowerCase().trim()];
@@ -990,6 +1007,8 @@ async function getOptimizedKO() {
 
   if (!target || source == target) {
     document.getElementById("opt_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+    globals.optimizetotalchart.data = {};
+    globals.optimizechart.data = {};
     globals.optimizechart.update();
     globals.optimizetotalchart.update();
     enablebtn("xp_opt_btn", text);
@@ -1024,7 +1043,7 @@ async function getOptimizedKO() {
   for (var [path, value] of Object.entries(allpaths)) {
     var splitted = path.split(re);
 
-    if (!consistentCompartments(splitted)) {
+    if (!consistentCompartments(splitted).consistent) {
       continue;
     }
 
@@ -1263,9 +1282,6 @@ async function getCentralityFC() {
   let source = $("#xp_cent_element_source").val().split(',')[0];
   let target = $("#xp_cent_element_target").val().split(',')[0];
   var chartData = [];
-  globals.centralityChart.data = {};
-  globals.centralitypathchart.data = {};
-  globals.centralitychartData = [];
 
   if (AIR.ElementNames.fullname.hasOwnProperty(source.toLowerCase().trim())) {
     source = AIR.ElementNames.fullname[source.toLowerCase().trim()];
@@ -1283,6 +1299,9 @@ async function getCentralityFC() {
 
   if (!target || source == target || ko_elements.length == 0) {
     document.getElementById("cent_canvasContainer").style.height = 70 * chartData.length < 600 ? "600px" : (70 * chartData.length).toString() + "px";
+    globals.centralityChart.data = {};
+    globals.centralitypathchart.data = {};
+    globals.centralitychartData = [];
     globals.centralityChart.update();
     globals.centralitypathchart.update();
     enablebtn("xp_cent_btn", text);
@@ -1314,7 +1333,7 @@ async function getCentralityFC() {
   for (var [path, value] of Object.entries(allpaths)) {
     var splitted = path.split(re);
 
-    if (!consistentCompartments(splitted)) {
+    if (!consistentCompartments(splitted).consistent) {
       continue;
     }
 
@@ -1479,12 +1498,12 @@ async function getPathPanel() {
                 var _data = globals.pathChartData.data[context.dataIndex];
 
                 if (context.dataIndex == 0) {
-                  return ["Total paths: " + _data[1] + " (" + expo(_data[1] * 100 / _data[8]) + "%)", "   of these positive: " + _data[2] + " (" + expo(_data[2] * 100 / _data[1]) + "%)", "   of these negative: " + _data[3] + " (" + expo(_data[3] * 100 / _data[1]) + "%)"];
+                  return ["Total paths: " + expo(_data[1]) + " (" + expo(_data[1] * 100 / _data[8]) + "%)", "   of these positive: " + expo(_data[2]) + " (" + expo(_data[2] * 100 / _data[1]) + "%)", "   of these negative: " + expo(_data[3]) + " (" + expo(_data[3] * 100 / _data[1]) + "%)"];
                 }
 
                 var indexincrease = context.datasetIndex;
                 var typeText = context.datasetIndex == 0 ? ["Positive", "++", "Pos-Pos Paths (→→)", "--", "Neg-Neg Paths (⊣⊣)"] : ["Negative", "+-", "Pos-Neg Paths (→⊣)", "-+", "Neg-Pos Paths (⊣→)"];
-                return [typeText[0] + " Paths: " + _data[2 + indexincrease] + " (" + expo(_data[2 + indexincrease] * 100 / _data[1]) + "%)", "(Total Paths: " + _data[1] + " (" + expo(_data[1] * 100 / _data[8]) + "%))", "", typeText[2] + ": " + _data[4 + indexincrease] + " (" + expo(_data[4 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[1] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[1] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[1] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[1] + "out"].map(e => "    " + AIR.Molecules[e].name)] : []), "", typeText[4] + ": " + _data[6 + indexincrease] + " (" + expo(_data[6 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[3] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[3] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[3] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[3] + "out"].map(e => "    " + AIR.Molecules[e].name)] : [])];
+                return [typeText[0] + " Paths: " + expo(_data[2 + indexincrease]) + " (" + expo(_data[2 + indexincrease] * 100 / _data[1]) + "%)", "(Total Paths: " + _data[1] + " (" + expo(_data[1] * 100 / _data[8]) + "%))", "", typeText[2] + ": " + expo(_data[4 + indexincrease]) + " (" + expo(_data[4 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[1] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[1] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[1] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[1] + "out"].map(e => "    " + AIR.Molecules[e].name)] : []), "", typeText[4] + ": " + expo(_data[6 + indexincrease]) + " (" + expo(_data[6 + indexincrease] * 100 / _data[2 + indexincrease]) + "%)", ...(_data[9][typeText[3] + "in"].length > 0 ? ["  incoming:", ..._data[9][typeText[3] + "in"].map(e => "    " + AIR.Molecules[e].name)] : []), ...(_data[9][typeText[3] + "out"].length > 0 ? ["  outgoing:", ..._data[9][typeText[3] + "out"].map(e => "    " + AIR.Molecules[e].name)] : [])];
               }
             }
           }
@@ -1534,7 +1553,9 @@ async function getPathPanel() {
         var firstPoint = activePoints[0];
         $("#xp_path_element_source").val(AIR.Molecules[globals.pathChartData.source].name);
         $("#xp_path_element_through").val(globals.pathChartData.data[firstPoint.index][0]);
-        $("#xp_path_element_target").val(AIR.Molecules[globals.pathChartData.target].name) & "#xp_cb_through".prop("checked", true) & "#xp_cb_notthrough".prop("checked", false);
+        $("#xp_path_element_target").val(AIR.Molecules[globals.pathChartData.target].name);
+        $("#xp_cb_through").prop("checked", true);
+        $("#xp_cb_notthrough").prop("checked", false);
         await updatePathData();
         globals.xp_path_table.search(firstPoint.datasetIndex == 0 ? "positive" : "negative").draw();
       }
@@ -1546,11 +1567,10 @@ async function getPathPanel() {
 }
 
 async function updatePathData() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async function (resolve, reject) {
+    let text = await disablebutton("xp_path_btn");
     minervaProxy.project.map.getHighlightedBioEntities().then(async function (highlighted) {
       minervaProxy.project.map.hideBioEntity(highlighted).then(async function (pv) {
-        globals.xp_path_table.search("");
-        globals.pathchart.data.datasets = [];
         globals.xp_path_table.clear();
         let source = $("#xp_path_element_source").val().split(',')[0];
         let through = $("#xp_path_element_through").val().split(',')[0];
@@ -1576,6 +1596,8 @@ async function updatePathData() {
 
         if (!source || !target || source == target || source == through || target == through) {
           document.getElementById("canvasContainer").style.height = "0px";
+          globals.xp_path_table.search("");
+          globals.pathchart.data.datasets = [];
           globals.pathchart.update();
           globals.xp_path_table.columns.adjust().draw();
           resolve();
@@ -1584,24 +1606,34 @@ async function updatePathData() {
 
         let ko_elements = perturbedElements();
         let pathsfromelement = (await BSFfromTarget(target, document.getElementById("xp_cb_considerko").checked ? ko_elements : [], document.getElementById("xp_cb_allpaths").checked ? false : true, true, true))[source];
-        let epaths = Object.keys(pathsfromelement);
+        let epaths = [];
         var re = new RegExp("([+-])", 'g');
         var sre = new RegExp("[+-]");
+        var allowreentry = $("#xp_cb_reentry").prop("checked");
+        var filteronlythrough = $("#xp_cb_through").prop("checked");
+        var weighted = $("#xp_cb_weighted").prop("checked");
+        var through_regExp = new RegExp(through + "[+-]");
 
-        if (!$("#xp_cb_reentry").prop("checked")) {
-          epaths = epaths.filter(p => consistentCompartments(p.split(sre)));
-        }
+        for (let p of Object.keys(pathsfromelement)) {
+          var comps = consistentCompartments(p.split(sre));
+          pathsfromelement[p] = {
+            type: pathsfromelement[p],
+            skips: comps.numberofskips == 0 ? 1 : comps.numberofskips
+          };
+          if (!allowreentry && !comps.consistent) continue;
 
-        if (through) {
-          let through_regExp = new RegExp(through + "[+-]");
-
-          if ($("#xp_cb_through").prop("checked")) {
-            epaths = epaths.filter(p => p.match(through_regExp));
-          } else {
-            epaths = epaths.filter(p => !p.match(through_regExp));
+          if (through) {
+            if (filteronlythrough) {
+              if (!p.match(through_regExp)) continue;
+            } else {
+              if (!p.match(through_regExp)) continue;
+            }
           }
+
+          epaths.push(p);
         }
 
+        pathsfromelement = Object.filter(pathsfromelement, p => epaths.includes(p));
         var numberofinclusions = {};
 
         for (var e in AIR.Molecules) {
@@ -1631,60 +1663,84 @@ async function updatePathData() {
           var length = 0;
           var relation = 1;
           var crossedElements = {};
+          var elementcounter = 0;
+          var throughtype = pathsfromelement[path].type;
 
           for (var e of path.split(re)) {
             switch (e) {
               case "+":
-                newpath += '<span style="color:blue;font-weight:bold"> → </span>';
+                newpath += '<span style="color:red;font-weight:bold"> → </span>';
                 length += 1;
                 break;
 
               case "-":
-                newpath += '<span style="color:red;font-weight:bold"> ⊣ </span>';
+                newpath += '<span style="color:blue;font-weight:bold"> ⊣ </span>';
                 length += 1;
                 relation *= -1;
                 break;
 
               default:
-                newpath += AIR.Molecules[e].name; //getLinkIconHTML(e, false)
+                newpath += getLinkIconHTML(e, true); //getLinkIconHTML(e, false)
 
-                numberofinclusions[e].total += 1;
-                var type = pathsfromelement[path] == -1 ? "negative" : "positive";
-                var subtype = (relation == -1 ? "-" : "+") + (pathsfromelement[path] * relation == 1 ? "+" : "-");
-                numberofinclusions[e][type] += 1;
-                numberofinclusions[e][subtype] += 1;
-                subtype = subtype + "in";
+                var _number = weighted ? 1 / pathsfromelement[path].skips : 1;
+
+                numberofinclusions[e].total += _number;
+                var type = pathsfromelement[path].type == -1 ? "negative" : "positive";
+                var subtype = (relation == -1 ? "-" : "+") + (pathsfromelement[path].type * relation == 1 ? "+" : "-");
+                numberofinclusions[e][type] += _number;
+                numberofinclusions[e][subtype] += _number;
+                var intype = subtype + "in";
 
                 if (e != target) {
                   for (var _e in crossedElements) {
-                    var type = (crossedElements[_e] == -1 ? "-" : "+") + (pathsfromelement[path] * relation == 1 ? "+" : "-") + "out";
+                    var outtype = (crossedElements[_e] == -1 ? "-" : "+") + (pathsfromelement[path].type * crossedElements[_e] == 1 ? "+" : "-") + "out";
 
-                    if (!numberofinclusions[_e].topregulators[type].hasOwnProperty(e)) {
-                      numberofinclusions[_e].topregulators[type][e] = 1;
+                    if (!numberofinclusions[_e].topregulators[outtype].hasOwnProperty(e)) {
+                      numberofinclusions[_e].topregulators[outtype][e] = _number;
                     } else {
-                      numberofinclusions[_e].topregulators[type][e] += 1;
+                      numberofinclusions[_e].topregulators[outtype][e] += _number;
                     }
 
-                    if (_e != source) {
-                      if (!numberofinclusions[e].topregulators[subtype].hasOwnProperty(_e)) {
-                        numberofinclusions[e].topregulators[subtype][_e] = 1;
+                    if (_e != source || elementcounter == 1) {
+                      if (!numberofinclusions[e].topregulators[intype].hasOwnProperty(_e)) {
+                        numberofinclusions[e].topregulators[intype][_e] = _number;
                       } else {
-                        numberofinclusions[e].topregulators[subtype][_e] += 1;
+                        numberofinclusions[e].topregulators[intype][_e] += _number;
                       }
                     }
                   }
                 }
 
+                if (through && e == through) {
+                  throughtype = relation;
+                }
+
                 crossedElements[e] = relation;
+                elementcounter++;
                 break;
             }
           }
 
           newpath += "</div>";
-          globals.xp_path_table.row.add(['<a href="#" class="xp_path_entry" data="' + path + '"><span class="fas fa-eye"></a>', length, pathsfromelement[path] == -1 ? '<span style="color:red">negative</span>' : '<span style="color:blue">positive</span>', newpath]);
+          globals.xp_path_table.row.add(['<a href="#" class="xp_path_entry" data="' + path + '"><span class="fas fa-eye"></a>', length, coloredElement(through ? [throughtype, throughtype * pathsfromelement[path].type] : [throughtype], false), coloredElement([pathsfromelement[path].type]), newpath]);
         }
 
-        let chartdata = [["Total", epaths.length, epaths.filter(p => pathsfromelement[p] == 1).length, epaths.filter(p => pathsfromelement[p] == -1).length, 0, 0, 0, 0, epaths.length, {}]];
+        function coloredElement(typearray, text = true, seperator = "") {
+          return typearray.map(t => t == -1 ? '<span style="color:blue">' + (text ? "negative" : "⊣") + '</span>' : '<span style="color:red">' + (text ? "positive" : "→") + '</span>').join(seperator);
+        }
+
+        var _elength = 0;
+
+        for (var p of epaths) {
+          _elength += 1 / pathsfromelement[p].skips;
+
+          if (!_elength) {
+            let gawhgnwg;
+          }
+        }
+
+        var elength = weighted ? epaths.reduce((total, p) => 1 / pathsfromelement[p].skips + total, 0) : epaths.length;
+        let chartdata = [["Total", elength, weighted ? epaths.filter(p => pathsfromelement[p].type == 1).reduce((total, p) => 1 / pathsfromelement[p].skips + total, 0) : epaths.filter(p => pathsfromelement[p].type == 1).length, weighted ? epaths.filter(p => pathsfromelement[p].type == -1).reduce((total, p) => 1 / pathsfromelement[p].skips + total, 0) : epaths.filter(p => pathsfromelement[p].type == -1).length, 0, 0, 0, 0, elength, {}]];
 
         for (let e in numberofinclusions) {
           if (numberofinclusions[e].total == 0 || e == source || e == target) continue;
@@ -1694,7 +1750,7 @@ async function updatePathData() {
             topregulators[type] = Object.keys(pickHighest(numberofinclusions[e].topregulators[type], 3, false));
           }
 
-          chartdata.push([AIR.Molecules[e].name, numberofinclusions[e].total, numberofinclusions[e].positive, numberofinclusions[e].negative, numberofinclusions[e]["++"], numberofinclusions[e]["+-"], numberofinclusions[e]["--"], numberofinclusions[e]["-+"], epaths.length, topregulators]);
+          chartdata.push([AIR.Molecules[e].name, numberofinclusions[e].total, numberofinclusions[e].positive, numberofinclusions[e].negative, numberofinclusions[e]["++"], numberofinclusions[e]["+-"], numberofinclusions[e]["--"], numberofinclusions[e]["-+"], elength, topregulators]);
         }
 
         chartdata = chartdata.sort(function (a, b) {
@@ -1706,22 +1762,25 @@ async function updatePathData() {
           target: target,
           data: chartdata
         };
+        document.getElementById("canvasContainer").style.height = (50 + 40 * chartdata.length).toString() + "px";
         globals.pathchart.data = {
           labels: chartdata.map(p => p[0]),
           datasets: [{
             label: "Percentage of positive Paths",
-            data: chartdata.map(p => expo(p[2] * 100 / epaths.length)),
-            backgroundColor: "#ff4d4d"
+            data: chartdata.map(p => expo(p[2] * 100 / elength)),
+            backgroundColor: "#ff4d4d",
+            barThickness: 30
           }, {
             label: "Percentage of negative Paths",
-            data: chartdata.map(p => expo(p[3] * 100 / epaths.length)),
-            backgroundColor: "#4da3ff"
+            data: chartdata.map(p => expo(p[3] * 100 / elength)),
+            backgroundColor: "#4da3ff",
+            barThickness: 30
           }]
         };
-        document.getElementById("canvasContainer").style.height = (50 + 40 * chartdata.length).toString() + "px";
-        globals.pathchart.update();
         globals.xp_path_table.columns.adjust().draw();
+        globals.pathchart.update();
         adjustPanels();
+        enablebtn("xp_path_btn", text);
         resolve();
       });
     });
@@ -2808,18 +2867,23 @@ async function DFSfromTarget(element, allowreentry, ko_elements = []) {
   return [results, allpaths];
 }
 
-async function BSFfromTarget(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false) {
+async function BSFfromTarget(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false, btn = "") {
   let paths = {};
   var re = interactiontype ? new RegExp("[+-]") : new RegExp("_");
   let elements = {};
   let elementids = Object.keys(AIR.Molecules);
+  let count = 0;
+  let maxlength = elementids.length;
+  await updateProgress(0, 1, btn, " Finding Paths ...");
+  var elementres = {};
 
   for (let e of elementids) {
     elements[e] = {};
     paths[e] = {};
+    elementres[e] = new RegExp(e + "([+-_]|$)");
   }
 
-  for (let inter of AIR.Interactions) {
+  for (var inter of AIR.Interactions) {
     if (ko_elements.includes(inter.source) || ko_elements.includes(inter.target) || inter.type == 0) {
       continue;
     }
@@ -2841,21 +2905,25 @@ async function BSFfromTarget(element, ko_elements = [], allpaths = false, intera
     e = queue.shift();
 
     for (var neighbour in elements[e]) {
+      var splitsign = interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_";
+
       if (!visited.includes(neighbour)) {
+        if (count % 30 == 0) await updateProgress(count, maxlength, btn, " Finding Paths ...");
+        count++;
         visited.push(neighbour);
         dist[neighbour] = dist[e] + 1;
         queue.push(neighbour);
         spcount[neighbour] = 1;
 
         for (let p in paths[e]) {
-          paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
+          paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
         }
       } else {
         if (dist[neighbour] == dist[e] + 1) {
           spcount[neighbour] = +1;
 
           for (let p in paths[e]) {
-            if (!p.split(re).includes(neighbour)) paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
+            if (!p.match(elementres[neighbour])) paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
           }
         }
 
@@ -2864,7 +2932,7 @@ async function BSFfromTarget(element, ko_elements = [], allpaths = false, intera
           queue.push(neighbour);
 
           for (let p in paths[e]) {
-            if (!p.split(re).includes(neighbour)) paths[neighbour][neighbour + (interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_") + p] = paths[e][p] * elements[e][neighbour];
+            if (!p.match(elementres[neighbour])) paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
           }
         }
       }
@@ -2906,12 +2974,13 @@ async function getPhenotypeInfluences(force = false) {
     return;
   }
 
-  allpaths = await BSFfromTarget(sarco, [], true, false, true);
+  allpaths = await BSFfromTarget(sarco, [], true, false, true, "air_init_btn");
 
   if (ko_elements.length > 0) {
     for (var e in allpaths) allpaths[e] = Object.filter(allpaths[e], k => ko_elements.some(e => k.split(re).includes(e)));
   }
 
+  console.log(JSON.stringify(allpaths).length);
   let maxlength = Object.keys(AIR.Phenotypes).length + Object.keys(allpaths).length;
   var phenotypevalues = {};
 
@@ -2938,13 +3007,13 @@ async function getPhenotypeInfluences(force = false) {
   }
 
   for (var e in allpaths) {
-    if (count % 50 == 0) await updateProgress(count, maxlength, "air_init_btn", " Calculating Influence Scores");
+    if (count % 30 == 0) await updateProgress(count, maxlength, "air_init_btn", " Calculating Influence Scores");
     count++;
     var phenotypes = Object.keys(phenotypevalues).filter(p => p != e);
 
     for (var [path, value] of Object.entries(allpaths[e])) {
       let elements = path.split(re);
-      if (!consistentCompartments(elements)) continue;
+      if (!consistentCompartments(elements).consistent) continue;
 
       for (var p of phenotypes) {
         var i = elements.indexOf(p);
@@ -3317,16 +3386,25 @@ function pickHighest(obj, _num = 0, ascendend = true, key = null) {
 
 function consistentCompartments(path) {
   if (path.length == 0) return false;
-  let currentcompartment = AIR.Molecules[path[0]].compartment;
+  var currentcompartment = AIR.Molecules[path[0]].compartment;
+  var currentcompartment_allskips = "";
+  var numberofskips = 0;
   let leftcompartments = [];
+  var consistent = true;
 
   for (var e of path) {
+    var ecompartment = AIR.Molecules[e].compartment;
+
+    if (currentcompartment_allskips != ecompartment) {
+      currentcompartment_allskips = ecompartment;
+      numberofskips++;
+    }
+
     if (AIR.Molecules[e].secreted) {
       continue;
     }
 
-    var ecompartment = AIR.Molecules[e].compartment;
-    if (leftcompartments.includes(ecompartment)) return false;
+    if (leftcompartments.includes(ecompartment)) consistent = false;
 
     if (currentcompartment != ecompartment) {
       leftcompartments.push(currentcompartment);
@@ -3334,7 +3412,10 @@ function consistentCompartments(path) {
     }
   }
 
-  return true;
+  return {
+    consistent: consistent,
+    numberofskips: numberofskips
+  };
 }
 
 function strikeThrough(text) {
