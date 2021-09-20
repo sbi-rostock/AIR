@@ -16,11 +16,10 @@ var VCF = require('@gmod/vcf');
 
 var ttest = require('ttest');
 
-require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
+require('datatables.net-buttons')(window, $); 
 
-
-var URL = "http://localhost:3000/Energie/";
-var filetesting = true;
+var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
+//var URL = "http://localhost:3000/Energie/"; var filetesting = true;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -2005,142 +2004,130 @@ async function getPhenotypePanel() {
 
 function readDataFiles() {
   return new Promise((resolve, reject) => {
-    minerva.ServerConnector.getLoggedUser().then(function (user) {
-      globals.user = user._login.toString().toLowerCase();
+    pluginContainer = $(minervaProxy.element);
+    pluginContainerId = pluginContainer.attr('id');
+    minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
+      function getNameFromAlias(e) {
+        let name = e.name;
 
-      if (globals.defaultusers.includes(globals.user) === true) {
-        alert('Warning: you can create overlays only after logging into your account.');
+        if (e._compartmentId) {
+          name += "_" + AIR.Compartments[e._compartmentId];
+        } else {
+          name += "_secreted";
+        }
+
+        return name;
       }
 
-      if (globals.guestuser.includes(globals.user) === true) {
-        alert("Warning: You're logged in through a public account. Overlays you create may be visible to other users if not removed.");
+      AIR.allBioEntities = bioEntities;
+
+      for (let e of bioEntities) {
+        if (e._type == "Compartment") {
+          AIR.Compartments[e.id] = e.name.trim().toLowerCase().replace(" ", "");
+        }
       }
 
-      pluginContainer = $(minervaProxy.element);
-      pluginContainerId = pluginContainer.attr('id');
-      minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
-        function getNameFromAlias(e) {
-          let name = e.name;
+      ;
 
-          if (e._compartmentId) {
-            name += "_" + AIR.Compartments[e._compartmentId];
-          } else {
-            name += "_secreted";
-          }
-
-          return name;
+      for (let e of bioEntities) {
+        if (e.constructor.name === 'Alias') {
+          let name = getNameFromAlias(e);
+          let namelower = name.toLowerCase();
+          AIR.MapSpeciesLowerCase.push(namelower);
+          AIR.MapSpecies.push(name);
+          AIR.MapElements[namelower] = e;
         }
 
-        AIR.allBioEntities = bioEntities;
-
-        for (let e of bioEntities) {
-          if (e._type == "Compartment") {
-            AIR.Compartments[e.id] = e.name.trim().toLowerCase().replace(" ", "");
-          }
+        if (e.constructor.name === 'Reaction') {
+          AIR.MapReactions.push({
+            "reactants": e._reactants.map(r => getNameFromAlias(r._alias).toLowerCase()),
+            "products": e._products.map(r => getNameFromAlias(r._alias).toLowerCase()),
+            "modifiers": e._modifiers.map(r => getNameFromAlias(r._alias).toLowerCase()),
+            "id": e.id,
+            "modelId": e.getModelId()
+          });
         }
+      }
 
-        ;
-
-        for (let e of bioEntities) {
-          if (e.constructor.name === 'Alias') {
-            let name = getNameFromAlias(e);
-            let namelower = name.toLowerCase();
-            AIR.MapSpeciesLowerCase.push(namelower);
-            AIR.MapSpecies.push(name);
-            AIR.MapElements[namelower] = e;
-          }
-
-          if (e.constructor.name === 'Reaction') {
-            AIR.MapReactions.push({
-              "reactants": e._reactants.map(r => getNameFromAlias(r._alias).toLowerCase()),
-              "products": e._products.map(r => getNameFromAlias(r._alias).toLowerCase()),
-              "modifiers": e._modifiers.map(r => getNameFromAlias(r._alias).toLowerCase()),
-              "id": e.id,
-              "modelId": e.getModelId()
-            });
-          }
-        }
-
-        ;
-        $.ajax({
-          url: URL + 'Interactions.json',
-          success: function (content) {
-            readInteractions(content).then(r => {
-              setTimeout(() => {
-                $.ajax({
-                  url: URL + 'Elements.json',
-                  success: function (moleculecontent) {
-                    readMolecules(moleculecontent).then(s => {
-                      resolve();
-                    });
-                  },
-                  error: function () {
-                    reject();
-                  }
-                });
-              }, 0);
-            });
-            ;
-          },
-          error: function (content) {
-            alert(content);
-            reject();
-          }
-        });
-
-        function readMolecules(content) {
-          return new Promise((resolve, reject) => {
-            if (filetesting) {
-              AIR.Molecules = content;
-            } else {
-              AIR.Molecules = JSON.parse(content);
-            }
-
-            for (let element in AIR.Molecules) {
-              // if (!AIR.ElementNames.fullname.hasOwnProperty(AIR.Molecules[element].name.toLowerCase()))
-              //     AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()] = [];
-              AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()] = element;
-
-              if (AIR.Molecules[element].complex === false) {
-                for (let id in AIR.Molecules[element].ids) {
-                  let db_key = id.replace('.', '');
-
-                  if (AIR.ElementNames.hasOwnProperty(db_key)) {
-                    // if (!AIR.ElementNames[db_key].hasOwnProperty(AIR.Molecules[element].ids[id]))
-                    //     AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = [];
-                    AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = element;
-                  }
+      ;
+      $.ajax({
+        url: URL + 'Interactions.json',
+        success: function (content) {
+          readInteractions(content).then(r => {
+            setTimeout(() => {
+              $.ajax({
+                url: URL + 'Elements.json',
+                success: function (moleculecontent) {
+                  readMolecules(moleculecontent).then(s => {
+                    resolve();
+                  });
+                },
+                error: function () {
+                  reject();
                 }
-              }
-
-              if (AIR.Molecules[element].type === "PHENOTYPE" && AIR.Molecules[element].compartment == "muscle") {
-                AIR.Phenotypes[element] = {};
-                AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
-                AIR.Phenotypes[element]["values"] = {};
-                AIR.Phenotypes[element]["SPs"] = {};
-                AIR.Phenotypes[element]["Paths"] = {};
-              }
-
-              AIR.Molecules[element]["Centrality"] = {};
-            }
-
-            resolve('');
+              });
+            }, 0);
           });
-        }
-
-        function readInteractions(content) {
-          return new Promise((resolve, reject) => {
-            if (filetesting) {
-              AIR.Interactions = content;
-            } else {
-              AIR.Interactions = JSON.parse(content);
-            }
-
-            resolve('');
-          });
+          ;
+        },
+        error: function (content) {
+          alert(content);
+          reject();
         }
       });
-    }, 0);
+
+      function readMolecules(content) {
+        return new Promise((resolve, reject) => {
+          if (filetesting) {
+            AIR.Molecules = content;
+          } else {
+            AIR.Molecules = JSON.parse(content);
+          }
+
+          for (let element in AIR.Molecules) {
+            // if (!AIR.ElementNames.fullname.hasOwnProperty(AIR.Molecules[element].name.toLowerCase()))
+            //     AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()] = [];
+            AIR.ElementNames.fullname[AIR.Molecules[element].name.toLowerCase()] = element;
+
+            if (AIR.Molecules[element].complex === false) {
+              for (let id in AIR.Molecules[element].ids) {
+                let db_key = id.replace('.', '');
+
+                if (AIR.ElementNames.hasOwnProperty(db_key)) {
+                  // if (!AIR.ElementNames[db_key].hasOwnProperty(AIR.Molecules[element].ids[id]))
+                  //     AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = [];
+                  AIR.ElementNames[db_key][AIR.Molecules[element].ids[id]] = element;
+                }
+              }
+            }
+
+            if (AIR.Molecules[element].type === "PHENOTYPE" && AIR.Molecules[element].compartment == "muscle") {
+              AIR.Phenotypes[element] = {};
+              AIR.Phenotypes[element]["name"] = AIR.Molecules[element].name;
+              AIR.Phenotypes[element]["values"] = {};
+              AIR.Phenotypes[element]["SPs"] = {};
+              AIR.Phenotypes[element]["Paths"] = {};
+            }
+
+            AIR.Molecules[element]["Centrality"] = {};
+          }
+
+          resolve('');
+        });
+      }
+
+      function readInteractions(content) {
+        return new Promise((resolve, reject) => {
+          if (filetesting) {
+            AIR.Interactions = content;
+          } else {
+            AIR.Interactions = JSON.parse(content);
+          }
+
+          resolve('');
+        });
+      }
+    });
   });
 }
 
