@@ -19,7 +19,7 @@ var ttest = require('ttest');
 require('datatables.net-buttons')(window, $); 
 
 var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
-//var URL = "http://localhost:3000/Energie/"; var filetesting = true;
+
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -2442,7 +2442,7 @@ async function setPeTable() {
       createCell(row, 'td', getFontfromValue(globals.pe_data[globals.pe_data_index][e].value), 'col slidervalue', '', 'center').setAttribute('id', 'ESliderValue' + e);
       var slider = createSliderCell(row, 'td', e);
       slider.setAttribute('id', 'ESlider' + e);
-      slider.setAttribute('value', globals.pe_data[globals.pe_data_index][e]);
+      slider.setAttribute('value', globals.pe_data[globals.pe_data_index][e].value);
 
       slider.onchange = async function () {
         let value = this.value;
