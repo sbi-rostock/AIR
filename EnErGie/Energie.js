@@ -259,7 +259,7 @@ async function initMainPageStructure() {
                 
                 <div><span>From</span></div>
                 <div>
-                <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" placeholder="Type in name"/>
+                <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" value="cirrhosis_liver"/>
                 <datalist id="xp_path_elementnames_source" style="height:5.1em;overflow:hidden">
                 </datalist>
                 </div>
@@ -1599,6 +1599,7 @@ async function updatePathData() {
           globals.pathchart.data.datasets = [];
           globals.pathchart.update();
           globals.xp_path_table.columns.adjust().draw();
+          enablebtn("xp_path_btn", text);
           resolve();
           return;
         }
