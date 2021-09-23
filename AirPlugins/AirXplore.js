@@ -284,7 +284,7 @@ function getExportPanel() {
                     AIR.Molecules,
                     AIR.interactions
                 ]
-            } 
+            }
 
             var filteredElementIds = []
 
@@ -296,10 +296,10 @@ function getExportPanel() {
                 for (var e in AIR.Molecules) {
                     var lowername = AIR.Molecules[e].name.toLowerCase();
                     if (AIR.MapElements.hasOwnProperty(lowername)) {
-                        for(let mapelement of AIR.MapElements[lowername])
-                        if (selectedMap == mapelement._modelId) {
-                            filteredElementIds.push(e)
-                        }
+                        for (let mapelement of AIR.MapElements[lowername])
+                            if (selectedMap == mapelement._modelId) {
+                                filteredElementIds.push(e)
+                            }
                     }
 
                 }
@@ -2224,12 +2224,13 @@ async function getHPO(element) {
                 error: function (content) {
                     resolve({});
                 },
-                statusCode:
-                {
-                    404: function () {
-                        resolve({});
-                    }
-                }
+                timeout: 500
+                // statusCode:
+                // {
+                //     404: function () {
+                //         resolve({});
+                //     }
+                // }
             });
         }
         else {
@@ -2243,19 +2244,18 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
     let elementname = $("#xp_elementinput").val().toLowerCase();
 
-    if (elementname.trim() == "") {
-        $('#xp_dl').hide();
-        $('#xp_value_type').html("");
-        $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
-        $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
-        globals.xplore.regulationtable.clear();
-        globals.xplore.targettable.clear();
-        globals.xplore.phenotypetable.clear();
-        globals.xplore.hpotable.clear();
-        globals.xplore.hpotable.columns.adjust().draw();
-        globals.xplore.selected_element = "";
-    }
-    else {
+    $('#xp_dl').hide();
+    $('#xp_value_type').html("");
+    $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
+    $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
+    globals.xplore.regulationtable.clear().draw();
+    globals.xplore.targettable.clear().draw();
+    globals.xplore.phenotypetable.clear().draw();
+    globals.xplore.hpotable.clear().draw();
+    globals.xplore.hpotable.columns.adjust().draw();
+    globals.xplore.selected_element = "";
+
+    if (elementname.trim() != "") {
         let elementid = null;
 
         for (let element in AIR.Molecules) {
@@ -2264,6 +2264,14 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                 break;
             }
         }
+        if (elementid == null) {
+            globals.xplore.regulationtable.columns.adjust().draw();
+            globals.xplore.targettable.columns.adjust().draw();
+
+            adjustPanels(globals.xplore.container);
+            return
+        }
+
         let elementtype = getElementType(elementname)
         if (elementtype) {
             switch (elementtype) {
@@ -2302,151 +2310,147 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
         globals.xplore.selected_element = elementid;
 
-        if (elementid == null) {
 
-            globals.xplore.regulationtable.clear();
-            globals.xplore.targettable.clear();
-            globals.xplore.phenotypetable.clear();
-            globals.xplore.hpotable.clear();
-            globals.xplore.hpotable.columns.adjust().draw();
+
+        if (globals.xplore.pe_influenceScores.hasOwnProperty(elementid)) {
+            elementsToHighlight = {}
+            for (let e in globals.xplore.pe_influenceScores[elementid].values) {
+                elementsToHighlight[AIR.Molecules[e].name] = valueToHex(globals.xplore.pe_influenceScores[elementid].values[e]);
+            }
+            for (let e of perturbedElements()) {
+                elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9"
+            }
+            ColorElements(elementsToHighlight);
         }
-        else {
-            if (globals.xplore.pe_influenceScores.hasOwnProperty(elementid)) {
-                elementsToHighlight = {}
-                for (let e in globals.xplore.pe_influenceScores[elementid].values) {
-                    elementsToHighlight[AIR.Molecules[e].name] = valueToHex(globals.xplore.pe_influenceScores[elementid].values[e]);
-                }
-                for (let e of perturbedElements()) {
-                    elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9"
-                }
-                ColorElements(elementsToHighlight);
+        if (onlyHPO == false) {
+            globals.xplore.regulationtable.clear();
+            if (onlyRegulators === false) {
+                globals.xplore.targettable.clear();
+                await xp_updatePhenotypeTable();
             }
-            if (onlyHPO == false) {
-                globals.xplore.regulationtable.clear();
-                if (onlyRegulators === false) {
-                    globals.xplore.targettable.clear();
-                    await xp_updatePhenotypeTable();
-                }
-                for (let s of AIR.Molecules[elementid].subunits) {
-                    globals.xplore.regulationtable.row.add([
-                        getLinkIconHTML(AIR.Molecules[s].name),
-                        "Subunit",
-                        AIR.Molecules[s].subtype,
-                        ""
-                    ])
-                }
-
-                for (let inter in AIR.Interactions) {
-                    let { source: _source, target: _target, typeString: _typestring, type: _type, pubmed: _pubmed } = AIR.Interactions[inter];
-
-                    if (AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false) {
-                        continue;
-                    }
-                    if (_target == elementid) {
-                        let { subtype: _sourcetype, name: _sourcename, ids: _sourceids } = AIR.Molecules[_source];
-                        let typevalue = $("#xp_select_interaction_type").val();
-                        switch (typevalue) {
-                            case "1":
-                                if (_sourcetype != "miRNA") {
-                                    continue;
-                                }
-                                break;
-                            case "2":
-                                if (_sourcetype != "lncRNA") {
-                                    continue;
-                                }
-                                break;
-                            case "3":
-                                if (_sourcetype != "TF") {
-                                    continue;
-                                }
-                                break;
-                        }
-
-                        globals.xplore.downloadtext = "";
-
-                        var result_row = [];
-
-                        result_row.push(getLinkIconHTML(_sourcename));
-
-                        var typehtml = '<font color="green">activation</font>';
-                        if (_type == -1) {
-                            typehtml = '<font color="red">inhibition</font>';
-                        }
-                        else if (_type == 0) {
-                            typehtml = _typestring;
-                        }
-
-
-                        result_row.push(typehtml);
-
-                        result_row.push(_sourcetype);
-
-                        var pubmedstring = "";
-                        _pubmed.forEach(p => {
-                            p = p.trim();
-                            var ptext = p.replace('pubmed:', '');
-
-                            if (isNaN(ptext)) {
-                                return;
-                            }
-
-                            if (p.includes(":") === false) {
-                                p = "pubmed:" + p;
-                            }
-                            var ptext = p.replace('pubmed:', '');
-                            pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
-                        });
-
-                        result_row.push(pubmedstring.substr(0, pubmedstring.length - 2));
-                        globals.xplore.regulationtable.row.add(result_row)
-                    }
-
-                    if (_source == elementid && onlyRegulators === false) {
-
-                        let { type: _targettype, name: _targetname, ids: _targetids } = AIR.Molecules[_target];
-
-                        var result_row = [];
-
-                        result_row.push(getLinkIconHTML(_targetname));
-
-                        var typehtml = '<font color="green">activation</font>';
-                        if (_type == -1) {
-                            typehtml = '<font color="red">inhibition</font>';
-                        }
-                        else if (_type == 0) {
-                            typehtml = _typestring;
-                        }
-
-                        result_row.push(_targettype);
-
-                        result_row.push(typehtml);
-
-                        var pubmedstring = "";
-                        _pubmed.forEach(p => {
-                            p = p.trim();
-                            var ptext = p.replace('pubmed:', '');
-
-                            if (isNaN(ptext)) {
-                                return;
-                            }
-                            if (p.includes(":") === false) {
-                                p = "pubmed:" + p;
-                            }
-
-                            pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
-                        });
-
-                        result_row.push(pubmedstring.substr(0, pubmedstring.length - 2));
-                        globals.xplore.targettable.row.add(result_row)
-                    }
-
-
-                }
+            for (let s of AIR.Molecules[elementid].subunits) {
+                globals.xplore.regulationtable.row.add([
+                    getLinkIconHTML(AIR.Molecules[s].name),
+                    "Subunit",
+                    AIR.Molecules[s].subtype,
+                    ""
+                ])
             }
-            if (onlyRegulators === false && ENABLE_API_CALLS == true) {
 
-                globals.xplore.hpotable.clear();
+            for (let inter in AIR.Interactions) {
+                let { source: _source, target: _target, typeString: _typestring, type: _type, pubmed: _pubmed } = AIR.Interactions[inter];
+
+                if (AIR.Molecules.hasOwnProperty(_source) == false || AIR.Molecules.hasOwnProperty(_target) == false) {
+                    continue;
+                }
+                if (_target == elementid) {
+                    let { subtype: _sourcetype, name: _sourcename, ids: _sourceids } = AIR.Molecules[_source];
+                    let typevalue = $("#xp_select_interaction_type").val();
+                    switch (typevalue) {
+                        case "1":
+                            if (_sourcetype != "miRNA") {
+                                continue;
+                            }
+                            break;
+                        case "2":
+                            if (_sourcetype != "lncRNA") {
+                                continue;
+                            }
+                            break;
+                        case "3":
+                            if (_sourcetype != "TF") {
+                                continue;
+                            }
+                            break;
+                    }
+
+                    globals.xplore.downloadtext = "";
+
+                    var result_row = [];
+
+                    result_row.push(getLinkIconHTML(_sourcename));
+
+                    var typehtml = '<font color="green">activation</font>';
+                    if (_type == -1) {
+                        typehtml = '<font color="red">inhibition</font>';
+                    }
+                    else if (_type == 0) {
+                        typehtml = _typestring;
+                    }
+
+
+                    result_row.push(typehtml);
+
+                    result_row.push(_sourcetype);
+
+                    var pubmedstring = "";
+                    _pubmed.forEach(p => {
+                        p = p.trim();
+                        var ptext = p.replace('pubmed:', '');
+
+                        if (isNaN(ptext)) {
+                            return;
+                        }
+
+                        if (p.includes(":") === false) {
+                            p = "pubmed:" + p;
+                        }
+                        var ptext = p.replace('pubmed:', '');
+                        pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
+                    });
+
+                    result_row.push(pubmedstring.substr(0, pubmedstring.length - 2));
+                    globals.xplore.regulationtable.row.add(result_row)
+                }
+
+                if (_source == elementid && onlyRegulators === false) {
+
+                    let { type: _targettype, name: _targetname, ids: _targetids } = AIR.Molecules[_target];
+
+                    var result_row = [];
+
+                    result_row.push(getLinkIconHTML(_targetname));
+
+                    var typehtml = '<font color="green">activation</font>';
+                    if (_type == -1) {
+                        typehtml = '<font color="red">inhibition</font>';
+                    }
+                    else if (_type == 0) {
+                        typehtml = _typestring;
+                    }
+
+                    result_row.push(_targettype);
+
+                    result_row.push(typehtml);
+
+                    var pubmedstring = "";
+                    _pubmed.forEach(p => {
+                        p = p.trim();
+                        var ptext = p.replace('pubmed:', '');
+
+                        if (isNaN(ptext)) {
+                            return;
+                        }
+                        if (p.includes(":") === false) {
+                            p = "pubmed:" + p;
+                        }
+
+                        pubmedstring += `<a target="_blank" href="https://identifiers.org/${p}">${ptext}</a>, `;
+                    });
+
+                    result_row.push(pubmedstring.substr(0, pubmedstring.length - 2));
+                    globals.xplore.targettable.row.add(result_row)
+                }
+
+
+            }
+        }
+        globals.xplore.regulationtable.columns.adjust().draw();
+        globals.xplore.targettable.columns.adjust().draw();
+        if (onlyRegulators === false && ENABLE_API_CALLS == true) {
+
+            globals.xplore.hpotable.clear();
+            try {
                 let response = await getHPO(elementid)
                 let typevalue = $("#xp_select_interaction_hpo").val();
                 if (response.hasOwnProperty("termAssoc") && typevalue != 2) {
@@ -2479,9 +2483,13 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                         globals.xplore.hpotable.row.add(result_row)
                     }
                 }
-                globals.xplore.hpotable.columns.adjust().draw();
+            } catch (error) {
+
             }
+
+            globals.xplore.hpotable.columns.adjust().draw();
         }
+
 
         if (onlyRegulators === false && onlyHPO == false) {
             setTimeout(async function () {
@@ -2585,8 +2593,6 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
         }
     }
     // Add new data
-    globals.xplore.regulationtable.columns.adjust().draw();
-    globals.xplore.targettable.columns.adjust().draw();
 
     adjustPanels(globals.xplore.container);
 
