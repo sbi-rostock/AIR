@@ -1,4 +1,4 @@
-async function AirMassSpec(){    
+async function AirMassSpec() {
 
     globals.massspec = {
         max_fc: 0,
@@ -27,12 +27,12 @@ async function AirMassSpec(){
         data_chart: undefined,
         samples: [],
         columnheaders: [],
-        seperator: "\t",  
-        
+        seperator: "\t",
+
         adduct_table: undefined,
         metabolite_table: undefined,
 
-        colors: ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F","#EDC948", "#B07AA1","#FF9DA7","#9C755F","#BAB0AC"],
+        colors: ["#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC"],
         pickedcolors: [],
 
         numberofcontrols: 0,
@@ -41,13 +41,13 @@ async function AirMassSpec(){
         results: {}
     }
 
-    globals.massspec.ms_container = $('#airmassspec_tab_content');   
+    globals.massspec.ms_container = $('#airmassspec_tab_content');
 
     $("#airmassspec_tab").on('shown.bs.tab', function () {
         globals.massspec.metabolite_table.columns.adjust();
-        globals.massspec.adduct_table.columns.adjust();     
+        globals.massspec.adduct_table.columns.adjust();
     });
-    
+
     $(
         /*<div class="text-center">
             <img src="https://www.sbi.uni-rostock.de/files/Projects/AIR/AIR3D_croped.png" class="img-fluid" width="100%">
@@ -179,11 +179,11 @@ async function AirMassSpec(){
                         <td style="text-align: right;">m/z Threshold:</td>
                         <td>0</td>
                         <td>
-                            <input type="range" style="width: 100%"  value="0.5" min="0" max="1" step="0.05" class="slider air_slider ms_slider" data="m" id="ms_slider_m">
+                            <input type="range" style="width: 100%"  value="20" min="0" max="100" step="1" class="slider air_slider ms_slider" data="m" id="ms_slider_m">
                         </td>
                         <td>1</td>
                         <td>
-                            <input type="text"  style="text-align: center; width: 90%" class="textfield ms_relative_value" value="0.5" id="ms_mvalue_relative" onkeypress="return isNumber(event)" />
+                            <input type="text"  style="text-align: center; width: 90%" class="textfield ms_relative_value" value="20" id="ms_mvalue_relative" onkeypress="return isNumber(event)" />
                         </td>  
                         <td>
                             <input type="text"  style="text-align: center; width: 90%" class="textfield ms_absolute_value" value="" id="ms_mvalue_absolute"  onkeypress="return isNumber(event)" />
@@ -434,35 +434,32 @@ async function AirMassSpec(){
     `
     ).appendTo(globals.massspec.ms_container);
 
-    $('#ms_addoverlay').on('click', async function() {
-        
+    $('#ms_addoverlay').on('click', async function () {
+
         var max = parseFloat($("#ms_ol_max").val());
         var min = parseFloat($("#ms_ol_min").val());
 
-        if(isNaN(min) || min >= 0)
-        {
+        if (isNaN(min) || min >= 0) {
             alert("Please provide a value smaller than zero for the min FC.");
             return;
         }
-        if(isNaN(max) || max <= 0)
-        {
+        if (isNaN(max) || max <= 0) {
             alert("Please provide a value greater than zero for the min FC.");
             return;
         }
 
-        var text = await disablebutton("ms_addoverlay"); 
+        var text = await disablebutton("ms_addoverlay");
         var olname = $("#ms_olname").val();
         globals.specialCharacters.forEach(c => {
             olname = olname.replaceAll(c, "");
         })
-    
-        if(olname == "")
-        {
+
+        if (olname == "") {
             alert("Please specify a name for the overlay.");
             enablebtn("ms_addoverlay", text);
             return;
         }
-            
+
         await air_addoverlay(olname, ms_contentString)
 
         enablebtn("ms_addoverlay", text);
@@ -470,37 +467,36 @@ async function AirMassSpec(){
 
     $("#ms_table-tab").on('shown.bs.tab', function () {
         globals.massspec.metabolite_table.columns.adjust();
-        globals.massspec.adduct_table.columns.adjust();     
+        globals.massspec.adduct_table.columns.adjust();
     });
 
     $("#ms_table_metabolite-tab").on('shown.bs.tab', function () {
-        globals.massspec.metabolite_table.columns.adjust();    
+        globals.massspec.metabolite_table.columns.adjust();
     });
 
     $("#ms_table_adduct-tab").on('shown.bs.tab', function () {
-        globals.massspec.adduct_table.columns.adjust();     
+        globals.massspec.adduct_table.columns.adjust();
     });
 
     $("#ms_peak-tab").on('shown.bs.tab', function () {
-        globals.massspec.data_chart.update(); 
+        globals.massspec.data_chart.update();
     });
 
     $('.air_btn_info[data-toggle="popover"]').popover()
     $('a[data-toggle="popover"]').popover()
 
-    $('#ms_checkbox_zaxis').on('change', async function() {
+    $('#ms_checkbox_zaxis').on('change', async function () {
         fillGraph(true, false);
     });
 
-    $('#ms_select_x').on('change', async function() {
+    $('#ms_select_x').on('change', async function () {
         let val = $(this).val()
         $('#ms_select_y').children().each(
-            function (){
-                if($(this).val() == val){
+            function () {
+                if ($(this).val() == val) {
                     $(this).attr('disabled', 'disabled');
                 }
-                else
-                {
+                else {
                     $(this).removeAttr('disabled');
                 }
             }
@@ -508,15 +504,14 @@ async function AirMassSpec(){
         fillGraph(true, true);
     });
 
-    $('#ms_select_y').on('change', async function() {
+    $('#ms_select_y').on('change', async function () {
         let val = $(this).val()
         $('#ms_select_x').children().each(
-            function (){
-                if($(this).val() == val){
+            function () {
+                if ($(this).val() == val) {
                     $(this).attr('disabled', 'disabled');
                 }
-                else
-                {
+                else {
                     $(this).removeAttr('disabled');
                 }
             }
@@ -524,66 +519,60 @@ async function AirMassSpec(){
         fillGraph(true, true);
     });
 
-    $('#ms_select_mapping').on('change', async function() {
-        if($("#ms_select_mapping").val() == 0)
+    $('#ms_select_mapping').on('change', async function () {
+        if ($("#ms_select_mapping").val() == 0)
             $("#ms_checkbox_weighting").removeClass("air_disabledbutton");
         else
             $("#ms_checkbox_weighting").addClass("air_disabledbutton");
         await fillGraph(true, false);
     });
 
-    $("#ms_checkbox_weighting").on('change', async function() {
+    $("#ms_checkbox_weighting").on('change', async function () {
         await fillGraph(true, false);
     });
 
-    $('.ms_relative_value').on('input', async function() {
+    $('.ms_relative_value').on('input', async function () {
 
         var number = parseFloat($(this).val());
-        if(isNaN(number))
-        {
+        if (isNaN(number)) {
             return;
         }
 
         var slider = $(this).closest(".ms_slider_row").find(".ms_slider").first().get()[0];
         globals.massspec.thresholds[slider.getAttribute("data")] = number
 
-        if(number > slider.max)
-        {
+        if (number > slider.max) {
             slider.value = slider.max
         }
-        else if(number < slider.min)
-        {
+        else if (number < slider.min) {
             slider.value = slider.min
         }
-        else
-        {
+        else {
             slider.value = number
-        } 
+        }
 
         await fillGraph(true, false);
     });
-    
-    $('.ms_absolute_value').on('input', async function() {
+
+    $('.ms_absolute_value').on('input', async function () {
         await fillGraph(true, false);
     });
 
-    $('.ms_slider').on('change', async function() {
+    $('.ms_slider').on('change', async function () {
         await fillGraph(true, false);
     });
 
-    $('.ms_slider').on('input', async function() {
+    $('.ms_slider').on('input', async function () {
         globals.massspec.thresholds[$(this).attr("data")] = $(this).val();
         $(this).closest(".ms_slider_row").find('.ms_relative_value').first().val($(this).val())
-        if(($("#ms_checkbox_dynamicupdate").prop('checked') == true))
-        {
+        if (($("#ms_checkbox_dynamicupdate").prop('checked') == true)) {
             await fillGraph(false, false);
         }
     });
 
-    $('#ms_filetypeSelect').on('change', async function() {
+    $('#ms_filetypeSelect').on('change', async function () {
 
-        switch(parseFloat($('#ms_filetypeSelect').val()))
-        {
+        switch (parseFloat($('#ms_filetypeSelect').val())) {
             case 1:
                 globals.massspec.seperator = ",";
                 break;
@@ -596,51 +585,51 @@ async function AirMassSpec(){
         globals.massspec.ms_container.removeClass("air_disabledbutton")
     });
 
-    $('#ms_select_compound').on('change', async function() {
+    $('#ms_select_compound').on('change', async function () {
         await fillGraph(true, true);
     });
 
 
-    $('#ms_select_compound').on('change', async function() {
+    $('#ms_select_compound').on('change', async function () {
         await fillGraph(true, true);
     });
 
-    $('#ms_inputId').on('change', async function() {
+    $('#ms_inputId').on('change', async function () {
         globals.massspec.ms_container.addClass("air_disabledbutton")
         let result = await ms_detectFile(false);
         globals.massspec.ms_container.removeClass("air_disabledbutton")
         return result;
     });
 
-    $('#ms_select_a_mapping').on('change', async function() { 
+    $('#ms_select_a_mapping').on('change', async function () {
         await updateMetaboliteTable();
     });
-    $('#ms_select_c_mapping').on('change', async function() { 
+    $('#ms_select_c_mapping').on('change', async function () {
         await updateMetaboliteTable();
     });
 
-    $('#ms_negative').change(function() {
-        if($(this).prop('checked') === true) {
-            $('#ms_positive').prop('checked', false)   
+    $('#ms_negative').change(function () {
+        if ($(this).prop('checked') === true) {
+            $('#ms_positive').prop('checked', false)
         }
     });
-    $('#ms_negative').click(function() {
-        if($(this).prop('checked') === false) {
-            return false;  
+    $('#ms_negative').click(function () {
+        if ($(this).prop('checked') === false) {
+            return false;
         }
     });
-    $('#ms_positive').change(function() {
-        if($(this).prop('checked') === true) {
-            $('#ms_negative').prop('checked', false)   
+    $('#ms_positive').change(function () {
+        if ($(this).prop('checked') === true) {
+            $('#ms_negative').prop('checked', false)
         }
     });
-    $('#ms_positive').click(function() {
-        if($(this).prop('checked') === false) {
-            return false;  
+    $('#ms_positive').click(function () {
+        if ($(this).prop('checked') === false) {
+            return false;
         }
     });
 
-    $('#ms_btn_readdata').on('click', async function() {
+    $('#ms_btn_readdata').on('click', async function () {
         var _text = await disablebutton("ms_btn_readdata")
         ms_loadfile().then(r => {
             fillGraph(true, true).then(s => {
@@ -655,7 +644,7 @@ async function AirMassSpec(){
     });
 
     globals.massspec.adduct_table = $('#ms_adduct_table').DataTable({
-        "order": [[ 1, "asc" ]], 
+        "order": [[1, "asc"]],
         "scrollX": true,
         "table-layout": "fixed",
         "autoWidth": true,
@@ -700,7 +689,7 @@ async function AirMassSpec(){
     }).columns.adjust().draw();
 
     globals.massspec.metabolite_table = $('#ms_metabolite_table').DataTable({
-        "order": [[ 0, "asc" ]], 
+        "order": [[0, "asc"]],
         "scrollX": true,
         "table-layout": "fixed",
         "autoWidth": true,
@@ -724,8 +713,7 @@ async function AirMassSpec(){
     async function ms_detectFile(force_seperator) {
         return new Promise((resolve, reject) => {
 
-            if(document.getElementById("ms_inputId").files.length == 0)
-            {
+            if (document.getElementById("ms_inputId").files.length == 0) {
                 $("#ms_ccsSelect").addClass("air_disabledbutton");
                 $("#ms_retentionSelect").addClass("air_disabledbutton");
                 $("#ms_mzSelect").addClass("air_disabledbutton");
@@ -754,21 +742,17 @@ async function AirMassSpec(){
 
                 var textFromFileLoaded = fileLoadedEvent.target.result;
 
-                if(textFromFileLoaded.trim() == "")
-                {
+                if (textFromFileLoaded.trim() == "") {
                     return stopfile('The file appears to be empty.');
                 }
                 var line = textFromFileLoaded.split('\n')[0];
 
-                if(!force_seperator)
-                {
-                    if((line.match(new RegExp(",", "g")) || []).length > (line.match(new RegExp("\t", "g")) || []).length )
-                    {
+                if (!force_seperator) {
+                    if ((line.match(new RegExp(",", "g")) || []).length > (line.match(new RegExp("\t", "g")) || []).length) {
                         globals.massspec.seperator = ",";
                         $("#ms_filetypeSelect").val(1);
                     }
-                    else
-                    {
+                    else {
                         globals.massspec.seperator = "\t";
                         $("#ms_filetypeSelect").val(0);
                     }
@@ -780,8 +764,8 @@ async function AirMassSpec(){
                     globals.specialCharacters.forEach(c => {
                         header = header.replace(c, "");
                     })
-                    globals.massspec.columnheaders.push(header.trim());                 
-                    index ++; 
+                    globals.massspec.columnheaders.push(header.trim());
+                    index++;
                 })
 
 
@@ -789,29 +773,25 @@ async function AirMassSpec(){
                 let rSelect = document.getElementById('ms_retentionSelect');
                 let cSelect = document.getElementById('ms_ccsSelect');
 
-                for(let i = 0; i < globals.massspec.columnheaders.length;i++) {
-                    
+                for (let i = 0; i < globals.massspec.columnheaders.length; i++) {
+
                     let header = globals.massspec.columnheaders[i]
 
-                    if(globals.massspec.columnheaders.filter(item => item == header).length > 1)
-                    {
+                    if (globals.massspec.columnheaders.filter(item => item == header).length > 1) {
                         resolve(stopfile('Headers in first line need to be unique!<br>Column ' + header + ' occured multiple times.'));
                     }
 
                     mzSelect.options[mzSelect.options.length] = new Option(header, i);
-                    if(header.toLowerCase().includes("m/z") || header.toLowerCase().includes("m / z") || header.toLowerCase().includes("mz") || header.toLowerCase().includes("m /z") || header.toLowerCase().includes("m/ z"))
-                    {    
-                        $("#ms_mzSelect").val(i); 
+                    if (header.toLowerCase().includes("m/z") || header.toLowerCase().includes("m / z") || header.toLowerCase().includes("mz") || header.toLowerCase().includes("m /z") || header.toLowerCase().includes("m/ z")) {
+                        $("#ms_mzSelect").val(i);
                     }
-                    rSelect.options[rSelect.options.length] = new Option(header, i); 
-                    if(header.toLowerCase().includes("retention"))
-                    {    
-                        $("#ms_retentionSelect").val(i); 
+                    rSelect.options[rSelect.options.length] = new Option(header, i);
+                    if (header.toLowerCase().includes("retention")) {
+                        $("#ms_retentionSelect").val(i);
                     }
-                    cSelect.options[cSelect.options.length] = new Option(header, i); 
-                    if(header.toLowerCase().includes("ccs"))
-                    {    
-                        $("#ms_ccsSelect").val(i); 
+                    cSelect.options[cSelect.options.length] = new Option(header, i);
+                    if (header.toLowerCase().includes("ccs")) {
+                        $("#ms_ccsSelect").val(i);
                     }
 
 
@@ -826,18 +806,16 @@ async function AirMassSpec(){
                     $("#ms_case_sample_list").append(`<li>
                         <input class="ms_sample_item" id="ms_sampleitem_case_${i}" data="${i}" type="checkbox">
                         <label class="air_checkbox" for="ms_sampleitem_case_${i}">${header}</label>
-                    </li>`)                    
+                    </li>`)
                 };
-                if(globals.massspec.columnheaders.length <= 1)
-                {
-                    resolve(stopfile('Could not read Headers'));  
-                    return;                        
+                if (globals.massspec.columnheaders.length <= 1) {
+                    resolve(stopfile('Could not read Headers'));
+                    return;
                 }
-                                            
+
                 success = true;
 
-                function stopfile(alerttext)
-                {
+                function stopfile(alerttext) {
                     alert(alerttext);
                     success = false;
                     return false;
@@ -867,14 +845,12 @@ function ms_Yvalue() {
 
 async function ms_loadfile() {
     let _result = true;
-    if(globals.massspec.metadata == null)
-    {
+    if (globals.massspec.metadata == null) {
         _result = await initializeData()
     }
     return new Promise((resolve, reject) => {
-    
-        if(_result == false)
-        {
+
+        if (_result == false) {
             reject("Could not fetch metadata. Please try again or contact the admin.")
         }
 
@@ -883,8 +859,7 @@ async function ms_loadfile() {
         var resolvemessage = "";
         var fileToLoad = document.getElementById("ms_inputId").files[0];
 
-        if(!fileToLoad)
-        {
+        if (!fileToLoad) {
             reject('No file selected.');
         }
 
@@ -892,8 +867,7 @@ async function ms_loadfile() {
         fileReader.onload = function (fileLoadedEvent) {
 
             var textFromFileLoaded = fileLoadedEvent.target.result;
-            if(textFromFileLoaded.trim() == "")
-            {
+            if (textFromFileLoaded.trim() == "") {
                 reject('The file appears to be empty.');
             }
             var firstline = true;
@@ -905,8 +879,7 @@ async function ms_loadfile() {
             globals.massspec.c_column = $("#ms_ccsSelect").val();
             globals.massspec.max_fc = 0;
 
-            if(globals.massspec.mz_column == globals.massspec.r_column || globals.massspec.r_column == globals.massspec.c_column || globals.massspec.mz_column == globals.massspec.c_column)
-            {
+            if (globals.massspec.mz_column == globals.massspec.r_column || globals.massspec.r_column == globals.massspec.c_column || globals.massspec.mz_column == globals.massspec.c_column) {
                 reject("All three parameter columns have to be distinct.");
             }
 
@@ -915,50 +888,44 @@ async function ms_loadfile() {
 
             $("#ms_control_sample_list input:checked").each(function () {
                 var value = $(this).attr("data")
-                if(value == globals.massspec.mz_column || value == globals.massspec.r_column || value == globals.massspec.c_column)
-                {
+                if (value == globals.massspec.mz_column || value == globals.massspec.r_column || value == globals.massspec.c_column) {
                     reject("Parameter columns can be set as value columns.")
                 }
                 control_samples.push(value)
 
-            }) 
+            })
             $("#ms_case_sample_list input:checked").each(function () {
                 var value = $(this).attr("data")
-                if(value == globals.massspec.mz_column || value == globals.massspec.r_column || value == globals.massspec.c_column)
-                {
+                if (value == globals.massspec.mz_column || value == globals.massspec.r_column || value == globals.massspec.c_column) {
                     reject("Parameter columns can be set as value columns.")
                 }
                 case_samples.push(value)
-            }) 
+            })
 
-            if(control_samples.length == 0)
-            {
+            if (control_samples.length == 0) {
                 reject("Please select columns for control values.");
             }
-            if(case_samples.length == 0)
-            {
+            if (case_samples.length == 0) {
                 reject("Please select columns for case values.");
             }
             globals.massspec.numberofcontrols = control_samples.length;
             globals.massspec.numberofcases = case_samples.length;
 
-            textFromFileLoaded.split('\n').forEach(function(line) {
+            textFromFileLoaded.split('\n').forEach(function (line) {
                 if (firstline === true) {
                     firstline = false;
                 }
-                else {                   
-                    if(line == ""){
+                else {
+                    if (line == "") {
                         return;
                     }
-                    
+
                     let entries = line.split(globals.massspec.seperator);
 
-                    globals.massspec.numberofuserprobes ++;
-                    if(globals.massspec.pvalue && entries.length != globals.massspec.samples.length * 2 + 1 || globals.massspec.pvalue == false && line.split('\t').length != globals.massspec.samples.length + 1)
-                    {
+                    globals.massspec.numberofuserprobes++;
+                    if (globals.massspec.pvalue && entries.length != globals.massspec.samples.length * 2 + 1 || globals.massspec.pvalue == false && line.split('\t').length != globals.massspec.samples.length + 1) {
                         var linelengtherror = "Lines in the datafile may have been skipped because of structural issues.";
-                        if(resolvemessage.includes(linelengtherror) === false)
-                        {
+                        if (resolvemessage.includes(linelengtherror) === false) {
                             resolvemessage += linelengtherror
                         }
                         return;
@@ -967,30 +934,25 @@ async function ms_loadfile() {
                     let control_values = [];
                     let case_values = [];
 
-                    for(let _id of control_samples)
-                    {
+                    for (let _id of control_samples) {
                         let _value = parseFloat(entries[_id].replace(",", ".").trim())
-                        control_values.push(!isNaN(_value)? _value : 0)
+                        control_values.push(!isNaN(_value) ? _value : 0)
                     }
-                    for(let _id of case_samples)
-                    {
+                    for (let _id of case_samples) {
                         let _value = parseFloat(entries[_id].replace(",", ".").trim())
-                        case_values.push(!isNaN(_value)? _value : 0)
+                        case_values.push(!isNaN(_value) ? _value : 0)
                     }
 
-                    let fc = Math.log2((mean(case_values) + 1)/(mean(control_values) + 1))
+                    let fc = Math.log2((mean(case_values) + 1) / (mean(control_values) + 1))
                     let pvalue = ttest(control_values, case_values).pValue();
 
-                    if(!isNaN(fc))
-                    {
-                        if(Math.abs(fc) > globals.massspec.max_fc)
-                        {
+                    if (!isNaN(fc)) {
+                        if (Math.abs(fc) > globals.massspec.max_fc) {
                             globals.massspec.max_fc = Math.abs(fc);
                         }
 
                     }
-                    else
-                    {
+                    else {
                         fc = 0
                     }
 
@@ -1006,12 +968,11 @@ async function ms_loadfile() {
                 }
 
             });
-                   
-            if(globals.massspec.raw_values.length === 0)
-            {
+
+            if (globals.massspec.raw_values.length === 0) {
                 resolve(false);
             }
-            else{
+            else {
                 fillGraph(true, false).then(r => {
                     resolve(resolvemessage);
                 })
@@ -1033,7 +994,7 @@ async function drawChart() {
     var outputCanvas = document.getElementById('ms_chart_data');
 
     var chartOptions = {
-        type: 'scatter',        
+        type: 'scatter',
         data: {
             datasets: [],
         },
@@ -1054,7 +1015,7 @@ async function drawChart() {
                     pan: {
                         // Boolean to enable panning
                         enabled: true,
-    
+
                         // Panning directions. Remove the appropriate direction to disable 
                         // Eg. 'y' would only allow panning in the y direction
                         mode: 'xy',
@@ -1068,15 +1029,15 @@ async function drawChart() {
                             x: null,
                             y: null
                         },
-            
+
                         // On category scale, factor of pan velocity
                         speed: 20,
-            
+
                         // Minimal pan distance required before actually applying pan
                         threshold: 10,
-            
+
                     },
-    
+
                     // Container for zoom options
                     zoom: {
                         wheel: {
@@ -1092,10 +1053,9 @@ async function drawChart() {
                     callbacks: {
                         label: function (context) {
                             var label = context.dataset.label || '';
-                            
+
                             let _id = parseFloat(label)
-                            if(isNaN(_id))
-                            {
+                            if (isNaN(_id)) {
                                 let labels = label.split(";")
                                 return [
                                     labels[0],
@@ -1105,7 +1065,7 @@ async function drawChart() {
                                 ];
                             }
                             let entry = globals.massspec.raw_values[_id];
-    
+
                             return [
                                 'm/z: ' + entry.m,
                                 'Rt: ' + entry.r,
@@ -1120,7 +1080,7 @@ async function drawChart() {
                 event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
             responsive: true,
-            maintainAspectRatio: false,                    
+            maintainAspectRatio: false,
             animation: {
                 duration: 0
             },
@@ -1130,10 +1090,10 @@ async function drawChart() {
             responsiveAnimationDuration: 0,
             layout: {
                 padding: {
-                top: 15
+                    top: 15
                 }
             },
-            
+
             scales: {
                 y: {
                     title: {
@@ -1149,27 +1109,25 @@ async function drawChart() {
                 }
             }
         }
-    }; 
+    };
 
-    globals.massspec.data_chart = new Chart(outputCanvas, chartOptions);  
-    
-    $("#ms_chart_data").height(400);  
+    globals.massspec.data_chart = new Chart(outputCanvas, chartOptions);
+
+    $("#ms_chart_data").height(400);
 }
 
-async function fillGraph(updateAll, redraw) 
-{ 
+async function fillGraph(updateAll, redraw) {
     let xaxis = ms_Xvalue()
     let yaxis = ms_Yvalue()
     let zaxis = "c"
 
-    if(updateAll)
-    {
+    if (updateAll) {
         globals.massspec.adduct_table.clear();
     }
 
     let accountfor_zaxis = ($("#ms_checkbox_zaxis").prop('checked') == true);
 
-    let mapping = $("#ms_select_mapping").val(); 
+    let mapping = $("#ms_select_mapping").val();
 
     let abs_thresholds = {
         "m": parseFloat($("#ms_mvalue_absolute").val()),
@@ -1179,34 +1137,28 @@ async function fillGraph(updateAll, redraw)
 
     let mapped_values = {}
 
-    for(let p of Object.keys(globals.massspec.thresholds))
-    {
-        if(p != xaxis && p != yaxis)
-        {
+    for (let p of Object.keys(globals.massspec.thresholds)) {
+        if (p != xaxis && p != yaxis) {
             zaxis = p;
             continue;
         }
     }
-    
-    if(redraw)
-    {
+
+    if (redraw) {
         await drawChart();
     }
     globals.massspec.data_chart.data.datasets = [];
 
-    let selected_compound = $( "#ms_select_compound option:selected" ).text();
+    let selected_compound = $("#ms_select_compound option:selected").text();
     let weighted = $("#ms_checkbox_weighting").prop('checked') == true;
 
-    
-    if(!globals.massspec.metadata.hasOwnProperty(selected_compound))
-    {
+
+    if (!globals.massspec.metadata.hasOwnProperty(selected_compound)) {
         return;
     }
 
-    for(let adduct of globals.massspec.metadata[selected_compound].adducts)
-    {
-        if(adduct["polarity"] != globals.massspec.polarity)
-        {
+    for (let adduct of globals.massspec.metadata[selected_compound].adducts) {
+        if (adduct["polarity"] != globals.massspec.polarity) {
             continue;
         }
         globals.massspec.data_chart.data.datasets.push({
@@ -1224,76 +1176,63 @@ async function fillGraph(updateAll, redraw)
     let x_margin, y_margin, z_margin;
     let entry, xvalue, yvalue, zvalue;
 
-    for(let e in globals.massspec.raw_values)
-    {
+    for (let e in globals.massspec.raw_values) {
         entry = globals.massspec.raw_values[e];
-        xvalue = entry[xaxis];        
+        xvalue = entry[xaxis];
         yvalue = entry[yaxis];
         zvalue = entry[zaxis];
 
-        for(let c in globals.massspec.metadata)
-        {
-            if(!mapped_values.hasOwnProperty(c))
-            {
+        for (let c in globals.massspec.metadata) {
+            if (!mapped_values.hasOwnProperty(c)) {
                 mapped_values[c] = {};
             }
-            if(c != selected_compound && updateAll == false)
-            {
+            if (c != selected_compound && updateAll == false) {
                 continue;
             }
             let adducts = [];
-            for(let a in globals.massspec.metadata[c].adducts)
-            {
-                if(!mapped_values[c].hasOwnProperty(a))
-                {
+            for (let a in globals.massspec.metadata[c].adducts) {
+                if (!mapped_values[c].hasOwnProperty(a)) {
                     mapped_values[c][a] = {};
                 }
 
                 var adduct = globals.massspec.metadata[c].adducts[a];
-                if(adduct["polarity"] != globals.massspec.polarity)
-                {
+                if (adduct["polarity"] != globals.massspec.polarity) {
                     continue;
                 }
 
-                x_margin = isNaN(abs_thresholds[xaxis])? adduct[xaxis] * globals.massspec.thresholds[xaxis] / 100 : abs_thresholds[xaxis];
-                if(xvalue > (adduct[xaxis] + x_margin) || xvalue < (adduct[xaxis] - x_margin))
-                {
-                    continue;
-                }
-        
-                y_margin = isNaN(abs_thresholds[yaxis])? adduct[yaxis] * globals.massspec.thresholds[yaxis] / 100 : abs_thresholds[yaxis];
-                if(yvalue > (adduct[yaxis] + y_margin) || yvalue < (adduct[yaxis] - y_margin))
-                {
+                x_margin = isNaN(abs_thresholds[xaxis]) ? adduct[xaxis] * globals.massspec.thresholds[xaxis] / 100 : abs_thresholds[xaxis];
+                if (xvalue > (adduct[xaxis] + x_margin) || xvalue < (adduct[xaxis] - x_margin)) {
                     continue;
                 }
 
-                if(!accountfor_zaxis && c == selected_compound)
-                {
+                y_margin = isNaN(abs_thresholds[yaxis]) ? adduct[yaxis] * globals.massspec.thresholds[yaxis] / 100 : abs_thresholds[yaxis];
+                if (yvalue > (adduct[yaxis] + y_margin) || yvalue < (adduct[yaxis] - y_margin)) {
+                    continue;
+                }
+
+                if (!accountfor_zaxis && c == selected_compound) {
                     adducts.push(adduct["adduct"])
                 }
 
-                z_margin = isNaN(abs_thresholds[zaxis])? adduct[zaxis] * globals.massspec.thresholds[zaxis] / 100 : abs_thresholds[zaxis];
-                if(zvalue > (adduct[zaxis] + z_margin) || zvalue < (adduct[zaxis] - z_margin))
-                {
+                z_margin = isNaN(abs_thresholds[zaxis]) ? adduct[zaxis] * globals.massspec.thresholds[zaxis] / 100 : abs_thresholds[zaxis];
+                if (zvalue > (adduct[zaxis] + z_margin) || zvalue < (adduct[zaxis] - z_margin)) {
                     continue;
                 }
 
-                if(accountfor_zaxis && c == selected_compound)
-                {
+                if (accountfor_zaxis && c == selected_compound) {
                     adducts.push(adduct["adduct"])
                 }
 
-                switch(mapping)
-                {
-                    case "0": 
-                        if(weighted)
-                            mapped_values[c][a][e] = -Math.sqrt(Math.pow((1-(xvalue/adduct[xaxis])), 2)*Math.sqrt(x_margin/adduct[xaxis],2) + Math.pow((1-(yvalue/adduct[yaxis])), 2)*Math.sqrt(y_margin/adduct[yaxis],2) + Math.pow((1-(zvalue/adduct[zaxis])), 2)* Math.sqrt(z_margin/adduct[zaxis],2))
+                switch (mapping) {
+                    case "0":
+                        if (weighted)
+                            mapped_values[c][a][e] = -Math.sqrt(Math.pow((1 - (xvalue / adduct[xaxis])), 2) * Math.sqrt(x_margin / adduct[xaxis], 2) + Math.pow((1 - (yvalue / adduct[yaxis])), 2) * Math.sqrt(y_margin / adduct[yaxis], 2) + Math.pow((1 - (zvalue / adduct[zaxis])), 2) * Math.sqrt(z_margin / adduct[zaxis], 2))
                         else
-                            mapped_values[c][a][e] = -Math.sqrt(Math.pow(1-(xvalue/adduct[xaxis]), 2) + Math.pow(1-(yvalue/adduct[yaxis]), 2) + Math.pow(1-(zvalue/adduct[zaxis]), 2))
+                            mapped_values[c][a][e] = -Math.sqrt(Math.pow(1 - (xvalue / adduct[xaxis]), 2) + Math.pow(1 - (yvalue / adduct[yaxis]), 2) + Math.pow(1 - (zvalue / adduct[zaxis]), 2))
                         break;
                     case "1":
                         mapped_values[c][a][e] = Math.abs(entry.fc)
-                        break;  
+                        break;
                     case "2":
                         mapped_values[c][a][e] = entry.fc
                         break;
@@ -1302,7 +1241,7 @@ async function fillGraph(updateAll, redraw)
                         break;
                     case "4":
                         mapped_values[c][a][e] = Math.max(entry.control)
-                        break;  
+                        break;
                     case "5":
                         mapped_values[c][a][e] = -Math.min(entry.control)
                         break;
@@ -1311,8 +1250,8 @@ async function fillGraph(updateAll, redraw)
                         break;
                     case "7":
                         mapped_values[c][a][e] = Math.min(entry.case)
-                        break;                   
-                    default: 
+                        break;
+                    default:
                         break;
                 }
 
@@ -1320,8 +1259,7 @@ async function fillGraph(updateAll, redraw)
 
             }
 
-            if(adducts.length > 0)
-            {
+            if (adducts.length > 0) {
 
                 let _result = {
                     label: e,
@@ -1331,9 +1269,8 @@ async function fillGraph(updateAll, redraw)
                         r: 3,
                     }],
                 }
-                if(globals.massspec.max_fc != 0 && !isNaN(entry.fc))
-                {
-                    var rgb = valueToRGB(entry.fc/globals.massspec.max_fc);
+                if (globals.massspec.max_fc != 0 && !isNaN(entry.fc)) {
+                    var rgb = valueToRGB(entry.fc / globals.massspec.max_fc);
                     var colorstring = `rgb(${rgb[0]},${rgb[1]},${rgb[2]}, 1)`
                     _result["backgroundColor"] = colorstring
                     _result["hoverBackgroundColor"] = colorstring
@@ -1345,12 +1282,12 @@ async function fillGraph(updateAll, redraw)
 
     compoundsWithPeaks = Array.from(compoundsWithPeaks)
     $('#ms_select_compound').children().each(
-        function (){
-            if(compoundsWithPeaks.includes($(this).text())){
-                $(this).css('backgroundColor','#F08080');
+        function () {
+            if (compoundsWithPeaks.includes($(this).text())) {
+                $(this).css('backgroundColor', '#F08080');
             }
             else {
-                $(this).css('backgroundColor','white');
+                $(this).css('backgroundColor', 'white');
             }
         }
     );
@@ -1359,40 +1296,34 @@ async function fillGraph(updateAll, redraw)
     var only_selected = {}
     only_selected[selected_compound] = {};
 
-    for(let c in (updateAll? mapped_values : only_selected))
-    {
+    for (let c in (updateAll ? mapped_values : only_selected)) {
         let _metabolite = globals.massspec.metadata[c].metabolite;
-        for(let a in mapped_values[c])
-        {       
+        for (let a in mapped_values[c]) {
 
-            if(Object.keys(mapped_values[c][a]).length === 0)  
-            {
+            if (Object.keys(mapped_values[c][a]).length === 0) {
                 continue;
             }
 
-            var items = Object.keys(mapped_values[c][a]).map(function(key) {
+            var items = Object.keys(mapped_values[c][a]).map(function (key) {
                 return [key, mapped_values[c][a][key]];
-              });
-    
-            items.sort(function(first, second) {
+            });
+
+            items.sort(function (first, second) {
                 return second[1] - first[1];
             });
-    
+
             let _id = items[0][0];
             let adduct = globals.massspec.metadata[c].adducts[a]
 
-            if(!globals.massspec.metabolite_values.hasOwnProperty(_metabolite))
-            {
+            if (!globals.massspec.metabolite_values.hasOwnProperty(_metabolite)) {
                 globals.massspec.metabolite_values[_metabolite] = {};
             }
-            if(!globals.massspec.metabolite_values[_metabolite].hasOwnProperty(c))
-            {
+            if (!globals.massspec.metabolite_values[_metabolite].hasOwnProperty(c)) {
                 globals.massspec.metabolite_values[_metabolite][c] = new Set();
             }
             globals.massspec.metabolite_values[_metabolite][c].add(_id);
 
-            if(updateAll)
-            {
+            if (updateAll) {
                 let entry = globals.massspec.raw_values[_id];
 
                 var result_row = [
@@ -1407,15 +1338,12 @@ async function fillGraph(updateAll, redraw)
                     expo(entry.c) + " (" + expo(adduct.c) + ")",
                     expo(Math.sqrt(Math.pow(adduct.m - entry.m, 2) + Math.pow(adduct.r - entry.r, 2) + Math.pow(adduct.c - entry.c, 2)))
                 ]
-                globals.massspec.adduct_table.row.add(result_row)  
+                globals.massspec.adduct_table.row.add(result_row)
             }
 
-            if(c == selected_compound)
-            {
-                for(let data of globals.massspec.data_chart.data.datasets)
-                {
-                    if(data.label == _id)
-                    {
+            if (c == selected_compound) {
+                for (let data of globals.massspec.data_chart.data.datasets) {
+                    if (data.label == _id) {
                         data.data[0]["pointStyle"] = "triangle";
                         data["borderWidth"] = 2;
                         data["borderColor"] = "rgba(0, 0, 0, 1)";
@@ -1425,7 +1353,7 @@ async function fillGraph(updateAll, redraw)
                             y: adduct[yaxis],
                             r: 0,
                         }),
-                        data["showLine"] = true;
+                            data["showLine"] = true;
                         data["fill"] = false;
                         data["lineTension"] = 0;
                     }
@@ -1434,18 +1362,15 @@ async function fillGraph(updateAll, redraw)
         }
 
     }
-    if(updateAll)
-    {
+    if (updateAll) {
         await updateMetaboliteTable()
     }
 
-    if(updateAll)
-    {
+    if (updateAll) {
         globals.massspec.adduct_table.columns.adjust().draw();
     }
-    if($('#ms_peak').hasClass('active'))
-    {
-        globals.massspec.data_chart.update(); 
+    if ($('#ms_peak').hasClass('active')) {
+        globals.massspec.data_chart.update();
     }
 
 }
@@ -1457,13 +1382,11 @@ async function updateMetaboliteTable() {
     let adduct_mapping = parseFloat($("#ms_select_a_mapping").val());
     let compound_mapping = parseFloat($("#ms_select_c_mapping").val());
 
-    for(let m in globals.massspec.metabolite_values)
-    {
+    for (let m in globals.massspec.metabolite_values) {
         let m_control_values, m_case_values;
 
-        switch(compound_mapping)
-        {
-            
+        switch (compound_mapping) {
+
             case 0:
                 m_control_values = Array.from(Array(globals.massspec.numberofcontrols), () => [])
                 m_case_values = Array.from(Array(globals.massspec.numberofcases), () => [])
@@ -1474,12 +1397,10 @@ async function updateMetaboliteTable() {
                 break;
         }
 
-        for(let c in globals.massspec.metabolite_values[m])
-        {
+        for (let c in globals.massspec.metabolite_values[m]) {
             let c_control_values, c_case_values;
-            
-            switch(adduct_mapping)
-            {
+
+            switch (adduct_mapping) {
                 case 0:
                     c_control_values = new Array(globals.massspec.numberofcontrols).fill(0);
                     c_case_values = new Array(globals.massspec.numberofcases).fill(0);
@@ -1493,71 +1414,58 @@ async function updateMetaboliteTable() {
                     c_case_values = Array.from(Array(globals.massspec.numberofcases), () => [])
                     break;
             }
-            
 
-            for(let _id of Array.from(globals.massspec.metabolite_values[m][c]))
-            {
+
+            for (let _id of Array.from(globals.massspec.metabolite_values[m][c])) {
                 var entry = globals.massspec.raw_values[_id];
-                switch(adduct_mapping)
-                {
+                switch (adduct_mapping) {
                     case 0:
-                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                        {
-                            if(entry.control[i] > c_control_values[i])
+                        for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
+                            if (entry.control[i] > c_control_values[i])
                                 c_control_values[i] = entry.control[i];
                         }
-                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                        {
-                            if(entry.case[i] > c_case_values[i])
+                        for (var i = 0; i < globals.massspec.numberofcases; i++) {
+                            if (entry.case[i] > c_case_values[i])
                                 c_case_values[i] = entry.case[i];
                         }
                         break;
                     case 1:
-                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                        {
-                            if(entry.control[i] < c_control_values[i])
+                        for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
+                            if (entry.control[i] < c_control_values[i])
                                 c_control_values[i] = entry.control[i];
                         }
-                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                        {
-                            if(entry.case[i] < c_case_values[i])
+                        for (var i = 0; i < globals.massspec.numberofcases; i++) {
+                            if (entry.case[i] < c_case_values[i])
                                 c_case_values[i] = entry.case[i];
                         }
                         break;
                     case 2:
-                        for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                        {
+                        for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
                             c_control_values[i].push(entry.control[i])
                         }
-                        for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                        {
+                        for (var i = 0; i < globals.massspec.numberofcases; i++) {
                             c_case_values[i].push(entry.case[i])
                         }
                         break;
                 }
 
             }
-            switch(adduct_mapping)
-            {
+            switch (adduct_mapping) {
                 case 1:
-                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                    {
-                        if(c_control_values[i] == Number.MAX_SAFE_INTEGER)
+                    for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
+                        if (c_control_values[i] == Number.MAX_SAFE_INTEGER)
                             c_control_values[i] = 0;
                     }
-                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                    {
-                        if(c_case_values[i] == Number.MAX_SAFE_INTEGER)
+                    for (var i = 0; i < globals.massspec.numberofcases; i++) {
+                        if (c_case_values[i] == Number.MAX_SAFE_INTEGER)
                             c_case_values[i] = 0;
                     }
                     break;
                 case 2:
-                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                    {
+                    for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
                         c_control_values[i] = mean(c_control_values[i]);
                     }
-                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                    {
+                    for (var i = 0; i < globals.massspec.numberofcases; i++) {
                         c_case_values[i] = mean(c_case_values[i]);
                     }
                     break;
@@ -1565,48 +1473,40 @@ async function updateMetaboliteTable() {
                     break;
             }
 
-            
-            switch(compound_mapping)
-            {
-                
-                case 1:                    
-                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                    {
+
+            switch (compound_mapping) {
+
+                case 1:
+                    for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
                         m_control_values[i] += c_control_values[i];
                     }
-                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                    {
+                    for (var i = 0; i < globals.massspec.numberofcases; i++) {
                         m_case_values[i] += c_case_values[i];
                     }
                     break;
-                case 0:              
-                    for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-                    {
+                case 0:
+                    for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
                         m_control_values[i].push(c_control_values[i])
                     }
-                    for(var i = 0; i < globals.massspec.numberofcases; i ++)
-                    {
+                    for (var i = 0; i < globals.massspec.numberofcases; i++) {
                         m_case_values[i].push(c_case_values[i])
                     }
                     break;
             }
         }
 
-        if(compound_mapping == 0)
-        {
-            for(var i = 0; i < globals.massspec.numberofcontrols; i ++)
-            {
+        if (compound_mapping == 0) {
+            for (var i = 0; i < globals.massspec.numberofcontrols; i++) {
                 m_control_values[i] = mean(m_control_values[i])
             }
-            for(var i = 0; i < globals.massspec.numberofcases; i ++)
-            {
+            for (var i = 0; i < globals.massspec.numberofcases; i++) {
                 m_case_values[i] = mean(m_case_values[i])
             }
         }
-            
-        var fc = Math.log2((mean(m_case_values)+1)/(mean(m_control_values)+1))
+
+        var fc = Math.log2((mean(m_case_values) + 1) / (mean(m_control_values) + 1))
         var pvalue = ttest(m_control_values, m_case_values).pValue()
-        fc = isNaN(fc)? 0 : fc;
+        fc = isNaN(fc) ? 0 : fc;
 
         var result_row = [
             getLinkIconHTML(m),
@@ -1618,7 +1518,7 @@ async function updateMetaboliteTable() {
             "fc": fc,
             "pvalue": pvalue
         };
-        globals.massspec.metabolite_table.row.add(result_row)   
+        globals.massspec.metabolite_table.row.add(result_row)
     }
     globals.massspec.metabolite_table.columns.adjust().draw();
     update_importMassSpecTable();
@@ -1626,104 +1526,79 @@ async function updateMetaboliteTable() {
 
 async function initializeData() {
     return new Promise((resolve, reject) => {
-        var client = new XMLHttpRequest();
+        getFiles('Metabolite_meta.txt').then(async function (output) {
+            globals.massspec.metadata = {}
+            let lines = output.split('\n');
+            for (let line of lines) {
+                let entry = line.split("\t");
 
-        var _url = FILE_URL + "Metabolite_meta.txt";
-        client.open('GET', _url);
-        client.onreadystatechange = async function() {
-            if (this.readyState == 4)
-            {
-                
-                if(this.status == 200) {
-
-                    globals.massspec.metadata = {}
-                    let lines = client.responseText.split('\n');
-                    for(let line of lines)
-                    {
-                        let entry = line.split("\t");
-
-                        if(!globals.massspec.metadata.hasOwnProperty(entry[1]))
-                        {
-                            globals.massspec.metadata[entry[1]] = {
-                                "metabolite": entry[0],
-                                "adducts": []
-                            }
-                        }
-                        globals.massspec.metadata[entry[1]].adducts.push({
-                            "polarity": entry[2].toLowerCase() == "positive"? true:false,
-                            "adduct": entry[3],
-                            "m": parseFloat(entry[4]),
-                            "r": parseFloat(entry[5]),
-                            "c": parseFloat(entry[6]),
-                            "id": entry[7]
-                        })
+                if (!globals.massspec.metadata.hasOwnProperty(entry[1])) {
+                    globals.massspec.metadata[entry[1]] = {
+                        "metabolite": entry[0],
+                        "adducts": []
                     }
+                }
+                globals.massspec.metadata[entry[1]].adducts.push({
+                    "polarity": entry[2].toLowerCase() == "positive" ? true : false,
+                    "adduct": entry[3],
+                    "m": parseFloat(entry[4]),
+                    "r": parseFloat(entry[5]),
+                    "c": parseFloat(entry[6]),
+                    "id": entry[7]
+                })
+            }
 
-                    $("#ms_select_compound").empty();
-                    let cSelect = document.getElementById('ms_select_compound');
-                    
-                    let metabolite = "";
-                    let first = true;
-                    for(let compound in globals.massspec.metadata)
-                    {
-                        if(globals.massspec.metadata[compound].metabolite != metabolite)
-                        {
-                            metabolite = globals.massspec.metadata[compound].metabolite
-                            let opt = new Option("-- " + metabolite + " --");
-                            opt.disabled = true;
-                            cSelect.options[cSelect.options.length] = opt
-                        }
-                        if(first)
-                        {
-                            cSelect.options[cSelect.options.length] = new Option(compound, "", true, true);
-                            first = false;
-                        }
-                        else {
-                            cSelect.options[cSelect.options.length] = new Option(compound);
-                        }
-                    }
+            $("#ms_select_compound").empty();
+            let cSelect = document.getElementById('ms_select_compound');
 
-                    resolve(true)
+            let metabolite = "";
+            let first = true;
+            for (let compound in globals.massspec.metadata) {
+                if (globals.massspec.metadata[compound].metabolite != metabolite) {
+                    metabolite = globals.massspec.metadata[compound].metabolite
+                    let opt = new Option("-- " + metabolite + " --");
+                    opt.disabled = true;
+                    cSelect.options[cSelect.options.length] = opt
+                }
+                if (first) {
+                    cSelect.options[cSelect.options.length] = new Option(compound, "", true, true);
+                    first = false;
                 }
                 else {
-                    resolve(false)
+                    cSelect.options[cSelect.options.length] = new Option(compound);
                 }
             }
-        };
-        client.send();
+
+            resolve(true)
+
+        });
     });
 }
 
-function ms_contentString()
-{ 
+function ms_contentString() {
     var max = parseFloat($("#ms_ol_max").val());
     var min = parseFloat($("#ms_ol_min").val());
     var output = '';
 
-    for (var m in globals.massspec.results)
-    {
+    for (var m in globals.massspec.results) {
         var _value = globals.massspec.results[m].fc;
         output += `%0A${m}`;
-        if(_value <= min)
-        {
-            output +='%09%230000ff'
+        if (_value <= min) {
+            output += '%09%230000ff'
         }
-        else if (_value >= max)
-        {
-            output +='%09%23ff0000'
+        else if (_value >= max) {
+            output += '%09%23ff0000'
         }
-        else if (_value == 0)
-        {
-            output +='%09%23ffffff'
+        else if (_value == 0) {
+            output += '%09%23ffffff'
         }
-        else if (_value < 0)
-        {
-            var hex = rgbToHex((1 - Math.abs(_value/min)) * 255);
+        else if (_value < 0) {
+            var hex = rgbToHex((1 - Math.abs(_value / min)) * 255);
             output += '%09%23' + hex + hex + "ff";
         }
         else {
-            var hex = rgbToHex((1 - Math.abs(_value/max)) * 255);
-            output += '%09%23ff' + hex + hex;            
+            var hex = rgbToHex((1 - Math.abs(_value / max)) * 255);
+            output += '%09%23ff' + hex + hex;
         }
     };
 

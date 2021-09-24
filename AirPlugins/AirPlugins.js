@@ -19,8 +19,9 @@ let ttest = require('ttest');
 
 require('datatables.net-buttons')(window, $);
 
-let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
 let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/AirPlugins/";
+let local_datafile_URL = "http://localhost:3000/AirPlugIns/";
+let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
 let localURL = "http://localhost:3000/AirPlugIns/";
 const pluginName = 'AirPlugins';
 const pluginVersion = '0.9.0';
@@ -139,8 +140,8 @@ async function initMainPageStructure() {
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : globalURL;
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
-  CssFiles = Array.from(css_files, x => filepath + x);
-  ScriptPaths = Array.from(js_files, x => filepath + x);
+  var CssFiles = Array.from(css_files, x => filepath + x);
+  var ScriptPaths = Array.from(js_files, x => filepath + x);
   CssFiles.forEach(s => {
     $("<link/>", {
       rel: "stylesheet",
@@ -173,36 +174,6 @@ async function initMainPageStructure() {
             <span id="air_loading_text">LOADING ...</span>
         </div>
     </div>`).appendTo(container);
-  container.append(
-  /*html*/
-  `
-
-    <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-        <li class="air_nav_item nav-item"  style="width: 25%;">
-            <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
-        </li>
-        <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
-        </li>
-        <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
-        </li>
-        <li class="air_nav_item nav-item" style="width: 25%;">
-            <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
-        </li>
-    </ul>
-    <div class="tab-content" id="air_tab">
-        <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
-        </div>
-        <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
-        </div>
-        <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
-        </div>
-        <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
-        </div>
-    </div>
-
-    `);
 
   function loadScripts(Scripts) {
     var deferred = $.Deferred();
@@ -218,16 +189,63 @@ async function initMainPageStructure() {
     return deferred.promise();
   }
 
+  function GetDataFiles(filename, datatype = "text") {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: (filetesting ? local_datafile_URL : datafile_url) + filename,
+        dataType: datatype,
+        success: function (data) {
+          resolve(data);
+        },
+        error: function (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
   $.getScript(ScriptPaths[0]).done(function () {
-    readDataFiles(minervaProxy, filetesting, filetesting ? localURL : datafile_url, Chart, ttest, JSZip, FileSaver, VCF, Decimal).finally(async function (data) {
+    readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal).then(async function (height) {
+      document.getElementById("stat_spinner").remove();
+      container.append(
+      /*html*/
+      `
+
+            <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
+                <li class="air_nav_item nav-item"  style="width: 25%;">
+                    <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 25%;">
+                    <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
+                </li>
+            </ul>
+            <div class="tab-content" id="air_tab">
+                <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
+                </div>
+                <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
+                </div>
+                <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+                </div>
+                <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
+                </div>
+            </div>
+        
+            `);
+
       for (let s of scripts) {
         await loadScript(s);
       }
 
-      document.getElementById("stat_spinner").remove();
       $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
       let p = document.getElementById('Air_Tab');
       p.removeAttribute("hidden");
+      $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
       setTimeout(() => {
         $.getScript(ScriptPaths[1]).done(function () {
           AirXplore();

@@ -238,40 +238,34 @@ async function AirGenvar(){
         {
             var _text = disablebutton("gv_readfile")
             var client = new XMLHttpRequest();
-
-            client.open('GET', FILE_URL + genome + '_genome.json');
-            client.onreadystatechange = async function() {
-                if (this.readyState == 4)
+            getFiles(genome + '_genome.json').then(async function(output)
+            {
+                output = replaceAll(output, "ß", '"},"');
+                output = replaceAll(output, "ü", '":{"');
+                output = replaceAll(output, "ä", '":"');
+                output = replaceAll(output, "q", '","');
+                output = replaceAll(output, "ö", '"},{"');
+                var _data = JSON.parse(output)
+                globals.variant.transcripts = [];
+                for(var m in _data)
                 {
-                    if(this.status == 200) {
-                        var output = client.responseText;
-                        output = replaceAll(output, "ß", '"},"');
-                        output = replaceAll(output, "ü", '":{"');
-                        output = replaceAll(output, "ä", '":"');
-                        output = replaceAll(output, "q", '","');
-                        output = replaceAll(output, "ö", '"},{"');
-                        var _data = JSON.parse(output)
-                        globals.variant.transcripts = [];
-                        for(var m in _data)
+                    for(var _id in _data[m])
+                    {
+                        var _temp = _data[m][_id];
+                        if(_temp.p == true || globals.variant.negativeStrand == true)
                         {
-                            for(var _id in _data[m])
-                            {
-                                var _temp = _data[m][_id];
-                                if(_temp.p == true || globals.variant.negativeStrand == true)
-                                {
-                                    _temp["m"] = m;
-                                    globals.variant.transcripts.push(_temp)
-                                }
-                            }
+                            _temp["m"] = m;
+                            globals.variant.transcripts.push(_temp)
                         }
-                        disablebutton("gv_readfile", progress = true);           
-                        await buildIndexDatabase();
-                        await analyzevcf();
-                        $("#gv_typeselect-container").removeClass("air_disabledbutton");
                     }
                 }
-            };
-            client.send();
+                disablebutton("gv_readfile", progress = true);           
+                await buildIndexDatabase();
+                await analyzevcf();
+                $("#gv_typeselect-container").removeClass("air_disabledbutton");
+
+                
+            });
         }
         else
         {

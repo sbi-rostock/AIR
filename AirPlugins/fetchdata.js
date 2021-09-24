@@ -1,5 +1,4 @@
 let ENABLE_API_CALLS = true;
-let FILE_URL = '';
 let TESTING;
 
 //npm modules
@@ -9,6 +8,7 @@ let FileSaver;
 let VCF;
 let ttest;
 let Decimal;
+var getFiles;
 
 Object.filter = (obj, predicate) =>
     Object.keys(obj)
@@ -42,6 +42,7 @@ const AIR = {
     MapReactions: [],
     Paths: {},
     InfluenceData: {},
+    Modifiers: {},
 }
 
 const globals = {
@@ -83,19 +84,14 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal) {
+function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal) {
 
     return new Promise((resolve, reject) => {
 
 
         minerva.ServerConnector.getLoggedUser().then(function (user) {
             globals.user = user._login.toString().toLowerCase();
-            if (globals.defaultusers.includes(globals.user) === true) {
-                alert('Warning: you can create overlays only after logging into your account.');
-            }
-            if (globals.guestuser.includes(globals.user) === true) {
-                alert("Warning: You're logged in through a public account. Overlays you create may be visible to other users if not removed.");
-            }
+
             var t0 = 0;
             var t1 = 0;
 
@@ -105,7 +101,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
             FileSaver = _filesaver;
             TESTING = _filetesting;
             minervaProxy = _minerva;
-            FILE_URL = _filepath;
+            getFiles = getfiles;
             ttest = _ttest;
             Decimal = _decimal;
             pluginContainer = $(minervaProxy.element);
@@ -152,9 +148,9 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 AIR.MapSpeciesLowerCase.push(namelower);
                                 AIR.MapSpecies.push(name);
 
-                                if(!AIR.MapElements.hasOwnProperty(namelower))
+                                if (!AIR.MapElements.hasOwnProperty(namelower))
                                     AIR.MapElements[namelower] = []
-                                
+
                                 AIR.MapElements[namelower].push(e);
                             }
                             if (e.constructor.name === 'Reaction') {
@@ -169,88 +165,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                             }
 
                         };
-
-                        let typevalue = $('.selectdata').val();
-                        //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
-                        t0 = performance.now();
-                        $.ajax({
-                            url: FILE_URL + 'Interactions.json',
-                            success: function (content) {
-                                readInteractions(content).then(r => {
-                                    t1 = performance.now()
-                                    console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
-                                    t0 = performance.now();
-                                    $('#air_loading_text').html('Fetching data ...')
-                                    setTimeout(() => {
-                                        $.ajax({
-                                            //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                            url: FILE_URL + 'Elements.json',
-                                            success: function (moleculecontent) {
-                                                t1 = performance.now()
-                                                console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
-                                                readMolecules(moleculecontent).then(s => {
-
-                                                    calculateShortestPaths([], false, true, "air_init_btn").then(r => {
-
-                                                        t1 = performance.now()
-                                                        console.log("Call to calculate SPs took " + (t1 - t0) + " milliseconds.");
-                                                        setTimeout(() => {
-                                                            $.ajax({
-                                                                //url: 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Molecules.txt',
-                                                                url: FILE_URL + 'PhenotypePaths.json',
-                                                                success: function (pathcontent) {
-                                                                    t1 = performance.now()
-                                                                    console.log("Call to read Moleculestook " + (t1 - t0) + " milliseconds.")
-                                                                    $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
-                                                                    readPhenotypePaths(pathcontent).then(s => {
-                                                                        $("#air_init_btn").remove()
-                                                                        t1 = performance.now()
-                                                                        console.log("Call to get Paths took " + (t1 - t0) + " milliseconds.")
-                                                                        t0 = performance.now();
-                                                                        $("#stat_spinner").before(`
-                                                                        <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
-                                                                            <span>The AirPlugins are still under development. Future updates may change the results of analyses. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
-                                                                            <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
-                                                                                <span aria-hidden="true">&times;</span>
-                                                                            </button>
-                                                                        </div>      
-                                                                        `)
-                                                                        $('#air_welcome_alert .close').on('click', function () {
-                                                                            $(".air_tab_pane").css("height", "calc(100vh - 90px)");
-                                                                        });
-                                                                        resolve(AIR);
-                                                                    });
-
-                                                                },
-                                                                error: function () {
-                                                                    reject(AIR);
-                                                                }
-                                                            })
-                                                        })
-                                                    });
-                                                });
-                                            },
-                                            error: function () {
-                                                reject(AIR);
-                                            }
-                                        });
-                                    }, 0);
-                                });;
-                            },
-                            error: function (content) {
-                                alert(content);
-                                reject(AIR);
-                            }
-                        });
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
 
-                                if (TESTING) {
-                                    AIR.Molecules = content;
-                                }
-                                else {
-                                    AIR.Molecules = JSON.parse(content);
-                                }
+                                AIR.Molecules = JSON.parse(content);
 
                                 for (let element in AIR.Molecules) {
                                     AIR.Molecules[element]["Centrality"] = {
@@ -263,7 +181,7 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                     AIR.Molecules[element]["Targets"] = {}
                                     AIR.Molecules[element]["Sources"] = {}
                                     AIR.Molecules[element]["InfluencedTargets"] = {}
-                                                                         
+
                                     for (let id in AIR.Molecules[element].ids) {
                                         let db_key = id.replace('.', '');
                                         if (AIR.ElementNames.hasOwnProperty(db_key)) {
@@ -297,13 +215,13 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                     }
                                 }
 
-                                for(let inter of AIR.Interactions)
-                                {
+                                for (let inter of AIR.Interactions) {
+                                    if(inter.type == 0)
+                                        continue;
                                     AIR.Molecules[inter.source].Targets[inter.target] = inter.type;
                                     AIR.Molecules[inter.target].Sources[inter.source] = inter.type;
 
-                                    if(inter.subtype == "cat" || inter.subtype == "tf")
-                                    {
+                                    if (inter.subtype == "cat" || inter.subtype == "tf") {
                                         AIR.Molecules[inter.source].InfluencedTargets[inter.target] = inter.type;
                                     }
                                 }
@@ -311,70 +229,10 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 resolve('');
                             });
                         }
-                        function readCentrality(content, centrality) {
-                            return new Promise((resolve, reject) => {
-                                let firstline = true;
-                                let header = [];
-                                content.toString().split('\n').forEach(line => {
-                                    if (firstline === true) {
-
-                                        firstline = false;
-
-                                        var column = 0;
-
-                                        line.split('\t').forEach(s => {
-                                            header.push(s);
-                                            if (column > 0) {
-                                                AIR.centralityheader.add(s);
-                                            }
-                                            else {
-                                                column++;
-                                            }
-                                        });
-                                    }
-                                    else {
-                                        let id = "";
-                                        let column = 0;
-                                        let breakflag = false;
-
-                                        line.split('\t').forEach(element => {
-
-                                            if (column === 0) {
-                                                if (element === "")
-                                                    breakflag = true;
-                                                else {
-                                                    id = element;
-                                                    if (AIR.Centrality[centrality].hasOwnProperty(id) == false) {
-                                                        AIR.Centrality[centrality][id] = {};
-                                                    }
-                                                }
-                                            }
-                                            else if (breakflag === false) {
-                                                let pname = header[column];
-                                                let value = parseFloat(element)
-
-                                                if (isNaN(value) == false) {
-
-                                                    AIR.Centrality[centrality][id][pname] = Math.round((value + Number.EPSILON) * 100) / 100;
-                                                }
-                                            }
-
-                                            column++;
-                                        });
-                                    }
-                                });
-                                resolve('');
-                            });
-                        }
                         function readInteractions(content) {
                             return new Promise((resolve, reject) => {
 
-                                if (TESTING) {
-                                    AIR.Interactions = content;
-                                }
-                                else {
-                                    AIR.Interactions = JSON.parse(content);
-                                }
+                                AIR.Interactions = JSON.parse(content);
 
                                 resolve('');
                             });
@@ -387,13 +245,12 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 let maxlength = Object.keys(AIR.Phenotypes).length
                                 await updateProgress(count++, maxlength, "air_init_btn", text = " Calculating Shortest Paths");
 
-                                let paths;
-                                if (TESTING) {
-                                    paths = content;
-                                }
-                                else {
-                                    paths = JSON.parse(content);
-                                }
+                                let phenotypepaths;
+                                
+                                phenotypepaths = JSON.parse(content);
+
+                                let paths = phenotypepaths.paths;
+                                AIR.Modifiers = phenotypepaths.modifiers
 
                                 for (let p in AIR.Phenotypes) {
                                     if (paths.hasOwnProperty(p))
@@ -409,26 +266,77 @@ function readDataFiles(_minerva, _filetesting, _filepath, _chart, _ttest, _jszip
                                 resolve('');
                             });
                         }
-                        function readFile(content) {
-                            return new Promise((resolve, reject) => {
-                                content.toString().split('\n').forEach(line => {
-                                    let first = true;
-                                    let id = "";
-                                    line.split('\t').forEach(element => {
-                                        if (first) {
-                                            id = element;
-                                            first = false;
-                                        }
-                                        else {
-                                            if (element != "") {
-                                                AIR.MoleculeData[id] = JSON.parse(element)
-                                            }
-                                        }
+                        let typevalue = $('.selectdata').val();
+                        //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
+                        t0 = performance.now();
+                        getFiles('Interactions.json').then(content => {
+                            readInteractions(content).then(r => {
+                                t1 = performance.now()
+                                console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
+                                t0 = performance.now();
+                                $('#air_loading_text').html('Fetching data ...')
+                                getFiles('Elements.json').then(moleculecontent => {
+                                    t1 = performance.now()
+                                    console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
+                                    readMolecules(moleculecontent).then(s => {
+                                        calculateShortestPaths([], false, true, "air_init_btn").then(r => {
+                                            t1 = performance.now()
+                                            console.log("Call to calculate SPs took " + (t1 - t0) + " milliseconds.");
+                                            getFiles('PhenotypePaths.json').then(pathcontent => {
+                                                t1 = performance.now()
+                                                console.log("Call to read Moleculestook " + (t1 - t0) + " milliseconds.")
+                                                $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
+                                                readPhenotypePaths(pathcontent).then(s => {
+                                                    $("#air_init_btn").remove()
+                                                    t1 = performance.now()
+                                                    console.log("Call to get Paths took " + (t1 - t0) + " milliseconds.")
+                                                    t0 = performance.now();
+                                                    var height = 160;
+                                                    if (globals.defaultusers.includes(globals.user) === true) {
+
+                                                        $("#stat_spinner").before(`
+                                                        <div class="air_alert alert alert-danger mt-2" id="air_warning_user_alert">
+                                                            <span>You are not logged in with an account. You can still use the plugins, but will not be able to create and store overlays.</span>
+                                                            <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                                                                <span aria-hidden="true">&times;</span>
+                                                            </button>
+                                                        </div>      
+                                                        `)
+                                                        $('#air_warning_user_alert .close').on('click', function () {
+                                                            if($('#air_welcome_alert').length)
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 160px)");
+                                                            else
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 80px)");
+                                                        });
+                                                        height = 240;
+                                                    }
+                                                    else
+                                                    {
+                                                        $(".air_tab_pane").css("height", "calc(100vh - 160px)");
+                                                    }
+
+                                                    $("#stat_spinner").before(`
+                                                        <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
+                                                            <span>The plugin mansucript has been published as a <a href="PrePrint" target="_blank">PrePrint</a>. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                            <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                                                                <span aria-hidden="true">&times;</span>
+                                                            </button>
+                                                        </div>      
+                                                    `)
+                                                    $('#air_welcome_alert .close').on('click', function () {
+                                                        if($('#air_warning_user_alert').length)
+                                                            $(".air_tab_pane").css("height", "calc(100vh - 160px)");
+                                                        else
+                                                            $(".air_tab_pane").css("height", "calc(100vh - 80px)");
+                                                    });
+                                                    resolve(height);
+                                                });
+                                            })
+                                        })
                                     });
                                 });
-                                resolve('');
                             });
-                        }
+                        })
                     });
                 }, 0);
             })
@@ -966,30 +874,27 @@ function getElementContent(elements, seperator) {
         output[e] = {
             name: AIR.Molecules[e].name.replace(seperator, ""),
             type: AIR.Molecules[e].type.replace(seperator, ""),
-            subunits: AIR.Molecules[e].subunits.map(s => AIR.Molecules[s].name.replace(seperator, "")).join(seperator.includes(",")? "; " : ", "),
-            submaps: (AIR.MapElements.hasOwnProperty(lowername)? AIR.MapElements[lowername].map(m => globals.submaps[m._modelId]).join(seperator.includes(",")? "; " : ", ") : "")
+            subunits: AIR.Molecules[e].subunits.map(s => AIR.Molecules[s].name.replace(seperator, "")).join(seperator.includes(",") ? "; " : ", "),
+            submaps: (AIR.MapElements.hasOwnProperty(lowername) ? AIR.MapElements[lowername].map(m => globals.submaps[m._modelId]).join(seperator.includes(",") ? "; " : ", ") : "")
         }
 
         for (let s in AIR.Molecules[e].ids) {
             if (s != "name") {
                 idset.add(s)
-                output[e][s] = (AIR.Molecules[e].ids[s]? AIR.Molecules[e].ids[s].replace(seperator, "") : "");
+                output[e][s] = (AIR.Molecules[e].ids[s] ? AIR.Molecules[e].ids[s].replace(seperator, "") : "");
             }
         }
     }
     idset = Array.from(idset)
-    for(var id of idset)
-    {
+    for (var id of idset) {
         element_content += seperator + id;
     }
     element_content += seperator + "Subunits" + seperator.submaps
 
-    for(var e in output)
-    {
+    for (var e in output) {
         element_content += "\n" + output[e].name + seperator + output[e].type;
-        for(var id of idset)
-        {
-            element_content += seperator +  (output[e].hasOwnProperty(id)? output[e][id] : "");
+        for (var id of idset) {
+            element_content += seperator + (output[e].hasOwnProperty(id) ? output[e][id] : "");
         }
         element_content += seperator + output[e].subunits + seperator + output[e].submaps
     }
@@ -1171,8 +1076,11 @@ async function air_addoverlay(olname, callback, cb_param = null) {
     });
 }
 
-function shuffle(_array) {
-    let array = _array;
+function shuffle(a) {
+    
+    i = a.length;
+    let array = Array(i);
+    while(i--) array[i] = a[i];
 
     var currentIndex = array.length, temporaryValue, randomIndex;
 
@@ -1344,15 +1252,14 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
         var paths = {}
         var regulators = new Set()
 
-        for(let p in AIR.Phenotypes[phenotype].paths)
-        {
+        for (let p in AIR.Phenotypes[phenotype].paths) {
             let splitpath = p.split("_");
-            if(perturbedElements.some(e => splitpath.includes(e)))
+            if (perturbedElements.some(e => splitpath.includes(e)))
                 continue;
             paths[p] = AIR.Phenotypes[phenotype].paths[p];
-            for(let e of splitpath)
-            {
-                regulators.add(e)
+            for (let e of splitpath) {
+                if(e != phenotype)
+                    regulators.add(e)
             }
         }
         regulators = Array.from(regulators);
@@ -1364,26 +1271,27 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
         }
         var patharray = Object.keys(paths);
         for (let e of regulators) {
-            if(AIR.Molecules[e].subtype == "COMPLEX" || e == phenotype)
+            if (AIR.Molecules[e].subtype == "COMPLEX" || e == phenotype)
                 continue
-                        
+
             var minlength = Math.min(...patharray.filter(p => p.startsWith(e + "_")).map(p => p.split("_").length));
-            if(!minlength)
-            {
+            if (!minlength) {
                 continue;
             }
 
             var type = Math.min(...Object.values(Object.filter(paths, p => p.startsWith(e + "_") && p.split("_").length == minlength)));
-            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_")) ))).size;
+            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_"))))).size;
+            
             var includedpaths = patharray.filter(p => p.includes("_" + e + "_") || AIR.Molecules[e].parent.some(pe => p.includes("_" + pe + "_"))).length;
+
+            if(AIR.Modifiers.hasOwnProperty(e))
+            {
+                var mod_paths = patharray.filter(p => AIR.Modifiers[e].some(m => p.includes(m + "_"))).length;
+                includedpaths += mod_paths;
+            }
 
             influencevalues.SPs[e] = minlength * type;
             influencevalues.values[e] = type * (includedpaths / patharray.length + elementsonpaths / regulators.length)
-
-            if(!influencevalues.values[e])
-            {
-                let fafawff;
-            }
         };
 
         let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
@@ -1395,32 +1303,26 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
         for (var e in influencevalues.values) {
             sorted_values.push([e, influencevalues.values[e]]);
         }
-        sorted_values = sorted_values.sort(function(a, b) {
+        sorted_values = sorted_values.sort(function (a, b) {
             return Math.abs(b[1]) - Math.abs(a[1]);
         });
 
-        for(let e of sorted_values.map(_a => _a[0]))
-        {
-            for(let t1 in AIR.Molecules[e].Sources)
-            {
-                if(perturbedElements.includes(t1))
+        for (let e of sorted_values.map(_a => _a[0])) {
+            for (let t1 in AIR.Molecules[e].Sources) {
+                if (perturbedElements.includes(t1))
                     continue;
-                if(!influencevalues.values.hasOwnProperty(t1))
-                {
-                    influencevalues.values[t1] = influencevalues.values[e] * AIR.Molecules[e].Sources[t1]/ 2
+                if (!influencevalues.values.hasOwnProperty(t1)) {
+                    influencevalues.values[t1] = influencevalues.values[e] * AIR.Molecules[e].Sources[t1] / 2
                     influencevalues.SPs[t1] = influencevalues.SPs[e] + 1
                 }
             }
-            for(let t1 in AIR.Molecules[e].Sources)
-            {
-                if(perturbedElements.includes(t1))
+            for (let t1 in AIR.Molecules[e].Sources) {
+                if (perturbedElements.includes(t1))
                     continue;
-                for(let t2 in AIR.Molecules[t1].Sources)
-                {
-                    if(perturbedElements.includes(t2))
+                for (let t2 in AIR.Molecules[t1].Sources) {
+                    if (perturbedElements.includes(t2))
                         continue;
-                    if(!influencevalues.values.hasOwnProperty(t2))
-                    {
+                    if (!influencevalues.values.hasOwnProperty(t2)) {
                         influencevalues.values[t2] = influencevalues.values[t1] * AIR.Molecules[t1].Sources[t2] / 2
                         influencevalues.SPs[t1] = influencevalues.SPs[e] + 2
                     }
@@ -1562,7 +1464,7 @@ function createdtButtons(dt, download_string) {
 }
 
 function leastSquaresRegression(data) {
-    var sum = [0, 0], n = 0, results = [];
+    var sum = [0, 0], n = 0;
 
     for (; n < data.length; n++) {
         if (data[n][1] != null) {
@@ -1695,14 +1597,13 @@ function sort_object(obj, absolute = false, reverse = false) {
     return (items.reverse())
 }
 
-async function getPathsConnectedToPhenotype(phenotype, ko_elements = [], allpaths = false, interactiontype = false, sorted = false)
-{
+async function getPathsConnectedToPhenotype(phenotype, ko_elements = [], allpaths = false, interactiontype = false, sorted = false) {
     let paths = AIR.Phenotypes[phenotype].paths;
 
     let re = new RegExp("_")
 
     let visited = []
-    let queue = []  
+    let queue = []
 
 }
 async function getPathsConnectedToElement(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false) {
@@ -1795,9 +1696,8 @@ async function calculateShortestPaths(_elementids = [], centrality = false, rese
 
     if (reset) {
         AIR.Paths = {}
-        for(var m in AIR.Molecules)
-        {
-            AIR.Paths[m] = 
+        for (var m in AIR.Molecules) {
+            AIR.Paths[m] =
             {
                 SP: {},
                 Consist: {},
@@ -1925,65 +1825,52 @@ async function calculateShortestPaths(_elementids = [], centrality = false, rese
     }
 }
 
-async function getInfluencesForElement(element)
-{
-    if(AIR.InfluenceData.hasOwnProperty(element))
-    {
+async function getInfluencesForElement(element) {
+    if (AIR.InfluenceData.hasOwnProperty(element)) {
         return AIR.InfluenceData[element];
     }
     var output = {}
 
-    for(let r in AIR.Molecules[element].InfluencedTargets)
-    {
+    for (let r in AIR.Molecules[element].InfluencedTargets) {
         output[r] = AIR.Molecules[element].InfluencedTargets[r]
     }
 
     let includedelemnts = Object.keys(output)
-    for(var t1 in AIR.Molecules[element].Targets)
-    {
+    for (var t1 in AIR.Molecules[element].Targets) {
         let t1_type = AIR.Molecules[element].Targets[t1];
-        for(let r in AIR.Molecules[t1].InfluencedTargets)
-        {
-            if(includedelemnts.includes(r))
-            {
+        for (let r in AIR.Molecules[t1].InfluencedTargets) {
+            if (includedelemnts.includes(r)) {
                 continue;
             }
-            if(!output.hasOwnProperty(r))
+            if (!output.hasOwnProperty(r))
                 output[r] = AIR.Molecules[t1].InfluencedTargets[r] * t1_type / 2
-            else
-            {
-                output[r] += AIR.Molecules[t1].InfluencedTargets[r] * t1_type  / 2
+            else {
+                output[r] += AIR.Molecules[t1].InfluencedTargets[r] * t1_type / 2
             }
         }
     }
+
     includedelemnts = Object.keys(output)
-    for(var t1 in AIR.Molecules[element].Targets)
-    {
+    for (var t1 in AIR.Molecules[element].Targets) {
         let t1_type = AIR.Molecules[element].Targets[t1];
-        for(var t2 in AIR.Molecules[t1].Targets)
-        {
+        for (var t2 in AIR.Molecules[t1].Targets) {
             let t2_type = AIR.Molecules[t1].Targets[t2];
 
-            for(let r in AIR.Molecules[t2].InfluencedTargets)
-            {
-                if(includedelemnts.includes(r))
-                {
+            for (let r in AIR.Molecules[t2].InfluencedTargets) {
+                if (includedelemnts.includes(r)) {
                     continue;
                 }
-                if(!output.hasOwnProperty(r))
+                if (!output.hasOwnProperty(r))
                     output[r] = AIR.Molecules[t2].InfluencedTargets[r] * t1_type * t2_type / 4
-                else
-                {
+                else {
                     output[r] += AIR.Molecules[t2].InfluencedTargets[r] * t1_type * t2_type / 4
                 }
             }
         }
     }
 
-    for(let t of Object.keys(output))
-    {
-        if(Math.abs(output[t]) > 1)
-        {
+    for (let t of Object.keys(output)) {
+        if (Math.abs(output[t]) > 1) {
             output[t] = Math.sign(output[t])
         }
     }
