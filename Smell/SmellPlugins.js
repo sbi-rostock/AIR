@@ -221,7 +221,7 @@ async function initMainPageStructure(){
     }
 
     $.getScript(ScriptPaths[0]).done(function(){
-        readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal).finally(async function (height) {
+        readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal).then(async function (height) {
         
             
             document.getElementById("stat_spinner").remove();
