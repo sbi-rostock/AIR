@@ -29,7 +29,7 @@ let PLUGIN_URL = "https://api.github.com/repos/sbi-rostock/LSD_Map/";
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let ScriptPaths = [];
 let CssFiles = [];
-let token = "";
+let TOKEN = "";
 let minervaProxy;
 let pluginContainer;
 let pluginContainerId;
@@ -123,7 +123,7 @@ async function initMainPageStructure() {
       event.preventDefault();
       var el = $(this);
       el.prop('disabled', true);
-      token = document.getElementById('plugin_github_pass').value;
+      TOKEN = document.getElementById('plugin_github_pass').value;
       initializePlugins();
     });
   } else {
