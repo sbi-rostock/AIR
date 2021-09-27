@@ -143,7 +143,7 @@ async function initMainPageStructure() {
             </div>`).appendTo(container);
     let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
     let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
-    let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
+    let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
     let filepath = filetesting ? localURL : globalURL;
     CssFiles = Array.from(css_files, x => filepath + x);
     ScriptPaths = Array.from(js_files, x => filepath + x);
