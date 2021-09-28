@@ -2110,7 +2110,12 @@ function xp_searchListener(entites) {
     globals.xplore.selected = entites[0];
     if (globals.xplore.selected.length > 0) {
         if (globals.xplore.selected[0].constructor.name === 'Alias') {
-            xp_setSelectedElement(globals.xplore.selected[0].name);
+            var tag = globals.xplore.selected[0]._other.structuralState;
+            if(tag && tag.toLowerCase() == "family")
+            {
+                tag = "";
+            }
+            xp_setSelectedElement(globals.xplore.selected[0].name+ (tag? ("_" + tag) : ""));
         }
     }
 }

@@ -2981,10 +2981,6 @@ async function om_loadfile(imported) {
                     let entries = line.split(globals.omics.seperator);
                     let probeid = entries[headerid].toLowerCase();
 
-                    if (probeid.toLowerCase().includes("glucosylsphingosine")) {
-                        console.log(probeid)
-                        console.log(Object.keys(AIR.ElementNames[globals.omics.selectedmapping]).filter(m => m.toLowerCase().includes("glucosylsphingosine")))
-                    }
                     if (AIR.ElementNames[globals.omics.selectedmapping].hasOwnProperty(probeid)) {
                         let molecule_id = AIR.ElementNames[globals.omics.selectedmapping][probeid];
 
@@ -3339,7 +3335,7 @@ function readExpressionValues() {
 
     return new Promise((resolve, reject) => {
         for (let item in AIR.Molecules) {
-
+            continue;
             if (!AIR.Molecules[item].type == "COMPLEX") {
                 continue;
             }
@@ -4933,7 +4929,7 @@ function om_createpopup(button, parameter) {
                     <div id="om_chart_popover_content" class="popover-content">
                         <div class="cbcontainer mt-1 mb-2 ml-2">
                             <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
-                            <label class="air_checkbox" for="om_popup_showregression">Show Regression Line</label>
+                            <label class="air_checkbox" for="om_popup_showregression">Show Confidence Intervall</label>
                         </div>
                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
@@ -5249,7 +5245,7 @@ function om_createpopup(button, parameter) {
             <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
                 <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
                     <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
-                    Regression of Distribution</li>
+                    Normalized Regression</li>
                 <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                     <span class="legendspan_small" style="background-color:#cccccc"></span>
                     95% Confidence Intervall (unadjusted)</li>
