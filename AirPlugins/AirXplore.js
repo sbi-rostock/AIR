@@ -1047,8 +1047,13 @@ async function getPhenotypePanel() {
                     globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
 
                     let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
-
-                    let element = globals.xplore.selected[0].name
+                    var tag = globals.xplore.selected[0]._other.structuralState;
+                    if(tag && tag.toLowerCase() == "family")
+                    {
+                        tag = "";
+                    }
+                    let element = globals.xplore.selected[0].name+ (tag? ("_" + tag) : "")
+                    
                     if (AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim())) {
                         var m = AIR.ElementNames.name[element.toLowerCase().trim()];
 

@@ -304,9 +304,9 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                                         `)
                                                         $('#air_warning_user_alert .close').on('click', function () {
                                                             if($('#air_welcome_alert').length)
-                                                                $(".air_tab_pane").css("height", "calc(100vh - 160px)");
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 165px)");
                                                             else
-                                                                $(".air_tab_pane").css("height", "calc(100vh - 80px)");
+                                                                $(".air_tab_pane").css("height", "calc(100vh - 85px)");
                                                         });
                                                         height = 240;
                                                     }
@@ -325,9 +325,9 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                                     `)
                                                     $('#air_welcome_alert .close').on('click', function () {
                                                         if($('#air_warning_user_alert').length)
-                                                            $(".air_tab_pane").css("height", "calc(100vh - 160px)");
+                                                            $(".air_tab_pane").css("height", "calc(100vh - 165px)");
                                                         else
-                                                            $(".air_tab_pane").css("height", "calc(100vh - 80px)");
+                                                            $(".air_tab_pane").css("height", "calc(100vh - 85px)");
                                                     });
                                                     resolve(height);
                                                 });

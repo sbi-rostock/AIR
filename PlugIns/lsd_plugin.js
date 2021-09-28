@@ -237,7 +237,7 @@ async function initMainPageStructure() {
     }
 
     $.getScript(ScriptPaths[0]).done(function () {
-      readDataFiles(minervaProxy, filetesting, filetesting ? GetDataFiles : GetGithubScript, Chart, ttest, JSZip, FileSaver, VCF, Decimal).finally(async function (data) {
+      readDataFiles(minervaProxy, filetesting, filetesting ? GetDataFiles : GetGithubScript, Chart, ttest, JSZip, FileSaver, VCF, Decimal).then(async function (height) {
         document.getElementById("stat_spinner").remove();
         container.append(
         /*html*/
@@ -277,6 +277,7 @@ async function initMainPageStructure() {
         $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
         let p = document.getElementById('Air_Tab');
         p.removeAttribute("hidden");
+        $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
         setTimeout(() => {
           $.getScript(ScriptPaths[1]).done(function () {
             AirXplore();
