@@ -131,7 +131,7 @@ async function initMainPageStructure() {
   }
 
   async function initializePlugins() {
-    document.getElementById("github_auth_check").remove();
+    if (!filetesting) document.getElementById("github_auth_check").remove();
     $(`<div id="stat_spinner" class="mt-5">
                 <div class="d-flex justify-content-center">
                             <div class="spinner-border" role="status">
