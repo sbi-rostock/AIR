@@ -5027,6 +5027,8 @@ function om_createpopup(button, parameter) {
         );
     }
 
+    maxx_dist = maxx_dist < 1? 1 : maxx_dist;
+    
     var m = AIR.Phenotypes[phenotype]["slope"][sample];
     var [std1,std2] = AIR.Phenotypes[phenotype]["std"][sample];
     dist_targets.push(
