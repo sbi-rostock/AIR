@@ -23,7 +23,7 @@ let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
 let local_datafile_URL = "http://localhost:3000/Smell/";
 let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/Smell/";
 let localURL = "http://localhost:3000/AirPlugIns/";
-const pluginName = 'Smell';
+const pluginName = 'NOSE-OE';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = false;
@@ -146,7 +146,7 @@ async function initMainPageStructure(){
 
     let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
     let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];  
-    let filepath = filetesting? local_datafile_URL: globalURL;
+    let filepath = filetesting? localURL: globalURL;
     let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"]
     var CssFiles = Array.from(css_files, x => filepath + x)
     var ScriptPaths = Array.from(js_files, x => filepath + x)
@@ -208,7 +208,7 @@ async function initMainPageStructure(){
     {
         return new Promise((resolve, reject) => {
             $.ajax({
-                url: (filetesting? localURL : datafile_url) + filename,
+                url: (filetesting? local_datafile_URL : datafile_url) + filename,
                 dataType: datatype,
                 success: function (data) {
                     resolve(data)

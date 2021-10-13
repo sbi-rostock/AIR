@@ -25,6 +25,7 @@ function AirXplore() {
         selected_element: "",
         centralitychartData: [],
         kochartdata: [],
+        pe_results: {},
     }
 
     globals.xplore["container"] = document.getElementById("airxplore_tab_content")
@@ -445,83 +446,168 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
     xp_updatePathgraph()
 });
 
-async function xp_EstimatePhenotypes() {
-    return new Promise((resolve, reject) => {
-        globals.xplore.pe_results_table.clear()
-        let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
-        let elementsToHighlight = {};
-        let elementswithFC = 0
-        for (let e in _data) {
-            let FC = _data[e].value
-            if (_data[e].perturbed) {
-                elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9";
+function xp_EstimatePhenotypes() {
+    return new Promise(async function(resolve, reject) {
+        await startloading()
+        setTimeout(() => {
+            globals.xplore.pe_results_table.clear()
+            let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
+            let elementsToHighlight = {};
+            let elementswithFC = 0
+            globals.xplore.pe_results = {};
+
+            typeNumbersinSamples = {
+                "protein": 0,
+                "metabolite": 0
             }
-            else if (FC != 0) {
-                elementswithFC++;
-                elementsToHighlight[AIR.Molecules[e].name] = valueToHex(FC);
-            }
-        }
-
-        var max_level = 0;
-        var results = [];
-        for (let p in AIR.Phenotypes) {
-
-            let phenotypeValues = globals.xplore.pe_influenceScores[p].values;
-
-            let max_influence = 0;
-            let influence = 0;
-            let level = 0;
-            let count_elements = 0;
-
-            for (let e in phenotypeValues) {
-                let _influene = parseFloat(phenotypeValues[e]);
-                max_influence += Math.abs(_influene);
-
-                if (_data.hasOwnProperty(e) && !_data[e].perturbed) {
-                    let fc = _data[e].value;
-
-                    if (fc != 0) {
-                        influence += Math.abs(_influene);
-                        level += _influene * fc;
-                        count_elements++;
-                    }
+            for (let e in _data) {
+                let FC = _data[e].value
+                if (_data[e].perturbed) {
+                    elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9";
+                }
+                else if (FC != 0) {
+                    elementswithFC++;
+                    elementsToHighlight[AIR.Molecules[e].name] = valueToHex(FC);
+                }
+                switch (AIR.Molecules[e].type) {
+                    case "PROTEIN":
+                    case "RNA":
+                        typeNumbersinSamples.protein += 1;
+                        break;
+                    case "SIMPLE_MOLECULE":
+                        typeNumbersinSamples.metabolite += 1;
+                        break;
+                    default:
+                        break;
                 }
             }
 
-            if (Math.abs(level) > max_level) {
-                max_level = Math.abs(level)
+            let FC_values = Object.values(_data);
+            let shuffled_arrays = [];
+            let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
+            let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
+        
+            for (let i = 0; i < 1000; i++) {
+                let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
+                shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite))
+                shuffled_arrays.push(shuffle(shuffled_array))
             }
 
-            results.push({
-                id: p,
-                level: level,
-                percentage: (influence / max_influence) * 100
-            })
-        }
+            var max_level = 0;
+            var results = [];
+            for (let p in AIR.Phenotypes) {
 
-        for (var r of results) {
-            var level = r.level / ((document.getElementById("xp_normalize_phen").checked === true && max_level != 0) ? max_level : 1);
-            if (level != 0) {
-                if (level > 1)
-                    level = 1;
-                else if (level < -1)
-                    level = -1;
-                elementsToHighlight[AIR.Phenotypes[r.id].name] = valueToHex(level);
+                let phenotypeValues = globals.xplore.pe_influenceScores[p].values;
+
+                let max_influence = 0;
+                let influence = 0;
+                let level = 0;
+                let count_elements = 0;
+                var regr_data = {}
+
+                for (let e in phenotypeValues) {
+                    let SP = parseFloat(phenotypeValues[e]);
+                    max_influence += Math.abs(SP);
+
+                    if (_data.hasOwnProperty(e) && !_data[e].perturbed) {
+                        let FC = _data[e].value;
+
+                        if (FC != 0) {
+                            influence += Math.abs(SP);
+                            level += SP * FC;
+                            count_elements++;
+                            regr_data[e] = [SP, FC];
+                        }
+                    }
+                }
+                var score = getEnrichmentScore(Object.values(regr_data))
+                let random_scores = [];
+                let random_en_scores = [];
+                for (let shuffled_elements of shuffled_arrays) {
+                    var _regr_data = [];
+                    var _en_score = 0;
+                    for (let i in FC_values) {
+                        let element = shuffled_elements[i];
+                        if (phenotypeValues.hasOwnProperty(element)) {
+                            var SP = phenotypeValues[element];
+                            var FC = FC_values[i].value
+                            _en_score += FC * SP;
+                            _regr_data.push([SP, FC]);
+                        }
+                    }
+                    if (_regr_data.length > 0)
+                        random_scores.push(getEnrichmentScore(_regr_data))
+                    else
+                        random_scores.push(0)
+
+                    random_en_scores.push(_en_score)
+                }
+
+                globals.xplore.pe_results[p] = {
+                    id: p,
+                    level: level,
+                    percentage: (influence / max_influence) * 100,
+                    pvalue: 1,
+                    dces: regr_data,
+                }
+
+                var std = standarddeviation(random_scores)
+                var _mean = mean(random_scores);
+                var z_score = std != 0 ? (score - _mean) / std : 0;
+                var pvalue = GetpValueFromZ(z_score);
+                if (!isNaN(pvalue))
+                    globals.xplore.pe_results[p]["pvalue"] = pvalue;
+                globals.xplore.pe_results[p]["std"] = [_mean + 1.96 * std, _mean - 1.96 * std];
+                globals.xplore.pe_results[p]["slope"] = score;
+
+                std = standarddeviation(random_en_scores)
+                z_score = std != 0 ? (level - mean(random_en_scores)) / std : 0;
+                pvalue = GetpValueFromZ(z_score);
+                if (!isNaN(pvalue) && pvalue < globals.xplore.pe_results[p]["pvalue"])
+                    globals.xplore.pe_results[p]["pvalue"] = pvalue
+
+                if (Math.abs(level) > max_level) {
+                    max_level = Math.abs(level)
+                }
             }
 
-            globals.xplore.pe_results_table.row.add(
-                [
-                    getLinkIconHTML(AIR.Phenotypes[r.id].name),
-                    '<button type="button" class="xp_pe_popup_btn air_invisiblebtn" data="' + r.id + '" style="cursor: pointer;">' + getFontfromValue(expo(level)) + '</button>',
-                    expo(r.percentage)
-                ]
-            )
-        }
+            var m_pvalues = Object.values(globals.xplore.pe_results).map(r => r.pvalue).sort((a, b) => a - b);
+            var m_phenotypevalues = {}
 
-        globals.xplore.pe_results_table.columns.adjust().draw();
-        adjustPanels(globals.xplore.container);
-        ColorElements(elementsToHighlight);
-        resolve()
+            for (var [p,r] of Object.entries(globals.xplore.pe_results))
+            {
+                m_phenotypevalues[r.id] = m_pvalues.indexOf(r.pvalue)
+            }
+            m_pvalues = getAdjPvalues(m_pvalues);
+
+            for (var [p,r] of Object.entries(globals.xplore.pe_results)) {
+                r.pvalue = m_pvalues[m_phenotypevalues[r.id]]
+                var level = r.level / ((document.getElementById("xp_normalize_phen").checked === true && max_level != 0) ? max_level : 1);
+                if (level != 0) {
+                    if (level > 1)
+                        level = 1;
+                    else if (level < -1)
+                        level = -1;
+                    elementsToHighlight[AIR.Phenotypes[r.id].name] = valueToHex(level);
+                }
+
+                globals.xplore.pe_results_table.row.add(
+                    [
+                        '<button type="button" class="xp_pe_popup_btn air_invisiblebtn" data="' + r.id + '" style="cursor: pointer;"><a><span class="fa fa-external-link-alt"></span></a></button>',
+                        getLinkIconHTML(AIR.Phenotypes[r.id].name),
+                        getFontfromValue(expo(level)),
+                        expo(r.pvalue),
+                        expo(r.percentage)
+                    ]
+                )
+            }
+
+            globals.xplore.pe_results_table.columns.adjust().draw();
+            adjustPanels(globals.xplore.container);
+            ColorElements(elementsToHighlight);
+            stoploading()            
+            resolve()
+        }, 0);
     });
 }
 $(document).on('click', '.xp_pe_popup_btn', function () {
@@ -743,9 +829,11 @@ async function getPhenotypePanel() {
                         <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
                             <thead>
                                 <tr>
+                                    <th style="vertical-align: middle;"></th>
                                     <th style="vertical-align: middle;">Phenotype</th>
                                     <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
-                                    <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Saturation</th>
+                                    <th style="vertical-align: middle;">adj. p-value</th>
+                                    <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Sat.</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -954,25 +1042,35 @@ async function getPhenotypePanel() {
                 }
             ],
             //"scrollX": true,
-            "order": [[2, "desc"]],
+            "order": [[3, "asc"]],
             "table-layout": "fixed", // ***********add this
             "word-wrap": "break-word",
             "columns": [
-                { "width": "70%" },
+                { "width": "5%" },
+                { "width": "50%" },
                 { "width": "15%" },
-                { "width": "15%" }
+                { "width": "20%" },
+                { "width": "10%" }
             ],
             "columnDefs": [
                 {
                     targets: 0,
-                    className: 'dt-left',
+                    className: 'dt-center',
                 },
                 {
                     targets: 1,
-                    className: 'dt-center'
+                    className: 'dt-right',
                 },
                 {
                     targets: 2,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 3,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 4,
                     className: 'dt-center'
                 },
             ]
@@ -991,8 +1089,10 @@ async function getPhenotypePanel() {
             kophenoSelect.options[kophenoSelect.options.length] = new Option(p, phenotype);
 
             globals.xplore.pe_results_table.row.add([
+                "",
                 getLinkIconHTML(p),
                 `<div id="xp_pe_value_${p}">0</div>`,
+                1,
                 `<div id="xp_pe_accuracy_${p}">0</div>`
             ])
         }
@@ -2850,8 +2950,6 @@ function createCentralityTable(phenotype) {
 
 function xp_createpopup(button, phenotype) {
 
-    let phenotypeValues = globals.xplore.pe_influenceScores[phenotype].values;
-
     var $target = $('#xp_chart_popover');
     var $btn = $(button);
 
@@ -2875,56 +2973,175 @@ function xp_createpopup(button, phenotype) {
     $(button).attr('id', 'xp_clickedpopupcell');
     $(button).css('background-color', 'lightgray');
 
-    $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+    $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="width: 100%; top: 55px; z-index: 2; border: none;">
                     <div class="arrow" style="left: 9.375%;"></div>
-                    <div id="xp_chart_popover_content" class="popover-content">
-                        <canvas class="popup_chart" id="xp_popup_chart"></canvas>
-                        <div id="xp_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                    <div id="xp_chart_popover_content" class="popover-content" style="width: 100% !important;">
+                        <button type="button" id="xp_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="cbcontainer mt-1 mb-2 ml-2">
+                            <input type="checkbox" class="air_checkbox" id="xp_popup_showregression">
+                            <label class="air_checkbox" for="xp_popup_showregression">Show Confidence Intervall</label>
+                        </div>
+                        <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#009933"></span>
+                                <span class="legendspan_small" style="background-color:#C00000"></span>
                                 Activates Phenotype</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                <span class="legendspan_small" style="background-color:#0070C0"></span>
                                 Represses Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#cccccc"></span>
-                                Not diff. expressed</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="triangle_small"></span>
                                 External Link</li>
                         </div>
+                        <div style="height: 80%">
+                            <canvas class="popup_chart" id="xp_popup_chart"></canvas>
+                        </div>
                     </div>
                 </div>`);
 
+    
     $btn.after($target);
 
-    let targets = []
-    let _data = globals.xplore.pe_data[globals.xplore.pe_data_index];
-
-    for (let e in phenotypeValues) {
-        if (_data.hasOwnProperty(e)) {
-            let fc = _data[e].value
-            let sp = phenotypeValues[e]
-            var pstyle = 'circle';
-            if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[e].name.toLowerCase()) === false) {
-                pstyle = 'triangle'
-            }
-            let level = (sp * fc)
-            targets.push(
-                {
-                    label: e,
-                    data: [{
-                        x: fc,
-                        y: sp,
-                        r: level == 0 ? 3 : 6
-                    }],
-                    pointStyle: pstyle,
-                    backgroundColor: level == 0 ? "#cccccc" : (level < 0 ? "#ffcccc" : "#009933"),
-                    hoverBackgroundColor: level == 0 ? "#cccccc" : (level < 0 ? "#ffcccc" : "#009933"),
-                }
-            );
-        }
+    let close_btn = document.getElementById("xp_popup_close");
+    // When the user clicks on <span> (x), close the modal
+    close_btn.onclick = function () {
+        $target.remove();
+        $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+            minHeight: "0px",
+        });
     }
+
+    let targets = []
+    var dist_targets = [
+        {
+            label: "",
+            data: [{
+                x: 1,
+                y: 0,
+                r: 4
+            }],
+        },
+        {
+            label: "",
+            data: [{
+                x: -1,
+                y: 0,
+                r: 4
+            }],
+        }
+    ]
+    var maxx_dist = 0;
+    for (let [element, data] of Object.entries(globals.xplore.pe_results[phenotype]["dces"])) {
+
+        let SP = data[0];
+        let hex = "#cccccc";
+        let rad = 3;
+        let FC = data[1]
+
+        var aggr = SP * FC
+        rad = 6
+
+        if (aggr < 0) {
+            hex = "#0070C0";
+        }
+        else if (aggr > 0) {
+            hex = "#C00000"
+        }
+        if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
+        dist_targets.push(
+            {
+                label: element,
+                data: [{
+                    x: Math.abs(aggr) * Math.sign(FC),
+                    y: Math.abs(aggr) * Math.sign(SP),
+                    r: rad
+                }],
+                pointStyle: pstyle,
+                backgroundColor: hex,
+                hoverBackgroundColor: hex,
+            })
+        
+
+        var pstyle = 'circle';
+        if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
+            pstyle = 'triangle'
+        }
+
+
+        targets.push(
+            {
+                label: element,
+                data: [{
+                    x: FC,
+                    y: SP,
+                    r: rad
+                }],
+                pointStyle: pstyle,
+                backgroundColor: hex,
+                hoverBackgroundColor: hex,
+            }
+        );
+    }
+
+    maxx_dist = maxx_dist < 1? 1 : maxx_dist;
+    
+    var m = globals.xplore.pe_results[phenotype]["slope"];
+    var [std1,std2] = globals.xplore.pe_results[phenotype]["std"];
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * m,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * m,
+                r: 0,
+            }],
+            type: 'line',
+            fill: false,
+            pointRadius: 0,
+            backgroundColor: m < 0 ? "#0070C0" : "#C00000",
+            borderColor: m < 0 ? "#0070C0" : "#C00000",
+            borderWidth: 2,
+        }
+    );
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * std2,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * std2,
+                r: 0,
+            }],
+            type: 'line',
+            fill: "+1",
+            pointRadius: 0,
+        }
+    );
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * std1,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * std1,
+                r: 0,
+            }],
+            type: 'line',
+            fill: false,
+            pointRadius: 0,
+        }
+    );
 
     var outputCanvas = document.getElementById('xp_popup_chart');
 
@@ -2935,6 +3152,14 @@ function xp_createpopup(button, phenotype) {
         },
         options: {
             plugins: {
+                plugins: {
+                    filler: {
+                        propagate: false
+                    }
+                },
+                legend: {
+                    display: false
+                },
                 zoom: {
                     // Container for pan options
                     pan: {
@@ -2974,13 +3199,23 @@ function xp_createpopup(button, phenotype) {
                         mode: 'xy',
                     }
                 },
-                legend: {
-                    display: false
-                },
-                title: {
-                    display: true,
-                    text: "Regulators for '" + AIR.Phenotypes[phenotype].name,
-                    fontFamily: 'Helvetica',
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var element = context.label || '';
+
+                            if (element && globals.xplore.pe_results[phenotype].dces.hasOwnProperty(element)) {
+                                return [
+                                    'Name: ' + AIR.Molecules[element].name,
+                                    'Influence: ' + expo( globals.xplore.pe_results[phenotype].dces[element][0]),
+                                    'FC: ' + expo( globals.xplore.pe_results[phenotype].dces[element][1])
+                                ];
+                            }
+                            else
+                                return "";
+
+                        }
+                    }
                 }
             },
             responsive: true,
@@ -2990,7 +3225,7 @@ function xp_createpopup(button, phenotype) {
             },
             onClick: (event, chartElement) => {
                 if (chartElement[0]) {
-                    let name = popupchart.data.datasets[chartElement[0].datasetIndex].label;
+                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
                     selectElementonMap(name, true);
                     xp_setSelectedElement(name);
                 }
@@ -3000,56 +3235,96 @@ function xp_createpopup(button, phenotype) {
                     top: 0
                 }
             },
+            title: {
+                display: true,
+                text: "Regulators for '" + AIR.Phenotypes[phenotype].name,
+                fontFamily: 'Helvetica',
+            },
             scales: {
                 y: {
                     title: {
                         display: true,
                         text: 'Influence on Phenotype'
                     },
-                    ticks: {
-                        //beginAtZero: true,
+                    max: 1,
+                    min: -1,
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
                     }
                 },
-                x: {
+                x:
+                {
                     title: {
                         display: true,
-                        text: 'User set Fold Change'
+                        text: 'Fold Change in Data'
                     },
                     ticks: {
                         //beginAtZero: false,
-                    }
-                }
-            },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var e = data.datasets[tooltipItem.datasetIndex].label || '';
-
-                        if (e && AIR.Molecules.hasOwnProperty(e)) {
-                            return [
-                                'Name: ' + AIR.Molecules[e].name,
-                                'Influence: ' + expo(phenotypeValues[e]),
-                                'FC: ' + _data[e].value,
-                            ];
-                        }
-                        else
-                            return "";
-
-                    }
-                }
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
             }
         }
 
     };
 
     let popupchart = new Chart(outputCanvas, chartOptions);
-
     $target.show();
 
     var popupheight = $("#xp_chart_popover").height() + 50;
-    $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+    $("#xp_resultstable").parents(".dataTables_scrollBody").css({
         minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
     });
+
+
+    $('#xp_popup_showregression').on('click', function () {
+
+        if (document.getElementById("xp_popup_showregression").checked === true) {
+            popupchart.data.datasets = dist_targets
+            $("#xp_legend_target").replaceWith(`
+            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
+                    Normalized Regression</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#cccccc"></span>
+                    95% Confidence Intervall (unadjusted)</li>
+            </div>
+            `);
+        }
+        else {
+            popupchart.data.datasets = targets
+
+            $("#xp_legend_target").replaceWith(`            
+            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#C00000"></span>
+                    Activates Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#0070C0"></span>
+                    Represses Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="triangle_small"></span>
+                    External Link</li>
+            </div>`);
+        }
+
+        popupchart.update();
+    })
 };
 
 async function xp_updatePathgraph() {

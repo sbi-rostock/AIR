@@ -22,6 +22,8 @@ async function AirOmics() {
         spsliderchart: undefined,
         plevelchart_config: undefined,
         plevelchart: undefined,
+        pregulatorchart: undefined,
+        pregulatorchartData: [],
         om_container: undefined,
         numberofuserprobes: 0,
         numberOfRandomSamples: 0,
@@ -54,7 +56,10 @@ async function AirOmics() {
 
         selectedDataType: "",
 
-        pvalue_labels: ["pvalue", "en_pvalue"]//, "abs_en_pvalue"],
+        pvalue_labels: ["pvalue", "en_pvalue"],
+
+        correctSPs: {},
+        elements_with_FC: {},
     }
     var t0 = performance.now();
     globals.omics.om_container = $('#airomics_tab_content');
@@ -1532,27 +1537,27 @@ function om_detectfile(force_seperator) {
         }
 
         var stop_break = false;
-        for (let line of textFromFileLoaded.split('\n')) {
-            for (var _entry of line.split("\t")) {
-                var _value = Number(_entry)
+        // for (let line of textFromFileLoaded.split('\n')) {
+        //     for (var _entry of line.split("\t")) {
+        //         var _value = Number(_entry)
 
-                if (!isNaN(_value)) {
-                    if (_value < 0) {
-                        $("#om_analysistypeSelect").val(0);
-                        stop_break = true;
-                        break;
-                    }
-                    if (Math.abs(_value) > 100) {
-                        $("#om_analysistypeSelect").val(1);
-                        stop_break = true;
-                        break;
-                    }
-                }
-            }
-            if (stop_break) {
-                break;
-            }
-        }
+        //         if (!isNaN(_value)) {
+        //             if (_value < 0) {
+        //                 $("#om_analysistypeSelect").val(0);
+        //                 stop_break = true;
+        //                 break;
+        //             }
+        //             if (Math.abs(_value) > 100) {
+        //                 $("#om_analysistypeSelect").val(1);
+        //                 stop_break = true;
+        //                 break;
+        //             }
+        //         }
+        //     }
+        //     if (stop_break) {
+        //         break;
+        //     }
+        // }
         var firstline = textFromFileLoaded.split('\n')[0];
 
         if (!force_seperator) {
@@ -1771,6 +1776,47 @@ async function om_createTable(param) {
                 <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
             </div>
 
+            <hr>
+
+            <h5 class="mt-4 mb-4" style="font-weight: bold;">Ranking of Regulators</h5> 
+
+            <div class="row mb-3">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                data-content="Include only Phenotypes with an adj. p-value < 0.05">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="om_checkbox_pregulator_sign">
+                        <label class="air_checkbox" for="om_checkbox_pregulator_sign">Only significant Phenotypes?</label>
+                    </div>
+                </div>
+            </div>
+            <div id="om_pregulatorchart_sample_select-container" class="row mb-2">
+                <div class="col-auto" style="width: 30%;">
+                    <button type="button" id="om_export_rankedphenotypes"  class="air_btn_light btn btn-block mb-2 mt-2">Export (JSON)</button>
+                </div>
+                <div class="col-auto air_select_label" style="padding:0; width: 15%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Sample:</span>
+                </div>
+                <div class="col">
+                    <select id="om_pregulatorchart_sample_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>
+                </div>
+            </div>
+
+            <div class="mb-4 mt-4" style="height:400px;overflow-y:scroll; position:relative">
+                <div id="om_pregulatorchart_canvasContainer" style="height:0px">
+                    <canvas id="om_pregulatorchart"></canvas>
+                </div>
+            </div>
+
+            <hr>
+
             <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_resultsgraph_panel">Results Graph:</button>
             <div id="om_resultsgraph_panel" class="collapse air_box_lightgray">
                 <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
@@ -1839,6 +1885,7 @@ async function om_createTable(param) {
         </div>
     `);
 
+
         function updatepvalues() {
             if (!globals.omics.resultsTable)
                 return;
@@ -1894,6 +1941,10 @@ async function om_createTable(param) {
         $("#om_cb_fdr").on('click', updatepvalues);
         $("#om_checkbox_exclude_ns").on('click', updatepvalues);
         $("#om_select_pvalue").on('change', updatepvalues);
+        $("#om_checkbox_pregulator_sign").on('change', updateRegulatorChart);
+        $("#om_pregulatorchart_sample_select").on('change', updateRegulatorChart);
+        $("#om_export_rankedphenotypes").on('click', exportPhenotypeRegulators);
+        
         $("#om_select_normalize").on('change', function () {
             om_normalizePhenotypeValues().then(async function (pv) {
                 updatepvalues();
@@ -2040,6 +2091,10 @@ async function om_createTable(param) {
 
         for (let sample in globals.omics.samples) {
 
+            $("#om_pregulatorchart_sample_select").append($('<option>', {
+                value: sample,
+                text: globals.omics.samples[sample]
+            }));
             let headercell = createCustomLinkCell(headerrow, 'th', globals.omics.samples[sample], 'col-auto', 'col', 'center').parentElement;
             headercell.innerHTML += "<br>(p-value)"
 
@@ -2254,6 +2309,7 @@ async function om_createTable(param) {
         });
 
 
+
         //var colorschemes = require('chartjs-plugin-colorschemes');
         var outputCanvas = document.getElementById('om_plevelchart').getContext('2d');
 
@@ -2361,6 +2417,104 @@ async function om_createTable(param) {
         }
 
         globals.omics.plevelchart = new Chart(outputCanvas, globals.omics.plevelchart_config);
+
+        var outputCanvas = document.getElementById('om_pregulatorchart').getContext('2d');
+        globals.omics.pregulatorchart = new Chart(outputCanvas, {
+            type: 'bar',
+            data: {
+            },
+            options: {
+                plugins: {
+                    title: {
+                        display: false,
+                        text: 'Phenotype Regulators',
+                        fontFamily: 'Helvetica',
+                        fontColor: '#6E6EC8',
+                        fontStyle: 'bold'
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                var _data = globals.omics.pregulatorchartData[context.dataIndex]
+                                var output = [
+                                    "FC: " + expo(_data[1]),
+                                    "p-value: " + (globals.omics.pvalue? expo(globals.omics.ExpressionValues[_data[0]].pvalues[_data[4]]) : "NA"),
+                                    "",
+                                    "Phenotypes with highest influence:"
+                                ]
+                                var values = []
+                                for(var [p, sp] of Object.entries(_data[3]))
+                                {
+                                    values.push([
+                                        AIR.Phenotypes[p].name,
+                                        sp
+                                    ])
+                                }
+                                values = values.sort(function (a, b) {
+                                    return Math.abs(b[1]) - Math.abs(a[1]);
+                                });
+
+                                for(var v of (values.length > 5? values.slice(0, 5) : values))
+                                {
+                                    output.push("   " + v[0] + ": " + expo(v[1]))
+                                }
+
+                                if(values.length > 5)
+                                    output.push("...")
+
+                                return output;
+                            }
+                        }
+                    },
+                },
+
+                scales: {
+                    y: {
+                        ticks:
+                        {
+                            mirror: true,
+                            z: 2,
+                            color: "#000000",
+                        },
+                        stacked: true
+                    },
+                    x: {
+                        position: "top",
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Normalized Inclusion in Phenotypes'
+                        },
+                        ticks: {
+                            callback: function (value, index, values) {
+                                return value + '%';
+                            },
+                            stepSize: 20
+                        },
+                        min: 0,
+                        max: 100,
+                        stacked: true
+                    }
+                },
+
+                responsive: true,
+                maintainAspectRatio: false,
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                },
+                animation: {
+                    duration: 0
+                },
+                hover: {
+                    animationDuration: 0
+                },
+                responsiveAnimationDuration: 0,
+                indexAxis: 'y',
+            }
+        });
 
         /*
         $("#om_legend > ul > li").on("click", function (e) {
@@ -2620,7 +2774,7 @@ async function om_PhenotypeSP() {
         for (let i = 0; i < globals.omics.numberOfRandomSamples; i++) {
             let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples[sample].protein);
             shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples[sample].metabolite))
-            shuffled_arrays.push(shuffled_array)
+            shuffled_arrays.push(shuffle(shuffled_array))
         }
 
         for (let phenotype in AIR.Phenotypes) {
@@ -2711,13 +2865,15 @@ async function om_PhenotypeSP() {
     else {
         $("#om_pheno_mapped_elements").replaceWith(`<p id="om_pheno_mapped_elements">${considered_elements.size} elements were considered.<p>`);
     }
-
+    globals.elements_with_FC = elements_with_FC;
+    globals.correctSPs = correct_SPs;
     await om_normalizePhenotypeValues().then(async function (pv) {
 
         await om_createTable({
             correctSPs: correct_SPs,
             FilteredElements: elements_with_FC,
         })
+        updateRegulatorChart()
         await enablebtn("om_pheno_analyzebtn", _text);
     });
 }
@@ -4924,9 +5080,12 @@ function om_createpopup(button, parameter) {
     $(button).attr('id', 'om_clickedpopupcell');
     $(button).css('background-color', 'lightgray');
 
-    $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+    $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2; border: none;">
                     <div class="arrow" style="left: 9.375%;"></div>
                     <div id="om_chart_popover_content" class="popover-content">
+                        <button type="button" id="om_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                         <div class="cbcontainer mt-1 mb-2 ml-2">
                             <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
                             <label class="air_checkbox" for="om_popup_showregression">Show Confidence Intervall</label>
@@ -4952,6 +5111,15 @@ function om_createpopup(button, parameter) {
                 </div>`);
 
     $btn.after($target);
+
+    let close_btn = document.getElementById("om_popup_close");
+    // When the user clicks on <span> (x), close the modal
+    close_btn.onclick = function () {
+        $target.remove();
+        $("#om_resultstable").parents(".dataTables_scrollBody").css({
+            minHeight: "0px",
+        });
+    }
 
     let targets = []
     var dist_targets = [
@@ -4996,8 +5164,8 @@ function om_createpopup(button, parameter) {
                 {
                     label: element,
                     data: [{
-                        x: aggr * Math.sign(FC),
-                        y: aggr * Math.sign(SP),
+                        x: Math.abs(aggr) * Math.sign(FC),
+                        y: Math.abs(aggr) * Math.sign(SP),
                         r: rad
                     }],
                     pointStyle: pstyle,
@@ -5943,7 +6111,7 @@ async function optimizePhenotypeSettings() {
     });
 }
 
-function getEnrichmentScore(points, maxfc) {
+function getEnrichmentScore(points, maxfc = 0) {
     var _points = [[1, 0], [-1, 0]]
     for (var p of points)
         _points.push([Math.abs(p[0]) * p[1], p[0] * Math.abs(p[1])]);
@@ -5951,4 +6119,99 @@ function getEnrichmentScore(points, maxfc) {
     var slope = leastSquaresRegression(_points);
     return slope;
 
+}
+function exportPhenotypeRegulators()
+{
+    var sample = $("#om_pregulatorchart_sample_select").val();
+    var usesignificantonly = $("#om_checkbox_pregulator_sign").prop("checked")
+    results = []
+    for(var [e,fc] of Object.entries(globals.elements_with_FC[sample]))
+    {
+        var values = {}
+        for(var [p,SPs] of Object.entries(globals.correctSPs))
+        {
+            if(usesignificantonly && getPvalue(p, sample) > 0.05)
+                continue;
+            if(SPs.hasOwnProperty(e))
+            {
+                values[AIR.Phenotypes[p].name] = SPs[e];
+            }
+        }
+
+        results.push([
+            e,
+            fc,
+            Object.values(values).reduce((sum, v) => sum + Math.abs(fc)*Math.abs(v), 0),
+            values,
+            sample,
+        ])
+    }
+    var maxvalue = Math.max(...results.map(r => r[2]))
+
+    results = results.filter(r => (r[2] * 100 / maxvalue) > 0.1).sort(function (a, b) {
+        return b[2] - a[2];
+    });
+
+    output = {}
+    for(var i in results)
+    {
+        var r = results[i]
+        output[AIR.Molecules[r[0]].name] = {
+            "Fold Change": r[1],
+            "Rank": parseInt(i)+1,
+            "Impact": r[2] / maxvalue,
+            "Values": r[3]
+        }
+    }
+
+    air_download("PhenotypeRegulators_" + globals.omics.samples[sample] + ".json", JSON.stringify(output))
+}
+
+function updateRegulatorChart()
+{
+    var sample = $("#om_pregulatorchart_sample_select").val();
+    var usesignificantonly = $("#om_checkbox_pregulator_sign").prop("checked")
+    results = []
+    for(var [e,fc] of Object.entries(globals.elements_with_FC[sample]))
+    {
+        var values = {}
+        for(var [p,SPs] of Object.entries(globals.correctSPs))
+        {
+            if(usesignificantonly && getPvalue(p, sample) > 0.05)
+                continue;
+            if(SPs.hasOwnProperty(e))
+            {
+                values[p] = SPs[e];
+            }
+        }
+
+        results.push([
+            e,
+            fc,
+            Object.values(values).reduce((sum, v) => sum + fc*Math.abs(v), 0),
+            values,
+            sample,
+        ])
+    }
+
+    var maxvalue = Math.max(...results.map(r => r[2]))
+
+    results = results.filter(r => (r[2] * 100 / maxvalue) > 0.1).sort(function (a, b) {
+        return b[2] - a[2];
+    });
+    globals.omics.pregulatorchart.data = {
+        labels: results.map(r => AIR.Molecules[r[0]].name),
+        datasets:
+            [
+                {
+                    data: results.map(r => r[2] * 100 / maxvalue),
+                    backgroundColor: results.map(r => r[1] < 0? "#4da3ff" : "#ff4d4d"),
+                    barThickness: 30,
+                },
+            ]
+    }
+
+    document.getElementById("om_pregulatorchart_canvasContainer").style.height =((50 + 40 * results.length) < 250? 250 : (50 + 40 * results.length)).toString() + "px";
+    globals.omics.pregulatorchartData = results
+    globals.omics.pregulatorchart.update();
 }

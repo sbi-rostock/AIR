@@ -792,6 +792,30 @@ async function enablebtn(id, text) {
     });
 }
 
+async function startloading()
+{
+    return new Promise(resolve => {
+        setTimeout(() => {
+
+            $("#air_plugincontainer").addClass("waiting")
+            $("body").css("cursor", "progress");
+            resolve('');
+        }, 0);
+    });
+}
+
+async function stoploading()
+{
+    return new Promise(resolve => {
+        setTimeout(() => {
+
+            $("#air_plugincontainer").removeClass("waiting")
+            $("body").css("cursor", "default");
+            resolve('');
+        }, 0);
+    });
+}
+
 function checkNested(obj /*, level1, level2, ... levelN*/) {
     var args = Array.prototype.slice.call(arguments, 1);
 
@@ -1464,13 +1488,12 @@ function createdtButtons(dt, download_string) {
 }
 
 function leastSquaresRegression(data) {
-    var sum = [0, 0], n = 0;
+    var sum = [0, 0], _d = 0;
 
-    for (; n < data.length; n++) {
-        if (data[n][1] != null) {
-            sum[0] += data[n][0] * data[n][0]; //sumSqX
-            sum[1] += data[n][0] * data[n][1]; //sumXY
-        }
+    for (_d of data)
+    {
+        sum[0] += _d[0] * _d[0]; //sumSqX
+        sum[1] += _d[0] * _d[1]; //sumXY
     }
 
     var gradient = sum[1] / sum[0];
