@@ -1102,7 +1102,7 @@ async function air_addoverlay(olname, callback, cb_param = null) {
 
 function shuffle(a) {
     
-    i = a.length;
+    let i = a.length;
     let array = Array(i);
     while(i--) array[i] = a[i];
 

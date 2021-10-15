@@ -456,7 +456,7 @@ function xp_EstimatePhenotypes() {
             let elementswithFC = 0
             globals.xplore.pe_results = {};
 
-            typeNumbersinSamples = {
+            let typeNumbersinSamples = {
                 "protein": 0,
                 "metabolite": 0
             }

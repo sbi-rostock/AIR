@@ -1,3 +1,9 @@
+.waiting {
+  cursor: progress !important;
+  pointer-events: none;
+  opacity: 0.7; 
+}
+
 .air_red {
   background-color: lightcoral !important;
 }
@@ -90,6 +96,10 @@
 .popover-content {
   width: 500px !important;
   height:300px !important;
+  border-color: black;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
 }
 
 .legendspan {
@@ -335,6 +345,15 @@
     font-weight: bold;
     transition: 0.3s;
     margin-left: 5px;
+}
+.air_close_tight {
+  position: absolute;
+  right: 5px;
+  color: black;
+  font-size: 25px;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-left: 5px;
 }
 
 .air_alert {
