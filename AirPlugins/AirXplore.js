@@ -796,13 +796,13 @@ async function getPhenotypePanel() {
             <h4 class="mb-4">Downstream Impact:</h4>
             <ul  id="xp_pe_tab_pane" class="air_nav_tabs nav nav-tabs mt-4" role="tablist">
                 <li class="air_nav_item nav-item" style="width: 33%;">
-                    <a class="air_tab air_tab_sub active nav-link" id="xp_pe_result_pheno-tab" data-toggle="tab" href="#xp_pe_result_pheno" role="tab" aria-controls="xp_pe_result_pheno" aria-selected="true">Phenotypes</a>
+                    <a class="air_tab air_tab_sub xp_pe_tabs active nav-link" id="xp_pe_result_pheno-tab" data-toggle="tab" href="#xp_pe_result_pheno" role="tab" aria-controls="xp_pe_result_pheno" aria-selected="true">Phenotypes</a>
                 </li>
                 <li class="air_nav_item nav-item" style="width: 33%;">
-                    <a class="air_tab air_tab_sub nav-link" id="xp_pe_result_element-tab" data-toggle="tab" href="#xp_pe_result_element" role="tab" aria-controls="xp_pe_result_element" aria-selected="false">Paths</a>
+                    <a class="air_tab air_tab_sub nav-link xp_pe_tabs" id="xp_pe_result_element-tab" data-toggle="tab" href="#xp_pe_result_element" role="tab" aria-controls="xp_pe_result_element" aria-selected="false">Paths</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 32%;">
-                    <a class="air_tab air_tab_sub nav-link" id="xp_pe_result_ko-tab" data-toggle="tab" href="#xp_pe_result_ko" role="tab" aria-controls="xp_pe_result_ko" aria-selected="false">KO Impact</a>
+                <li class="air_disabledbutton air_nav_item nav-item" style="width: 32%;">
+                    <a class="air_tab air_tab_sub nav-link xp_pe_tabs" id="xp_pe_result_ko-tab" data-toggle="tab" href="#xp_pe_result_ko" role="tab" aria-controls="xp_pe_result_ko" aria-selected="false">KO Impact</a>
                 </li>
             </ul>
             <div class="tab-content air_tab_content">
@@ -1244,7 +1244,9 @@ async function getPhenotypePanel() {
             xp_EstimatePhenotypes()
         });
 
-        $('.xp_pe_tab_pane[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        globals.xplore.targetpanel.append('<div class="mb-4"></div>');
+
+        $('.xp_pe_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
             var target = $(e.target).attr("href") // activated tab
             switch (target) {
                 case "#xp_pe_result_pheno":
@@ -1253,7 +1255,7 @@ async function getPhenotypePanel() {
             }
             adjustPanels(globals.xplore.container);
         });
-        globals.xplore.targetpanel.append('<div class="mb-4"></div>');
+
 
         resolve('');
     });
