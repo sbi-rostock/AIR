@@ -2356,16 +2356,18 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
     let elementname = $("#xp_elementinput").val().toLowerCase();
 
-    $('#xp_dl').hide();
-    $('#xp_value_type').html("");
-    $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
-    $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
-    globals.xplore.regulationtable.clear().draw();
-    globals.xplore.targettable.clear().draw();
-    globals.xplore.phenotypetable.clear().draw();
-    globals.xplore.hpotable.clear().draw();
-    globals.xplore.hpotable.columns.adjust().draw();
-    globals.xplore.selected_element = "";
+    if (onlyHPO == false) {
+        $('#xp_dl').hide();
+        $('#xp_value_type').html("");
+        $("#xp_molart").replaceWith('<div id="xp_molart" class="xp_molartContainer">No information available.</div>');
+        $("#xp_molartimg_modal").replaceWith('<div id="xp_molartimg_modal"></div>');
+        globals.xplore.regulationtable.clear().draw();
+        globals.xplore.targettable.clear().draw();
+        globals.xplore.phenotypetable.clear().draw();
+        globals.xplore.hpotable.clear().draw();
+        globals.xplore.hpotable.columns.adjust().draw();
+        globals.xplore.selected_element = "";
+    }
 
     if (elementname.trim() != "") {
         let elementid = null;
