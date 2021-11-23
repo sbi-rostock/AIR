@@ -1770,10 +1770,19 @@ async function om_createTable(param) {
                     </div>
                 </div>
             </div>
-            <button id="om_btn_download_pheno" class="om_btn_download btn mb-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>
+             <p class="mt-4 mb-0">Clicking on a column header will highlight results of the respective sample on the maps.</p>
+            <div id="om_overlay_pvalue_threshold-container" class="row mb-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value threshold:</span>
+                </div>
+                <div class="col">
+                    <input type="text" class="textfield" value="0.05" id="om_highlight_pvalue_threshold" onkeypress="return isNumber(event)" />
+                </div>
+            </div>
             <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
             <div id="om_resultstable_container" class="mb-2">
                 <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
+                <button id="om_btn_download_pheno" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>           
             </div>
 
             <hr>
@@ -1914,7 +1923,7 @@ async function om_createTable(param) {
                             numberofsignsamples++;
                         }
                         else if (pvalue < 0.1) {
-                            $(this).css('background-color', '#ffff80');
+                            $(this).css('background-color', '#ffffa7');
                         }
                         else {
                             $(this).css('background-color', 'transparent');
@@ -2099,10 +2108,20 @@ async function om_createTable(param) {
             headercell.innerHTML += "<br>(p-value)"
 
             $(headercell.getElementsByTagName('a')[0]).click("click", function (event) {
+
+                
+                let pvalue_threshold = parseFloat($("#om_highlight_pvalue_threshold").val().replace(',', '.'))
+                if (isNaN(pvalue_threshold)) {
+                    alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
+                    pvalue_threshold = 0.05;
+                }
                 event.stopPropagation();
                 var highlightelements = {}
                 for (let phenotype in AIR.Phenotypes) {
-                    highlightelements[AIR.Phenotypes[phenotype].name] = valueToHex(AIR.Phenotypes[phenotype].norm_results[sample])
+                    if(getPvalue(phenotype, sample) < pvalue_threshold)
+                    {
+                        highlightelements[AIR.Phenotypes[phenotype].name] = valueToHex(AIR.Phenotypes[phenotype].norm_results[sample])
+                    }
                 }
                 ColorElements(highlightelements)
             });
