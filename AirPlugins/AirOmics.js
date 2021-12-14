@@ -1871,6 +1871,13 @@ async function om_createTable(param) {
                 </div>
             </div>
 
+            <div class="air_alert alert alert-danger mt-2">
+                <span>Because of server issues, generating overlays can take several minutes.</span>
+                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>     
+
             <button type="button" id="om_addoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Create Overlays</button>
 
             <button type="button" id="om_showonmapbtn"  class="air_disabledbutton air_btn_light btn btn-block mb-2">Show On Phenotype Submap</button>
@@ -2122,6 +2129,12 @@ async function om_createTable(param) {
                     {
                         highlightelements[AIR.Phenotypes[phenotype].name] = valueToHex(AIR.Phenotypes[phenotype].norm_results[sample])
                     }
+                }
+
+                absmax = Math.max(...Object.values(param.FilteredElements[sample]).map(v => Math.abs(v)))
+                for(let [e,val] of Object.entries(param.FilteredElements[sample]))
+                {
+                    highlightelements[AIR.Molecules[e].name] = valueToHex(val/absmax)
                 }
                 ColorElements(highlightelements)
             });
@@ -2715,11 +2728,11 @@ async function om_PhenotypeSP() {
             let activity = 0.0;
             let abs_activity = 0.0;
             var accuracy = 0;
-
+            var xysum = 0;
+            var xxsum = 2;
             AIR.Phenotypes[phenotype].includedelements[sample] = [];
             AIR.Phenotypes[phenotype].genenumbers[sample] = 0;
 
-            var regr_data = [];
             for (let element in correct_SPs[phenotype]) {
 
                 if (!elements_with_FC[sample].hasOwnProperty(element)) {
@@ -2727,10 +2740,13 @@ async function om_PhenotypeSP() {
                 }
 
                 AIR.Phenotypes[phenotype].includedelements[sample].push(element);
-
                 let SP = correct_SPs[phenotype][element];
-
                 let FC = elements_with_FC[sample][element];
+
+                var xy = SP * FC;
+                
+                xxsum += xy * xy
+                xysum += xy * Math.abs(xy) 
 
                 let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
                 if (isNaN(pvalue) || !pvalue) {
@@ -2741,7 +2757,6 @@ async function om_PhenotypeSP() {
                 AIR.Phenotypes[phenotype].genenumbers[sample] += 1;
                 considered_elements.add(element);
 
-                regr_data.push([SP, FC]);
 
                 var weightedInfluence;
                 if (globals.omics.pvalue && document.getElementById("om_checkbox_pheno_pvalue").checked === true) {
@@ -2749,10 +2764,10 @@ async function om_PhenotypeSP() {
                     if (isNaN(pvalue) || !pvalue) {
                         pvalue = 1;
                     }
-                    weightedInfluence = FC * SP * (1 - (pvalue / globals.omics.pvalue_threshold))
+                    weightedInfluence = xy * (1 - (pvalue / globals.omics.pvalue_threshold))
                 }
                 else {
-                    weightedInfluence = FC * SP;
+                    weightedInfluence = xy;
                 }
                 activity += weightedInfluence;
                 abs_activity += Math.abs(weightedInfluence);
@@ -2771,7 +2786,7 @@ async function om_PhenotypeSP() {
 
 
             AIR.Phenotypes[phenotype].results[sample] = activity;
-            AIR.Phenotypes[phenotype]["slope"][sample] = getEnrichmentScore(regr_data, maxFCs[sample]);
+            AIR.Phenotypes[phenotype]["slope"][sample] = xysum/xxsum
 
             accuracyvalues.push(accuracy);
         }
@@ -2806,24 +2821,26 @@ async function om_PhenotypeSP() {
             let random_scores = [];
             let random_en_scores = [];
             for (let shuffled_elements of shuffled_arrays) {
-                var _regr_data = [];
                 var _en_score = 0;
+                var xysum = 0;
+                var xxsum = 2;
                 for (let i in FC_values) {
                     let element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
-                        var SP = correct_SPs[phenotype][element];
-                        var FC = FC_values[i]
-                        _en_score += FC * SP;
-                        _regr_data.push([SP, FC]);
+                        var xy = correct_SPs[phenotype][element] * FC_values[i]
+                        _en_score += xy;
+                        xxsum += xy * xy
+                        xysum += xy * Math.abs(xy) 
                     }
                 }
-                if (_regr_data.length > 0)
-                    random_scores.push(getEnrichmentScore(_regr_data, maxFCs[sample]))
-                else
-                    random_scores.push(0)
 
+                random_scores.push(xysum/xxsum)
+                
                 random_en_scores.push(_en_score)
             }
+
+            random_scores = random_scores.concat(random_scores.map(x => -x))
+            random_en_scores = random_en_scores.concat(random_en_scores.map(x => -x))
 
             var std = standarddeviation(random_scores)
             var _mean = mean(random_scores);
@@ -2912,9 +2929,13 @@ function AddOverlaysPromise(samples = globals.omics.samples) {
                         cookie: 'MINERVA_AUTH_TOKEN=xxxxxxxx',
                         success: (response) => {
                             ajaxPostQuery(count + 1).then(r =>
-                                resolve(response));
+                                resolve(response)).catch(err => {
+                                    console.log(err)
+                                    resolve(response);
+                                });
                         },
                         error: (response) => {
+                            console.log(response)
                             reject();
                         }
                     })
@@ -3312,8 +3333,9 @@ function contentString(ID) {
 
     let pvalue_threshold = parseFloat($("#om_overlay_pvalue_threshold").val().replace(',', '.'))
     if (isNaN(pvalue_threshold)) {
-        alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
+        //alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
         pvalue_threshold = 0.05;
+        $("#om_overlay_pvalue_threshold").val(0.05)
     }
 
     for (let p in AIR.Phenotypes) {
@@ -3573,7 +3595,6 @@ function normalizeExpressionValues() {
         let typevalue = $('#om_select_normalize').val();
 
         let allmax = 0.0;
-        let alreadyincluded = [];
         let samplemaxvalues = [];
         let probemaxvalues = [];
 
@@ -3585,7 +3606,7 @@ function normalizeExpressionValues() {
 
             let probemax = 0;
             for (let sample in globals.omics.samples) {
-                let value = globals.omics.ExpressionValues[expression]["nonnormalized"][sample];
+                let value = Math.abs(globals.omics.ExpressionValues[expression]["nonnormalized"][sample]);
                 if (value > allmax)
                     allmax = value;
                 if (value > probemax)
@@ -3598,10 +3619,6 @@ function normalizeExpressionValues() {
         }
 
         for (let expression in globals.omics.ExpressionValues) {
-
-
-            if (alreadyincluded.includes(name) === true)
-                continue;
 
             let max = allmax;
             if (typevalue == 1) {
@@ -5977,6 +5994,7 @@ function getFilteredRegulators(phenotype, i_threshold, submapsonly) {
 function getFilteredExpression(sample, fc_threshold, pvalue_threshold) {
     let output = {}
     for (let element in globals.omics.ExpressionValues) {
+
         let FC = globals.omics.ExpressionValues[element].nonnormalized[sample];
         if (!FC) {
             continue;
