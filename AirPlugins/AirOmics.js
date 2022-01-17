@@ -1599,7 +1599,7 @@ function om_detectfile(force_seperator) {
         for (let i = 0; i < globals.omics.columnheaders.length; i++) {
 
             if (globals.omics.columnheaders.filter(item => item == globals.omics.columnheaders[i]).length > 1) {
-                return stopfile('Headers in first line need to be unique!<br>Column ' + globals.omics.columnheaders[i] + ' occured multiple times.');
+                return stopfile('Headers in first line need to be unique!<br>Column "' + globals.omics.columnheaders[i] + '" occured multiple times.');
             }
 
             columnSelect.options[columnSelect.options.length] = new Option(globals.omics.columnheaders[i], i);
@@ -1736,168 +1736,169 @@ async function om_createTable(param) {
 
             <h4 class="mt-4 mb-4">Results</h4> 
 
-            <hr>
-
-            <h5 class="mt-4 mb-4" style="font-weight: bold;">Overview</h5> 
-            
-            <div id="om_select_pvalue-container" class="row mb-2">
-                <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
-                </div>
-                <div class="col">
-                    <select id="om_select_pvalue" class="browser-default om_select custom-select">                        
-                        <option value="2">Level-based</option>
-                        <option value="1">Distribution-based</option>
-                        <option value="3"  selected>Lowest p-value of both</option>
-                        <option value="0">Highest p-value of both</option>
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-2">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
-                                data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
-                            ?
-                        </button>
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_outputtable_panel">Table</button>
+            <div id="om_outputtable_panel" class="collapse air_box_lightgray">
+                <div id="om_select_pvalue-container" class="row mb-2">
+                    <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
+                    </div>
+                    <div class="col">
+                        <select id="om_select_pvalue" class="browser-default om_select custom-select">                        
+                            <option value="2">Level-based</option>
+                            <option value="1">Distribution-based</option>
+                            <option value="3"  selected>Lowest p-value of both</option>
+                            <option value="0">Highest p-value of both</option>
+                        </select>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="om_cb_fdr" checked>
-                        <label class="air_checkbox" for="om_cb_fdr">FDR Correction?</label>
+                <div class="row mb-2">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="om_cb_fdr" checked>
+                            <label class="air_checkbox" for="om_cb_fdr">FDR Correction?</label>
+                        </div>
                     </div>
                 </div>
-            </div>
-             <p class="mt-4 mb-0">Clicking on a column header will highlight results of the respective sample on the maps.</p>
-            <div id="om_overlay_pvalue_threshold-container" class="row mb-4">
-                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value threshold:</span>
-                </div>
-                <div class="col">
-                    <input type="text" class="textfield" value="0.05" id="om_highlight_pvalue_threshold" onkeypress="return isNumber(event)" />
-                </div>
-            </div>
-            <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
-            <div id="om_resultstable_container" class="mb-2">
-                <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
-                <button id="om_btn_download_pheno" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>           
-            </div>
-
-            <hr>
-
-            <h5 class="mt-4 mb-4" style="font-weight: bold;">Ranking of Regulators</h5> 
-
-            <div class="row mb-3">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
-                                data-content="Include only Phenotypes with an adj. p-value < 0.05">
-                            ?
-                        </button>
+                <p class="mt-4 mb-0">Clicking on a column header will highlight results of the respective sample on the maps.</p>
+                <div id="om_overlay_pvalue_threshold-container" class="row mb-4">
+                    <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value threshold:</span>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="textfield" value="0.05" id="om_highlight_pvalue_threshold" onkeypress="return isNumber(event)" />
                     </div>
                 </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="om_checkbox_pregulator_sign">
-                        <label class="air_checkbox" for="om_checkbox_pregulator_sign">Only significant Phenotypes?</label>
-                    </div>
-                </div>
-            </div>
-            <div id="om_pregulatorchart_sample_select-container" class="row mb-2">
-                <div class="col-auto" style="width: 30%;">
-                    <button type="button" id="om_export_rankedphenotypes"  class="air_btn_light btn btn-block mb-2 mt-2">Export (JSON)</button>
-                </div>
-                <div class="col-auto air_select_label" style="padding:0; width: 15%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Sample:</span>
-                </div>
-                <div class="col">
-                    <select id="om_pregulatorchart_sample_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>
-                </div>
-            </div>
-
-            <div class="mb-4 mt-4" style="height:400px;overflow-y:scroll; position:relative">
-                <div id="om_pregulatorchart_canvasContainer" style="height:0px">
-                    <canvas id="om_pregulatorchart"></canvas>
+                <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+                <div id="om_resultstable_container" class="mb-2">
+                    <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
+                    <button id="om_btn_download_pheno" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>           
                 </div>
             </div>
 
             <hr>
 
-            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_resultsgraph_panel">Results Graph:</button>
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_resultsgraph_panel">Results Graph</button>
             <div id="om_resultsgraph_panel" class="collapse air_box_lightgray">
                 <canvas class="mb-2 mt-4" id="om_plevelchart"></canvas>
                 <div id="om_legend" class="chart-legend"></div>
             </div>
             
-            <hr>
-
-            <h5 class="mt-4 mb-4" style="font-weight: bold;">Show on Map</h4> 
-            
-            <div class="row mb-3">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
-                                data-content="Include values of the user data file in the overlays and color mapped nodes in the network.<br/>This may decrease the performance significantly">
-                            ?
-                        </button>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="cbcontainer">
-                        <input type="checkbox" class="air_checkbox" id="checkbox_datavalues_overlay">
-                        <label class="air_checkbox" for="checkbox_datavalues_overlay">Include values from the datafile in visualization?</label>
-                    </div>
-                </div>
-            </div>
-            <div id="om_overlay_pvalue_threshold-container" class="row mb-2">
-                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype p-value threshold:</span>
-                </div>
-                <div class="col">
-                    <input type="text" class="textfield" value="0.05" id="om_overlay_pvalue_threshold" onkeypress="return isNumber(event)" />
-                </div>
-            </div>
-
-            <div id="om_overlay_suffix-container" class="row mb-4">
-                <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Overlay suffix:</span>
-                </div>
-                <div class="col">
-                    <input type="text" class="textfield" value="" id="om_overlay_suffix"/>
-                </div>
-            </div>
-
-            <div class="air_alert alert alert-danger mt-2">
-                <span>Because of server issues, generating overlays can take several minutes.</span>
-                <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>     
-
-            <button type="button" id="om_addoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Create Overlays</button>
-
-            <button type="button" id="om_showonmapbtn"  class="air_disabledbutton air_btn_light btn btn-block mb-2">Show On Phenotype Submap</button>
-
-            <div class="btn-group btn-group-justified">
-                <div class="btn-group">
-                    <button type="button" id="om_showoverlaybtn" class="air_disabledbutton air_btn_light btn mr-1">Show Overlays</button>
-                </div>
-                <div class="btn-group">
-                    <button type="button" id="om_hideoverlaybtn" class="air_disabledbutton air_btn_light btn ml-1">Hide Overlays</button>
-                </div>
-            </div>
-            <button type="button" id="om_removeoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Remove Overlays</button>
 
             <hr>
 
-            <button type="button" id="om_addimagebtn"  class="air_disabledbutton btn-image air_btn_light btn btn-block mb-2 mt-2">Generate Image</button>
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_regulatorranking_panel">Regulator Ranking</button>
+            <div id="om_regulatorranking_panel" class="collapse air_box_lightgray">
+                <div class="row mb-3">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-content="Include only Phenotypes with an adj. p-value < 0.05">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="om_checkbox_pregulator_sign">
+                            <label class="air_checkbox" for="om_checkbox_pregulator_sign">Only significant Phenotypes?</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="om_pregulatorchart_sample_select-container" class="row mb-2">
+                    <div class="col-auto" style="width: 30%;">
+                        <button type="button" id="om_export_rankedphenotypes"  class="air_btn_light btn btn-block mb-2 mt-2">Export (JSON)</button>
+                    </div>
+                    <div class="col-auto air_select_label" style="padding:0; width: 15%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Sample:</span>
+                    </div>
+                    <div class="col">
+                        <select id="om_pregulatorchart_sample_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>
+                    </div>
+                </div>
 
-            <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+                <div class="mb-4 mt-4" style="height:400px;overflow-y:scroll; position:relative">
+                    <div id="om_pregulatorchart_canvasContainer" style="height:0px">
+                        <canvas id="om_pregulatorchart"></canvas>
+                    </div>
+                </div>
+            </div>
             
+            <hr>
+
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_showonmap_panel">Highlight on Map</button>
+            <div id="om_showonmap_panel" class="collapse air_box_lightgray">
+                <div class="row mb-3">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-content="Include values of the user data file in the overlays and color mapped nodes in the network.<br/>This may decrease the performance significantly">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="checkbox_datavalues_overlay">
+                            <label class="air_checkbox" for="checkbox_datavalues_overlay">Include values from the datafile in visualization?</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="om_overlay_pvalue_threshold-container" class="row mb-2">
+                    <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype p-value threshold:</span>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="textfield" value="0.05" id="om_overlay_pvalue_threshold" onkeypress="return isNumber(event)" />
+                    </div>
+                </div>
+
+                <div id="om_overlay_suffix-container" class="row mb-4">
+                    <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                        <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Overlay suffix:</span>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="textfield" value="" id="om_overlay_suffix"/>
+                    </div>
+                </div>
+
+                <div class="air_alert alert alert-danger mt-2">
+                    <span>Because of server issues, generating overlays can take several minutes.</span>
+                    <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>     
+
+                <button type="button" id="om_addoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Create Overlays</button>
+
+                <button type="button" id="om_showonmapbtn"  class="air_disabledbutton air_btn_light btn btn-block mb-2">Show On Phenotype Submap</button>
+
+                <div class="btn-group btn-group-justified">
+                    <div class="btn-group">
+                        <button type="button" id="om_showoverlaybtn" class="air_disabledbutton air_btn_light btn mr-1">Show Overlays</button>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" id="om_hideoverlaybtn" class="air_disabledbutton air_btn_light btn ml-1">Hide Overlays</button>
+                    </div>
+                </div>
+                <button type="button" id="om_removeoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Remove Overlays</button>
+
+                <hr>
+
+                <button type="button" id="om_addimagebtn"  class="air_disabledbutton btn-image air_btn_light btn btn-block mb-2 mt-2">Generate Image</button>
+
+                <div id="om_img_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
+            </div>
         </div>
     `);
 

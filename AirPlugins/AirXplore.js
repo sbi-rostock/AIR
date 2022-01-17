@@ -31,11 +31,6 @@ function AirXplore() {
     globals.xplore["container"] = document.getElementById("airxplore_tab_content")
 
     let t0 = performance.now();
-    minervaProxy.project.map.addListener({
-        dbOverlayName: "search",
-        type: "onSearch",
-        callback: xp_searchListener
-    });
 
     $("#airomics_tab").on('shown.bs.tab', function () {
 
@@ -2213,20 +2208,6 @@ function getCentralityPanel() {
     });
 }
 
-function xp_searchListener(entites) {
-    globals.xplore.selected = entites[0];
-    if (globals.xplore.selected.length > 0) {
-        if (globals.xplore.selected[0].constructor.name === 'Alias') {
-            var tag = globals.xplore.selected[0]._other.structuralState;
-            if(tag && tag.toLowerCase() == "family")
-            {
-                tag = "";
-            }
-            xp_setSelectedElement(globals.xplore.selected[0].name+ (tag? ("_" + tag) : ""));
-        }
-    }
-}
-
 function xp_setSelectedElement(name) {
     $("#xp_elementinput").val(name);
     getData(false);
@@ -2715,10 +2696,51 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 $(document).on('click', '.air_elementlink', function () {
     selectElementonMap($(this).html(), false);
 });
-$(document).on('click', '.air_phenotypepath', function () {
-    let data = $(this).attr("data").split("_");
-    let _perturbedElements = perturbedElements();
-    findPhenotypePath(data[0], data[1], _perturbedElements);
+$(document).on('click', '.air_phenotypepath', function (event) {
+    
+    let data = $(this).attr("data");
+    let clicked = $(this).attr("data").endsWith("_clicked")
+    globals.xplore.phenotypetable.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        var rowNode = this.node();
+        $(rowNode).find(".air_phenotypepath").each(function () {
+
+            if($(this).attr("data") == data)
+            {
+                if(clicked)
+                {
+                    $(this).attr("data", $(this).attr("data").replace("_clicked", ""));
+                    $(this).html('<span class="fas fa-eye"></span>')
+                }
+                else
+                {
+              
+                    data = data.split("_");
+                    $(this).attr("data", $(this).attr("data") + "_clicked");
+                    //$(this).removeClass("fa-eye")
+                    //$(this).addClass("fa-eye-slash")
+                    $(this).html('<span class="fas fa-eye-slash"></span>')
+
+                }
+            }
+            else
+            {
+                $(this).attr("data", $(this).attr("data").replace("_clicked", ""));
+                $(this).html('<span class="fas fa-eye"></span>')
+            }
+        });
+        //this.invalidate();
+    });
+
+    if(clicked)
+    {
+        highlightSelected([])
+    }
+    else
+    {
+        let _perturbedElements = perturbedElements();
+        findPhenotypePath(data[0], data[1], _perturbedElements);
+    }
+    globals.xplore.phenotypetable.draw(false);
 });
 
 async function xp_updatePhenotypeTable() {
@@ -2736,7 +2758,7 @@ async function xp_updatePhenotypeTable() {
             if (globals.xplore.pe_influenceScores[p].SPs.hasOwnProperty(elementid) == false) {
                 continue;
             }
-            var result_row = ['<a href="#" class="air_phenotypepath" data="' + elementid + "_" + p + '"><span class="fas fa-eye"></span></a>'];
+            var result_row = AIR.Phenotypes[p].SubmapElements.includes(elementid)? ['<a href="#" class="air_phenotypepath" data="' + elementid + "_" + p + '"><span class="fas fa-eye"></span></a>'] : [""];
             var pname = AIR.Molecules[p].name;
 
             var SP = globals.xplore.pe_influenceScores[p].SPs[elementid];
@@ -2794,7 +2816,7 @@ function XP_PredictTargets() {
 
         globals.xplore.xp_target_downloadtext += `\n${AIR.Phenotypes[p].name}\t${AIR.Phenotypes[p].value}`;
     }
-    globals.xplore.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivit\type';
+    globals.xplore.xp_target_downloadtext += '\n\nElement\tSpecificity\tSensitivity\tType';
 
     for (let e in AIR.Molecules) {
 

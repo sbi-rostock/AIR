@@ -207,23 +207,24 @@ async function initMainPageStructure() {
   $.getScript(ScriptPaths[0]).done(function () {
     readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal).then(async function (height) {
       document.getElementById("stat_spinner").remove();
-      container.append(
+      $("#air_plugincontainer").append(
       /*html*/
       `
 
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-                <li class="air_nav_item nav-item"  style="width: 25%;">
-                    <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">AirXplore</a>
+                <li class="air_nav_item nav-item"  style="width: 20%;">
+                    <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">Xplore</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 25%;">
-                    <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">AirOmics</a>
+                <li class="air_nav_item nav-item" style="width: 20%;">
+                    <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 25%;">
-                    <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">AirVariant</a>
+                <li class="air_nav_item nav-item" style="width: 20%;">
+                    <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 25%;">
-                    <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">AirMassSpec</a>
+                <li class="air_nav_item nav-item" style="width: 20%;">
+                    <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">MassSpec</a>
                 </li>
+                <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
             </ul>
             <div class="tab-content" id="air_tab">
                 <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">

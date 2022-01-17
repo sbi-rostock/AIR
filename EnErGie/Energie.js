@@ -8,18 +8,13 @@ if ($ === undefined && minerva.$ !== undefined) {
 
 var Chart = require('chart.js');
 
-var JSZip = require("jszip");
+let Decimal = require('decimal.js');
 
-var FileSaver = require('file-saver');
+require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
 
-var VCF = require('@gmod/vcf');
 
-var ttest = require('ttest');
-
-require('datatables.net-buttons')(window, $); 
-
-var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
-
+var URL = "http://localhost:3000/Energie/";
+var filetesting = false;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -52,7 +47,9 @@ var AIR = {
   allBioEntities: [],
   MapElements: {},
   Compartments: {},
-  MapReactions: []
+  MapReactions: [],
+  Fullnames: {},
+  Aliases: {}
 };
 var globals = {
   defaultusers: ['anonymous', 'guest', 'guest user'],
@@ -60,6 +57,7 @@ var globals = {
   guestuser: ['airuser'],
   pe_element_table: undefined,
   pe_reults_table: undefined,
+  pe_results: {},
   pe_data: [{}],
   pe_data_index: 0,
   pe_influenceScores: {},
@@ -81,7 +79,8 @@ var globals = {
   xp_targetchart: undefined,
   targetphenotypetable: undefined,
   targetpanel: undefined,
-  xp_target_downloadtext: ""
+  xp_target_downloadtext: "",
+  phenopaths: {}
 };
 const centralities = ["Betweenness", "Closeness", "Degree", "Indegree", "Outdegree"];
 
@@ -161,8 +160,21 @@ function removeScripts() {
   $(document).find('script[src^="http"]').remove();
 }
 
+async function loadScript(script) {
+  return new Promise((resolve, reject) => {
+    try {
+      $.getScript(script).done(function () {
+        resolve();
+      });
+    } catch (err) {
+      resolve();
+    }
+  });
+}
+
 async function initMainPageStructure() {
   container = $('<div class="' + pluginName + '-container" id="sarco_plugincontainer"></div>').appendTo(pluginContainer);
+  let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
   $("<link/>", {
     rel: "stylesheet",
     type: "text/css",
@@ -185,6 +197,11 @@ async function initMainPageStructure() {
     $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
     await getPhenotypeInfluences(true);
     $("#air_init_btn").remove();
+
+    for (let s of scripts) {
+      await loadScript(s);
+    }
+
     container.append(`
             <button class="air_collapsible mt-4">Interaction Path Identification</button>
             <div id="xp_panel_interaction" class="air_collapsible_content">
@@ -259,7 +276,7 @@ async function initMainPageStructure() {
                 
                 <div><span>From</span></div>
                 <div>
-                <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" value="cirrhosis_liver"/>
+                <input type="text" list="xp_path_elementnames_source" style="width: 70%" class="textfield mb-2" id="xp_path_element_source" value="cirrhosis (liver)"/>
                 <datalist id="xp_path_elementnames_source" style="height:5.1em;overflow:hidden">
                 </datalist>
                 </div>
@@ -279,7 +296,7 @@ async function initMainPageStructure() {
                     </datalist>
                 </div>
                 <div><span>To</span></div>
-                <input type="text" list="xp_path_elementnames_target" style="width: 70%" class="textfield mb-2" id="xp_path_element_target" value="sarcopenia_muscle"/>
+                <input type="text" list="xp_path_elementnames_target" style="width: 70%" class="textfield mb-2" id="xp_path_element_target" value="sarcopenia (muscle)"/>
                 <datalist id="xp_path_elementnames_target" style="height:5.1em;overflow:hidden">
                 </datalist>
 
@@ -369,20 +386,43 @@ async function initMainPageStructure() {
     await getOptimizePanel();
     await getTargetPanel();
 
-    for (let element of Object.keys(AIR.Molecules).map(e => AIR.Molecules[e].name).sort()) {
-      $("#xp_elementnames").append('<option value="' + element + '">');
-      $("#xp_path_elementnames_source").append('<option value="' + element + '">');
-      $("#xp_path_elementnames_through").append('<option value="' + element + '">');
-      $("#xp_path_elementnames_target").append('<option value="' + element + '">');
-      $("#xp_cent_elementnames_target").append('<option value="' + element + '">');
-      $("#xp_cent_elementnames_source").append('<option value="' + element + '">');
-      $("#xp_opt_elementnames_target").append('<option value="' + element + '">');
-      $("#xp_opt_elementnames_source").append('<option value="' + element + '">');
+    for (let eid of Object.keys(AIR.Molecules).sort(function (a, b) {
+      var nameA = AIR.Molecules[a].name.toUpperCase();
+      var nameB = AIR.Molecules[b].name.toUpperCase();
+
+      if (nameA < nameB) {
+        return -1;
+      }
+
+      if (nameA > nameB) {
+        return 1;
+      }
+
+      return 0;
+    })) {
+      var element = AIR.Molecules[eid].name;
+      var symbol = AIR.Molecules[eid].ids.name;
+      var description = "";
+
+      if (AIR.Fullnames.hasOwnProperty(symbol)) {
+        if (AIR.Fullnames[symbol]) description += AIR.Fullnames[symbol] + " ";
+        if (AIR.Aliases[symbol]) description += "(" + AIR.Aliases[symbol] + ")";
+      }
+
+      var option = '<option value="' + element + '">' + (description != "" ? description + "</option>" : "");
+      $("#xp_elementnames").append(option);
+      $("#xp_path_elementnames_source").append(option);
+      $("#xp_path_elementnames_through").append(option);
+      $("#xp_path_elementnames_target").append(option);
+      $("#xp_cent_elementnames_target").append(option);
+      $("#xp_cent_elementnames_source").append(option);
+      $("#xp_opt_elementnames_target").append(option);
+      $("#xp_opt_elementnames_source").append(option);
     }
 
     for (let p in AIR.Phenotypes) {
       AIR.Phenotypes[p]["value"] = 0;
-      globals.pe_results_table.row.add([getLinkIconHTML(AIR.Phenotypes[p].name), `<div id="xp_pe_value_${p}">0</div>`, `<div id="xp_pe_accuracy_${p}">0</div>`]);
+      globals.pe_results_table.row.add(["", getLinkIconHTML(AIR.Phenotypes[p].name), `<div id="xp_pe_value_${p}">0</div>`, 1, `<div id="xp_pe_accuracy_${p}">0</div>`]);
       $("#xp_path_phenotypes").append('<option value="' + p + '">' + AIR.Phenotypes[p].name + '</option>');
       $("#xp_cent_phenotypes").append('<option value="' + p + '">' + AIR.Phenotypes[p].name + '</option>');
     }
@@ -844,7 +884,7 @@ async function getOptimizePanel() {
                 <input type="text" list="xp_opt_elementnames_source" style="width: 49%" class="textfield mr-1" id="xp_opt_element_source" placeholder="Type in name"/>
                 <datalist id="xp_opt_elementnames_source" style="height:5.1em;overflow:hidden">
                 </datalist>
-                <input type="text" list="xp_opt_elementnames_target" style="width: 49%" class="textfield" id="xp_opt_element_target" value="sarcopenia_muscle"/>
+                <input type="text" list="xp_opt_elementnames_target" style="width: 49%" class="textfield" id="xp_opt_element_target" value="sarcopenia (muscle)"/>
                 <datalist id="xp_opt_elementnames_target" style="height:5.1em;overflow:hidden">
                 </datalist>
             </div>
@@ -1124,7 +1164,7 @@ async function getCentralityPanel() {
                 <input type="text" list="xp_cent_elementnames_source" style="width: 49%" class="textfield mr-1" id="xp_cent_element_source" placeholder="Type in name"/>
                 <datalist id="xp_cent_elementnames_source" style="height:5.1em;overflow:hidden">
                 </datalist>
-                <input type="text" list="xp_cent_elementnames_target" style="width: 49%" class="textfield" id="xp_cent_element_target" value="sarcopenia_muscle"/>
+                <input type="text" list="xp_cent_elementnames_target" style="width: 49%" class="textfield" id="xp_cent_element_target" value="sarcopenia (muscle)"/>
                 <datalist id="xp_cent_elementnames_target" style="height:5.1em;overflow:hidden">
                 </datalist>
             </div>
@@ -1800,12 +1840,31 @@ async function getPhenotypePanel() {
 
         <div class="tab-pane air_sub_tab_pane show active" id="xp_pheno" role="tabpanel" aria-labelledby="xp_pheno-tab">
             <h4 class="mt-4 mb-4">Resulting phenotype levels:</h4>
+            <div class="row mt-2 mb-4">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
+                                data-content="If checked, phenotype levels will be normalized by the max absolute values.">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="cbcontainer">
+                        <input type="checkbox" class="air_checkbox" id="xp_normalize_phen">
+                        <label class="air_checkbox" for="xp_normalize_phen">Normalize Phenotypes</label>
+                    </div>
+                </div>
+            </div> 
             <table id="xp_table_pe_results" cellspacing="0" class="air_table table table-sm mt-4 mb-4" style="width:100%">
                 <thead>
                     <tr>
+                        <th style="vertical-align: middle;"></th>
                         <th style="vertical-align: middle;">Phenotype</th>
                         <th style="vertical-align: middle;" data-toggle="tooltip" title="Predicted change in the level of the phenotype after perturbation (normalized from -1 to 1)." >Level</th>
-                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">% Regulators</th>
+                        <th style="vertical-align: middle;">adj. p-value</th>
+                        <th style="vertical-align: middle;" data-toggle="tooltip" title="Weighted percentage of the total number of regulators of the phenotype that were perturbed.">Sat.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1818,6 +1877,7 @@ async function getPhenotypePanel() {
         $("#xp_pe_element_btn").click();
       }
     });
+    $('#xp_normalize_phen').on('click', xp_EstimatePhenotypes);
     globals.pe_element_table = $('#xp_table_pe_elements').DataTable({
       //"scrollX": true,
       "order": [[0, "asc"]],
@@ -1844,29 +1904,39 @@ async function getPhenotypePanel() {
         text: 'TSV',
         className: 'air_dt_btn',
         action: function () {
-          air_download(download_string + "InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.pe_results_table));
+          air_download("InSilicoPerturb_PhenotypeResults_tsv.txt", getDTExportString(globals.pe_results_table));
         }
       }],
       //"scrollX": true,
-      "order": [[2, "desc"]],
+      "order": [[3, "asc"]],
       "table-layout": "fixed",
       // ***********add this
       "word-wrap": "break-word",
       "columns": [{
-        "width": "60%"
+        "width": "5%"
       }, {
-        "width": "25%"
+        "width": "50%"
       }, {
         "width": "15%"
+      }, {
+        "width": "20%"
+      }, {
+        "width": "10%"
       }],
       "columnDefs": [{
         targets: 0,
-        className: 'dt-left'
-      }, {
-        targets: 1,
         className: 'dt-center'
       }, {
+        targets: 1,
+        className: 'dt-right'
+      }, {
         targets: 2,
+        className: 'dt-center'
+      }, {
+        targets: 3,
+        className: 'dt-center'
+      }, {
+        targets: 4,
         className: 'dt-center'
       }]
     });
@@ -2012,9 +2082,9 @@ function readDataFiles() {
         let name = e.name;
 
         if (e._compartmentId) {
-          name += "_" + AIR.Compartments[e._compartmentId];
+          name += " (" + AIR.Compartments[e._compartmentId] + ")";
         } else {
-          name += "_secreted";
+          name += " (secreted)";
         }
 
         return name;
@@ -2026,17 +2096,15 @@ function readDataFiles() {
         if (e._type == "Compartment") {
           AIR.Compartments[e.id] = e.name.trim().toLowerCase().replace(" ", "");
         }
-      }
 
-      ;
-
-      for (let e of bioEntities) {
         if (e.constructor.name === 'Alias') {
           let name = getNameFromAlias(e);
           let namelower = name.toLowerCase();
           AIR.MapSpeciesLowerCase.push(namelower);
           AIR.MapSpecies.push(name);
           AIR.MapElements[namelower] = e;
+          AIR.Fullnames[e.name.toLowerCase()] = e.fullName ? e.fullName : "";
+          AIR.Aliases[e.name.toLowerCase()] = e._synonyms.join(", ");
         }
 
         if (e.constructor.name === 'Reaction') {
@@ -2337,57 +2405,159 @@ $(document).on('change', '.xp_pe_clickCBinTable', async function () {
 });
 
 async function xp_EstimatePhenotypes() {
-  return new Promise((resolve, reject) => {
-    globals.pe_results_table.clear();
-    let _data = globals.pe_data[globals.pe_data_index];
-    let elementsToHighlight = {};
-    let elementswithFC = 0;
+  return new Promise(async function (resolve, reject) {
+    await startloading();
+    setTimeout(() => {
+      globals.pe_results_table.clear();
+      let _data = globals.pe_data[globals.pe_data_index];
+      let elementsToHighlight = {};
+      let elementswithFC = 0;
+      globals.pe_results = {};
+      let typeNumbersinSamples = {
+        "protein": 0,
+        "metabolite": 0
+      };
 
-    for (let e in _data) {
-      let FC = _data[e].value;
+      for (let e in _data) {
+        let FC = _data[e].value;
 
-      if (_data[e].perturbed) {
-        elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9";
-      } else if (FC != 0) {
-        elementswithFC++;
-        elementsToHighlight[AIR.Molecules[e].name] = valueToHex(FC);
-      }
-    }
+        if (_data[e].perturbed) {
+          elementsToHighlight[AIR.Molecules[e].name] = "#a9a9a9";
+        } else if (FC != 0) {
+          elementswithFC++;
+          elementsToHighlight[AIR.Molecules[e].name] = valueToHex(FC);
+        }
 
-    for (let p in AIR.Phenotypes) {
-      let phenotypeValues = globals.pe_influenceScores[p].values;
-      let max_influence = 0;
-      let influence = 0;
-      let level = 0;
-      let count_elements = 0;
+        switch (AIR.Molecules[e].type) {
+          case "PROTEIN":
+          case "RNA":
+            typeNumbersinSamples.protein += 1;
+            break;
 
-      for (let e in phenotypeValues) {
-        let _influene = phenotypeValues[e];
-        max_influence += Math.abs(_influene);
+          case "SIMPLE_MOLECULE":
+            typeNumbersinSamples.metabolite += 1;
+            break;
 
-        if (_data.hasOwnProperty(e)) {
-          let fc = _data[e].value;
-
-          if (fc != 0) {
-            influence += Math.abs(_influene);
-            level += _influene * fc;
-            count_elements++;
-          }
+          default:
+            break;
         }
       }
 
-      if (level != 0) {
-        if (level > 1) level = 1;else if (level < -1) level = -1;
-        elementsToHighlight[AIR.Molecules[p].name] = valueToHex(level);
+      let FC_values = Object.values(_data);
+      let shuffled_arrays = [];
+      let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type));
+      let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE");
+
+      for (let i = 0; i < 1000; i++) {
+        let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples.protein);
+        shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples.metabolite));
+        shuffled_arrays.push(shuffle(shuffled_array));
       }
 
-      globals.pe_results_table.row.add([getLinkIconHTML(AIR.Phenotypes[p].name), '<button type="button" class="xp_pe_popup_btn air_invisiblebtn" data="' + p + '" style="cursor: pointer;">' + getFontfromValue(expo(level)) + '</button>', expo(influence / max_influence * 100)]);
-    }
+      var max_level = 0;
+      var results = [];
 
-    globals.pe_results_table.columns.adjust().draw();
-    adjustPanels();
-    ColorElements(elementsToHighlight);
-    resolve();
+      for (let p in AIR.Phenotypes) {
+        let phenotypeValues = globals.pe_influenceScores[p].values;
+        let max_influence = 0;
+        let influence = 0;
+        let level = 0;
+        let count_elements = 0;
+        var regr_data = {};
+
+        for (let e in phenotypeValues) {
+          let SP = parseFloat(phenotypeValues[e]);
+          max_influence += Math.abs(SP);
+
+          if (_data.hasOwnProperty(e) && !_data[e].perturbed) {
+            let FC = _data[e].value;
+
+            if (FC != 0) {
+              influence += Math.abs(SP);
+              level += SP * FC;
+              count_elements++;
+              regr_data[e] = [SP, FC];
+            }
+          }
+        }
+
+        var score = getEnrichmentScore(Object.values(regr_data));
+        let random_scores = [];
+        let random_en_scores = [];
+
+        for (let shuffled_elements of shuffled_arrays) {
+          var _regr_data = [];
+          var _en_score = 0;
+
+          for (let i in FC_values) {
+            let element = shuffled_elements[i];
+
+            if (phenotypeValues.hasOwnProperty(element)) {
+              var SP = phenotypeValues[element];
+              var FC = FC_values[i].value;
+              _en_score += FC * SP;
+
+              _regr_data.push([SP, FC]);
+            }
+          }
+
+          if (_regr_data.length > 0) random_scores.push(getEnrichmentScore(_regr_data));else random_scores.push(0);
+          random_en_scores.push(_en_score);
+        }
+
+        globals.pe_results[p] = {
+          id: p,
+          level: level,
+          percentage: influence / max_influence * 100,
+          pvalue: 1,
+          dces: regr_data
+        };
+        var std = standarddeviation(random_scores);
+
+        var _mean = mean(random_scores);
+
+        var z_score = std != 0 ? (score - _mean) / std : 0;
+        var pvalue = GetpValueFromZ(z_score);
+        if (!isNaN(pvalue)) globals.pe_results[p]["pvalue"] = pvalue;
+        globals.pe_results[p]["std"] = [_mean + 1.96 * std, _mean - 1.96 * std];
+        globals.pe_results[p]["slope"] = score;
+        std = standarddeviation(random_en_scores);
+        z_score = std != 0 ? (level - mean(random_en_scores)) / std : 0;
+        pvalue = GetpValueFromZ(z_score);
+        if (!isNaN(pvalue) && pvalue < globals.pe_results[p]["pvalue"]) globals.pe_results[p]["pvalue"] = pvalue;
+
+        if (Math.abs(level) > max_level) {
+          max_level = Math.abs(level);
+        }
+      }
+
+      var m_pvalues = Object.values(globals.pe_results).map(r => r.pvalue).sort((a, b) => a - b);
+      var m_phenotypevalues = {};
+
+      for (var [p, r] of Object.entries(globals.pe_results)) {
+        m_phenotypevalues[r.id] = m_pvalues.indexOf(r.pvalue);
+      }
+
+      m_pvalues = getAdjPvalues(m_pvalues);
+
+      for (var [p, r] of Object.entries(globals.pe_results)) {
+        r.pvalue = m_pvalues[m_phenotypevalues[r.id]];
+        var level = r.level / (document.getElementById("xp_normalize_phen").checked === true && max_level != 0 ? max_level : 1);
+
+        if (level != 0) {
+          if (level > 1) level = 1;else if (level < -1) level = -1;
+          elementsToHighlight[AIR.Phenotypes[r.id].name] = valueToHex(level);
+        }
+
+        globals.pe_results_table.row.add(['<button type="button" class="xp_pe_popup_btn air_invisiblebtn" data="' + r.id + '" style="cursor: pointer;"><a><span class="fa fa-external-link-alt"></span></a></button>', getLinkIconHTML(AIR.Phenotypes[r.id].name), getFontfromValue(expo(level)), expo(r.pvalue), expo(r.percentage)]);
+      }
+
+      globals.pe_results_table.columns.adjust().draw();
+      adjustPanels(globals.container);
+      ColorElements(elementsToHighlight);
+      stoploading();
+      resolve();
+    }, 0);
   });
 }
 
@@ -2796,79 +2966,16 @@ function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hi
   });
 }
 
-async function DFSfromTarget(element, allowreentry, ko_elements = []) {
-  let results = {};
-  let allpaths = 0;
-  let paths = {};
-  let elements = {};
-  let elementids = Object.keys(AIR.Molecules);
-
-  for (let e of elementids) {
-    elements[e] = {};
-    paths[e] = {};
-    results[e] = {
-      betw: 0,
-      clos: 0,
-      pos: 0,
-      neg: 0
-    };
-  }
-
-  for (let inter of AIR.Interactions) {
-    if (ko_elements.includes(inter.source) || ko_elements.includes(inter.target) || inter.type == 0) {
-      continue;
-    }
-
-    elements[inter.target][inter.source] = inter.type;
-  }
-
-  elements = Object.filter(elements, e => Object.keys(elements[e]).length > 0);
-
-  async function dfs(e, visited, type, leftcompartments, currentcompartment) {
-    var _leftcompartment = false;
-
-    for (var neighbour in elements[e]) {
-      if (visited.includes(neighbour)) continue;
-
-      if (!allowreentry && !AIR.Molecules[neighbour].secreted) {
-        if (leftcompartments.includes(AIR.Molecules[neighbour].compartment)) {
-          continue;
-        } else {
-          if (AIR.Molecules[neighbour].compartment != currentcompartment) {
-            _leftcompartment = true;
-          }
-        }
-      }
-
-      var newtype = type * elements[e][neighbour];
-      results[neighbour].clos += 1;
-      results[neighbour][newtype == -1 ? "neg" : "pos"] += 1;
-      allpaths += 1;
-
-      for (var _e of visited) results[_e].betw += 1;
-
-      await dfs(neighbour, visited.concat(neighbour), newtype, _leftcompartment ? leftcompartments.concat(currentcompartment) : leftcompartments, AIR.Molecules[neighbour].compartment);
-    }
-  }
-
-  await dfs(element, [element], 1, [], AIR.Molecules[element].compartment);
-  return [results, allpaths];
-}
-
-async function BSFfromTarget(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false, btn = "") {
-  let paths = {};
-  var re = interactiontype ? new RegExp("[+-]") : new RegExp("_");
-  let elements = {};
-  let elementids = Object.keys(AIR.Molecules);
-  let count = 0;
-  let maxlength = elementids.length;
-  await updateProgress(0, 1, btn, " Finding Paths ...");
+async function DFSfromTarget(element, ko_elements = [], interactiontype = false) {
+  var paths = new Set();
+  var elements = {};
+  var elementids = Object.keys(AIR.Molecules);
   var elementres = {};
 
-  for (let e of elementids) {
+  for (var e of elementids) {
     elements[e] = {};
     paths[e] = {};
-    elementres[e] = new RegExp(e + "([+-_]|$)");
+    elementres[e] = new RegExp(e + "([" + (interactiontype ? "+-" : "_") + "]|$)");
   }
 
   for (var inter of AIR.Interactions) {
@@ -2876,65 +2983,141 @@ async function BSFfromTarget(element, ko_elements = [], allpaths = false, intera
       continue;
     }
 
-    elements[inter.target][inter.source] = inter.type;
+    elements[inter.target][inter.source] = {
+      type: inter.type,
+      sign: interactiontype ? inter.type == -1 ? "-" : "+" : "_"
+    };
   }
 
-  elements = Object.fromEntries(Object.entries(elements).filter(([_, v]) => Object.keys(v).length > 0));
+  elements = Object.filter(elements, e => Object.keys(elements[e]).length > 0);
+  var path, newcomps, newtype;
+
+  async function dfs(e, visited, type) {
+    for (var neighbour in elements[e]) {
+      if (elementres[neighbour].test(visited)) {
+        paths.add(visited);
+        continue;
+      }
+
+      var {
+        secreted: _secreted,
+        compartment: comp
+      } = AIR.Molecules[neighbour];
+      if (leftcompartments.indexOf(comp) != -1) continue;
+      newcomps = [...leftcompartments];
+
+      if (!_secreted && currentcompartment != comp) {
+        newcomps.push(currentcompartment);
+      }
+
+      path = neighbour + elements[e][neighbour].sign + visited;
+      newtype = type * elements[e][neighbour].type;
+      await dfs(neighbour, path, newtype); //, _secreted? currentcompartment : comp, newcomps)
+    }
+  }
+
+  await dfs(element, element, 1); //, AIR.Molecules[element].compartment, [])
+
+  return paths;
+}
+
+async function BSFfromTarget(element, ko_elements = [], allpaths = false, interactiontype = false, sorted = false, btn = "") {
+  let paths = {};
+  let elements = {};
+  let elementids = Object.keys(AIR.Molecules);
+  let count = 0;
+  let maxlength = elementids.length;
+  await updateProgress(0, 1, btn, " Finding Paths ...");
+  var elementres = {};
+  var visitedpaths = {};
+
+  for (let e of elementids) {
+    elements[e] = {};
+    paths[e] = {};
+    elementres[e] = new RegExp(e + "([" + (interactiontype ? "+-" : "_") + "]|$)");
+  }
+
+  for (var inter of AIR.Interactions) {
+    if (ko_elements.includes(inter.source) || ko_elements.includes(inter.target) || inter.type == 0) {
+      continue;
+    }
+
+    elements[inter.target][inter.source] = {
+      type: inter.type,
+      sign: interactiontype ? inter.type == -1 ? "-" : "+" : "_"
+    };
+  }
+
+  elements = Object.filter(elements, e => Object.keys(elements[e]).length > 0);
   var neighbour, e, visited, queue, dist, spcount;
-  var visited = [element];
   var queue = [element];
   var dist = {};
   var spcount = {};
+  var visited = [element];
+  visitedpaths[element] = [];
   dist[element] = 0;
   spcount[element] = 0;
   paths[element][element] = 1;
+  var splitsign, type, neighbourpaths, neighbour_re, newpath;
 
   while (queue.length > 0) {
     e = queue.shift();
 
     for (var neighbour in elements[e]) {
-      var splitsign = interactiontype ? elements[e][neighbour] == -1 ? "-" : "+" : "_";
+      if (allpaths) {
+        var exists = false;
 
-      if (!visited.includes(neighbour)) {
-        if (count % 30 == 0) await updateProgress(count, maxlength, btn, " Finding Paths ...");
-        count++;
-        visited.push(neighbour);
-        dist[neighbour] = dist[e] + 1;
-        queue.push(neighbour);
-        spcount[neighbour] = 1;
-
-        for (let p in paths[e]) {
-          paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
+        if (!visitedpaths.hasOwnProperty(neighbour)) {
+          dist[neighbour] = dist[e] + 1;
+          visitedpaths[neighbour] = [];
+        } else {
+          exists = visitedpaths[neighbour].indexOf(e) != -1;
         }
-      } else {
-        if (dist[neighbour] == dist[e] + 1) {
-          spcount[neighbour] = +1;
 
-          for (let p in paths[e]) {
-            if (!p.match(elementres[neighbour])) paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
+        if (dist[neighbour] == dist[e] + 1 || !exists) {
+          if (!exists) queue.push(neighbour);
+          visitedpaths[neighbour].push(e);
+          splitsign = neighbour + elements[e][neighbour].sign;
+          type = elements[e][neighbour].type;
+          neighbourpaths = paths[neighbour];
+          neighbour_re = elementres[neighbour];
+
+          for (var [path, ptype] of Object.entries(paths[e])) {
+            if (!neighbour_re.test(path)) {
+              neighbourpaths[splitsign + path] = ptype * type;
+            }
           }
         }
+      } else {
+        if (!visited.hasOwnProperty(neighbour)) {
+          if (count % 100 == 0) await updateProgress(count, maxlength, btn, " Finding Paths ...");
+          count++;
+          visited.push(neighbour); // dist[neighbour] = dist[e] + 1;
+          // spcount[neighbour] = 1;
 
-        if (allpaths && !visited.includes(e + "_" + neighbour)) {
-          visited.push(e + "_" + neighbour);
           queue.push(neighbour);
 
-          for (let p in paths[e]) {
-            if (!p.match(elementres[neighbour])) paths[neighbour][neighbour + splitsign + p] = paths[e][p] * elements[e][neighbour];
+          for (var [path, ptype] of Object.entries(paths[e])) {
+            neighbourpaths[splitsign + path] = ptype * type;
+          }
+        } else if (dist[neighbour] == dist[e] + 1) {
+          // spcount[neighbour] = +1;
+          for (var [path, ptype] of Object.entries(paths[e])) {
+            if (!neighbour_re.test(path)) neighbourpaths[splitsign + path] = ptype * type;
           }
         }
       }
     }
   }
 
-  let output = {};
-
   if (sorted) {
     return paths;
   } else {
-    for (let e in paths) {
-      for (let p in paths[e]) {
-        output[p] = paths[e][p];
+    var output = {};
+
+    for (const e of Object.values(paths)) {
+      for (const [path, ptype] of Object.entries(e)) {
+        output[path] = ptype;
       }
     }
 
@@ -2943,29 +3126,124 @@ async function BSFfromTarget(element, ko_elements = [], allpaths = false, intera
 }
 
 async function getPhenotypeInfluences(force = false) {
+  $('body').addClass('waiting');
+  let text = await disablebutton("air_init_btn", true);
+  let count = 0;
+  await updateProgress(0, 1, "air_init_btn", " Calculating Influence Scores");
+  var maxlength = Object.keys(AIR.Phenotypes).length;
+  let ko_elements = perturbedElements();
+
+  if (ko_elements.length == 0 && !force) {
+    for (var p in AIR.Phenotypes) {
+      globals.pe_influenceScores[p] = {
+        values: AIR.Phenotypes[p].values,
+        SPs: AIR.Phenotypes[p].SPs
+      };
+    }
+
+    $('body').removeClass('waiting');
+    await enablebtn("air_init_btn", text);
+    return;
+  }
+
+  var reg = new RegExp("_", "g");
+  var re = new RegExp("_");
+  var ko_re = new RegExp("(" + ko_elements.join("|") + ")(_|$)");
+
+  for (let p in AIR.Phenotypes) {
+    let influencevalues = {
+      values: {},
+      SPs: {}
+    };
+    await updateProgress(count++, maxlength, "air_init_btn", " Calculating Influence Scores");
+    var allpaths;
+
+    if (globals.phenopaths.hasOwnProperty(p)) {
+      allpaths = JSON.parse(JSON.stringify(globals.phenopaths[p]));
+    } else {
+      allpaths = await BSFfromTarget(p, [], true, false, true, "");
+      globals.phenopaths[p] = JSON.parse(JSON.stringify(allpaths));
+    }
+
+    if (ko_elements.length > 0) for (var e of Object.keys(allpaths)) allpaths[e] = Object.filter(allpaths[e], k => !ko_re.test(k));
+    var totalregulators = Object.keys(allpaths).length;
+    var totalpaths = Object.values(allpaths).reduce((accumulator, currentValue) => accumulator + Object.keys(currentValue).length, 0);
+
+    for (var [e, paths] of Object.entries(allpaths)) {
+      var epaths = [];
+
+      for (const [path, ptype] of Object.entries(paths)) {
+        var elements = path.split(re);
+
+        if (consistentCompartments(elements)) {
+          epaths.push({
+            elements: elements,
+            length: elements.length,
+            type: ptype
+          });
+        }
+      }
+
+      var minlength = Math.min(...epaths.map(p => p.length));
+
+      var _type = epaths.filter(p => p.length == minlength).reduce((accumulator, currentValue) => accumulator + currentValue.type, 0);
+
+      _type = _type == 0 ? -1 : Math.sign(_type);
+      var elementset = new Set([].concat.apply([], epaths.map(p => p.elements)));
+
+      var value = _type * (Object.keys(paths).length / totalpaths + elementset.size / totalregulators);
+
+      if (!value) {
+        continue;
+      }
+
+      influencevalues.SPs[e] = minlength * _type;
+      influencevalues.values[e] = value;
+    }
+
+    ;
+    let maxvalue = Math.max(...Object.values(influencevalues.values).map(v => Math.abs(v)));
+    Object.keys(influencevalues.values).map(key => influencevalues.values[key] /= maxvalue);
+    globals.pe_influenceScores[p] = {
+      values: influencevalues.values,
+      SPs: influencevalues.SPs
+    };
+
+    if (force) {
+      AIR.Phenotypes[p].values = influencevalues.values;
+      AIR.Phenotypes[p].SPs = influencevalues.SPs;
+    }
+  }
+
+  $('body').removeClass('waiting');
+  await enablebtn("air_init_btn", text);
+}
+
+async function _oldgetPhenotypeInfluences(force = false) {
   let text = await disablebutton("air_init_btn", true);
   let count = 0;
   await updateProgress(0, 1, "air_init_btn", " Calculating Influence Scores");
   let ko_elements = perturbedElements();
-  let sarco = Object.keys(AIR.Phenotypes).filter(e => AIR.Molecules[e].name == "sarcopenia_muscle")[0];
+  let sarco = Object.keys(AIR.Phenotypes).filter(e => AIR.Molecules[e].name == "sarcopenia (muscle)")[0];
   let allpaths;
-  var re = new RegExp("_");
+  var re = new RegExp("(" + ko_elements.join("|") + ")(_|$)");
 
   if (ko_elements.length == 0 && !force) {
-    for (var p in AIR.phenotypes) {
+    for (var p in AIR.Phenotypes) {
       globals.pe_influenceScores[p] = {
-        values: AIR.phenotypes[p].values,
-        SPs: AIR.phenotypes[p].SPs
+        values: AIR.Phenotypes[p].values,
+        SPs: AIR.Phenotypes[p].SPs
       };
     }
 
+    await enablebtn("air_init_btn", text);
     return;
   }
 
   allpaths = await BSFfromTarget(sarco, [], true, false, true, "air_init_btn");
 
   if (ko_elements.length > 0) {
-    for (var e in allpaths) allpaths[e] = Object.filter(allpaths[e], k => ko_elements.some(e => k.split(re).includes(e)));
+    for (var e in allpaths) allpaths[e] = Object.filter(allpaths[e], k => !re.test(k));
   }
 
   console.log(JSON.stringify(allpaths).length);
@@ -2993,6 +3271,8 @@ async function getPhenotypeInfluences(force = false) {
       };
     }
   }
+
+  var re = new RegExp("_");
 
   for (var e in allpaths) {
     if (count % 30 == 0) await updateProgress(count, maxlength, "air_init_btn", " Calculating Influence Scores");
@@ -3095,7 +3375,6 @@ function valueToHex(_value) {
 }
 
 function xp_createpopup(button, phenotype) {
-  let phenotypeValues = globals.pe_influenceScores[phenotype].values;
   var $target = $('#xp_chart_popover');
   var $btn = $(button);
 
@@ -3116,55 +3395,156 @@ function xp_createpopup(button, phenotype) {
 
   $(button).attr('id', 'xp_clickedpopupcell');
   $(button).css('background-color', 'lightgray');
-  $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+  $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="width: 100%; top: 55px; z-index: 2; border: none;">
                     <div class="arrow" style="left: 9.375%;"></div>
-                    <div id="xp_chart_popover_content" class="popover-content">
-                        <canvas class="popup_chart" id="xp_popup_chart"></canvas>
-                        <div id="xp_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                    <div id="xp_chart_popover_content" class="popover-content" style="width: 100% !important;">
+                        <button type="button" id="xp_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="cbcontainer mt-1 mb-2 ml-2">
+                            <input type="checkbox" class="air_checkbox" id="xp_popup_showregression">
+                            <label class="air_checkbox" for="xp_popup_showregression">Show Confidence Intervall</label>
+                        </div>
+                        <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#009933"></span>
+                                <span class="legendspan_small" style="background-color:#C00000"></span>
                                 Activates Phenotype</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#ffcccc"></span>
+                                <span class="legendspan_small" style="background-color:#0070C0"></span>
                                 Represses Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#cccccc"></span>
-                                Not diff. expressed</li>
                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
                                 <span class="triangle_small"></span>
                                 External Link</li>
                         </div>
+                        <div style="height: 80%">
+                            <canvas class="popup_chart" id="xp_popup_chart"></canvas>
+                        </div>
                     </div>
                 </div>`);
   $btn.after($target);
+  let close_btn = document.getElementById("xp_popup_close"); // When the user clicks on <span> (x), close the modal
+
+  close_btn.onclick = function () {
+    $target.remove();
+    $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+      minHeight: "0px"
+    });
+  };
+
   let targets = [];
-  let _data = globals.pe_data[globals.pe_data_index];
+  var dist_targets = [{
+    label: "",
+    data: [{
+      x: 1,
+      y: 0,
+      r: 4
+    }]
+  }, {
+    label: "",
+    data: [{
+      x: -1,
+      y: 0,
+      r: 4
+    }]
+  }];
+  var maxx_dist = 0;
 
-  for (let e in phenotypeValues) {
-    if (_data.hasOwnProperty(e)) {
-      let fc = _data[e].value;
-      let sp = phenotypeValues[e];
-      var pstyle = 'circle';
+  for (let [element, data] of Object.entries(globals.pe_results[phenotype]["dces"])) {
+    let SP = data[0];
+    let hex = "#cccccc";
+    let rad = 3;
+    let FC = data[1];
+    var aggr = SP * FC;
+    rad = 6;
 
-      if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[e].name.toLowerCase()) === false) {
-        pstyle = 'triangle';
-      }
-
-      let level = sp * fc;
-      targets.push({
-        label: e,
-        data: [{
-          x: fc,
-          y: sp,
-          r: level == 0 ? 3 : 6
-        }],
-        pointStyle: pstyle,
-        backgroundColor: level == 0 ? "#cccccc" : level < 0 ? "#ffcccc" : "#009933",
-        hoverBackgroundColor: level == 0 ? "#cccccc" : level < 0 ? "#ffcccc" : "#009933"
-      });
+    if (aggr < 0) {
+      hex = "#0070C0";
+    } else if (aggr > 0) {
+      hex = "#C00000";
     }
+
+    if (Math.abs(aggr) > maxx_dist) {
+      maxx_dist = Math.abs(aggr);
+    }
+
+    dist_targets.push({
+      label: element,
+      data: [{
+        x: Math.abs(aggr) * Math.sign(FC),
+        y: Math.abs(aggr) * Math.sign(SP),
+        r: rad
+      }],
+      pointStyle: pstyle,
+      backgroundColor: hex,
+      hoverBackgroundColor: hex
+    });
+    var pstyle = 'circle';
+
+    if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
+      pstyle = 'triangle';
+    }
+
+    targets.push({
+      label: element,
+      data: [{
+        x: FC,
+        y: SP,
+        r: rad
+      }],
+      pointStyle: pstyle,
+      backgroundColor: hex,
+      hoverBackgroundColor: hex
+    });
   }
 
+  maxx_dist = maxx_dist < 1 ? 1 : maxx_dist;
+  var m = globals.pe_results[phenotype]["slope"];
+  var [std1, std2] = globals.pe_results[phenotype]["std"];
+  dist_targets.push({
+    data: [{
+      x: -maxx_dist,
+      y: -maxx_dist * m,
+      r: 0
+    }, {
+      x: maxx_dist,
+      y: maxx_dist * m,
+      r: 0
+    }],
+    type: 'line',
+    fill: false,
+    pointRadius: 0,
+    backgroundColor: m < 0 ? "#0070C0" : "#C00000",
+    borderColor: m < 0 ? "#0070C0" : "#C00000",
+    borderWidth: 2
+  });
+  dist_targets.push({
+    data: [{
+      x: -maxx_dist,
+      y: -maxx_dist * std2,
+      r: 0
+    }, {
+      x: maxx_dist,
+      y: maxx_dist * std2,
+      r: 0
+    }],
+    type: 'line',
+    fill: "+1",
+    pointRadius: 0
+  });
+  dist_targets.push({
+    data: [{
+      x: -maxx_dist,
+      y: -maxx_dist * std1,
+      r: 0
+    }, {
+      x: maxx_dist,
+      y: maxx_dist * std1,
+      r: 0
+    }],
+    type: 'line',
+    fill: false,
+    pointRadius: 0
+  });
   var outputCanvas = document.getElementById('xp_popup_chart');
   var chartOptions = {
     type: 'bubble',
@@ -3173,6 +3553,14 @@ function xp_createpopup(button, phenotype) {
     },
     options: {
       plugins: {
+        plugins: {
+          filler: {
+            propagate: false
+          }
+        },
+        legend: {
+          display: false
+        },
         zoom: {
           // Container for pan options
           pan: {
@@ -3206,6 +3594,17 @@ function xp_createpopup(button, phenotype) {
             },
             mode: 'xy'
           }
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              var element = context.label || '';
+
+              if (element && globals.pe_results[phenotype].dces.hasOwnProperty(element)) {
+                return ['Name: ' + AIR.Molecules[element].name, 'Influence: ' + expo(globals.pe_results[phenotype].dces[element][0]), 'FC: ' + expo(globals.pe_results[phenotype].dces[element][1])];
+              } else return "";
+            }
+          }
         }
       },
       responsive: true,
@@ -3213,8 +3612,12 @@ function xp_createpopup(button, phenotype) {
       onHover: (event, chartElement) => {
         event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
       },
-      legend: {
-        display: false
+      onClick: (event, chartElement) => {
+        if (chartElement[0]) {
+          let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+          selectElementonMap(name, true);
+          xp_setSelectedElement(name);
+        }
       },
       layout: {
         padding: {
@@ -3227,56 +3630,73 @@ function xp_createpopup(button, phenotype) {
         fontFamily: 'Helvetica'
       },
       scales: {
-        yAxes: [{
-          scaleLabel: {
+        y: {
+          title: {
             display: true,
-            labelString: 'Influence on Phenotype'
+            text: 'Influence on Phenotype'
           },
-          ticks: {//beginAtZero: true,
+          max: 1,
+          min: -1,
+          grid: {
+            drawBorder: false,
+            color: function (context) {
+              if (context.tick.value == 0) return '#000000';else return "#D3D3D3";
+            }
           }
-        }],
-        xAxes: [{
-          scaleLabel: {
+        },
+        x: {
+          title: {
             display: true,
-            labelString: 'User set Fold Change'
+            text: 'Fold Change in Data'
           },
           ticks: {//beginAtZero: false,
-          }
-        }]
-      },
-      tooltips: {
-        callbacks: {
-          label: function (tooltipItem, data) {
-            var e = data.datasets[tooltipItem.datasetIndex].label || '';
-
-            if (e && AIR.Molecules.hasOwnProperty(e)) {
-              return ['Name: ' + AIR.Molecules[e].name, 'Influence: ' + expo(phenotypeValues[e]), 'FC: ' + _data[e].value];
-            } else return "";
+          },
+          grid: {
+            drawBorder: false,
+            color: function (context) {
+              if (context.tick.value == 0) return '#000000';else return "#D3D3D3";
+            }
           }
         }
       }
     }
   };
   let popupchart = new Chart(outputCanvas, chartOptions);
-
-  document.getElementById('xp_popup_chart').onclick = function (evt) {
-    var activePoint = popupchart.lastActive[0];
-
-    if (activePoint !== undefined) {
-      let _id = popupchart.data.datasets[activePoint._datasetIndex].label;
-
-      if (_id && AIR.Molecules.hasOwnProperty(_id)) {
-        let name = AIR.Molecules[_id].name;
-        selectElementonMap(name, true);
-        getData(name);
-      }
-    }
-  };
-
   $target.show();
   var popupheight = $("#xp_chart_popover").height() + 50;
-  $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+  $("#xp_resultstable").parents(".dataTables_scrollBody").css({
     minHeight: (popupheight > 400 ? 400 : popupheight) + "px"
+  });
+  $('#xp_popup_showregression').on('click', function () {
+    if (document.getElementById("xp_popup_showregression").checked === true) {
+      popupchart.data.datasets = dist_targets;
+      $("#xp_legend_target").replaceWith(`
+            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
+                    Normalized Regression</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#cccccc"></span>
+                    95% Confidence Intervall (unadjusted)</li>
+            </div>
+            `);
+    } else {
+      popupchart.data.datasets = targets;
+      $("#xp_legend_target").replaceWith(`            
+            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#C00000"></span>
+                    Activates Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#0070C0"></span>
+                    Represses Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="triangle_small"></span>
+                    External Link</li>
+            </div>`);
+    }
+
+    popupchart.update();
   });
 }
 
@@ -3409,5677 +3829,198 @@ function consistentCompartments(path) {
 function strikeThrough(text) {
   return text.split('').map(char => char + '\u0336').join('');
 }
-},{"@gmod/vcf":11,"chart.js":21,"datatables.net-buttons":22,"file-saver":29,"jszip":32,"ttest":36}],2:[function(require,module,exports){
-function _arrayLikeToArray(arr, len) {
-  if (len == null || len > arr.length) len = arr.length;
 
-  for (var i = 0, arr2 = new Array(len); i < len; i++) {
-    arr2[i] = arr[i];
+function GetpValueFromZ(_z, type = "twosided") {
+  if (_z < -14) {
+    _z = -14;
+  } else if (_z > 14) {
+    _z = 14;
   }
 
-  return arr2;
-}
+  Decimal.set({
+    precision: 100
+  });
+  let z = new Decimal(_z);
+  var sum = new Decimal(0);
+  var term = new Decimal(1);
+  var k = new Decimal(0);
+  var loopstop = new Decimal("10E-50");
+  var minusone = new Decimal(-1);
+  var two = new Decimal(2);
+  let pi = new Decimal("3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148086513282306647");
 
-module.exports = _arrayLikeToArray;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],3:[function(require,module,exports){
-function _arrayWithHoles(arr) {
-  if (Array.isArray(arr)) return arr;
-}
+  while (term.abs().greaterThan(loopstop)) {
+    term = new Decimal(1);
 
-module.exports = _arrayWithHoles;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],4:[function(require,module,exports){
-function _classCallCheck(instance, Constructor) {
-  if (!(instance instanceof Constructor)) {
-    throw new TypeError("Cannot call a class as a function");
-  }
-}
-
-module.exports = _classCallCheck;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],5:[function(require,module,exports){
-function _defineProperties(target, props) {
-  for (var i = 0; i < props.length; i++) {
-    var descriptor = props[i];
-    descriptor.enumerable = descriptor.enumerable || false;
-    descriptor.configurable = true;
-    if ("value" in descriptor) descriptor.writable = true;
-    Object.defineProperty(target, descriptor.key, descriptor);
-  }
-}
-
-function _createClass(Constructor, protoProps, staticProps) {
-  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-  if (staticProps) _defineProperties(Constructor, staticProps);
-  return Constructor;
-}
-
-module.exports = _createClass;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],6:[function(require,module,exports){
-function _interopRequireDefault(obj) {
-  return obj && obj.__esModule ? obj : {
-    "default": obj
-  };
-}
-
-module.exports = _interopRequireDefault;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],7:[function(require,module,exports){
-function _iterableToArrayLimit(arr, i) {
-  var _i = arr == null ? null : typeof Symbol !== "undefined" && arr[Symbol.iterator] || arr["@@iterator"];
-
-  if (_i == null) return;
-  var _arr = [];
-  var _n = true;
-  var _d = false;
-
-  var _s, _e;
-
-  try {
-    for (_i = _i.call(arr); !(_n = (_s = _i.next()).done); _n = true) {
-      _arr.push(_s.value);
-
-      if (i && _arr.length === i) break;
-    }
-  } catch (err) {
-    _d = true;
-    _e = err;
-  } finally {
-    try {
-      if (!_n && _i["return"] != null) _i["return"]();
-    } finally {
-      if (_d) throw _e;
-    }
-  }
-
-  return _arr;
-}
-
-module.exports = _iterableToArrayLimit;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],8:[function(require,module,exports){
-function _nonIterableRest() {
-  throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-}
-
-module.exports = _nonIterableRest;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{}],9:[function(require,module,exports){
-var arrayWithHoles = require("./arrayWithHoles.js");
-
-var iterableToArrayLimit = require("./iterableToArrayLimit.js");
-
-var unsupportedIterableToArray = require("./unsupportedIterableToArray.js");
-
-var nonIterableRest = require("./nonIterableRest.js");
-
-function _slicedToArray(arr, i) {
-  return arrayWithHoles(arr) || iterableToArrayLimit(arr, i) || unsupportedIterableToArray(arr, i) || nonIterableRest();
-}
-
-module.exports = _slicedToArray;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{"./arrayWithHoles.js":3,"./iterableToArrayLimit.js":7,"./nonIterableRest.js":8,"./unsupportedIterableToArray.js":10}],10:[function(require,module,exports){
-var arrayLikeToArray = require("./arrayLikeToArray.js");
-
-function _unsupportedIterableToArray(o, minLen) {
-  if (!o) return;
-  if (typeof o === "string") return arrayLikeToArray(o, minLen);
-  var n = Object.prototype.toString.call(o).slice(8, -1);
-  if (n === "Object" && o.constructor) n = o.constructor.name;
-  if (n === "Map" || n === "Set") return Array.from(o);
-  if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return arrayLikeToArray(o, minLen);
-}
-
-module.exports = _unsupportedIterableToArray;
-module.exports["default"] = module.exports, module.exports.__esModule = true;
-},{"./arrayLikeToArray.js":2}],11:[function(require,module,exports){
-"use strict"; /** @module VCF */
-var VCF = require('./parse');
-
-module.exports = VCF;
-},{"./parse":12}],12:[function(require,module,exports){
-"use strict";var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));var _classCallCheck2 = _interopRequireDefault(require("@babel/runtime/helpers/classCallCheck"));var _createClass2 = _interopRequireDefault(require("@babel/runtime/helpers/createClass"));var _vcfReserved = _interopRequireDefault(require("./vcfReserved"));var
-
-Breakend = /*#__PURE__*/function () {function Breakend() {(0, _classCallCheck2.default)(this, Breakend);}(0, _createClass2.default)(Breakend, [{ key: "toString", value: function toString()
-    {
-      var char = this.MateDirection === 'left' ? ']' : '[';
-      if (this.Join === 'left') {
-        return "".concat(char).concat(this.MatePosition).concat(char).concat(this.Replacement);
-      }
-      return "".concat(this.Replacement).concat(char).concat(this.MatePosition).concat(char);
-    } }]);return Breakend;}();
-
-
-/**
-                                * Class representing a VCF parser, instantiated with the VCF header.
-                                * @param {object} args
-                                * @param {string} args.header - The VCF header. Supports both LF and CRLF
-                                * newlines.
-                                * @param {boolean} args.strict - Whether to parse in strict mode or not (default true)
-                                */var
-VCF = /*#__PURE__*/function () {
-  function VCF(args) {var _this = this;(0, _classCallCheck2.default)(this, VCF);
-    if (!args || !args.header || !args.header.length) {
-      throw new Error('empty header received');
-    }
-    var headerLines = args.header.split(/[\r\n]+/).filter(function (line) {return line;});
-    if (!headerLines.length) {
-      throw new Error('no non-empty header lines specified');
+    for (let i = 1; i <= k; i++) {
+      term = term.times(z).times(z.dividedBy(two.times(i)));
     }
 
-    // allow access to the Breakend class in case anybody wants to use it for checking
-    this.Breakend = Breakend;
-    this.strict = args.strict !== undefined ? args.strict : true; // true by default
-    this.metadata = JSON.parse(
-    JSON.stringify({
-      INFO: _vcfReserved.default.InfoFields,
-      FORMAT: _vcfReserved.default.GenotypeFields,
-      ALT: _vcfReserved.default.AltTypes,
-      FILTER: _vcfReserved.default.FilterTypes }));
-
-
-    headerLines.forEach(function (line) {
-      if (!line.startsWith('#')) {
-        throw new Error("Bad line in header:\n".concat(line));
-      }
-      if (line.startsWith('##')) {
-        _this._parseMetadata(line);
-      } else if (line) {
-        var fields = line.trim().split('\t');
-        var thisHeader = fields.slice(0, 8);
-        var correctHeader = [
-        '#CHROM',
-        'POS',
-        'ID',
-        'REF',
-        'ALT',
-        'QUAL',
-        'FILTER',
-        'INFO'];
-
-        if (fields.length < 8) {
-          throw new Error("VCF header missing columns:\n".concat(line));
-        } else if (fields.length === 9) {
-          throw new Error("VCF header has FORMAT but no samples:\n".concat(line));
-        } else if (
-        thisHeader.length !== correctHeader.length ||
-        !thisHeader.every(function (value, index) {return value === correctHeader[index];}))
-        {
-          throw new Error("VCF column headers not correct:\n".concat(line));
-        }
-        _this.samples = fields.slice(9);
-      }
-    });
-    if (!this.samples) throw new Error('VCF does not have a header line');
+    term = term.times(minusone.toPower(k)).dividedBy(k.times(2).plus(1));
+    sum = sum.plus(term);
+    k = k.plus(1);
   }
 
-  /**
-     * Parse a VCF metadata line (i.e. a line that starts with "##") and add its
-     * properties to the object.
-     * @param {string} line - A line from the VCF. Supports both LF and CRLF
-     * newlines.
-     */(0, _createClass2.default)(VCF, [{ key: "_parseMetadata", value: function _parseMetadata(
-    line) {var _line$trim$match$slic =
-      line.
-      trim().
-      match(/^##(.+?)=(.*)/).
-      slice(1, 3),_line$trim$match$slic2 = (0, _slicedToArray2.default)(_line$trim$match$slic, 2),metaKey = _line$trim$match$slic2[0],metaVal = _line$trim$match$slic2[1];
-      if (metaVal.startsWith('<')) {
-        if (!(metaKey in this.metadata)) {
-          this.metadata[metaKey] = {};
-        }var _this$_parseStructure =
-        this._parseStructuredMetaVal(metaVal),_this$_parseStructure2 = (0, _slicedToArray2.default)(_this$_parseStructure, 2),id = _this$_parseStructure2[0],keyVals = _this$_parseStructure2[1];
-        this.metadata[metaKey][id] = keyVals;
-      } else {
-        this.metadata[metaKey] = metaVal;
-      }
+  sum = sum.times(z).dividedBy(two.times(pi).sqrt()).plus(0.5);
+  if (sum.lessThan(0)) sum = sum.abs();else if (sum.greaterThan(1)) sum = two.minus(sum);
+
+  switch (type) {
+    case "left":
+      return parseFloat(sum.toExponential(40));
+
+    case "right":
+      return parseFloat(new Decimal(1).minus(sum).toExponential(40));
+
+    case "twosided":
+      return sum.lessThan(0.5) ? parseFloat(sum.times(two).toExponential(40)) : parseFloat(new Decimal(1).minus(sum).times(two).toExponential(40));
+  }
+}
+
+function getEnrichmentScore(points, maxfc = 0) {
+  var _points = [[1, 0], [-1, 0]];
+
+  for (var p of points) _points.push([Math.abs(p[0]) * p[1], p[0] * Math.abs(p[1])]);
+
+  var slope = leastSquaresRegression(_points);
+  return slope;
+}
+
+async function startloading() {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      $("#air_plugincontainer").addClass("waiting");
+      $("body").css("cursor", "progress");
+      resolve('');
+    }, 0);
+  });
+}
+
+async function stoploading() {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      $("#air_plugincontainer").removeClass("waiting");
+      $("body").css("cursor", "default");
+      resolve('');
+    }, 0);
+  });
+}
+
+function shuffle(a) {
+  let i = a.length;
+  let array = Array(i);
+
+  while (i--) array[i] = a[i];
+
+  var currentIndex = array.length,
+      temporaryValue,
+      randomIndex; // While there remain elements to shuffle...
+
+  while (0 !== currentIndex) {
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1; // And swap it with the current element.
+
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
+
+function pickRandomElements(arr, n) {
+  if (arr.length <= n) {
+    return shuffle(arr);
+  }
+
+  var result = new Array(n),
+      len = arr.length,
+      taken = new Array(len);
+
+  while (n--) {
+    var x = Math.floor(Math.random() * len);
+    result[n] = arr[x in taken ? taken[x] : x];
+    taken[x] = --len in taken ? taken[len] : len;
+  }
+
+  return result;
+}
+
+function leastSquaresRegression(data) {
+  var sum = [0, 0],
+      _d = 0;
+
+  for (_d of data) {
+    sum[0] += _d[0] * _d[0]; //sumSqX
+
+    sum[1] += _d[0] * _d[1]; //sumXY
+  }
+
+  var gradient = sum[1] / sum[0];
+  return gradient;
+}
+
+function standarddeviation(_temparray) {
+  let array = [];
+
+  _temparray.forEach(_e => {
+    if (!isNaN(_e)) {
+      array.push(_e);
     }
+  });
 
-    /**
-       * Parse a VCF header structured meta string (i.e. a meta value that starts
-       * with "<ID=...")
-       * @param {string} metaVal - The VCF metadata value
-       *
-       * @returns {Array} - Array with two entries, 1) a string of the metadata ID
-       * and 2) an object with the other key-value pairs in the metadata
-       */ }, { key: "_parseStructuredMetaVal", value: function _parseStructuredMetaVal(
-    metaVal) {
-      var keyVals = this._parseKeyValue(metaVal.replace(/^<|>$/g, ''), ',');
-      var id = keyVals.ID;
-      delete keyVals.ID;
-      if ('Number' in keyVals) {
-        if (!Number.isNaN(Number(keyVals.Number))) {
-          keyVals.Number = Number(keyVals.Number);
-        }
-      }
-      return [id, keyVals];
+  const n = array.length;
+  if (n == 0) return 0;
+  const mean = array.reduce((a, b) => a + b) / n;
+  return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
+}
+
+function mean(_temparray) {
+  let numbers = [];
+
+  _temparray.forEach(_e => {
+    if (!isNaN(_e)) {
+      numbers.push(_e);
     }
+  });
 
-    /**
-       * Get metadata filtered by the elements in args. For example, can pass
-       * ('INFO', 'DP') to only get info on an metadata tag that was like
-       * "##INFO=<ID=DP,...>"
-       * @param  {...string} args - List of metadata filter strings.
-       *
-       * @returns {any} An object, string, or number, depending on the filtering
-       */ }, { key: "getMetadata", value: function getMetadata()
-    {
-      var filteredMetadata = this.metadata;for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {args[_key] = arguments[_key];}
-      for (var i = 0; i < args.length; i += 1) {
-        filteredMetadata = filteredMetadata[args[i]];
-        if (!filteredMetadata) return filteredMetadata;
-      }
-      return filteredMetadata;
-    }
+  if (numbers.length == 0) return 0;
+  var total = 0,
+      i;
 
-    /**
-       * Sometimes VCFs have key-value strings that allow the separator within
-       * the value if it's in quotes, like:
-       * 'ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129"'
-       *
-       * Parse this at a low level since we can't just split at "," (or whatever
-       * separator). Above line would be parsed to:
-       * {ID: 'DB', Number: '0', Type: 'Flag', Description: 'dbSNP membership, build 129'}
-       * @param {string} str - Key-value pairs in a string
-       * @param {string} [pairSeparator] - A string that separates sets of key-value
-       * pairs
-       *
-       * @returns {object} An object containing the key-value pairs
-       */ }, { key: "_parseKeyValue", value: function _parseKeyValue(
-    str) {var pairSeparator = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : ';';
-      var data = {};
-      var currKey = '';
-      var currValue = '';
-      var state = 1; // states: 1: read key to = or pair sep, 2: read value to sep or quote, 3: read value to quote
-      for (var i = 0; i < str.length; i += 1) {
-        if (state === 1) {
-          // read key to = or pair sep
-          if (str[i] === '=') {
-            state = 2;
-          } else if (str[i] !== pairSeparator) {
-            currKey += str[i];
-          } else if (currValue === '') {
-            data[currKey] = null;
-            currKey = '';
-          }
-        } else if (state === 2) {
-          // read value to pair sep or quote
-          if (str[i] === pairSeparator) {
-            data[currKey] = currValue;
-            currKey = '';
-            currValue = '';
-            state = 1;
-          } else if (str[i] === '"') {
-            state = 3;
-          } else currValue += str[i];
-        } else if (state === 3) {
-          // read value to quote
-          if (str[i] !== '"') currValue += str[i];else
-          state = 2;
-        }
-      }
-      if (state === 2 || state === 3) {
-        data[currKey] = currValue;
-      } else if (state === 1) {
-        data[currKey] = null;
-      }
-      return data;
-    }
-
-    /**
-       * Parse a VCF line into an object like { CHROM POS ID REF ALT QUAL FILTER
-       * INFO } with SAMPLES optionally included if present in the VCF
-       * @param {string} line - A string of a line from a VCF. Supports both LF and
-       * CRLF newlines.
-       */ }, { key: "parseLine", value: function parseLine(
-    line) {var _this2 = this;
-      // eslint-disable-next-line no-param-reassign
-      line = line.trim();
-      if (!line.length) return undefined;
-      var currChar = 0;
-      for (var currField = 0; currChar < line.length; currChar += 1) {
-        if (line[currChar] === '\t') {
-          currField += 1;
-        }
-        if (currField === 9) {
-          // reached genotypes, rest of fields are evaluated lazily
-          break;
-        }
-      }
-      var fields = line.substr(0, currChar).split('\t');
-      var rest = line.substr(currChar + 1);
-      var variant = {
-        CHROM: fields[0],
-        POS: Number(fields[1]),
-        ID: fields[2] === '.' ? null : fields[2].split(';'),
-        REF: fields[3],
-        ALT: fields[4] === '.' ? null : fields[4].split(','),
-        QUAL: fields[5] === '.' ? null : parseFloat(fields[5]) };
-
-      if (fields[6] === '.') {
-        variant.FILTER = null;
-      } else if (fields[6] === 'PASS') {
-        variant.FILTER = 'PASS';
-      } else {
-        variant.FILTER = fields[6].split(';');
-      }
-      if (this.strict && fields[7] === undefined) {
-        throw new Error(
-        "no INFO field specified, must contain at least a '.' (turn off strict mode to allow)");
-
-      }
-      var info =
-      fields[7] === undefined || fields[7] === '.' ?
-      {} :
-      this._parseKeyValue(fields[7]);
-      Object.keys(info).forEach(function (key) {
-        var items;
-        if (info[key]) {
-          items = info[key].split(',');
-          items = items.map(function (val) {return val === '.' ? null : val;});
-        } else items = info[key];
-        var itemType = _this2.getMetadata('INFO', key, 'Type');
-        if (itemType) {
-          if (itemType === 'Integer' || itemType === 'Float') {
-            items = items.map(function (val) {
-              if (val === null) return null;
-              return Number(val);
-            });
-          } else if (itemType === 'Flag') {
-            if (info[key])
-              // eslint-disable-next-line no-console
-              console.warn("Info field ".concat(
-              key, " is a Flag and should not have a value (got value ").concat(info[key], ")"));else
-
-            items = true;
-          }
-        }
-        info[key] = items;
-      });
-      variant.INFO = info;
-
-      // if this has SVTYPE=BND, parse ALTS for breakend descriptions
-      if (variant.ALT && info && info.SVTYPE && info.SVTYPE[0] === 'BND') {
-        variant.ALT = variant.ALT.map(this._parseBreakend.bind(this));
-      }
-
-      // This creates a closure that allows us to attach "SAMPLES" as a lazy
-      // attribute
-
-      function Variant(stuff) {
-        Object.assign(this, stuff);
-      }
-
-      var that = this;
-
-      Object.defineProperty(Variant.prototype, 'SAMPLES', {
-        get: function get() {
-          var samples = that._parseGenotypes(fields[8], rest);
-
-          Object.defineProperty(this, 'SAMPLES', {
-            value: samples });
-
-
-          return samples;
-        } });
-
-
-      return new Variant(variant);
-    } }, { key: "_parseBreakend", value: function _parseBreakend(
-
-    breakendString) {
-      var tokens = breakendString.split(/[[\]]/);
-      if (tokens.length > 1) {
-        var parsed = new Breakend();
-        parsed.MateDirection = breakendString.includes('[') ? 'right' : 'left';
-        for (var i = 0; i < tokens.length; i += 1) {
-          var tok = tokens[i];
-          if (tok) {
-            if (tok.includes(':')) {
-              // this is the remote location
-              parsed.MatePosition = tok;
-              parsed.Join = parsed.Replacement ? 'right' : 'left';
-            } else {
-              // this is the local alteration
-              parsed.Replacement = tok;
-            }
-          }
-        }
-        return parsed;
-      }
-      // if there is not more than one token, there are no [ or ] characters,
-      // so just return it unmodified
-      return breakendString;
-    } }, { key: "_parseGenotypes", value: function _parseGenotypes(
-
-    formatKeys, rest) {var _this3 = this;
-      // eslint-disable-next-line no-param-reassign
-      rest = rest.split('\t');
-      var genotypes = {};
-      // eslint-disable-next-line no-param-reassign
-      formatKeys = formatKeys && formatKeys.split(':');
-      this.samples.forEach(function (sample, index) {
-        genotypes[sample] = {};
-        formatKeys.forEach(function (key) {
-          genotypes[sample][key] = null;
-        });
-        rest[index].split(':').forEach(function (formatValue, formatIndex) {
-          var thisValue;
-          if (
-          formatValue === '' ||
-          formatValue === '.' ||
-          formatValue === undefined)
-          {
-            thisValue = null;
-          } else {
-            thisValue = formatValue.
-            split(',').
-            map(function (val) {return val === '.' ? null : val;});
-            var valueType = _this3.getMetadata(
-            'FORMAT',
-            formatKeys[formatIndex],
-            'Type');
-
-            if ((valueType === 'Integer' || valueType === 'Float') && thisValue) {
-              thisValue = thisValue.map(function (val) {
-                if (!val) return null;
-                return Number(val);
-              });
-            }
-          }
-          genotypes[sample][formatKeys[formatIndex]] = thisValue;
-        }, {});
-      });
-      return genotypes;
-    } }]);return VCF;}();
-
-
-module.exports = VCF;
-},{"./vcfReserved":13,"@babel/runtime/helpers/classCallCheck":4,"@babel/runtime/helpers/createClass":5,"@babel/runtime/helpers/interopRequireDefault":6,"@babel/runtime/helpers/slicedToArray":9}],13:[function(require,module,exports){
-"use strict";Object.defineProperty(exports, "__esModule", { value: true });exports.default = void 0;var _default = {
-  // INFO fields
-  InfoFields: {
-    // from the VCF4.3 spec, https://samtools.github.io/hts-specs/VCFv4.3.pdf
-    AA: { Number: 1, Type: 'String', Description: 'Ancestral allele' },
-    AC: {
-      Number: 'A',
-      Type: 'Integer',
-      Description:
-      'Allele count in genotypes, for each ALT allele, in the same order as listed' },
-
-    AD: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Total read depth for each allele' },
-
-    ADF: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Read depth for each allele on the forward strand' },
-
-    ADR: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Read depth for each allele on the reverse strand' },
-
-    AF: {
-      Number: 'A',
-      Type: 'Float',
-      Description:
-      'Allele frequency for each ALT allele in the same order as listed (estimated from primary data, not called genotypes)' },
-
-    AN: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Total number of alleles in called genotypes' },
-
-    BQ: {
-      Number: 1,
-      Type: 'Float',
-      Description: 'RMS base quality' },
-
-    CIGAR: {
-      Number: 1,
-      Type: 'Float',
-      Description:
-      'Cigar string describing how to align an alternate allele to the reference allele' },
-
-    DB: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'dbSNP membership' },
-
-    DP: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'combined depth across samples' },
-
-    END: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'End position (for use with symbolic alleles)' },
-
-    H2: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'HapMap2 membership' },
-
-    H3: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'HapMap3 membership' },
-
-    MQ: {
-      Number: 1,
-      Type: null,
-      Description: 'RMS mapping quality' },
-
-    MQ0: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Number of MAPQ == 0 reads' },
-
-    NS: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Number of samples with data' },
-
-    SB: {
-      Number: 4,
-      Type: 'Integer',
-      Description: 'Strand bias' },
-
-    SOMATIC: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'Somatic mutation (for cancer genomics)' },
-
-    VALIDATED: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'Validated by follow-up experiment' },
-
-    '1000G': {
-      Number: 0,
-      Type: 'Flag',
-      Description: '1000 Genomes membership' },
-
-    // specifically for structural variants
-    IMPRECISE: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'Imprecise structural variation' },
-
-    NOVEL: {
-      Number: 0,
-      Type: 'Flag',
-      Description: 'Indicates a novel structural variation' },
-
-    // For precise variants, END is POS + length of REF allele - 1,
-    // and the for imprecise variants the corresponding best estimate.
-    SVTYPE: {
-      Number: 1,
-      Type: 'String',
-      Description: 'Type of structural variant' },
-
-    // Value should be one of DEL, INS, DUP, INV, CNV, BND. This key can
-    // be derived from the REF/ALT fields but is useful for filtering.
-    SVLEN: {
-      Number: null,
-      Type: 'Integer',
-      Description: 'Difference in length between REF and ALT alleles' },
-
-    // One value for each ALT allele. Longer ALT alleles (e.g. insertions)
-    // have positive values, shorter ALT alleles (e.g. deletions)
-    // have negative values.
-    CIPOS: {
-      Number: 2,
-      Type: 'Integer',
-      Description: 'Confidence interval around POS for imprecise variants' },
-
-    CIEND: {
-      Number: 2,
-      Type: 'Integer',
-      Description: 'Confidence interval around END for imprecise variants' },
-
-    HOMLEN: {
-      Type: 'Integer',
-      Description:
-      'Length of base pair identical micro-homology at event breakpoints' },
-
-    HOMSEQ: {
-      Type: 'String',
-      Description:
-      'Sequence of base pair identical micro-homology at event breakpoints' },
-
-    BKPTID: {
-      Type: 'String',
-      Description: 'ID of the assembled alternate allele in the assembly file' },
-
-    // For precise variants, the consensus sequence the alternate allele assembly
-    // is derivable from the REF and ALT fields. However, the alternate allele
-    // assembly file may contain additional information about the characteristics
-    // of the alt allele contigs.
-    MEINFO: {
-      Number: 4,
-      Type: 'String',
-      Description: 'Mobile element info of the form NAME,START,END,POLARITY' },
-
-    METRANS: {
-      Number: 4,
-      Type: 'String',
-      Description:
-      'Mobile element transduction info of the form CHR,START,END,POLARITY' },
-
-    DGVID: {
-      Number: 1,
-      Type: 'String',
-      Description: 'ID of this element in Database of Genomic Variation' },
-
-    DBVARID: {
-      Number: 1,
-      Type: 'String',
-      Description: 'ID of this element in DBVAR' },
-
-    DBRIPID: {
-      Number: 1,
-      Type: 'String',
-      Description: 'ID of this element in DBRIP' },
-
-    MATEID: {
-      Number: null,
-      Type: 'String',
-      Description: 'ID of mate breakends' },
-
-    PARID: {
-      Number: 1,
-      Type: 'String',
-      Description: 'ID of partner breakend' },
-
-    EVENT: {
-      Number: 1,
-      Type: 'String',
-      Description: 'ID of event associated to breakend' },
-
-    CILEN: {
-      Number: 2,
-      Type: 'Integer',
-      Description:
-      'Confidence interval around the inserted material between breakend' },
-
-    DPADJ: { Type: 'Integer', Description: 'Read Depth of adjacency' },
-    CN: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Copy number of segment containing breakend' },
-
-    CNADJ: {
-      Number: null,
-      Type: 'Integer',
-      Description: 'Copy number of adjacency' },
-
-    CICN: {
-      Number: 2,
-      Type: 'Integer',
-      Description: 'Confidence interval around copy number for the segment' },
-
-    CICNADJ: {
-      Number: null,
-      Type: 'Integer',
-      Description: 'Confidence interval around copy number for the adjacency' } },
-
-
-
-  // FORMAT fields
-  GenotypeFields: {
-    // from the VCF4.3 spec, https://samtools.github.io/hts-specs/VCFv4.3.pdf
-    AD: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Read depth for each allele' },
-
-    ADF: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Read depth for each allele on the forward strand' },
-
-    ADR: {
-      Number: 'R',
-      Type: 'Integer',
-      Description: 'Read depth for each allele on the reverse strand' },
-
-    DP: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Read depth' },
-
-    EC: {
-      Number: 'A',
-      Type: 'Integer',
-      Description: 'Expected alternate allele counts' },
-
-    FT: {
-      Number: 1,
-      Type: 'String',
-      Description: 'Filter indicating if this genotype was "called"' },
-
-    GL: {
-      Number: 'G',
-      Type: 'Float',
-      Description: 'Genotype likelihoods' },
-
-    GP: {
-      Number: 'G',
-      Type: 'Float',
-      Description: 'Genotype posterior probabilities' },
-
-    GQ: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Conditional genotype quality' },
-
-    GT: {
-      Number: 1,
-      Type: 'String',
-      Description: 'Genotype' },
-
-    HQ: {
-      Number: 2,
-      Type: 'Integer',
-      Description: 'Haplotype quality' },
-
-    MQ: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'RMS mapping quality' },
-
-    PL: {
-      Number: 'G',
-      Type: 'Integer',
-      Description:
-      'Phred-scaled genotype likelihoods rounded to the closest integer' },
-
-    PQ: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Phasing quality' },
-
-    PS: {
-      Number: 1,
-      Type: 'Integer',
-      Description: 'Phase set' } },
-
-
-
-  // ALT fields
-  AltTypes: {
-    DEL: {
-      Description: 'Deletion relative to the reference' },
-
-    INS: {
-      Description: 'Insertion of novel sequence relative to the reference' },
-
-    DUP: {
-      Description: 'Region of elevated copy number relative to the reference' },
-
-    INV: {
-      Description: 'Inversion of reference sequence' },
-
-    CNV: {
-      Description:
-      'Copy number variable region (may be both deletion and duplication)' },
-
-    'DUP:TANDEM': {
-      Description: 'Tandem duplication' },
-
-    'DEL:ME': {
-      Description: 'Deletion of mobile element relative to the reference' },
-
-    'INS:ME': {
-      Description: 'Insertion of a mobile element relative to the reference' },
-
-    NON_REF: {
-      Description:
-      'Represents any possible alternative allele at this location' },
-
-    '*': {
-      Description:
-      'Represents any possible alternative allele at this location' } },
-
-
-
-  // FILTER fields
-  FilterTypes: {
-    PASS: {
-      Description: 'Passed all filters' } } };exports.default = _default;
-},{}],14:[function(require,module,exports){
-'use strict'
-
-exports.byteLength = byteLength
-exports.toByteArray = toByteArray
-exports.fromByteArray = fromByteArray
-
-var lookup = []
-var revLookup = []
-var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
-
-var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-for (var i = 0, len = code.length; i < len; ++i) {
-  lookup[i] = code[i]
-  revLookup[code.charCodeAt(i)] = i
-}
-
-// Support decoding URL-safe base64 strings, as Node.js does.
-// See: https://en.wikipedia.org/wiki/Base64#URL_applications
-revLookup['-'.charCodeAt(0)] = 62
-revLookup['_'.charCodeAt(0)] = 63
-
-function getLens (b64) {
-  var len = b64.length
-
-  if (len % 4 > 0) {
-    throw new Error('Invalid string. Length must be a multiple of 4')
-  }
-
-  // Trim off extra bytes after placeholder bytes are found
-  // See: https://github.com/beatgammit/base64-js/issues/42
-  var validLen = b64.indexOf('=')
-  if (validLen === -1) validLen = len
-
-  var placeHoldersLen = validLen === len
-    ? 0
-    : 4 - (validLen % 4)
-
-  return [validLen, placeHoldersLen]
-}
-
-// base64 is 4/3 + up to two characters of the original data
-function byteLength (b64) {
-  var lens = getLens(b64)
-  var validLen = lens[0]
-  var placeHoldersLen = lens[1]
-  return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
-}
-
-function _byteLength (b64, validLen, placeHoldersLen) {
-  return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
-}
-
-function toByteArray (b64) {
-  var tmp
-  var lens = getLens(b64)
-  var validLen = lens[0]
-  var placeHoldersLen = lens[1]
-
-  var arr = new Arr(_byteLength(b64, validLen, placeHoldersLen))
-
-  var curByte = 0
-
-  // if there are placeholders, only get up to the last complete 4 chars
-  var len = placeHoldersLen > 0
-    ? validLen - 4
-    : validLen
-
-  var i
-  for (i = 0; i < len; i += 4) {
-    tmp =
-      (revLookup[b64.charCodeAt(i)] << 18) |
-      (revLookup[b64.charCodeAt(i + 1)] << 12) |
-      (revLookup[b64.charCodeAt(i + 2)] << 6) |
-      revLookup[b64.charCodeAt(i + 3)]
-    arr[curByte++] = (tmp >> 16) & 0xFF
-    arr[curByte++] = (tmp >> 8) & 0xFF
-    arr[curByte++] = tmp & 0xFF
-  }
-
-  if (placeHoldersLen === 2) {
-    tmp =
-      (revLookup[b64.charCodeAt(i)] << 2) |
-      (revLookup[b64.charCodeAt(i + 1)] >> 4)
-    arr[curByte++] = tmp & 0xFF
-  }
-
-  if (placeHoldersLen === 1) {
-    tmp =
-      (revLookup[b64.charCodeAt(i)] << 10) |
-      (revLookup[b64.charCodeAt(i + 1)] << 4) |
-      (revLookup[b64.charCodeAt(i + 2)] >> 2)
-    arr[curByte++] = (tmp >> 8) & 0xFF
-    arr[curByte++] = tmp & 0xFF
-  }
-
-  return arr
-}
-
-function tripletToBase64 (num) {
-  return lookup[num >> 18 & 0x3F] +
-    lookup[num >> 12 & 0x3F] +
-    lookup[num >> 6 & 0x3F] +
-    lookup[num & 0x3F]
-}
-
-function encodeChunk (uint8, start, end) {
-  var tmp
-  var output = []
-  for (var i = start; i < end; i += 3) {
-    tmp =
-      ((uint8[i] << 16) & 0xFF0000) +
-      ((uint8[i + 1] << 8) & 0xFF00) +
-      (uint8[i + 2] & 0xFF)
-    output.push(tripletToBase64(tmp))
-  }
-  return output.join('')
-}
-
-function fromByteArray (uint8) {
-  var tmp
-  var len = uint8.length
-  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
-  var parts = []
-  var maxChunkLength = 16383 // must be multiple of 3
-
-  // go through the array every three bytes, we'll deal with trailing stuff later
-  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
-    parts.push(encodeChunk(
-      uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)
-    ))
-  }
-
-  // pad the end with zeros, but make sure to not forget the extra bytes
-  if (extraBytes === 1) {
-    tmp = uint8[len - 1]
-    parts.push(
-      lookup[tmp >> 2] +
-      lookup[(tmp << 4) & 0x3F] +
-      '=='
-    )
-  } else if (extraBytes === 2) {
-    tmp = (uint8[len - 2] << 8) + uint8[len - 1]
-    parts.push(
-      lookup[tmp >> 10] +
-      lookup[(tmp >> 4) & 0x3F] +
-      lookup[(tmp << 2) & 0x3F] +
-      '='
-    )
-  }
-
-  return parts.join('')
-}
-
-},{}],15:[function(require,module,exports){
-
-},{}],16:[function(require,module,exports){
-(function (Buffer){
-/*!
- * The buffer module from node.js, for the browser.
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-/* eslint-disable no-proto */
-
-'use strict'
-
-var base64 = require('base64-js')
-var ieee754 = require('ieee754')
-var customInspectSymbol =
-  (typeof Symbol === 'function' && typeof Symbol.for === 'function')
-    ? Symbol.for('nodejs.util.inspect.custom')
-    : null
-
-exports.Buffer = Buffer
-exports.SlowBuffer = SlowBuffer
-exports.INSPECT_MAX_BYTES = 50
-
-var K_MAX_LENGTH = 0x7fffffff
-exports.kMaxLength = K_MAX_LENGTH
-
-/**
- * If `Buffer.TYPED_ARRAY_SUPPORT`:
- *   === true    Use Uint8Array implementation (fastest)
- *   === false   Print warning and recommend using `buffer` v4.x which has an Object
- *               implementation (most compatible, even IE6)
- *
- * Browsers that support typed arrays are IE 10+, Firefox 4+, Chrome 7+, Safari 5.1+,
- * Opera 11.6+, iOS 4.2+.
- *
- * We report that the browser does not support typed arrays if the are not subclassable
- * using __proto__. Firefox 4-29 lacks support for adding new properties to `Uint8Array`
- * (See: https://bugzilla.mozilla.org/show_bug.cgi?id=695438). IE 10 lacks support
- * for __proto__ and has a buggy typed array implementation.
- */
-Buffer.TYPED_ARRAY_SUPPORT = typedArraySupport()
-
-if (!Buffer.TYPED_ARRAY_SUPPORT && typeof console !== 'undefined' &&
-    typeof console.error === 'function') {
-  console.error(
-    'This browser lacks typed array (Uint8Array) support which is required by ' +
-    '`buffer` v5.x. Use `buffer` v4.x if you require old browser support.'
-  )
-}
-
-function typedArraySupport () {
-  // Can typed array instances can be augmented?
-  try {
-    var arr = new Uint8Array(1)
-    var proto = { foo: function () { return 42 } }
-    Object.setPrototypeOf(proto, Uint8Array.prototype)
-    Object.setPrototypeOf(arr, proto)
-    return arr.foo() === 42
-  } catch (e) {
-    return false
-  }
-}
-
-Object.defineProperty(Buffer.prototype, 'parent', {
-  enumerable: true,
-  get: function () {
-    if (!Buffer.isBuffer(this)) return undefined
-    return this.buffer
-  }
-})
-
-Object.defineProperty(Buffer.prototype, 'offset', {
-  enumerable: true,
-  get: function () {
-    if (!Buffer.isBuffer(this)) return undefined
-    return this.byteOffset
-  }
-})
-
-function createBuffer (length) {
-  if (length > K_MAX_LENGTH) {
-    throw new RangeError('The value "' + length + '" is invalid for option "size"')
-  }
-  // Return an augmented `Uint8Array` instance
-  var buf = new Uint8Array(length)
-  Object.setPrototypeOf(buf, Buffer.prototype)
-  return buf
-}
-
-/**
- * The Buffer constructor returns instances of `Uint8Array` that have their
- * prototype changed to `Buffer.prototype`. Furthermore, `Buffer` is a subclass of
- * `Uint8Array`, so the returned instances will have all the node `Buffer` methods
- * and the `Uint8Array` methods. Square bracket notation works as expected -- it
- * returns a single octet.
- *
- * The `Uint8Array` prototype remains unmodified.
- */
-
-function Buffer (arg, encodingOrOffset, length) {
-  // Common case.
-  if (typeof arg === 'number') {
-    if (typeof encodingOrOffset === 'string') {
-      throw new TypeError(
-        'The "string" argument must be of type string. Received type number'
-      )
-    }
-    return allocUnsafe(arg)
-  }
-  return from(arg, encodingOrOffset, length)
-}
-
-Buffer.poolSize = 8192 // not used by this implementation
-
-function from (value, encodingOrOffset, length) {
-  if (typeof value === 'string') {
-    return fromString(value, encodingOrOffset)
-  }
-
-  if (ArrayBuffer.isView(value)) {
-    return fromArrayLike(value)
-  }
-
-  if (value == null) {
-    throw new TypeError(
-      'The first argument must be one of type string, Buffer, ArrayBuffer, Array, ' +
-      'or Array-like Object. Received type ' + (typeof value)
-    )
-  }
-
-  if (isInstance(value, ArrayBuffer) ||
-      (value && isInstance(value.buffer, ArrayBuffer))) {
-    return fromArrayBuffer(value, encodingOrOffset, length)
-  }
-
-  if (typeof SharedArrayBuffer !== 'undefined' &&
-      (isInstance(value, SharedArrayBuffer) ||
-      (value && isInstance(value.buffer, SharedArrayBuffer)))) {
-    return fromArrayBuffer(value, encodingOrOffset, length)
-  }
-
-  if (typeof value === 'number') {
-    throw new TypeError(
-      'The "value" argument must not be of type number. Received type number'
-    )
-  }
-
-  var valueOf = value.valueOf && value.valueOf()
-  if (valueOf != null && valueOf !== value) {
-    return Buffer.from(valueOf, encodingOrOffset, length)
-  }
-
-  var b = fromObject(value)
-  if (b) return b
-
-  if (typeof Symbol !== 'undefined' && Symbol.toPrimitive != null &&
-      typeof value[Symbol.toPrimitive] === 'function') {
-    return Buffer.from(
-      value[Symbol.toPrimitive]('string'), encodingOrOffset, length
-    )
-  }
-
-  throw new TypeError(
-    'The first argument must be one of type string, Buffer, ArrayBuffer, Array, ' +
-    'or Array-like Object. Received type ' + (typeof value)
-  )
-}
-
-/**
- * Functionally equivalent to Buffer(arg, encoding) but throws a TypeError
- * if value is a number.
- * Buffer.from(str[, encoding])
- * Buffer.from(array)
- * Buffer.from(buffer)
- * Buffer.from(arrayBuffer[, byteOffset[, length]])
- **/
-Buffer.from = function (value, encodingOrOffset, length) {
-  return from(value, encodingOrOffset, length)
-}
-
-// Note: Change prototype *after* Buffer.from is defined to workaround Chrome bug:
-// https://github.com/feross/buffer/pull/148
-Object.setPrototypeOf(Buffer.prototype, Uint8Array.prototype)
-Object.setPrototypeOf(Buffer, Uint8Array)
-
-function assertSize (size) {
-  if (typeof size !== 'number') {
-    throw new TypeError('"size" argument must be of type number')
-  } else if (size < 0) {
-    throw new RangeError('The value "' + size + '" is invalid for option "size"')
-  }
-}
-
-function alloc (size, fill, encoding) {
-  assertSize(size)
-  if (size <= 0) {
-    return createBuffer(size)
-  }
-  if (fill !== undefined) {
-    // Only pay attention to encoding if it's a string. This
-    // prevents accidentally sending in a number that would
-    // be interpretted as a start offset.
-    return typeof encoding === 'string'
-      ? createBuffer(size).fill(fill, encoding)
-      : createBuffer(size).fill(fill)
-  }
-  return createBuffer(size)
-}
-
-/**
- * Creates a new filled Buffer instance.
- * alloc(size[, fill[, encoding]])
- **/
-Buffer.alloc = function (size, fill, encoding) {
-  return alloc(size, fill, encoding)
-}
-
-function allocUnsafe (size) {
-  assertSize(size)
-  return createBuffer(size < 0 ? 0 : checked(size) | 0)
-}
-
-/**
- * Equivalent to Buffer(num), by default creates a non-zero-filled Buffer instance.
- * */
-Buffer.allocUnsafe = function (size) {
-  return allocUnsafe(size)
-}
-/**
- * Equivalent to SlowBuffer(num), by default creates a non-zero-filled Buffer instance.
- */
-Buffer.allocUnsafeSlow = function (size) {
-  return allocUnsafe(size)
-}
-
-function fromString (string, encoding) {
-  if (typeof encoding !== 'string' || encoding === '') {
-    encoding = 'utf8'
-  }
-
-  if (!Buffer.isEncoding(encoding)) {
-    throw new TypeError('Unknown encoding: ' + encoding)
-  }
-
-  var length = byteLength(string, encoding) | 0
-  var buf = createBuffer(length)
-
-  var actual = buf.write(string, encoding)
-
-  if (actual !== length) {
-    // Writing a hex string, for example, that contains invalid characters will
-    // cause everything after the first invalid character to be ignored. (e.g.
-    // 'abxxcd' will be treated as 'ab')
-    buf = buf.slice(0, actual)
-  }
-
-  return buf
-}
-
-function fromArrayLike (array) {
-  var length = array.length < 0 ? 0 : checked(array.length) | 0
-  var buf = createBuffer(length)
-  for (var i = 0; i < length; i += 1) {
-    buf[i] = array[i] & 255
-  }
-  return buf
-}
-
-function fromArrayBuffer (array, byteOffset, length) {
-  if (byteOffset < 0 || array.byteLength < byteOffset) {
-    throw new RangeError('"offset" is outside of buffer bounds')
-  }
-
-  if (array.byteLength < byteOffset + (length || 0)) {
-    throw new RangeError('"length" is outside of buffer bounds')
-  }
-
-  var buf
-  if (byteOffset === undefined && length === undefined) {
-    buf = new Uint8Array(array)
-  } else if (length === undefined) {
-    buf = new Uint8Array(array, byteOffset)
-  } else {
-    buf = new Uint8Array(array, byteOffset, length)
-  }
-
-  // Return an augmented `Uint8Array` instance
-  Object.setPrototypeOf(buf, Buffer.prototype)
-
-  return buf
-}
-
-function fromObject (obj) {
-  if (Buffer.isBuffer(obj)) {
-    var len = checked(obj.length) | 0
-    var buf = createBuffer(len)
-
-    if (buf.length === 0) {
-      return buf
-    }
-
-    obj.copy(buf, 0, 0, len)
-    return buf
-  }
-
-  if (obj.length !== undefined) {
-    if (typeof obj.length !== 'number' || numberIsNaN(obj.length)) {
-      return createBuffer(0)
-    }
-    return fromArrayLike(obj)
-  }
-
-  if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
-    return fromArrayLike(obj.data)
-  }
-}
-
-function checked (length) {
-  // Note: cannot use `length < K_MAX_LENGTH` here because that fails when
-  // length is NaN (which is otherwise coerced to zero.)
-  if (length >= K_MAX_LENGTH) {
-    throw new RangeError('Attempt to allocate Buffer larger than maximum ' +
-                         'size: 0x' + K_MAX_LENGTH.toString(16) + ' bytes')
+  for (i = 0; i < numbers.length; i += 1) {
+    total += numbers[i];
   }
-  return length | 0
-}
-
-function SlowBuffer (length) {
-  if (+length != length) { // eslint-disable-line eqeqeq
-    length = 0
-  }
-  return Buffer.alloc(+length)
-}
-
-Buffer.isBuffer = function isBuffer (b) {
-  return b != null && b._isBuffer === true &&
-    b !== Buffer.prototype // so Buffer.isBuffer(Buffer.prototype) will be false
-}
-
-Buffer.compare = function compare (a, b) {
-  if (isInstance(a, Uint8Array)) a = Buffer.from(a, a.offset, a.byteLength)
-  if (isInstance(b, Uint8Array)) b = Buffer.from(b, b.offset, b.byteLength)
-  if (!Buffer.isBuffer(a) || !Buffer.isBuffer(b)) {
-    throw new TypeError(
-      'The "buf1", "buf2" arguments must be one of type Buffer or Uint8Array'
-    )
-  }
 
-  if (a === b) return 0
-
-  var x = a.length
-  var y = b.length
-
-  for (var i = 0, len = Math.min(x, y); i < len; ++i) {
-    if (a[i] !== b[i]) {
-      x = a[i]
-      y = b[i]
-      break
-    }
-  }
-
-  if (x < y) return -1
-  if (y < x) return 1
-  return 0
+  return total / numbers.length;
 }
 
-Buffer.isEncoding = function isEncoding (encoding) {
-  switch (String(encoding).toLowerCase()) {
-    case 'hex':
-    case 'utf8':
-    case 'utf-8':
-    case 'ascii':
-    case 'latin1':
-    case 'binary':
-    case 'base64':
-    case 'ucs2':
-    case 'ucs-2':
-    case 'utf16le':
-    case 'utf-16le':
-      return true
-    default:
-      return false
-  }
-}
-
-Buffer.concat = function concat (list, length) {
-  if (!Array.isArray(list)) {
-    throw new TypeError('"list" argument must be an Array of Buffers')
-  }
+function getAdjPvalues(_pvalues) {
+  let pvalues = _pvalues.sort((a, b) => b - a);
 
-  if (list.length === 0) {
-    return Buffer.alloc(0)
-  }
+  let n = pvalues.length;
+  let values = pvalues.map((element, index) => [element, n - index - 1]);
+  let new_values = [];
+  let new_pvalues = new Array(n);
 
-  var i
-  if (length === undefined) {
-    length = 0
-    for (i = 0; i < list.length; ++i) {
-      length += list[i].length
-    }
+  for (let i in values) {
+    let rank = n - i;
+    let pvalue = values[i][0];
+    new_values.push(n / rank * pvalue);
   }
 
-  var buffer = Buffer.allocUnsafe(length)
-  var pos = 0
-  for (i = 0; i < list.length; ++i) {
-    var buf = list[i]
-    if (isInstance(buf, Uint8Array)) {
-      buf = Buffer.from(buf)
-    }
-    if (!Buffer.isBuffer(buf)) {
-      throw new TypeError('"list" argument must be an Array of Buffers')
-    }
-    buf.copy(buffer, pos)
-    pos += buf.length
+  for (let i = 1; i < n; i++) {
+    if (new_values[i] < new_values[i + 1]) new_values[i + 1] = new_values[i];
   }
-  return buffer
-}
 
-function byteLength (string, encoding) {
-  if (Buffer.isBuffer(string)) {
-    return string.length
-  }
-  if (ArrayBuffer.isView(string) || isInstance(string, ArrayBuffer)) {
-    return string.byteLength
-  }
-  if (typeof string !== 'string') {
-    throw new TypeError(
-      'The "string" argument must be one of type string, Buffer, or ArrayBuffer. ' +
-      'Received type ' + typeof string
-    )
+  for (let i in values) {
+    let index = values[i][1];
+    new_pvalues[index] = new_values[i] > 1 ? 1 : new_values[i];
   }
 
-  var len = string.length
-  var mustMatch = (arguments.length > 2 && arguments[2] === true)
-  if (!mustMatch && len === 0) return 0
-
-  // Use a for loop to avoid recursion
-  var loweredCase = false
-  for (;;) {
-    switch (encoding) {
-      case 'ascii':
-      case 'latin1':
-      case 'binary':
-        return len
-      case 'utf8':
-      case 'utf-8':
-        return utf8ToBytes(string).length
-      case 'ucs2':
-      case 'ucs-2':
-      case 'utf16le':
-      case 'utf-16le':
-        return len * 2
-      case 'hex':
-        return len >>> 1
-      case 'base64':
-        return base64ToBytes(string).length
-      default:
-        if (loweredCase) {
-          return mustMatch ? -1 : utf8ToBytes(string).length // assume utf8
-        }
-        encoding = ('' + encoding).toLowerCase()
-        loweredCase = true
-    }
-  }
+  return new_pvalues;
 }
-Buffer.byteLength = byteLength
-
-function slowToString (encoding, start, end) {
-  var loweredCase = false
-
-  // No need to verify that "this.length <= MAX_UINT32" since it's a read-only
-  // property of a typed array.
-
-  // This behaves neither like String nor Uint8Array in that we set start/end
-  // to their upper/lower bounds if the value passed is out of range.
-  // undefined is handled specially as per ECMA-262 6th Edition,
-  // Section 13.3.3.7 Runtime Semantics: KeyedBindingInitialization.
-  if (start === undefined || start < 0) {
-    start = 0
-  }
-  // Return early if start > this.length. Done here to prevent potential uint32
-  // coercion fail below.
-  if (start > this.length) {
-    return ''
-  }
-
-  if (end === undefined || end > this.length) {
-    end = this.length
-  }
-
-  if (end <= 0) {
-    return ''
-  }
-
-  // Force coersion to uint32. This will also coerce falsey/NaN values to 0.
-  end >>>= 0
-  start >>>= 0
-
-  if (end <= start) {
-    return ''
-  }
-
-  if (!encoding) encoding = 'utf8'
-
-  while (true) {
-    switch (encoding) {
-      case 'hex':
-        return hexSlice(this, start, end)
-
-      case 'utf8':
-      case 'utf-8':
-        return utf8Slice(this, start, end)
-
-      case 'ascii':
-        return asciiSlice(this, start, end)
-
-      case 'latin1':
-      case 'binary':
-        return latin1Slice(this, start, end)
-
-      case 'base64':
-        return base64Slice(this, start, end)
-
-      case 'ucs2':
-      case 'ucs-2':
-      case 'utf16le':
-      case 'utf-16le':
-        return utf16leSlice(this, start, end)
-
-      default:
-        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
-        encoding = (encoding + '').toLowerCase()
-        loweredCase = true
-    }
-  }
-}
-
-// This property is used by `Buffer.isBuffer` (and the `is-buffer` npm package)
-// to detect a Buffer instance. It's not possible to use `instanceof Buffer`
-// reliably in a browserify context because there could be multiple different
-// copies of the 'buffer' package in use. This method works even for Buffer
-// instances that were created from another copy of the `buffer` package.
-// See: https://github.com/feross/buffer/issues/154
-Buffer.prototype._isBuffer = true
-
-function swap (b, n, m) {
-  var i = b[n]
-  b[n] = b[m]
-  b[m] = i
-}
-
-Buffer.prototype.swap16 = function swap16 () {
-  var len = this.length
-  if (len % 2 !== 0) {
-    throw new RangeError('Buffer size must be a multiple of 16-bits')
-  }
-  for (var i = 0; i < len; i += 2) {
-    swap(this, i, i + 1)
-  }
-  return this
-}
-
-Buffer.prototype.swap32 = function swap32 () {
-  var len = this.length
-  if (len % 4 !== 0) {
-    throw new RangeError('Buffer size must be a multiple of 32-bits')
-  }
-  for (var i = 0; i < len; i += 4) {
-    swap(this, i, i + 3)
-    swap(this, i + 1, i + 2)
-  }
-  return this
-}
-
-Buffer.prototype.swap64 = function swap64 () {
-  var len = this.length
-  if (len % 8 !== 0) {
-    throw new RangeError('Buffer size must be a multiple of 64-bits')
-  }
-  for (var i = 0; i < len; i += 8) {
-    swap(this, i, i + 7)
-    swap(this, i + 1, i + 6)
-    swap(this, i + 2, i + 5)
-    swap(this, i + 3, i + 4)
-  }
-  return this
-}
-
-Buffer.prototype.toString = function toString () {
-  var length = this.length
-  if (length === 0) return ''
-  if (arguments.length === 0) return utf8Slice(this, 0, length)
-  return slowToString.apply(this, arguments)
-}
-
-Buffer.prototype.toLocaleString = Buffer.prototype.toString
-
-Buffer.prototype.equals = function equals (b) {
-  if (!Buffer.isBuffer(b)) throw new TypeError('Argument must be a Buffer')
-  if (this === b) return true
-  return Buffer.compare(this, b) === 0
-}
-
-Buffer.prototype.inspect = function inspect () {
-  var str = ''
-  var max = exports.INSPECT_MAX_BYTES
-  str = this.toString('hex', 0, max).replace(/(.{2})/g, '$1 ').trim()
-  if (this.length > max) str += ' ... '
-  return '<Buffer ' + str + '>'
-}
-if (customInspectSymbol) {
-  Buffer.prototype[customInspectSymbol] = Buffer.prototype.inspect
-}
-
-Buffer.prototype.compare = function compare (target, start, end, thisStart, thisEnd) {
-  if (isInstance(target, Uint8Array)) {
-    target = Buffer.from(target, target.offset, target.byteLength)
-  }
-  if (!Buffer.isBuffer(target)) {
-    throw new TypeError(
-      'The "target" argument must be one of type Buffer or Uint8Array. ' +
-      'Received type ' + (typeof target)
-    )
-  }
-
-  if (start === undefined) {
-    start = 0
-  }
-  if (end === undefined) {
-    end = target ? target.length : 0
-  }
-  if (thisStart === undefined) {
-    thisStart = 0
-  }
-  if (thisEnd === undefined) {
-    thisEnd = this.length
-  }
-
-  if (start < 0 || end > target.length || thisStart < 0 || thisEnd > this.length) {
-    throw new RangeError('out of range index')
-  }
-
-  if (thisStart >= thisEnd && start >= end) {
-    return 0
-  }
-  if (thisStart >= thisEnd) {
-    return -1
-  }
-  if (start >= end) {
-    return 1
-  }
-
-  start >>>= 0
-  end >>>= 0
-  thisStart >>>= 0
-  thisEnd >>>= 0
-
-  if (this === target) return 0
-
-  var x = thisEnd - thisStart
-  var y = end - start
-  var len = Math.min(x, y)
-
-  var thisCopy = this.slice(thisStart, thisEnd)
-  var targetCopy = target.slice(start, end)
-
-  for (var i = 0; i < len; ++i) {
-    if (thisCopy[i] !== targetCopy[i]) {
-      x = thisCopy[i]
-      y = targetCopy[i]
-      break
-    }
-  }
-
-  if (x < y) return -1
-  if (y < x) return 1
-  return 0
-}
-
-// Finds either the first index of `val` in `buffer` at offset >= `byteOffset`,
-// OR the last index of `val` in `buffer` at offset <= `byteOffset`.
-//
-// Arguments:
-// - buffer - a Buffer to search
-// - val - a string, Buffer, or number
-// - byteOffset - an index into `buffer`; will be clamped to an int32
-// - encoding - an optional encoding, relevant is val is a string
-// - dir - true for indexOf, false for lastIndexOf
-function bidirectionalIndexOf (buffer, val, byteOffset, encoding, dir) {
-  // Empty buffer means no match
-  if (buffer.length === 0) return -1
-
-  // Normalize byteOffset
-  if (typeof byteOffset === 'string') {
-    encoding = byteOffset
-    byteOffset = 0
-  } else if (byteOffset > 0x7fffffff) {
-    byteOffset = 0x7fffffff
-  } else if (byteOffset < -0x80000000) {
-    byteOffset = -0x80000000
-  }
-  byteOffset = +byteOffset // Coerce to Number.
-  if (numberIsNaN(byteOffset)) {
-    // byteOffset: it it's undefined, null, NaN, "foo", etc, search whole buffer
-    byteOffset = dir ? 0 : (buffer.length - 1)
-  }
-
-  // Normalize byteOffset: negative offsets start from the end of the buffer
-  if (byteOffset < 0) byteOffset = buffer.length + byteOffset
-  if (byteOffset >= buffer.length) {
-    if (dir) return -1
-    else byteOffset = buffer.length - 1
-  } else if (byteOffset < 0) {
-    if (dir) byteOffset = 0
-    else return -1
-  }
-
-  // Normalize val
-  if (typeof val === 'string') {
-    val = Buffer.from(val, encoding)
-  }
-
-  // Finally, search either indexOf (if dir is true) or lastIndexOf
-  if (Buffer.isBuffer(val)) {
-    // Special case: looking for empty string/buffer always fails
-    if (val.length === 0) {
-      return -1
-    }
-    return arrayIndexOf(buffer, val, byteOffset, encoding, dir)
-  } else if (typeof val === 'number') {
-    val = val & 0xFF // Search for a byte value [0-255]
-    if (typeof Uint8Array.prototype.indexOf === 'function') {
-      if (dir) {
-        return Uint8Array.prototype.indexOf.call(buffer, val, byteOffset)
-      } else {
-        return Uint8Array.prototype.lastIndexOf.call(buffer, val, byteOffset)
-      }
-    }
-    return arrayIndexOf(buffer, [val], byteOffset, encoding, dir)
-  }
-
-  throw new TypeError('val must be string, number or Buffer')
-}
-
-function arrayIndexOf (arr, val, byteOffset, encoding, dir) {
-  var indexSize = 1
-  var arrLength = arr.length
-  var valLength = val.length
-
-  if (encoding !== undefined) {
-    encoding = String(encoding).toLowerCase()
-    if (encoding === 'ucs2' || encoding === 'ucs-2' ||
-        encoding === 'utf16le' || encoding === 'utf-16le') {
-      if (arr.length < 2 || val.length < 2) {
-        return -1
-      }
-      indexSize = 2
-      arrLength /= 2
-      valLength /= 2
-      byteOffset /= 2
-    }
-  }
-
-  function read (buf, i) {
-    if (indexSize === 1) {
-      return buf[i]
-    } else {
-      return buf.readUInt16BE(i * indexSize)
-    }
-  }
-
-  var i
-  if (dir) {
-    var foundIndex = -1
-    for (i = byteOffset; i < arrLength; i++) {
-      if (read(arr, i) === read(val, foundIndex === -1 ? 0 : i - foundIndex)) {
-        if (foundIndex === -1) foundIndex = i
-        if (i - foundIndex + 1 === valLength) return foundIndex * indexSize
-      } else {
-        if (foundIndex !== -1) i -= i - foundIndex
-        foundIndex = -1
-      }
-    }
-  } else {
-    if (byteOffset + valLength > arrLength) byteOffset = arrLength - valLength
-    for (i = byteOffset; i >= 0; i--) {
-      var found = true
-      for (var j = 0; j < valLength; j++) {
-        if (read(arr, i + j) !== read(val, j)) {
-          found = false
-          break
-        }
-      }
-      if (found) return i
-    }
-  }
-
-  return -1
-}
-
-Buffer.prototype.includes = function includes (val, byteOffset, encoding) {
-  return this.indexOf(val, byteOffset, encoding) !== -1
-}
-
-Buffer.prototype.indexOf = function indexOf (val, byteOffset, encoding) {
-  return bidirectionalIndexOf(this, val, byteOffset, encoding, true)
-}
-
-Buffer.prototype.lastIndexOf = function lastIndexOf (val, byteOffset, encoding) {
-  return bidirectionalIndexOf(this, val, byteOffset, encoding, false)
-}
-
-function hexWrite (buf, string, offset, length) {
-  offset = Number(offset) || 0
-  var remaining = buf.length - offset
-  if (!length) {
-    length = remaining
-  } else {
-    length = Number(length)
-    if (length > remaining) {
-      length = remaining
-    }
-  }
-
-  var strLen = string.length
-
-  if (length > strLen / 2) {
-    length = strLen / 2
-  }
-  for (var i = 0; i < length; ++i) {
-    var parsed = parseInt(string.substr(i * 2, 2), 16)
-    if (numberIsNaN(parsed)) return i
-    buf[offset + i] = parsed
-  }
-  return i
-}
-
-function utf8Write (buf, string, offset, length) {
-  return blitBuffer(utf8ToBytes(string, buf.length - offset), buf, offset, length)
-}
-
-function asciiWrite (buf, string, offset, length) {
-  return blitBuffer(asciiToBytes(string), buf, offset, length)
-}
-
-function latin1Write (buf, string, offset, length) {
-  return asciiWrite(buf, string, offset, length)
-}
-
-function base64Write (buf, string, offset, length) {
-  return blitBuffer(base64ToBytes(string), buf, offset, length)
-}
-
-function ucs2Write (buf, string, offset, length) {
-  return blitBuffer(utf16leToBytes(string, buf.length - offset), buf, offset, length)
-}
-
-Buffer.prototype.write = function write (string, offset, length, encoding) {
-  // Buffer#write(string)
-  if (offset === undefined) {
-    encoding = 'utf8'
-    length = this.length
-    offset = 0
-  // Buffer#write(string, encoding)
-  } else if (length === undefined && typeof offset === 'string') {
-    encoding = offset
-    length = this.length
-    offset = 0
-  // Buffer#write(string, offset[, length][, encoding])
-  } else if (isFinite(offset)) {
-    offset = offset >>> 0
-    if (isFinite(length)) {
-      length = length >>> 0
-      if (encoding === undefined) encoding = 'utf8'
-    } else {
-      encoding = length
-      length = undefined
-    }
-  } else {
-    throw new Error(
-      'Buffer.write(string, encoding, offset[, length]) is no longer supported'
-    )
-  }
-
-  var remaining = this.length - offset
-  if (length === undefined || length > remaining) length = remaining
-
-  if ((string.length > 0 && (length < 0 || offset < 0)) || offset > this.length) {
-    throw new RangeError('Attempt to write outside buffer bounds')
-  }
-
-  if (!encoding) encoding = 'utf8'
-
-  var loweredCase = false
-  for (;;) {
-    switch (encoding) {
-      case 'hex':
-        return hexWrite(this, string, offset, length)
-
-      case 'utf8':
-      case 'utf-8':
-        return utf8Write(this, string, offset, length)
-
-      case 'ascii':
-        return asciiWrite(this, string, offset, length)
-
-      case 'latin1':
-      case 'binary':
-        return latin1Write(this, string, offset, length)
-
-      case 'base64':
-        // Warning: maxLength not taken into account in base64Write
-        return base64Write(this, string, offset, length)
-
-      case 'ucs2':
-      case 'ucs-2':
-      case 'utf16le':
-      case 'utf-16le':
-        return ucs2Write(this, string, offset, length)
-
-      default:
-        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
-        encoding = ('' + encoding).toLowerCase()
-        loweredCase = true
-    }
-  }
-}
-
-Buffer.prototype.toJSON = function toJSON () {
-  return {
-    type: 'Buffer',
-    data: Array.prototype.slice.call(this._arr || this, 0)
-  }
-}
-
-function base64Slice (buf, start, end) {
-  if (start === 0 && end === buf.length) {
-    return base64.fromByteArray(buf)
-  } else {
-    return base64.fromByteArray(buf.slice(start, end))
-  }
-}
-
-function utf8Slice (buf, start, end) {
-  end = Math.min(buf.length, end)
-  var res = []
-
-  var i = start
-  while (i < end) {
-    var firstByte = buf[i]
-    var codePoint = null
-    var bytesPerSequence = (firstByte > 0xEF) ? 4
-      : (firstByte > 0xDF) ? 3
-        : (firstByte > 0xBF) ? 2
-          : 1
-
-    if (i + bytesPerSequence <= end) {
-      var secondByte, thirdByte, fourthByte, tempCodePoint
-
-      switch (bytesPerSequence) {
-        case 1:
-          if (firstByte < 0x80) {
-            codePoint = firstByte
-          }
-          break
-        case 2:
-          secondByte = buf[i + 1]
-          if ((secondByte & 0xC0) === 0x80) {
-            tempCodePoint = (firstByte & 0x1F) << 0x6 | (secondByte & 0x3F)
-            if (tempCodePoint > 0x7F) {
-              codePoint = tempCodePoint
-            }
-          }
-          break
-        case 3:
-          secondByte = buf[i + 1]
-          thirdByte = buf[i + 2]
-          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80) {
-            tempCodePoint = (firstByte & 0xF) << 0xC | (secondByte & 0x3F) << 0x6 | (thirdByte & 0x3F)
-            if (tempCodePoint > 0x7FF && (tempCodePoint < 0xD800 || tempCodePoint > 0xDFFF)) {
-              codePoint = tempCodePoint
-            }
-          }
-          break
-        case 4:
-          secondByte = buf[i + 1]
-          thirdByte = buf[i + 2]
-          fourthByte = buf[i + 3]
-          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80 && (fourthByte & 0xC0) === 0x80) {
-            tempCodePoint = (firstByte & 0xF) << 0x12 | (secondByte & 0x3F) << 0xC | (thirdByte & 0x3F) << 0x6 | (fourthByte & 0x3F)
-            if (tempCodePoint > 0xFFFF && tempCodePoint < 0x110000) {
-              codePoint = tempCodePoint
-            }
-          }
-      }
-    }
-
-    if (codePoint === null) {
-      // we did not generate a valid codePoint so insert a
-      // replacement char (U+FFFD) and advance only 1 byte
-      codePoint = 0xFFFD
-      bytesPerSequence = 1
-    } else if (codePoint > 0xFFFF) {
-      // encode to utf16 (surrogate pair dance)
-      codePoint -= 0x10000
-      res.push(codePoint >>> 10 & 0x3FF | 0xD800)
-      codePoint = 0xDC00 | codePoint & 0x3FF
-    }
-
-    res.push(codePoint)
-    i += bytesPerSequence
-  }
-
-  return decodeCodePointsArray(res)
-}
-
-// Based on http://stackoverflow.com/a/22747272/680742, the browser with
-// the lowest limit is Chrome, with 0x10000 args.
-// We go 1 magnitude less, for safety
-var MAX_ARGUMENTS_LENGTH = 0x1000
-
-function decodeCodePointsArray (codePoints) {
-  var len = codePoints.length
-  if (len <= MAX_ARGUMENTS_LENGTH) {
-    return String.fromCharCode.apply(String, codePoints) // avoid extra slice()
-  }
-
-  // Decode in chunks to avoid "call stack size exceeded".
-  var res = ''
-  var i = 0
-  while (i < len) {
-    res += String.fromCharCode.apply(
-      String,
-      codePoints.slice(i, i += MAX_ARGUMENTS_LENGTH)
-    )
-  }
-  return res
-}
-
-function asciiSlice (buf, start, end) {
-  var ret = ''
-  end = Math.min(buf.length, end)
-
-  for (var i = start; i < end; ++i) {
-    ret += String.fromCharCode(buf[i] & 0x7F)
-  }
-  return ret
-}
-
-function latin1Slice (buf, start, end) {
-  var ret = ''
-  end = Math.min(buf.length, end)
-
-  for (var i = start; i < end; ++i) {
-    ret += String.fromCharCode(buf[i])
-  }
-  return ret
-}
-
-function hexSlice (buf, start, end) {
-  var len = buf.length
-
-  if (!start || start < 0) start = 0
-  if (!end || end < 0 || end > len) end = len
-
-  var out = ''
-  for (var i = start; i < end; ++i) {
-    out += hexSliceLookupTable[buf[i]]
-  }
-  return out
-}
-
-function utf16leSlice (buf, start, end) {
-  var bytes = buf.slice(start, end)
-  var res = ''
-  for (var i = 0; i < bytes.length; i += 2) {
-    res += String.fromCharCode(bytes[i] + (bytes[i + 1] * 256))
-  }
-  return res
-}
-
-Buffer.prototype.slice = function slice (start, end) {
-  var len = this.length
-  start = ~~start
-  end = end === undefined ? len : ~~end
-
-  if (start < 0) {
-    start += len
-    if (start < 0) start = 0
-  } else if (start > len) {
-    start = len
-  }
-
-  if (end < 0) {
-    end += len
-    if (end < 0) end = 0
-  } else if (end > len) {
-    end = len
-  }
-
-  if (end < start) end = start
-
-  var newBuf = this.subarray(start, end)
-  // Return an augmented `Uint8Array` instance
-  Object.setPrototypeOf(newBuf, Buffer.prototype)
-
-  return newBuf
-}
-
-/*
- * Need to make sure that buffer isn't trying to write out of bounds.
- */
-function checkOffset (offset, ext, length) {
-  if ((offset % 1) !== 0 || offset < 0) throw new RangeError('offset is not uint')
-  if (offset + ext > length) throw new RangeError('Trying to access beyond buffer length')
-}
-
-Buffer.prototype.readUIntLE = function readUIntLE (offset, byteLength, noAssert) {
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) checkOffset(offset, byteLength, this.length)
-
-  var val = this[offset]
-  var mul = 1
-  var i = 0
-  while (++i < byteLength && (mul *= 0x100)) {
-    val += this[offset + i] * mul
-  }
-
-  return val
-}
-
-Buffer.prototype.readUIntBE = function readUIntBE (offset, byteLength, noAssert) {
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) {
-    checkOffset(offset, byteLength, this.length)
-  }
-
-  var val = this[offset + --byteLength]
-  var mul = 1
-  while (byteLength > 0 && (mul *= 0x100)) {
-    val += this[offset + --byteLength] * mul
-  }
-
-  return val
-}
-
-Buffer.prototype.readUInt8 = function readUInt8 (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 1, this.length)
-  return this[offset]
-}
-
-Buffer.prototype.readUInt16LE = function readUInt16LE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 2, this.length)
-  return this[offset] | (this[offset + 1] << 8)
-}
-
-Buffer.prototype.readUInt16BE = function readUInt16BE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 2, this.length)
-  return (this[offset] << 8) | this[offset + 1]
-}
-
-Buffer.prototype.readUInt32LE = function readUInt32LE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-
-  return ((this[offset]) |
-      (this[offset + 1] << 8) |
-      (this[offset + 2] << 16)) +
-      (this[offset + 3] * 0x1000000)
-}
-
-Buffer.prototype.readUInt32BE = function readUInt32BE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-
-  return (this[offset] * 0x1000000) +
-    ((this[offset + 1] << 16) |
-    (this[offset + 2] << 8) |
-    this[offset + 3])
-}
-
-Buffer.prototype.readIntLE = function readIntLE (offset, byteLength, noAssert) {
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) checkOffset(offset, byteLength, this.length)
-
-  var val = this[offset]
-  var mul = 1
-  var i = 0
-  while (++i < byteLength && (mul *= 0x100)) {
-    val += this[offset + i] * mul
-  }
-  mul *= 0x80
-
-  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
-
-  return val
-}
-
-Buffer.prototype.readIntBE = function readIntBE (offset, byteLength, noAssert) {
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) checkOffset(offset, byteLength, this.length)
-
-  var i = byteLength
-  var mul = 1
-  var val = this[offset + --i]
-  while (i > 0 && (mul *= 0x100)) {
-    val += this[offset + --i] * mul
-  }
-  mul *= 0x80
-
-  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
-
-  return val
-}
-
-Buffer.prototype.readInt8 = function readInt8 (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 1, this.length)
-  if (!(this[offset] & 0x80)) return (this[offset])
-  return ((0xff - this[offset] + 1) * -1)
-}
-
-Buffer.prototype.readInt16LE = function readInt16LE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 2, this.length)
-  var val = this[offset] | (this[offset + 1] << 8)
-  return (val & 0x8000) ? val | 0xFFFF0000 : val
-}
-
-Buffer.prototype.readInt16BE = function readInt16BE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 2, this.length)
-  var val = this[offset + 1] | (this[offset] << 8)
-  return (val & 0x8000) ? val | 0xFFFF0000 : val
-}
-
-Buffer.prototype.readInt32LE = function readInt32LE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-
-  return (this[offset]) |
-    (this[offset + 1] << 8) |
-    (this[offset + 2] << 16) |
-    (this[offset + 3] << 24)
-}
-
-Buffer.prototype.readInt32BE = function readInt32BE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-
-  return (this[offset] << 24) |
-    (this[offset + 1] << 16) |
-    (this[offset + 2] << 8) |
-    (this[offset + 3])
-}
-
-Buffer.prototype.readFloatLE = function readFloatLE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-  return ieee754.read(this, offset, true, 23, 4)
-}
-
-Buffer.prototype.readFloatBE = function readFloatBE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 4, this.length)
-  return ieee754.read(this, offset, false, 23, 4)
-}
-
-Buffer.prototype.readDoubleLE = function readDoubleLE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 8, this.length)
-  return ieee754.read(this, offset, true, 52, 8)
-}
-
-Buffer.prototype.readDoubleBE = function readDoubleBE (offset, noAssert) {
-  offset = offset >>> 0
-  if (!noAssert) checkOffset(offset, 8, this.length)
-  return ieee754.read(this, offset, false, 52, 8)
-}
-
-function checkInt (buf, value, offset, ext, max, min) {
-  if (!Buffer.isBuffer(buf)) throw new TypeError('"buffer" argument must be a Buffer instance')
-  if (value > max || value < min) throw new RangeError('"value" argument is out of bounds')
-  if (offset + ext > buf.length) throw new RangeError('Index out of range')
-}
-
-Buffer.prototype.writeUIntLE = function writeUIntLE (value, offset, byteLength, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) {
-    var maxBytes = Math.pow(2, 8 * byteLength) - 1
-    checkInt(this, value, offset, byteLength, maxBytes, 0)
-  }
-
-  var mul = 1
-  var i = 0
-  this[offset] = value & 0xFF
-  while (++i < byteLength && (mul *= 0x100)) {
-    this[offset + i] = (value / mul) & 0xFF
-  }
-
-  return offset + byteLength
-}
-
-Buffer.prototype.writeUIntBE = function writeUIntBE (value, offset, byteLength, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  byteLength = byteLength >>> 0
-  if (!noAssert) {
-    var maxBytes = Math.pow(2, 8 * byteLength) - 1
-    checkInt(this, value, offset, byteLength, maxBytes, 0)
-  }
-
-  var i = byteLength - 1
-  var mul = 1
-  this[offset + i] = value & 0xFF
-  while (--i >= 0 && (mul *= 0x100)) {
-    this[offset + i] = (value / mul) & 0xFF
-  }
-
-  return offset + byteLength
-}
-
-Buffer.prototype.writeUInt8 = function writeUInt8 (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 1, 0xff, 0)
-  this[offset] = (value & 0xff)
-  return offset + 1
-}
-
-Buffer.prototype.writeUInt16LE = function writeUInt16LE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
-  this[offset] = (value & 0xff)
-  this[offset + 1] = (value >>> 8)
-  return offset + 2
-}
-
-Buffer.prototype.writeUInt16BE = function writeUInt16BE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
-  this[offset] = (value >>> 8)
-  this[offset + 1] = (value & 0xff)
-  return offset + 2
-}
-
-Buffer.prototype.writeUInt32LE = function writeUInt32LE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
-  this[offset + 3] = (value >>> 24)
-  this[offset + 2] = (value >>> 16)
-  this[offset + 1] = (value >>> 8)
-  this[offset] = (value & 0xff)
-  return offset + 4
-}
-
-Buffer.prototype.writeUInt32BE = function writeUInt32BE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
-  this[offset] = (value >>> 24)
-  this[offset + 1] = (value >>> 16)
-  this[offset + 2] = (value >>> 8)
-  this[offset + 3] = (value & 0xff)
-  return offset + 4
-}
-
-Buffer.prototype.writeIntLE = function writeIntLE (value, offset, byteLength, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) {
-    var limit = Math.pow(2, (8 * byteLength) - 1)
-
-    checkInt(this, value, offset, byteLength, limit - 1, -limit)
-  }
-
-  var i = 0
-  var mul = 1
-  var sub = 0
-  this[offset] = value & 0xFF
-  while (++i < byteLength && (mul *= 0x100)) {
-    if (value < 0 && sub === 0 && this[offset + i - 1] !== 0) {
-      sub = 1
-    }
-    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
-  }
-
-  return offset + byteLength
-}
-
-Buffer.prototype.writeIntBE = function writeIntBE (value, offset, byteLength, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) {
-    var limit = Math.pow(2, (8 * byteLength) - 1)
-
-    checkInt(this, value, offset, byteLength, limit - 1, -limit)
-  }
-
-  var i = byteLength - 1
-  var mul = 1
-  var sub = 0
-  this[offset + i] = value & 0xFF
-  while (--i >= 0 && (mul *= 0x100)) {
-    if (value < 0 && sub === 0 && this[offset + i + 1] !== 0) {
-      sub = 1
-    }
-    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
-  }
-
-  return offset + byteLength
-}
-
-Buffer.prototype.writeInt8 = function writeInt8 (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 1, 0x7f, -0x80)
-  if (value < 0) value = 0xff + value + 1
-  this[offset] = (value & 0xff)
-  return offset + 1
-}
-
-Buffer.prototype.writeInt16LE = function writeInt16LE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
-  this[offset] = (value & 0xff)
-  this[offset + 1] = (value >>> 8)
-  return offset + 2
-}
-
-Buffer.prototype.writeInt16BE = function writeInt16BE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
-  this[offset] = (value >>> 8)
-  this[offset + 1] = (value & 0xff)
-  return offset + 2
-}
-
-Buffer.prototype.writeInt32LE = function writeInt32LE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
-  this[offset] = (value & 0xff)
-  this[offset + 1] = (value >>> 8)
-  this[offset + 2] = (value >>> 16)
-  this[offset + 3] = (value >>> 24)
-  return offset + 4
-}
-
-Buffer.prototype.writeInt32BE = function writeInt32BE (value, offset, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
-  if (value < 0) value = 0xffffffff + value + 1
-  this[offset] = (value >>> 24)
-  this[offset + 1] = (value >>> 16)
-  this[offset + 2] = (value >>> 8)
-  this[offset + 3] = (value & 0xff)
-  return offset + 4
-}
-
-function checkIEEE754 (buf, value, offset, ext, max, min) {
-  if (offset + ext > buf.length) throw new RangeError('Index out of range')
-  if (offset < 0) throw new RangeError('Index out of range')
-}
-
-function writeFloat (buf, value, offset, littleEndian, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) {
-    checkIEEE754(buf, value, offset, 4, 3.4028234663852886e+38, -3.4028234663852886e+38)
-  }
-  ieee754.write(buf, value, offset, littleEndian, 23, 4)
-  return offset + 4
-}
-
-Buffer.prototype.writeFloatLE = function writeFloatLE (value, offset, noAssert) {
-  return writeFloat(this, value, offset, true, noAssert)
-}
-
-Buffer.prototype.writeFloatBE = function writeFloatBE (value, offset, noAssert) {
-  return writeFloat(this, value, offset, false, noAssert)
-}
-
-function writeDouble (buf, value, offset, littleEndian, noAssert) {
-  value = +value
-  offset = offset >>> 0
-  if (!noAssert) {
-    checkIEEE754(buf, value, offset, 8, 1.7976931348623157E+308, -1.7976931348623157E+308)
-  }
-  ieee754.write(buf, value, offset, littleEndian, 52, 8)
-  return offset + 8
-}
-
-Buffer.prototype.writeDoubleLE = function writeDoubleLE (value, offset, noAssert) {
-  return writeDouble(this, value, offset, true, noAssert)
-}
-
-Buffer.prototype.writeDoubleBE = function writeDoubleBE (value, offset, noAssert) {
-  return writeDouble(this, value, offset, false, noAssert)
-}
-
-// copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
-Buffer.prototype.copy = function copy (target, targetStart, start, end) {
-  if (!Buffer.isBuffer(target)) throw new TypeError('argument should be a Buffer')
-  if (!start) start = 0
-  if (!end && end !== 0) end = this.length
-  if (targetStart >= target.length) targetStart = target.length
-  if (!targetStart) targetStart = 0
-  if (end > 0 && end < start) end = start
-
-  // Copy 0 bytes; we're done
-  if (end === start) return 0
-  if (target.length === 0 || this.length === 0) return 0
-
-  // Fatal error conditions
-  if (targetStart < 0) {
-    throw new RangeError('targetStart out of bounds')
-  }
-  if (start < 0 || start >= this.length) throw new RangeError('Index out of range')
-  if (end < 0) throw new RangeError('sourceEnd out of bounds')
-
-  // Are we oob?
-  if (end > this.length) end = this.length
-  if (target.length - targetStart < end - start) {
-    end = target.length - targetStart + start
-  }
-
-  var len = end - start
-
-  if (this === target && typeof Uint8Array.prototype.copyWithin === 'function') {
-    // Use built-in when available, missing from IE11
-    this.copyWithin(targetStart, start, end)
-  } else if (this === target && start < targetStart && targetStart < end) {
-    // descending copy from end
-    for (var i = len - 1; i >= 0; --i) {
-      target[i + targetStart] = this[i + start]
-    }
-  } else {
-    Uint8Array.prototype.set.call(
-      target,
-      this.subarray(start, end),
-      targetStart
-    )
-  }
-
-  return len
-}
-
-// Usage:
-//    buffer.fill(number[, offset[, end]])
-//    buffer.fill(buffer[, offset[, end]])
-//    buffer.fill(string[, offset[, end]][, encoding])
-Buffer.prototype.fill = function fill (val, start, end, encoding) {
-  // Handle string cases:
-  if (typeof val === 'string') {
-    if (typeof start === 'string') {
-      encoding = start
-      start = 0
-      end = this.length
-    } else if (typeof end === 'string') {
-      encoding = end
-      end = this.length
-    }
-    if (encoding !== undefined && typeof encoding !== 'string') {
-      throw new TypeError('encoding must be a string')
-    }
-    if (typeof encoding === 'string' && !Buffer.isEncoding(encoding)) {
-      throw new TypeError('Unknown encoding: ' + encoding)
-    }
-    if (val.length === 1) {
-      var code = val.charCodeAt(0)
-      if ((encoding === 'utf8' && code < 128) ||
-          encoding === 'latin1') {
-        // Fast path: If `val` fits into a single byte, use that numeric value.
-        val = code
-      }
-    }
-  } else if (typeof val === 'number') {
-    val = val & 255
-  } else if (typeof val === 'boolean') {
-    val = Number(val)
-  }
-
-  // Invalid ranges are not set to a default, so can range check early.
-  if (start < 0 || this.length < start || this.length < end) {
-    throw new RangeError('Out of range index')
-  }
-
-  if (end <= start) {
-    return this
-  }
-
-  start = start >>> 0
-  end = end === undefined ? this.length : end >>> 0
-
-  if (!val) val = 0
-
-  var i
-  if (typeof val === 'number') {
-    for (i = start; i < end; ++i) {
-      this[i] = val
-    }
-  } else {
-    var bytes = Buffer.isBuffer(val)
-      ? val
-      : Buffer.from(val, encoding)
-    var len = bytes.length
-    if (len === 0) {
-      throw new TypeError('The value "' + val +
-        '" is invalid for argument "value"')
-    }
-    for (i = 0; i < end - start; ++i) {
-      this[i + start] = bytes[i % len]
-    }
-  }
-
-  return this
-}
-
-// HELPER FUNCTIONS
-// ================
-
-var INVALID_BASE64_RE = /[^+/0-9A-Za-z-_]/g
-
-function base64clean (str) {
-  // Node takes equal signs as end of the Base64 encoding
-  str = str.split('=')[0]
-  // Node strips out invalid characters like \n and \t from the string, base64-js does not
-  str = str.trim().replace(INVALID_BASE64_RE, '')
-  // Node converts strings with length < 2 to ''
-  if (str.length < 2) return ''
-  // Node allows for non-padded base64 strings (missing trailing ===), base64-js does not
-  while (str.length % 4 !== 0) {
-    str = str + '='
-  }
-  return str
-}
-
-function utf8ToBytes (string, units) {
-  units = units || Infinity
-  var codePoint
-  var length = string.length
-  var leadSurrogate = null
-  var bytes = []
-
-  for (var i = 0; i < length; ++i) {
-    codePoint = string.charCodeAt(i)
-
-    // is surrogate component
-    if (codePoint > 0xD7FF && codePoint < 0xE000) {
-      // last char was a lead
-      if (!leadSurrogate) {
-        // no lead yet
-        if (codePoint > 0xDBFF) {
-          // unexpected trail
-          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
-          continue
-        } else if (i + 1 === length) {
-          // unpaired lead
-          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
-          continue
-        }
-
-        // valid lead
-        leadSurrogate = codePoint
-
-        continue
-      }
-
-      // 2 leads in a row
-      if (codePoint < 0xDC00) {
-        if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
-        leadSurrogate = codePoint
-        continue
-      }
-
-      // valid surrogate pair
-      codePoint = (leadSurrogate - 0xD800 << 10 | codePoint - 0xDC00) + 0x10000
-    } else if (leadSurrogate) {
-      // valid bmp char, but last char was a lead
-      if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
-    }
-
-    leadSurrogate = null
-
-    // encode utf8
-    if (codePoint < 0x80) {
-      if ((units -= 1) < 0) break
-      bytes.push(codePoint)
-    } else if (codePoint < 0x800) {
-      if ((units -= 2) < 0) break
-      bytes.push(
-        codePoint >> 0x6 | 0xC0,
-        codePoint & 0x3F | 0x80
-      )
-    } else if (codePoint < 0x10000) {
-      if ((units -= 3) < 0) break
-      bytes.push(
-        codePoint >> 0xC | 0xE0,
-        codePoint >> 0x6 & 0x3F | 0x80,
-        codePoint & 0x3F | 0x80
-      )
-    } else if (codePoint < 0x110000) {
-      if ((units -= 4) < 0) break
-      bytes.push(
-        codePoint >> 0x12 | 0xF0,
-        codePoint >> 0xC & 0x3F | 0x80,
-        codePoint >> 0x6 & 0x3F | 0x80,
-        codePoint & 0x3F | 0x80
-      )
-    } else {
-      throw new Error('Invalid code point')
-    }
-  }
-
-  return bytes
-}
-
-function asciiToBytes (str) {
-  var byteArray = []
-  for (var i = 0; i < str.length; ++i) {
-    // Node's code seems to be doing this and not & 0x7F..
-    byteArray.push(str.charCodeAt(i) & 0xFF)
-  }
-  return byteArray
-}
-
-function utf16leToBytes (str, units) {
-  var c, hi, lo
-  var byteArray = []
-  for (var i = 0; i < str.length; ++i) {
-    if ((units -= 2) < 0) break
-
-    c = str.charCodeAt(i)
-    hi = c >> 8
-    lo = c % 256
-    byteArray.push(lo)
-    byteArray.push(hi)
-  }
-
-  return byteArray
-}
-
-function base64ToBytes (str) {
-  return base64.toByteArray(base64clean(str))
-}
-
-function blitBuffer (src, dst, offset, length) {
-  for (var i = 0; i < length; ++i) {
-    if ((i + offset >= dst.length) || (i >= src.length)) break
-    dst[i + offset] = src[i]
-  }
-  return i
-}
-
-// ArrayBuffer or Uint8Array objects from other contexts (i.e. iframes) do not pass
-// the `instanceof` check but they should be treated as of that type.
-// See: https://github.com/feross/buffer/issues/166
-function isInstance (obj, type) {
-  return obj instanceof type ||
-    (obj != null && obj.constructor != null && obj.constructor.name != null &&
-      obj.constructor.name === type.name)
-}
-function numberIsNaN (obj) {
-  // For IE11 support
-  return obj !== obj // eslint-disable-line no-self-compare
-}
-
-// Create lookup table for `toString('hex')`
-// See: https://github.com/feross/buffer/issues/219
-var hexSliceLookupTable = (function () {
-  var alphabet = '0123456789abcdef'
-  var table = new Array(256)
-  for (var i = 0; i < 16; ++i) {
-    var i16 = i * 16
-    for (var j = 0; j < 16; ++j) {
-      table[i16 + j] = alphabet[i] + alphabet[j]
-    }
-  }
-  return table
-})()
-
-}).call(this,require("buffer").Buffer)
-},{"base64-js":14,"buffer":16,"ieee754":30}],17:[function(require,module,exports){
-
-const CephesWrapper = require('./cephes-wrapper.js');
-
-// Compile async in the browser
-module.exports = new CephesWrapper(false);
-
-},{"./cephes-wrapper.js":18}],18:[function(require,module,exports){
-(function (Buffer){
-
-const fs = require('fs');
-
-const TOTAL_STACK = 1024 * 1024; // 1MB
-const TOTAL_MEMORY = 2 * 1024 * 1024; // 1MB
-const WASM_PAGE_SIZE = 64 * 1024; // Defined in WebAssembly specs
-
-const WASM_CODE = Buffer.from(require('./cephes.wasm.base64.json'), 'base64');
-
-class CephesWrapper {
-  constructor(sync) {
-    // Initialize the runtime's memory
-    this._wasmMemory = new WebAssembly.Memory({
-      'initial': TOTAL_MEMORY / WASM_PAGE_SIZE,
-      'maximum': TOTAL_MEMORY / WASM_PAGE_SIZE
-    });
-
-    this._HEAP8 = new Int8Array(this._wasmMemory.buffer);
-    this._HEAP16 = new Int16Array(this._wasmMemory.buffer);
-    this._HEAP32 = new Int32Array(this._wasmMemory.buffer);
-    this._HEAPF32 = new Float32Array(this._wasmMemory.buffer);
-    this._HEAPF64 = new Float64Array(this._wasmMemory.buffer);
-
-    // Compile and export program
-    if (sync) {
-      // compile synchronously
-      const program = this._compileSync();
-      this._exportProgram(program);
-
-      // create a dummy compile promise
-      this.compiled = Promise.resolve();
-    } else {
-      // create a singleton compile promise
-      this.compiled = this._compileAsync()
-        .then((program) => this._exportProgram(program));
-    }
-  }
-
-  _AsciiToString(ptr) {
-    let str = '';
-    while (1) {
-      const ch = this._HEAP8[((ptr++)>>0)];
-      if (ch === 0) return str;
-      str += String.fromCharCode(ch);
-    }
-  }
-
-  _mtherr(name /* char* */, code /* int */) {
-    // from mtherr.c
-    let codemsg = '';
-    switch (code) {
-      case 1: codemsg = 'argument domain error'; break;
-      case 2: codemsg = 'function singularity'; break;
-      case 3: codemsg = 'overflow range error'; break;
-      case 4: codemsg = 'underflow range error'; break;
-      case 5: codemsg = 'total loss of precision'; break;
-      case 6: codemsg = 'partial loss of precision'; break;
-      case 33: codemsg = 'Unix domain error code'; break;
-      case 34: codemsg = 'Unix range error code'; break;
-      default: codemsg = 'unknown error';
-    }
-
-    const fnname = this._AsciiToString(name);
-    const message = 'cephes reports "' + codemsg + '" in ' + fnname;
-
-    // Restore stack to the STACKTOP before throwing. This only works because
-    // all the exported cephes functions are plain functions.
-    this.stackRestore(0);
-
-    if (code == 1) {
-      throw new RangeError(message);
-    } else {
-      throw new Error(message);
-    }
-  }
-
-  _wasmImports() {
-    return {
-      'env': {
-        // cephes error handler
-        "_mtherr": this._mtherr.bind(this),
-
-        // memory
-        "memory": this._wasmMemory,
-        "STACKTOP": 0,
-        "STACK_MAX": TOTAL_STACK
-      }
-    };
-  }
-
-  _compileSync() {
-    return new WebAssembly.Instance(
-      new WebAssembly.Module(WASM_CODE),
-      this._wasmImports()
-    );
-  }
-
-  _compileAsync() {
-    return WebAssembly.instantiate(
-      WASM_CODE,
-      this._wasmImports()
-    ).then((results) => results.instance);
-  }
-
-  _exportProgram(program) {
-    // export cephes functions
-    for (const key of Object.keys(program.exports)) {
-      if (key.startsWith('_cephes_')) {
-        this[key] = program.exports[key];
-      }
-    }
-
-    // export special stack functions
-    this.stackAlloc = program.exports.stackAlloc;
-    this.stackRestore = program.exports.stackRestore;
-    this.stackSave = program.exports.stackSave;
-  }
-
-  // export helper functions
-  getValue(ptr, type) {
-    type = type || 'i8';
-    if (type.charAt(type.length-1) === '*') type = 'i32'; // pointers are 32-bit
-      switch(type) {
-        case 'i1': return this._HEAP8[((ptr)>>0)];
-        case 'i8': return this._HEAP8[((ptr)>>0)];
-        case 'i16': return this._HEAP16[((ptr)>>1)];
-        case 'i32': return this._HEAP32[((ptr)>>2)];
-        case 'i64': return this._HEAP32[((ptr)>>2)];
-        case 'float': return this._HEAPF32[((ptr)>>2)];
-        case 'double': return this._HEAPF64[((ptr)>>3)];
-        default: throw new Error('invalid type for getValue: ' + type);
-      }
-    return null;
-  }
-
-  writeArrayToMemory(array, buffer) {
-    this._HEAP8.set(array, buffer);
-  }
-}
-
-module.exports = CephesWrapper;
-
-}).call(this,require("buffer").Buffer)
-},{"./cephes.wasm.base64.json":19,"buffer":16,"fs":15}],19:[function(require,module,exports){
-module.exports="AGFzbQEAAAABkwEWYAJ/fwF/YAF/AX9gAAF/YAF/AGACf38AYAF8AXxgBXx/f39/AX9gAnx8AXxgA39/fAF8YAN8fHwBfGADfH9/AXxgBnx8f39/fwF/YAJ/fAF8YAJ8fwF8YAF/AXxgA3x/fwF/YAR8fHx8AXxgBXx8fHx/AXxgBXx8fH9/AXxgAXwBf2AEf3x/fwF8YAR8f39/AX8CHgIDZW52B19tdGhlcnIAAANlbnYGbWVtb3J5AgEgIAONAYsBAQIDBAUGBQUFBQcFCAgIBwcJBQoHBwcFBQUHBwULBQUFBQwNDggICA0NDwUFCQkQEQkSBQUFBQcHBwkJCRMTEwcFBQUFDAcHBxQFBQUFDAwFDAUFBQUICAgFBQUFDAwMBwcHBQoKDAcNBQUFDw8FBQkVBQUFBQwMEREHBwUNBQUNBQUFBQUMBwUBAwYQAn8BQeCAAQt/AUHggMEACweMEIQBDF9jZXBoZXNfYWNvcwAIDV9jZXBoZXNfYWNvc2gABQxfY2VwaGVzX2FpcnkABgxfY2VwaGVzX2FzaW4ABw1fY2VwaGVzX2FzaW5oAAkMX2NlcGhlc19hdGFuAAoNX2NlcGhlc19hdGFuMgALDV9jZXBoZXNfYXRhbmgADAxfY2VwaGVzX2JkdHIADg1fY2VwaGVzX2JkdHJjAA0NX2NlcGhlc19iZHRyaQAPDF9jZXBoZXNfYmV0YQAQDV9jZXBoZXNfYnRkdHIAEgxfY2VwaGVzX2NicnQAEw5fY2VwaGVzX2NoYmV2bAAUDV9jZXBoZXNfY2hkdHIAFg5fY2VwaGVzX2NoZHRyYwAVDl9jZXBoZXNfY2hkdHJpABcLX2NlcGhlc19jb3MAcA1fY2VwaGVzX2Nvc2RnAHQMX2NlcGhlc19jb3NoABgNX2NlcGhlc19jb3NtMQCGAQtfY2VwaGVzX2NvdAB/DV9jZXBoZXNfY290ZGcAggENX2NlcGhlc19kYXdzbgAZCl9jZXBoZXNfZWkAGg1fY2VwaGVzX2VsbGllABsNX2NlcGhlc19lbGxpawAcDV9jZXBoZXNfZWxscGUAHQ1fY2VwaGVzX2VsbHBqAB4NX2NlcGhlc19lbGxwawAfC19jZXBoZXNfZXJmAFwMX2NlcGhlc19lcmZjAFsLX2NlcGhlc19leHAAIA1fY2VwaGVzX2V4cDEwACEMX2NlcGhlc19leHAyACINX2NlcGhlc19leHBtMQCFAQxfY2VwaGVzX2V4cG4AIw1fY2VwaGVzX2V4cHgyACQLX2NlcGhlc19mYWMAJQxfY2VwaGVzX2ZkdHIAJw1fY2VwaGVzX2ZkdHJjACYNX2NlcGhlc19mZHRyaQAoDl9jZXBoZXNfZnJlc25sACsNX2NlcGhlc19mcmV4cAApDV9jZXBoZXNfZ2FtbWEALAxfY2VwaGVzX2dkdHIALg1fY2VwaGVzX2dkdHJjAC8OX2NlcGhlc19oeXAyZjAAMw5fY2VwaGVzX2h5cDJmMQAwDl9jZXBoZXNfaHlwZXJnADIKX2NlcGhlc19pMAA0C19jZXBoZXNfaTBlADUKX2NlcGhlc19pMQA2C19jZXBoZXNfaTFlADcMX2NlcGhlc19pZ2FtADkNX2NlcGhlc19pZ2FtYwA4DV9jZXBoZXNfaWdhbWkAOg5fY2VwaGVzX2luY2JldAA7DV9jZXBoZXNfaW5jYmkAPRBfY2VwaGVzX2lzZmluaXRlAEANX2NlcGhlc19pc25hbgA/Cl9jZXBoZXNfaXYAQQpfY2VwaGVzX2owAEIKX2NlcGhlc19qMQBECl9jZXBoZXNfam4ARgpfY2VwaGVzX2p2AEcKX2NlcGhlc19rMABLC19jZXBoZXNfazBlAEwKX2NlcGhlc19rMQBNC19jZXBoZXNfazFlAE4KX2NlcGhlc19rbgBPD19jZXBoZXNfa29sbW9naQBTEl9jZXBoZXNfa29sbW9nb3JvdgBRDV9jZXBoZXNfbGJldGEAEQ1fY2VwaGVzX2xkZXhwACoMX2NlcGhlc19sZ2FtAC0LX2NlcGhlc19sb2cAVA1fY2VwaGVzX2xvZzEwAFUNX2NlcGhlc19sb2cxcACEAQxfY2VwaGVzX2xvZzIAVg1fY2VwaGVzX25iZHRyAFgOX2NlcGhlc19uYmR0cmMAVw5fY2VwaGVzX25iZHRyaQBZDF9jZXBoZXNfbmR0cgBaDV9jZXBoZXNfbmR0cmkAXQ1fY2VwaGVzX29uZWYyAHkNX2NlcGhlc19wMWV2bABmDF9jZXBoZXNfcGR0cgBfDV9jZXBoZXNfcGR0cmMAXg1fY2VwaGVzX3BkdHJpAGAPX2NlcGhlc19wbGFuY2tjAGIPX2NlcGhlc19wbGFuY2tkAGMPX2NlcGhlc19wbGFuY2tpAGEPX2NlcGhlc19wbGFuY2t3AGQOX2NlcGhlc19wb2xldmwAZQ9fY2VwaGVzX3BvbHlsb2cAZwtfY2VwaGVzX3BvdwBoDF9jZXBoZXNfcG93aQBpC19jZXBoZXNfcHNpAGoOX2NlcGhlc19yYWRpYW4AcQ5fY2VwaGVzX3JnYW1tYQBrDV9jZXBoZXNfcm91bmQAbA5fY2VwaGVzX3NoaWNoaQBtDF9jZXBoZXNfc2ljaQBuD19jZXBoZXNfc2lnbmJpdAA+C19jZXBoZXNfc2luAG8OX2NlcGhlc19zaW5jb3MAcg1fY2VwaGVzX3NpbmRnAHMMX2NlcGhlc19zaW5oAHUPX2NlcGhlc19zbWlybm92AFAQX2NlcGhlc19zbWlybm92aQBSDl9jZXBoZXNfc3BlbmNlAHYNX2NlcGhlc19zdGR0cgB3Dl9jZXBoZXNfc3RkdHJpAHgOX2NlcGhlc19zdHJ1dmUAewtfY2VwaGVzX3RhbgB9DV9jZXBoZXNfdGFuZGcAgAEMX2NlcGhlc190YW5oAIMBD19jZXBoZXNfdGhyZWVmMAB6Cl9jZXBoZXNfeTAAQwpfY2VwaGVzX3kxAEUKX2NlcGhlc195bgCHAQpfY2VwaGVzX3l2AHwMX2NlcGhlc196ZXRhAIgBDV9jZXBoZXNfemV0YWMAiQEFX2ZyZWUAiwEHX21hbGxvYwCKARNlc3RhYmxpc2hTdGFja1NwYWNlAAQKc3RhY2tBbGxvYwABDHN0YWNrUmVzdG9yZQADCXN0YWNrU2F2ZQACCo39AosBGwEBfyMAIQEgACMAaiQAIwBBD2pBcHEkACABCwQAIwALBgAgACQACwoAIAAkACABJAELmgEBAXwgAEQAAAAAAADwP2MEQEGA8wBBARAAGkHw8gArAwAPCyAARAAAAACE15dBZARAQejyACsDACIBIABhBEAgAQ8LIAAQVEHQ8gArAwCgDwsgAEQAAAAAAADwv6AiAUQAAAAAAADgP2MEfCABnyABQYAIQQQQZSABQbAIQQUQZqOiBSABIABEAAAAAAAA8D+gop8gAKAQVAsLigkCAX8IfCAARAwCK4cW+VlAZARAIAFEAAAAAAAAAAA5AwAgAkQAAAAAAAAAADkDACADQZjyACsDADkDACAEQZjyACsDADkD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aGR0cgBjaGR0cmkAY29zaABlaQBlbGxpawBlbGxwZQBlbGxwagBlbGxwawBleHBuAGZhYwBmZHRyYwBmZHRyAGZkdHJpAGdhbW1hAGxnYW0AZ2R0cgBnZHRyYwBoeXAyZjEAaHlwZXJnAGlnYW1jAGlnYW0AaWdhbWkAaW5jYmV0AGluY2JpAGl2AHkwAHkxAEp2AGp2AGswAGswZQBrMQBrMWUAa24Ac21pcm5vdmkAa29sbW9naQBsb2cAbG9nMTAAbG9nMgBuYmR0cgBuYmR0cmkAZXJmYwBuZHRyaQBwZHRyYwBwZHRyAHBkdHJpAHBvbHlsb2cAcG93AHBvdwBwb3dpAHBzaQByZ2FtbWEAc2luAGNvcwBzaW5kZwBjb3NkZwBzaW5oAHNwZW5jZQBzdGR0cgBzdGR0cmkAdGFuAGNvdAB0YW5kZwBjb3RkZwB5bgB6ZXRhAHpldGFjANoPBG5hbWUB0g+MAQAHX210aGVycgEKc3RhY2tBbGxvYwIJc3RhY2tTYXZlAwxzdGFja1Jlc3RvcmUEE2VzdGFibGlzaFN0YWNrU3BhY2UFDV9jZXBoZXNfYWNvc2gGDF9jZXBoZXNfYWlyeQcMX2NlcGhlc19hc2luCAxfY2VwaGVzX2Fjb3MJDV9jZXBoZXNfYXNpbmgKDF9jZXBoZXNfYXRhbgsNX2NlcGhlc19hdGFuMgwNX2NlcGhlc19hdGFuaA0NX2NlcGhlc19iZHRyYw4MX2NlcGhlc19iZHRyDw1fY2VwaGVzX2JkdHJpEAxfY2VwaGVzX2JldGERDV9jZXBoZXNfbGJldGESDV9jZXBoZXNfYnRkdHITDF9jZXBoZXNfY2JydBQOX2NlcGhlc19jaGJldmwVDl9jZXBoZXNfY2hkdHJjFg1fY2VwaGVzX2NoZHRyFw5fY2VwaGVzX2NoZHRyaRgMX2NlcGhlc19jb3NoGQ1fY2VwaGVzX2Rhd3NuGgpfY2VwaGVzX2VpGw1fY2VwaGVzX2VsbGllHA1fY2VwaGVzX2VsbGlrHQ1fY2VwaGVzX2VsbHBlHg1fY2VwaGVzX2VsbHBqHw1fY2VwaGVzX2VsbHBrIAtfY2VwaGVzX2V4cCENX2NlcGhlc19leHAxMCIMX2NlcGhlc19leHAyIwxfY2VwaGVzX2V4cG4kDV9jZXBoZXNfZXhweDIlC19jZXBoZXNfZmFjJg1fY2VwaGVzX2ZkdHJjJwxfY2VwaGVzX2ZkdHIoDV9jZXBoZXNfZmR0cmkpDV9jZXBoZXNfZnJleHAqDV9jZXBoZXNfbGRleHArDl9jZXBoZXNfZnJlc25sLA1fY2VwaGVzX2dhbW1hLQxfY2VwaGVzX2xnYW0uDF9jZXBoZXNfZ2R0ci8NX2NlcGhlc19nZHRyYzAOX2NlcGhlc19oeXAyZjExB19oeXQyZjEyDl9jZXBoZXNfaHlwZXJnMw5fY2VwaGVzX2h5cDJmMDQKX2NlcGhlc19pMDULX2NlcGhlc19pMGU2Cl9jZXBoZXNfaTE3C19jZXBoZXNfaTFlOA1fY2VwaGVzX2lnYW1jOQxfY2VwaGVzX2lnYW06DV9jZXBoZXNfaWdhbWk7Dl9jZXBoZXNfaW5jYmV0PAhfcHNlcmllcz0NX2NlcGhlc19pbmNiaT4PX2NlcGhlc19zaWduYml0Pw1fY2VwaGVzX2lzbmFuQBBfY2VwaGVzX2lzZmluaXRlQQpfY2VwaGVzX2l2QgpfY2VwaGVzX2owQwpfY2VwaGVzX3kwRApfY2VwaGVzX2oxRQpfY2VwaGVzX3kxRgpfY2VwaGVzX2puRwpfY2VwaGVzX2p2SARfanZzSQdfaGFua2VsSgZfcmVjdXJLCl9jZXBoZXNfazBMC19jZXBoZXNfazBlTQpfY2VwaGVzX2sxTgtfY2VwaGVzX2sxZU8KX2NlcGhlc19rblAPX2NlcGhlc19zbWlybm92URJfY2VwaGVzX2tvbG1vZ29yb3ZSEF9jZXBoZXNfc21pcm5vdmlTD19jZXBoZXNfa29sbW9naVQLX2NlcGhlc19sb2dVDV9jZXBoZXNfbG9nMTBWDF9jZXBoZXNfbG9nMlcOX2NlcGhlc19uYmR0cmNYDV9jZXBoZXNfbmJkdHJZDl9jZXBoZXNfbmJkdHJpWgxfY2VwaGVzX25kdHJbDF9jZXBoZXNfZXJmY1wLX2NlcGhlc19lcmZdDV9jZXBoZXNfbmR0cmleDV9jZXBoZXNfcGR0cmNfDF9jZXBoZXNfcGR0cmANX2NlcGhlc19wZHRyaWEPX2NlcGhlc19wbGFuY2tpYg9fY2VwaGVzX3BsYW5ja2NjD19jZXBoZXNfcGxhbmNrZGQPX2NlcGhlc19wbGFuY2t3ZQ5fY2VwaGVzX3BvbGV2bGYNX2NlcGhlc19wMWV2bGcPX2NlcGhlc19wb2x5bG9naAtfY2VwaGVzX3Bvd2kMX2NlcGhlc19wb3dpagtfY2VwaGVzX3BzaWsOX2NlcGhlc19yZ2FtbWFsDV9jZXBoZXNfcm91bmRtDl9jZXBoZXNfc2hpY2hpbgxfY2VwaGVzX3NpY2lvC19jZXBoZXNfc2lucAtfY2VwaGVzX2Nvc3EOX2NlcGhlc19yYWRpYW5yDl9jZXBoZXNfc2luY29zcw1fY2VwaGVzX3NpbmRndA1fY2VwaGVzX2Nvc2RndQxfY2VwaGVzX3Npbmh2Dl9jZXBoZXNfc3BlbmNldw1fY2VwaGVzX3N0ZHRyeA5fY2VwaGVzX3N0ZHRyaXkNX2NlcGhlc19vbmVmMnoPX2NlcGhlc190aHJlZWYwew5fY2VwaGVzX3N0cnV2ZXwKX2NlcGhlc195dn0LX2NlcGhlc190YW5+B190YW5jb3R/C19jZXBoZXNfY290gAENX2NlcGhlc190YW5kZ4EBC190YW5jb3RfMjI0ggENX2NlcGhlc19jb3RkZ4MBDF9jZXBoZXNfdGFuaIQBDV9jZXBoZXNfbG9nMXCFAQ1fY2VwaGVzX2V4cG0xhgENX2NlcGhlc19jb3NtMYcBCl9jZXBoZXNfeW6IAQxfY2VwaGVzX3pldGGJAQ1fY2VwaGVzX3pldGFjigEHX21hbGxvY4sBBV9mcmVl"
-
-},{}],20:[function(require,module,exports){
-
-const cephes = require('./cephes.js');
-
-// Export compiled promise, in Node.js this is just a dummy promise as the
-// WebAssembly program will be compiled synchronously. It takes about 20ms
-// as of Node.js v10.6.1.
-exports.compiled = cephes.compiled;
-
-// from cephes/isnan.c
-exports.signbit = function signbit(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: int
-  const fn_ret = cephes._cephes_signbit(carg_x) | 0;
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/isnan.c
-exports.isnan = function isnan(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: int
-  const fn_ret = cephes._cephes_isnan(carg_x) | 0;
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/isnan.c
-exports.isfinite = function isfinite(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: int
-  const fn_ret = cephes._cephes_isfinite(carg_x) | 0;
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/cbrt.c
-exports.cbrt = function cbrt(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cbrt(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/polevl.c
-exports.polevl = function polevl(/* double */ x, /* double[] */ coef, /* int */ N) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double[] coef
-  if (!(coef instanceof Float64Array)) {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('coef must be either a Float64Array');
-  }
-  const carg_coef = cephes.stackAlloc(coef.length << 3);
-  cephes.writeArrayToMemory(new Uint8Array(coef.buffer, coef.byteOffset, coef.byteLength), carg_coef);
-
-  // argument: int N
-  if (typeof N !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('N must be a number');
-  }
-  const carg_N = N | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_polevl(carg_x, carg_coef, carg_N);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/chbevl.c
-exports.chbevl = function chbevl(/* double */ x, /* double[] */ array, /* int */ n) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double[] array
-  if (!(array instanceof Float64Array)) {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('array must be either a Float64Array');
-  }
-  const carg_array = cephes.stackAlloc(array.length << 3);
-  cephes.writeArrayToMemory(new Uint8Array(array.buffer, array.byteOffset, array.byteLength), carg_array);
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_chbevl(carg_x, carg_array, carg_n);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/round.c
-exports.round = function round(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_round(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/floor.c
-exports.frexp = function frexp(/* double */ x) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: int* pw2
-  const carg_pw2 = cephes.stackAlloc(4); // No need to zero-set it.
-
-  // return: double
-  const fn_ret = cephes._cephes_frexp(carg_x, carg_pw2);
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'pw2': cephes.getValue(carg_pw2, 'i32'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/floor.c
-exports.ldexp = function ldexp(/* double */ x, /* int */ pw2) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: int pw2
-  if (typeof pw2 !== 'number') {
-    throw new TypeError('pw2 must be a number');
-  }
-  const carg_pw2 = pw2 | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_ldexp(carg_x, carg_pw2);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/expx2.c
-exports.expx2 = function expx2(/* double */ x, /* int */ sign) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: int sign
-  if (typeof sign !== 'number') {
-    throw new TypeError('sign must be a number');
-  }
-  const carg_sign = sign | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_expx2(carg_x, carg_sign);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sin.c
-exports.radian = function radian(/* double */ d, /* double */ m, /* double */ s) {
-  // argument: double d
-  if (typeof d !== 'number') {
-    throw new TypeError('d must be a number');
-  }
-  const carg_d = d;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // argument: double s
-  if (typeof s !== 'number') {
-    throw new TypeError('s must be a number');
-  }
-  const carg_s = s;
-
-  // return: double
-  const fn_ret = cephes._cephes_radian(carg_d, carg_m, carg_s);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sincos.c
-exports.sincos = function sincos(/* double */ x, /* int */ flg) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double* s
-  const carg_s = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* c
-  const carg_c = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: int flg
-  if (typeof flg !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('flg must be a number');
-  }
-  const carg_flg = flg | 0;
-
-  // return: int
-  const fn_ret = cephes._cephes_sincos(carg_x, carg_s, carg_c, carg_flg) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    's': cephes.getValue(carg_s, 'double'),
-    'c': cephes.getValue(carg_c, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/tan.c
-exports.cot = function cot(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cot(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/tandg.c
-exports.cotdg = function cotdg(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cotdg(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/unity.c
-exports.log1p = function log1p(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_log1p(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/unity.c
-exports.expm1 = function expm1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_expm1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/unity.c
-exports.cosm1 = function cosm1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cosm1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/asin.c
-exports.acos = function acos(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_acos(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/acosh.c
-exports.acosh = function acosh(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_acosh(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/asinh.c
-exports.asinh = function asinh(/* double */ xx) {
-  // argument: double xx
-  if (typeof xx !== 'number') {
-    throw new TypeError('xx must be a number');
-  }
-  const carg_xx = xx;
-
-  // return: double
-  const fn_ret = cephes._cephes_asinh(carg_xx);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/atanh.c
-exports.atanh = function atanh(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_atanh(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/asin.c
-exports.asin = function asin(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_asin(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/atan.c
-exports.atan = function atan(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_atan(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/atan.c
-exports.atan2 = function atan2(/* double */ y, /* double */ x) {
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_atan2(carg_y, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sin.c
-exports.cos = function cos(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cos(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sindg.c
-exports.cosdg = function cosdg(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cosdg(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/exp.c
-exports.exp = function exp(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_exp(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/exp2.c
-exports.exp2 = function exp2(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_exp2(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/exp10.c
-exports.exp10 = function exp10(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_exp10(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/cosh.c
-exports.cosh = function cosh(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_cosh(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sinh.c
-exports.sinh = function sinh(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_sinh(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/tanh.c
-exports.tanh = function tanh(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_tanh(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/log.c
-exports.log = function log(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_log(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/log2.c
-exports.log2 = function log2(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_log2(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/log10.c
-exports.log10 = function log10(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_log10(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/pow.c
-exports.pow = function pow(/* double */ x, /* double */ y) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_pow(carg_x, carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/powi.c
-exports.powi = function powi(/* double */ x, /* int */ nn) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: int nn
-  if (typeof nn !== 'number') {
-    throw new TypeError('nn must be a number');
-  }
-  const carg_nn = nn | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_powi(carg_x, carg_nn);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sin.c
-exports.sin = function sin(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_sin(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/sindg.c
-exports.sindg = function sindg(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_sindg(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/tan.c
-exports.tan = function tan(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_tan(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/tandg.c
-exports.tandg = function tandg(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_tandg(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ei.c
-exports.ei = function ei(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_ei(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/expn.c
-exports.expn = function expn(/* int */ n, /* double */ x) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_expn(carg_n, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/shichi.c
-exports.shichi = function shichi(/* double */ x) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double* si
-  const carg_si = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* ci
-  const carg_ci = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // return: int
-  const fn_ret = cephes._cephes_shichi(carg_x, carg_si, carg_ci) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'si': cephes.getValue(carg_si, 'double'),
-    'ci': cephes.getValue(carg_ci, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/sici.c
-exports.sici = function sici(/* double */ x) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double* si
-  const carg_si = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* ci
-  const carg_ci = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // return: int
-  const fn_ret = cephes._cephes_sici(carg_x, carg_si, carg_ci) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'si': cephes.getValue(carg_si, 'double'),
-    'ci': cephes.getValue(carg_ci, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/beta.c
-exports.lbeta = function lbeta(/* double */ a, /* double */ b) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // return: double
-  const fn_ret = cephes._cephes_lbeta(carg_a, carg_b);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/beta.c
-exports.beta = function beta(/* double */ a, /* double */ b) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // return: double
-  const fn_ret = cephes._cephes_beta(carg_a, carg_b);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/fac.c
-exports.fac = function fac(/* int */ i) {
-  // argument: int i
-  if (typeof i !== 'number') {
-    throw new TypeError('i must be a number');
-  }
-  const carg_i = i | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_fac(carg_i);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/gamma.c
-exports.gamma = function gamma(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_gamma(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/gamma.c
-exports.lgam = function lgam(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_lgam(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/incbet.c
-exports.incbet = function incbet(/* double */ aa, /* double */ bb, /* double */ xx) {
-  // argument: double aa
-  if (typeof aa !== 'number') {
-    throw new TypeError('aa must be a number');
-  }
-  const carg_aa = aa;
-
-  // argument: double bb
-  if (typeof bb !== 'number') {
-    throw new TypeError('bb must be a number');
-  }
-  const carg_bb = bb;
-
-  // argument: double xx
-  if (typeof xx !== 'number') {
-    throw new TypeError('xx must be a number');
-  }
-  const carg_xx = xx;
-
-  // return: double
-  const fn_ret = cephes._cephes_incbet(carg_aa, carg_bb, carg_xx);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/incbi.c
-exports.incbi = function incbi(/* double */ aa, /* double */ bb, /* double */ yy0) {
-  // argument: double aa
-  if (typeof aa !== 'number') {
-    throw new TypeError('aa must be a number');
-  }
-  const carg_aa = aa;
-
-  // argument: double bb
-  if (typeof bb !== 'number') {
-    throw new TypeError('bb must be a number');
-  }
-  const carg_bb = bb;
-
-  // argument: double yy0
-  if (typeof yy0 !== 'number') {
-    throw new TypeError('yy0 must be a number');
-  }
-  const carg_yy0 = yy0;
-
-  // return: double
-  const fn_ret = cephes._cephes_incbi(carg_aa, carg_bb, carg_yy0);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/igam.c
-exports.igam = function igam(/* double */ a, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_igam(carg_a, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/igam.c
-exports.igamc = function igamc(/* double */ a, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_igamc(carg_a, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/igami.c
-exports.igami = function igami(/* double */ a, /* double */ y0) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double y0
-  if (typeof y0 !== 'number') {
-    throw new TypeError('y0 must be a number');
-  }
-  const carg_y0 = y0;
-
-  // return: double
-  const fn_ret = cephes._cephes_igami(carg_a, carg_y0);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/psi.c
-exports.psi = function psi(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_psi(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/rgamma.c
-exports.rgamma = function rgamma(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_rgamma(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ndtr.c
-exports.erf = function erf(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_erf(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ndtr.c
-exports.erfc = function erfc(/* double */ a) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // return: double
-  const fn_ret = cephes._cephes_erfc(carg_a);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/dawsn.c
-exports.dawsn = function dawsn(/* double */ xx) {
-  // argument: double xx
-  if (typeof xx !== 'number') {
-    throw new TypeError('xx must be a number');
-  }
-  const carg_xx = xx;
-
-  // return: double
-  const fn_ret = cephes._cephes_dawsn(carg_xx);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/fresnl.c
-exports.fresnl = function fresnl(/* double */ xxa) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double xxa
-  if (typeof xxa !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('xxa must be a number');
-  }
-  const carg_xxa = xxa;
-
-  // argument: double* ssa
-  const carg_ssa = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* cca
-  const carg_cca = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // return: int
-  const fn_ret = cephes._cephes_fresnl(carg_xxa, carg_ssa, carg_cca) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'ssa': cephes.getValue(carg_ssa, 'double'),
-    'cca': cephes.getValue(carg_cca, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/airy.c
-exports.airy = function airy(/* double */ x) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double* ai
-  const carg_ai = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* aip
-  const carg_aip = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* bi
-  const carg_bi = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* bip
-  const carg_bip = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // return: int
-  const fn_ret = cephes._cephes_airy(carg_x, carg_ai, carg_aip, carg_bi, carg_bip) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'ai': cephes.getValue(carg_ai, 'double'),
-    'aip': cephes.getValue(carg_aip, 'double'),
-    'bi': cephes.getValue(carg_bi, 'double'),
-    'bip': cephes.getValue(carg_bip, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/j0.c
-exports.j0 = function j0(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_j0(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/j1.c
-exports.j1 = function j1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_j1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/jn.c
-exports.jn = function jn(/* int */ n, /* double */ x) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_jn(carg_n, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/jv.c
-exports.jv = function jv(/* double */ n, /* double */ x) {
-  // argument: double n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_jv(carg_n, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/j0.c
-exports.y0 = function y0(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_y0(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/j1.c
-exports.y1 = function y1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_y1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/yn.c
-exports.yn = function yn(/* int */ n, /* double */ x) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_yn(carg_n, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/struve.c
-exports.yv = function yv(/* double */ v, /* double */ x) {
-  // argument: double v
-  if (typeof v !== 'number') {
-    throw new TypeError('v must be a number');
-  }
-  const carg_v = v;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_yv(carg_v, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/i0.c
-exports.i0 = function i0(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_i0(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/i0.c
-exports.i0e = function i0e(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_i0e(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/i1.c
-exports.i1 = function i1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_i1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/i1.c
-exports.i1e = function i1e(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_i1e(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/iv.c
-exports.iv = function iv(/* double */ v, /* double */ x) {
-  // argument: double v
-  if (typeof v !== 'number') {
-    throw new TypeError('v must be a number');
-  }
-  const carg_v = v;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_iv(carg_v, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/k0.c
-exports.k0 = function k0(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_k0(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/k0.c
-exports.k0e = function k0e(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_k0e(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/k1.c
-exports.k1 = function k1(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_k1(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/k1.c
-exports.k1e = function k1e(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_k1e(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/kn.c
-exports.kn = function kn(/* int */ nn, /* double */ x) {
-  // argument: int nn
-  if (typeof nn !== 'number') {
-    throw new TypeError('nn must be a number');
-  }
-  const carg_nn = nn | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_kn(carg_nn, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/hyperg.c
-exports.hyperg = function hyperg(/* double */ a, /* double */ b, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_hyperg(carg_a, carg_b, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/hyp2f1.c
-exports.hyp2f1 = function hyp2f1(/* double */ a, /* double */ b, /* double */ c, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // argument: double c
-  if (typeof c !== 'number') {
-    throw new TypeError('c must be a number');
-  }
-  const carg_c = c;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_hyp2f1(carg_a, carg_b, carg_c, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ellpe.c
-exports.ellpe = function ellpe(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_ellpe(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ellie.c
-exports.ellie = function ellie(/* double */ phi, /* double */ m) {
-  // argument: double phi
-  if (typeof phi !== 'number') {
-    throw new TypeError('phi must be a number');
-  }
-  const carg_phi = phi;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // return: double
-  const fn_ret = cephes._cephes_ellie(carg_phi, carg_m);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ellpk.c
-exports.ellpk = function ellpk(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_ellpk(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ellik.c
-exports.ellik = function ellik(/* double */ phi, /* double */ m) {
-  // argument: double phi
-  if (typeof phi !== 'number') {
-    throw new TypeError('phi must be a number');
-  }
-  const carg_phi = phi;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // return: double
-  const fn_ret = cephes._cephes_ellik(carg_phi, carg_m);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ellpj.c
-exports.ellpj = function ellpj(/* double */ u, /* double */ m) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double u
-  if (typeof u !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('u must be a number');
-  }
-  const carg_u = u;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // argument: double* sn
-  const carg_sn = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* cn
-  const carg_cn = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* dn
-  const carg_dn = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // argument: double* ph
-  const carg_ph = cephes.stackAlloc(8); // No need to zero-set it.
-
-  // return: int
-  const fn_ret = cephes._cephes_ellpj(carg_u, carg_m, carg_sn, carg_cn, carg_dn, carg_ph) | 0;
-
-  // There are pointers, so return the values of thoese too
-  const ret = [fn_ret, {
-    'sn': cephes.getValue(carg_sn, 'double'),
-    'cn': cephes.getValue(carg_cn, 'double'),
-    'dn': cephes.getValue(carg_dn, 'double'),
-    'ph': cephes.getValue(carg_ph, 'double'),
-  }];
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/btdtr.c
-exports.btdtr = function btdtr(/* double */ a, /* double */ b, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_btdtr(carg_a, carg_b, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/kolmogorov.c
-exports.smirnov = function smirnov(/* int */ n, /* double */ e) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double e
-  if (typeof e !== 'number') {
-    throw new TypeError('e must be a number');
-  }
-  const carg_e = e;
-
-  // return: double
-  const fn_ret = cephes._cephes_smirnov(carg_n, carg_e);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/kolmogorov.c
-exports.kolmogorov = function kolmogorov(/* double */ y) {
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_kolmogorov(carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/kolmogorov.c
-exports.smirnovi = function smirnovi(/* int */ n, /* double */ p) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_smirnovi(carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/kolmogorov.c
-exports.kolmogi = function kolmogi(/* double */ p) {
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_kolmogi(carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/nbdtr.c
-exports.nbdtri = function nbdtri(/* int */ k, /* int */ n, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_nbdtri(carg_k, carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/stdtr.c
-exports.stdtri = function stdtri(/* int */ k, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_stdtri(carg_k, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/bdtr.c
-exports.bdtr = function bdtr(/* int */ k, /* int */ n, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_bdtr(carg_k, carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/bdtr.c
-exports.bdtrc = function bdtrc(/* int */ k, /* int */ n, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_bdtrc(carg_k, carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/bdtr.c
-exports.bdtri = function bdtri(/* int */ k, /* int */ n, /* double */ y) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_bdtri(carg_k, carg_n, carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/chdtr.c
-exports.chdtr = function chdtr(/* double */ df, /* double */ x) {
-  // argument: double df
-  if (typeof df !== 'number') {
-    throw new TypeError('df must be a number');
-  }
-  const carg_df = df;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_chdtr(carg_df, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/chdtr.c
-exports.chdtrc = function chdtrc(/* double */ df, /* double */ x) {
-  // argument: double df
-  if (typeof df !== 'number') {
-    throw new TypeError('df must be a number');
-  }
-  const carg_df = df;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_chdtrc(carg_df, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/chdtr.c
-exports.chdtri = function chdtri(/* double */ df, /* double */ y) {
-  // argument: double df
-  if (typeof df !== 'number') {
-    throw new TypeError('df must be a number');
-  }
-  const carg_df = df;
-
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_chdtri(carg_df, carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/fdtr.c
-exports.fdtr = function fdtr(/* int */ ia, /* int */ ib, /* double */ x) {
-  // argument: int ia
-  if (typeof ia !== 'number') {
-    throw new TypeError('ia must be a number');
-  }
-  const carg_ia = ia | 0;
-
-  // argument: int ib
-  if (typeof ib !== 'number') {
-    throw new TypeError('ib must be a number');
-  }
-  const carg_ib = ib | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_fdtr(carg_ia, carg_ib, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/fdtr.c
-exports.fdtrc = function fdtrc(/* int */ ia, /* int */ ib, /* double */ x) {
-  // argument: int ia
-  if (typeof ia !== 'number') {
-    throw new TypeError('ia must be a number');
-  }
-  const carg_ia = ia | 0;
-
-  // argument: int ib
-  if (typeof ib !== 'number') {
-    throw new TypeError('ib must be a number');
-  }
-  const carg_ib = ib | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_fdtrc(carg_ia, carg_ib, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/fdtr.c
-exports.fdtri = function fdtri(/* int */ ia, /* int */ ib, /* double */ y) {
-  // argument: int ia
-  if (typeof ia !== 'number') {
-    throw new TypeError('ia must be a number');
-  }
-  const carg_ia = ia | 0;
-
-  // argument: int ib
-  if (typeof ib !== 'number') {
-    throw new TypeError('ib must be a number');
-  }
-  const carg_ib = ib | 0;
-
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_fdtri(carg_ia, carg_ib, carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/gdtr.c
-exports.gdtr = function gdtr(/* double */ a, /* double */ b, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_gdtr(carg_a, carg_b, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/gdtr.c
-exports.gdtrc = function gdtrc(/* double */ a, /* double */ b, /* double */ x) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // argument: double b
-  if (typeof b !== 'number') {
-    throw new TypeError('b must be a number');
-  }
-  const carg_b = b;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_gdtrc(carg_a, carg_b, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/nbdtr.c
-exports.nbdtr = function nbdtr(/* int */ k, /* int */ n, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_nbdtr(carg_k, carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/nbdtr.c
-exports.nbdtrc = function nbdtrc(/* int */ k, /* int */ n, /* double */ p) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double p
-  if (typeof p !== 'number') {
-    throw new TypeError('p must be a number');
-  }
-  const carg_p = p;
-
-  // return: double
-  const fn_ret = cephes._cephes_nbdtrc(carg_k, carg_n, carg_p);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ndtr.c
-exports.ndtr = function ndtr(/* double */ a) {
-  // argument: double a
-  if (typeof a !== 'number') {
-    throw new TypeError('a must be a number');
-  }
-  const carg_a = a;
-
-  // return: double
-  const fn_ret = cephes._cephes_ndtr(carg_a);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/ndtri.c
-exports.ndtri = function ndtri(/* double */ y0) {
-  // argument: double y0
-  if (typeof y0 !== 'number') {
-    throw new TypeError('y0 must be a number');
-  }
-  const carg_y0 = y0;
-
-  // return: double
-  const fn_ret = cephes._cephes_ndtri(carg_y0);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/pdtr.c
-exports.pdtr = function pdtr(/* int */ k, /* double */ m) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // return: double
-  const fn_ret = cephes._cephes_pdtr(carg_k, carg_m);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/pdtr.c
-exports.pdtrc = function pdtrc(/* int */ k, /* double */ m) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: double m
-  if (typeof m !== 'number') {
-    throw new TypeError('m must be a number');
-  }
-  const carg_m = m;
-
-  // return: double
-  const fn_ret = cephes._cephes_pdtrc(carg_k, carg_m);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/pdtr.c
-exports.pdtri = function pdtri(/* int */ k, /* double */ y) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: double y
-  if (typeof y !== 'number') {
-    throw new TypeError('y must be a number');
-  }
-  const carg_y = y;
-
-  // return: double
-  const fn_ret = cephes._cephes_pdtri(carg_k, carg_y);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/stdtr.c
-exports.stdtr = function stdtr(/* int */ k, /* double */ t) {
-  // argument: int k
-  if (typeof k !== 'number') {
-    throw new TypeError('k must be a number');
-  }
-  const carg_k = k | 0;
-
-  // argument: double t
-  if (typeof t !== 'number') {
-    throw new TypeError('t must be a number');
-  }
-  const carg_t = t;
-
-  // return: double
-  const fn_ret = cephes._cephes_stdtr(carg_k, carg_t);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/planck.c
-exports.plancki = function plancki(/* double */ w, /* double */ T) {
-  // argument: double w
-  if (typeof w !== 'number') {
-    throw new TypeError('w must be a number');
-  }
-  const carg_w = w;
-
-  // argument: double T
-  if (typeof T !== 'number') {
-    throw new TypeError('T must be a number');
-  }
-  const carg_T = T;
-
-  // return: double
-  const fn_ret = cephes._cephes_plancki(carg_w, carg_T);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/planck.c
-exports.planckc = function planckc(/* double */ w, /* double */ T) {
-  // argument: double w
-  if (typeof w !== 'number') {
-    throw new TypeError('w must be a number');
-  }
-  const carg_w = w;
-
-  // argument: double T
-  if (typeof T !== 'number') {
-    throw new TypeError('T must be a number');
-  }
-  const carg_T = T;
-
-  // return: double
-  const fn_ret = cephes._cephes_planckc(carg_w, carg_T);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/planck.c
-exports.planckd = function planckd(/* double */ w, /* double */ T) {
-  // argument: double w
-  if (typeof w !== 'number') {
-    throw new TypeError('w must be a number');
-  }
-  const carg_w = w;
-
-  // argument: double T
-  if (typeof T !== 'number') {
-    throw new TypeError('T must be a number');
-  }
-  const carg_T = T;
-
-  // return: double
-  const fn_ret = cephes._cephes_planckd(carg_w, carg_T);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/planck.c
-exports.planckw = function planckw(/* double */ T) {
-  // argument: double T
-  if (typeof T !== 'number') {
-    throw new TypeError('T must be a number');
-  }
-  const carg_T = T;
-
-  // return: double
-  const fn_ret = cephes._cephes_planckw(carg_T);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/spence.c
-exports.spence = function spence(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_spence(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/zetac.c
-exports.zetac = function zetac(/* double */ x) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_zetac(carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/zeta.c
-exports.zeta = function zeta(/* double */ x, /* double */ q) {
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double q
-  if (typeof q !== 'number') {
-    throw new TypeError('q must be a number');
-  }
-  const carg_q = q;
-
-  // return: double
-  const fn_ret = cephes._cephes_zeta(carg_x, carg_q);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/struve.c
-exports.struve = function struve(/* double */ v, /* double */ x) {
-  // argument: double v
-  if (typeof v !== 'number') {
-    throw new TypeError('v must be a number');
-  }
-  const carg_v = v;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_struve(carg_v, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-// from cephes/polevl.c
-exports.p1evl = function p1evl(/* double */ x, /* double[] */ coef, /* int */ N) {
-  //Save the STACKTOP because the following code will do some stack allocs
-  const stacktop = cephes.stackSave();
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // argument: double[] coef
-  if (!(coef instanceof Float64Array)) {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('coef must be either a Float64Array');
-  }
-  const carg_coef = cephes.stackAlloc(coef.length << 3);
-  cephes.writeArrayToMemory(new Uint8Array(coef.buffer, coef.byteOffset, coef.byteLength), carg_coef);
-
-  // argument: int N
-  if (typeof N !== 'number') {
-    cephes.stackRestore(stacktop);
-    throw new TypeError('N must be a number');
-  }
-  const carg_N = N | 0;
-
-  // return: double
-  const fn_ret = cephes._cephes_p1evl(carg_x, carg_coef, carg_N);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  // Restore internal stacktop before returning
-  cephes.stackRestore(stacktop);
-  return ret;
-};
-
-// from cephes/polylog.c
-exports.polylog = function polylog(/* int */ n, /* double */ x) {
-  // argument: int n
-  if (typeof n !== 'number') {
-    throw new TypeError('n must be a number');
-  }
-  const carg_n = n | 0;
-
-  // argument: double x
-  if (typeof x !== 'number') {
-    throw new TypeError('x must be a number');
-  }
-  const carg_x = x;
-
-  // return: double
-  const fn_ret = cephes._cephes_polylog(carg_n, carg_x);
-
-  // No pointers, so just return fn_ret
-  const ret = fn_ret;
-
-  return ret;
-};
-
-
-},{"./cephes.js":17}],21:[function(require,module,exports){
+},{"chart.js":2,"datatables.net-buttons":3,"decimal.js":5}],2:[function(require,module,exports){
 /*!
  * Chart.js v3.5.1
  * https://www.chartjs.org
@@ -22303,7 +17244,7 @@ return Chart;
 
 })));
 
-},{}],22:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*! Buttons for DataTables 1.7.1
  * ©2016-2021 SpryMedia Ltd - datatables.net/license
  */
@@ -24432,7 +19373,7 @@ if ( DataTable.ext.features ) {
 return Buttons;
 }));
 
-},{"datatables.net":23}],23:[function(require,module,exports){
+},{"datatables.net":4}],4:[function(require,module,exports){
 /*! DataTables 1.10.25
  * ©2008-2021 SpryMedia Ltd - datatables.net/license
  */
@@ -39815,347 +34756,4943 @@ return Buttons;
 	return $.fn.dataTable;
 }));
 
-},{"jquery":31}],24:[function(require,module,exports){
-
-exports.Normal = require('./distributions/normal.js');
-exports.Studentt = require('./distributions/studentt.js');
-exports.Uniform = require('./distributions/uniform.js');
-exports.Binomial = require('./distributions/binomial.js');
-
-},{"./distributions/binomial.js":25,"./distributions/normal.js":26,"./distributions/studentt.js":27,"./distributions/uniform.js":28}],25:[function(require,module,exports){
-
-var cephes = require('cephes');
-
-function BinomialDistribution(properbility, size) {
-  if (!(this instanceof BinomialDistribution)) {
-    return new BinomialDistribution(properbility, size);
-  }
-
-  if (typeof properbility !== 'number') {
-    throw TypeError('properbility must be a number');
-  }
-  if (typeof size !== 'number') {
-    throw TypeError('size must be a number');
-  }
-
-  if (size <= 0.0) {
-    throw TypeError('size must be positive');
-  }
-  if (properbility < 0.0 || properbility > 1) {
-    throw TypeError('properbility must be between 0 and 1');
-  }
-
-  this._properbility = properbility;
-  this._size = size;
-}
-module.exports = BinomialDistribution;
-
-BinomialDistribution.prototype.pdf = function (x) {
-  var n = this._size;
-  var p = this._properbility;
-
-  // choose(n, x)
-  var binomialCoefficent = cephes.gamma(n + 1) / (
-    cephes.gamma(x + 1) * cephes.gamma(n - x + 1)
-  )
-
-  return binomialCoefficent * Math.pow(p, x) * Math.pow(1 - p, n - x);
-};
-
-BinomialDistribution.prototype.cdf = function (x) {
-  return cephes.bdtr(x, this._size, this._properbility);
-};
-
-BinomialDistribution.prototype.inv = function (p) {
-  throw new Error('Inverse CDF of binomial distribution is not implemented');
-};
-
-BinomialDistribution.prototype.median = function () {
-  return Math.round(this._properbility * this._size);
-};
-
-BinomialDistribution.prototype.mean = function () {
-  return this._properbility * this._size;
-};
-
-BinomialDistribution.prototype.variance = function () {
-  return this._properbility * this._size * (1 - this._properbility);
-};
-
-},{"cephes":20}],26:[function(require,module,exports){
-
-var cephes = require('cephes');
-
-function NormalDistribution(mean, sd) {
-  if (!(this instanceof NormalDistribution)) {
-    return new NormalDistribution(mean, sd);
-  }
-
-  if (typeof mean !== 'number' && mean !== undefined) {
-    throw TypeError('mean must be a number');
-  }
-  if (typeof sd !== 'number' && sd !== undefined) {
-    throw TypeError('sd must be a number');
-  }
-
-  if (sd !== undefined && sd <= 0.0) {
-    throw TypeError('sd must be positive');
-  }
-
-  this._mean = mean || 0;
-  this._sd = sd || 1;
-  this._var = this._sd * this._sd;
-}
-module.exports = NormalDistribution;
-
-// -0.5 * log(2 Pi)
-var HALF_TWO_PI_LOG = -0.91893853320467274180;
-
-NormalDistribution.prototype.pdf = function (x) {
-  return Math.exp(HALF_TWO_PI_LOG - Math.log(this._sd) - Math.pow(x - this._mean, 2) / (2 * this._var));
-};
-
-NormalDistribution.prototype.cdf = function (x) {
-  return cephes.ndtr((x - this._mean) / this._sd);
-};
-
-NormalDistribution.prototype.inv = function (p) {
-  if (p <= 0) return -Infinity;
-  if (p >= 1) return Infinity;
-  return this._sd * cephes.ndtri(p) + this._mean;
-};
-
-NormalDistribution.prototype.median = function () {
-  return this._mean;
-};
-
-NormalDistribution.prototype.mean = function () {
-  return this._mean;
-};
-
-NormalDistribution.prototype.variance = function () {
-  return this._var;
-};
-
-},{"cephes":20}],27:[function(require,module,exports){
-
-var cephes = require('cephes');
-
-function StudenttDistribution(df) {
-  if (!(this instanceof StudenttDistribution)) {
-    return new StudenttDistribution(df);
-  }
-
-  if (typeof df !== 'number') {
-    throw TypeError('mean must be a number');
-  }
-  if (df <= 0) {
-    throw RangeError('df must be a positive number');
-  }
-
-  this._df = df;
-
-  this._pdf_const = Math.exp(cephes.lgam((df + 1) / 2) - cephes.lgam(df / 2)) / Math.sqrt(this._df * Math.PI);
-}
-module.exports = StudenttDistribution;
-
-StudenttDistribution.prototype.pdf = function (x) {
-  return this._pdf_const / Math.pow(1 + ((x*x) / this._df), (this._df + 1) / 2);
-};
-
-// Uses the idendenity specified in Abramowitz and Stegun 26.7.1 and
-// Abramowitz and Stegun 26.5.27.
-// F(x|df) = 1 - 0.5 * I_z (df/2, 1/2)
-//       z = df / (df + x^2)
-//     for   x > 0
-// Since the Student-t distribution is symetric:
-// F(x|df) = 0.5 * I_z (df/2, 1/2)
-//     for   x < 0
-StudenttDistribution.prototype.cdf = function (x) {
-  const z = this._df / (this._df + x * x);
-  const p = 0.5 * cephes.incbet(0.5 * this._df, 0.5, z);
-  return (x <= 0) ? p : 1 - p;
-};
-
-StudenttDistribution.prototype.inv = function (p) {
-  if (p <= 0) return -Infinity;
-  if (p >= 1) return Infinity;
-  if (p === 0.5) return 0;
-
-  if (p > 0.25 && p < 0.75) {
-    const phat = 1 - 2 * p;
-    const z = cephes.incbi(0.5, 0.5 * this._df, Math.abs(phat));
-    const t = Math.sqrt(this._df * z / (1 - z));
-    return (p < 0.5) ? -t : t;
-  } else {
-    const phat = (p >= 0.5) ? 1 - p : p;
-    const z = cephes.incbi(0.5 * this._df, 0.5, 2 * phat);
-    const t = Math.sqrt(this._df / z - this._df);
-    return (p < 0.5) ? -t : t;
-  }
-};
-
-StudenttDistribution.prototype.median = function () {
-  return 0;
-};
-
-StudenttDistribution.prototype.mean = function () {
-  return (this._df > 1) ? 0 : undefined;
-};
-
-StudenttDistribution.prototype.variance = function () {
-  if (this._df > 2) return this._df / (this._df - 2);
-  else if (this._df > 1) return Infinity;
-  else return undefined;
-};
-
-},{"cephes":20}],28:[function(require,module,exports){
-
-function UniformDistribution(a, b) {
-  if (!(this instanceof UniformDistribution)) {
-    return new UniformDistribution(a, b);
-  }
-
-  if (typeof a !== 'number' && a !== undefined) {
-    throw TypeError('mean must be a number');
-  }
-  if (typeof b !== 'number' && b !== undefined) {
-    throw TypeError('sd must be a number');
-  }
-
-  this._a = typeof a === 'number' ? a : 0;
-  this._b = typeof b === 'number' ? b : 1;
-
-  if (this._b <= this._a) {
-    throw new RangeError('a must be greater than b');
-  }
-
-  this._k = 1 / (this._b - this._a);
-  this._mean = (this._a + this._b) / 2;
-  this._var = (this._a - this._b) * (this._a - this._b) / 12;
-}
-module.exports = UniformDistribution;
-
-UniformDistribution.prototype.pdf = function (x) {
-  return (x < this._a || x > this._b) ? 0 : this._k;
-};
-
-UniformDistribution.prototype.cdf = function (x) {
-  if (x < this._a) return 0;
-  else if (x > this._b) return 1;
-  else return (x - this._a) * this._k;
-};
-
-UniformDistribution.prototype.inv = function (p) {
-  if (p < 0 || p > 1) return NaN;
-  else return p * (this._b - this._a) + this._a;
-};
-
-UniformDistribution.prototype.median = function () {
-  return this._mean;
-};
-
-UniformDistribution.prototype.mean = function () {
-  return this._mean;
-};
-
-UniformDistribution.prototype.variance = function () {
-  return this._var;
-};
-
-},{}],29:[function(require,module,exports){
-(function (global){
-(function(a,b){if("function"==typeof define&&define.amd)define([],b);else if("undefined"!=typeof exports)b();else{b(),a.FileSaver={exports:{}}.exports}})(this,function(){"use strict";function b(a,b){return"undefined"==typeof b?b={autoBom:!1}:"object"!=typeof b&&(console.warn("Deprecated: Expected third argument to be a object"),b={autoBom:!b}),b.autoBom&&/^\s*(?:text\/\S*|application\/xml|\S*\/\S*\+xml)\s*;.*charset\s*=\s*utf-8/i.test(a.type)?new Blob(["\uFEFF",a],{type:a.type}):a}function c(a,b,c){var d=new XMLHttpRequest;d.open("GET",a),d.responseType="blob",d.onload=function(){g(d.response,b,c)},d.onerror=function(){console.error("could not download file")},d.send()}function d(a){var b=new XMLHttpRequest;b.open("HEAD",a,!1);try{b.send()}catch(a){}return 200<=b.status&&299>=b.status}function e(a){try{a.dispatchEvent(new MouseEvent("click"))}catch(c){var b=document.createEvent("MouseEvents");b.initMouseEvent("click",!0,!0,window,0,0,0,80,20,!1,!1,!1,!1,0,null),a.dispatchEvent(b)}}var f="object"==typeof window&&window.window===window?window:"object"==typeof self&&self.self===self?self:"object"==typeof global&&global.global===global?global:void 0,a=f.navigator&&/Macintosh/.test(navigator.userAgent)&&/AppleWebKit/.test(navigator.userAgent)&&!/Safari/.test(navigator.userAgent),g=f.saveAs||("object"!=typeof window||window!==f?function(){}:"download"in HTMLAnchorElement.prototype&&!a?function(b,g,h){var i=f.URL||f.webkitURL,j=document.createElement("a");g=g||b.name||"download",j.download=g,j.rel="noopener","string"==typeof b?(j.href=b,j.origin===location.origin?e(j):d(j.href)?c(b,g,h):e(j,j.target="_blank")):(j.href=i.createObjectURL(b),setTimeout(function(){i.revokeObjectURL(j.href)},4E4),setTimeout(function(){e(j)},0))}:"msSaveOrOpenBlob"in navigator?function(f,g,h){if(g=g||f.name||"download","string"!=typeof f)navigator.msSaveOrOpenBlob(b(f,h),g);else if(d(f))c(f,g,h);else{var i=document.createElement("a");i.href=f,i.target="_blank",setTimeout(function(){e(i)})}}:function(b,d,e,g){if(g=g||open("","_blank"),g&&(g.document.title=g.document.body.innerText="downloading..."),"string"==typeof b)return c(b,d,e);var h="application/octet-stream"===b.type,i=/constructor/i.test(f.HTMLElement)||f.safari,j=/CriOS\/[\d]+/.test(navigator.userAgent);if((j||h&&i||a)&&"undefined"!=typeof FileReader){var k=new FileReader;k.onloadend=function(){var a=k.result;a=j?a:a.replace(/^data:[^;]*;/,"data:attachment/file;"),g?g.location.href=a:location=a,g=null},k.readAsDataURL(b)}else{var l=f.URL||f.webkitURL,m=l.createObjectURL(b);g?g.location=m:location.href=m,g=null,setTimeout(function(){l.revokeObjectURL(m)},4E4)}});f.saveAs=g.saveAs=g,"undefined"!=typeof module&&(module.exports=g)});
+},{"jquery":6}],5:[function(require,module,exports){
+;(function (globalScope) {
+  'use strict';
 
 
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],30:[function(require,module,exports){
-exports.read = function (buffer, offset, isLE, mLen, nBytes) {
-  var e, m
-  var eLen = (nBytes * 8) - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var nBits = -7
-  var i = isLE ? (nBytes - 1) : 0
-  var d = isLE ? -1 : 1
-  var s = buffer[offset + i]
+  /*
+   *  decimal.js v10.3.1
+   *  An arbitrary-precision Decimal type for JavaScript.
+   *  https://github.com/MikeMcl/decimal.js
+   *  Copyright (c) 2021 Michael Mclaughlin <M8ch88l@gmail.com>
+   *  MIT Licence
+   */
 
-  i += d
 
-  e = s & ((1 << (-nBits)) - 1)
-  s >>= (-nBits)
-  nBits += eLen
-  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+  // -----------------------------------  EDITABLE DEFAULTS  ------------------------------------ //
 
-  m = e & ((1 << (-nBits)) - 1)
-  e >>= (-nBits)
-  nBits += mLen
-  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
 
-  if (e === 0) {
-    e = 1 - eBias
-  } else if (e === eMax) {
-    return m ? NaN : ((s ? -1 : 1) * Infinity)
-  } else {
-    m = m + Math.pow(2, mLen)
-    e = e - eBias
-  }
-  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
-}
+    // The maximum exponent magnitude.
+    // The limit on the value of `toExpNeg`, `toExpPos`, `minE` and `maxE`.
+  var EXP_LIMIT = 9e15,                      // 0 to 9e15
 
-exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
-  var e, m, c
-  var eLen = (nBytes * 8) - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
-  var i = isLE ? 0 : (nBytes - 1)
-  var d = isLE ? 1 : -1
-  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+    // The limit on the value of `precision`, and on the value of the first argument to
+    // `toDecimalPlaces`, `toExponential`, `toFixed`, `toPrecision` and `toSignificantDigits`.
+    MAX_DIGITS = 1e9,                        // 0 to 1e9
 
-  value = Math.abs(value)
+    // Base conversion alphabet.
+    NUMERALS = '0123456789abcdef',
 
-  if (isNaN(value) || value === Infinity) {
-    m = isNaN(value) ? 1 : 0
-    e = eMax
-  } else {
-    e = Math.floor(Math.log(value) / Math.LN2)
-    if (value * (c = Math.pow(2, -e)) < 1) {
-      e--
-      c *= 2
+    // The natural logarithm of 10 (1025 digits).
+    LN10 = '2.3025850929940456840179914546843642076011014886287729760333279009675726096773524802359972050895982983419677840422862486334095254650828067566662873690987816894829072083255546808437998948262331985283935053089653777326288461633662222876982198867465436674744042432743651550489343149393914796194044002221051017141748003688084012647080685567743216228355220114804663715659121373450747856947683463616792101806445070648000277502684916746550586856935673420670581136429224554405758925724208241314695689016758940256776311356919292033376587141660230105703089634572075440370847469940168269282808481184289314848524948644871927809676271275775397027668605952496716674183485704422507197965004714951050492214776567636938662976979522110718264549734772662425709429322582798502585509785265383207606726317164309505995087807523710333101197857547331541421808427543863591778117054309827482385045648019095610299291824318237525357709750539565187697510374970888692180205189339507238539205144634197265287286965110862571492198849978748873771345686209167058',
+
+    // Pi (1025 digits).
+    PI = '3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566430860213949463952247371907021798609437027705392171762931767523846748184676694051320005681271452635608277857713427577896091736371787214684409012249534301465495853710507922796892589235420199561121290219608640344181598136297747713099605187072113499999983729780499510597317328160963185950244594553469083026425223082533446850352619311881710100031378387528865875332083814206171776691473035982534904287554687311595628638823537875937519577818577805321712268066130019278766111959092164201989380952572010654858632789',
+
+
+    // The initial configuration properties of the Decimal constructor.
+    DEFAULTS = {
+
+      // These values must be integers within the stated ranges (inclusive).
+      // Most of these values can be changed at run-time using the `Decimal.config` method.
+
+      // The maximum number of significant digits of the result of a calculation or base conversion.
+      // E.g. `Decimal.config({ precision: 20 });`
+      precision: 20,                         // 1 to MAX_DIGITS
+
+      // The rounding mode used when rounding to `precision`.
+      //
+      // ROUND_UP         0 Away from zero.
+      // ROUND_DOWN       1 Towards zero.
+      // ROUND_CEIL       2 Towards +Infinity.
+      // ROUND_FLOOR      3 Towards -Infinity.
+      // ROUND_HALF_UP    4 Towards nearest neighbour. If equidistant, up.
+      // ROUND_HALF_DOWN  5 Towards nearest neighbour. If equidistant, down.
+      // ROUND_HALF_EVEN  6 Towards nearest neighbour. If equidistant, towards even neighbour.
+      // ROUND_HALF_CEIL  7 Towards nearest neighbour. If equidistant, towards +Infinity.
+      // ROUND_HALF_FLOOR 8 Towards nearest neighbour. If equidistant, towards -Infinity.
+      //
+      // E.g.
+      // `Decimal.rounding = 4;`
+      // `Decimal.rounding = Decimal.ROUND_HALF_UP;`
+      rounding: 4,                           // 0 to 8
+
+      // The modulo mode used when calculating the modulus: a mod n.
+      // The quotient (q = a / n) is calculated according to the corresponding rounding mode.
+      // The remainder (r) is calculated as: r = a - n * q.
+      //
+      // UP         0 The remainder is positive if the dividend is negative, else is negative.
+      // DOWN       1 The remainder has the same sign as the dividend (JavaScript %).
+      // FLOOR      3 The remainder has the same sign as the divisor (Python %).
+      // HALF_EVEN  6 The IEEE 754 remainder function.
+      // EUCLID     9 Euclidian division. q = sign(n) * floor(a / abs(n)). Always positive.
+      //
+      // Truncated division (1), floored division (3), the IEEE 754 remainder (6), and Euclidian
+      // division (9) are commonly used for the modulus operation. The other rounding modes can also
+      // be used, but they may not give useful results.
+      modulo: 1,                             // 0 to 9
+
+      // The exponent value at and beneath which `toString` returns exponential notation.
+      // JavaScript numbers: -7
+      toExpNeg: -7,                          // 0 to -EXP_LIMIT
+
+      // The exponent value at and above which `toString` returns exponential notation.
+      // JavaScript numbers: 21
+      toExpPos:  21,                         // 0 to EXP_LIMIT
+
+      // The minimum exponent value, beneath which underflow to zero occurs.
+      // JavaScript numbers: -324  (5e-324)
+      minE: -EXP_LIMIT,                      // -1 to -EXP_LIMIT
+
+      // The maximum exponent value, above which overflow to Infinity occurs.
+      // JavaScript numbers: 308  (1.7976931348623157e+308)
+      maxE: EXP_LIMIT,                       // 1 to EXP_LIMIT
+
+      // Whether to use cryptographically-secure random number generation, if available.
+      crypto: false                          // true/false
+    },
+
+
+  // ----------------------------------- END OF EDITABLE DEFAULTS ------------------------------- //
+
+
+    Decimal, inexact, noConflict, quadrant,
+    external = true,
+
+    decimalError = '[DecimalError] ',
+    invalidArgument = decimalError + 'Invalid argument: ',
+    precisionLimitExceeded = decimalError + 'Precision limit exceeded',
+    cryptoUnavailable = decimalError + 'crypto unavailable',
+    tag = '[object Decimal]',
+
+    mathfloor = Math.floor,
+    mathpow = Math.pow,
+
+    isBinary = /^0b([01]+(\.[01]*)?|\.[01]+)(p[+-]?\d+)?$/i,
+    isHex = /^0x([0-9a-f]+(\.[0-9a-f]*)?|\.[0-9a-f]+)(p[+-]?\d+)?$/i,
+    isOctal = /^0o([0-7]+(\.[0-7]*)?|\.[0-7]+)(p[+-]?\d+)?$/i,
+    isDecimal = /^(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i,
+
+    BASE = 1e7,
+    LOG_BASE = 7,
+    MAX_SAFE_INTEGER = 9007199254740991,
+
+    LN10_PRECISION = LN10.length - 1,
+    PI_PRECISION = PI.length - 1,
+
+    // Decimal.prototype object
+    P = { toStringTag: tag };
+
+
+  // Decimal prototype methods
+
+
+  /*
+   *  absoluteValue             abs
+   *  ceil
+   *  clampedTo                 clamp
+   *  comparedTo                cmp
+   *  cosine                    cos
+   *  cubeRoot                  cbrt
+   *  decimalPlaces             dp
+   *  dividedBy                 div
+   *  dividedToIntegerBy        divToInt
+   *  equals                    eq
+   *  floor
+   *  greaterThan               gt
+   *  greaterThanOrEqualTo      gte
+   *  hyperbolicCosine          cosh
+   *  hyperbolicSine            sinh
+   *  hyperbolicTangent         tanh
+   *  inverseCosine             acos
+   *  inverseHyperbolicCosine   acosh
+   *  inverseHyperbolicSine     asinh
+   *  inverseHyperbolicTangent  atanh
+   *  inverseSine               asin
+   *  inverseTangent            atan
+   *  isFinite
+   *  isInteger                 isInt
+   *  isNaN
+   *  isNegative                isNeg
+   *  isPositive                isPos
+   *  isZero
+   *  lessThan                  lt
+   *  lessThanOrEqualTo         lte
+   *  logarithm                 log
+   *  [maximum]                 [max]
+   *  [minimum]                 [min]
+   *  minus                     sub
+   *  modulo                    mod
+   *  naturalExponential        exp
+   *  naturalLogarithm          ln
+   *  negated                   neg
+   *  plus                      add
+   *  precision                 sd
+   *  round
+   *  sine                      sin
+   *  squareRoot                sqrt
+   *  tangent                   tan
+   *  times                     mul
+   *  toBinary
+   *  toDecimalPlaces           toDP
+   *  toExponential
+   *  toFixed
+   *  toFraction
+   *  toHexadecimal             toHex
+   *  toNearest
+   *  toNumber
+   *  toOctal
+   *  toPower                   pow
+   *  toPrecision
+   *  toSignificantDigits       toSD
+   *  toString
+   *  truncated                 trunc
+   *  valueOf                   toJSON
+   */
+
+
+  /*
+   * Return a new Decimal whose value is the absolute value of this Decimal.
+   *
+   */
+  P.absoluteValue = P.abs = function () {
+    var x = new this.constructor(this);
+    if (x.s < 0) x.s = 1;
+    return finalise(x);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal rounded to a whole number in the
+   * direction of positive Infinity.
+   *
+   */
+  P.ceil = function () {
+    return finalise(new this.constructor(this), this.e + 1, 2);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal clamped to the range
+   * delineated by `min` and `max`.
+   *
+   * min {number|string|Decimal}
+   * max {number|string|Decimal}
+   *
+   */
+  P.clampedTo = P.clamp = function (min, max) {
+    var k,
+      x = this,
+      Ctor = x.constructor;
+    min = new Ctor(min);
+    max = new Ctor(max);
+    if (!min.s || !max.s) return new Ctor(NaN);
+    if (min.gt(max)) throw Error(invalidArgument + max);
+    k = x.cmp(min);
+    return k < 0 ? min : x.cmp(max) > 0 ? max : new Ctor(x);
+  };
+
+
+  /*
+   * Return
+   *   1    if the value of this Decimal is greater than the value of `y`,
+   *  -1    if the value of this Decimal is less than the value of `y`,
+   *   0    if they have the same value,
+   *   NaN  if the value of either Decimal is NaN.
+   *
+   */
+  P.comparedTo = P.cmp = function (y) {
+    var i, j, xdL, ydL,
+      x = this,
+      xd = x.d,
+      yd = (y = new x.constructor(y)).d,
+      xs = x.s,
+      ys = y.s;
+
+    // Either NaN or ±Infinity?
+    if (!xd || !yd) {
+      return !xs || !ys ? NaN : xs !== ys ? xs : xd === yd ? 0 : !xd ^ xs < 0 ? 1 : -1;
     }
-    if (e + eBias >= 1) {
-      value += rt / c
+
+    // Either zero?
+    if (!xd[0] || !yd[0]) return xd[0] ? xs : yd[0] ? -ys : 0;
+
+    // Signs differ?
+    if (xs !== ys) return xs;
+
+    // Compare exponents.
+    if (x.e !== y.e) return x.e > y.e ^ xs < 0 ? 1 : -1;
+
+    xdL = xd.length;
+    ydL = yd.length;
+
+    // Compare digit by digit.
+    for (i = 0, j = xdL < ydL ? xdL : ydL; i < j; ++i) {
+      if (xd[i] !== yd[i]) return xd[i] > yd[i] ^ xs < 0 ? 1 : -1;
+    }
+
+    // Compare lengths.
+    return xdL === ydL ? 0 : xdL > ydL ^ xs < 0 ? 1 : -1;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the cosine of the value in radians of this Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-1, 1]
+   *
+   * cos(0)         = 1
+   * cos(-0)        = 1
+   * cos(Infinity)  = NaN
+   * cos(-Infinity) = NaN
+   * cos(NaN)       = NaN
+   *
+   */
+  P.cosine = P.cos = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.d) return new Ctor(NaN);
+
+    // cos(0) = cos(-0) = 1
+    if (!x.d[0]) return new Ctor(1);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + Math.max(x.e, x.sd()) + LOG_BASE;
+    Ctor.rounding = 1;
+
+    x = cosine(Ctor, toLessThanHalfPi(Ctor, x));
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return finalise(quadrant == 2 || quadrant == 3 ? x.neg() : x, pr, rm, true);
+  };
+
+
+  /*
+   *
+   * Return a new Decimal whose value is the cube root of the value of this Decimal, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   *  cbrt(0)  =  0
+   *  cbrt(-0) = -0
+   *  cbrt(1)  =  1
+   *  cbrt(-1) = -1
+   *  cbrt(N)  =  N
+   *  cbrt(-I) = -I
+   *  cbrt(I)  =  I
+   *
+   * Math.cbrt(x) = (x < 0 ? -Math.pow(-x, 1/3) : Math.pow(x, 1/3))
+   *
+   */
+  P.cubeRoot = P.cbrt = function () {
+    var e, m, n, r, rep, s, sd, t, t3, t3plusx,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite() || x.isZero()) return new Ctor(x);
+    external = false;
+
+    // Initial estimate.
+    s = x.s * mathpow(x.s * x, 1 / 3);
+
+     // Math.cbrt underflow/overflow?
+     // Pass x to Math.pow as integer, then adjust the exponent of the result.
+    if (!s || Math.abs(s) == 1 / 0) {
+      n = digitsToString(x.d);
+      e = x.e;
+
+      // Adjust n exponent so it is a multiple of 3 away from x exponent.
+      if (s = (e - n.length + 1) % 3) n += (s == 1 || s == -2 ? '0' : '00');
+      s = mathpow(n, 1 / 3);
+
+      // Rarely, e may be one less than the result exponent value.
+      e = mathfloor((e + 1) / 3) - (e % 3 == (e < 0 ? -1 : 2));
+
+      if (s == 1 / 0) {
+        n = '5e' + e;
+      } else {
+        n = s.toExponential();
+        n = n.slice(0, n.indexOf('e') + 1) + e;
+      }
+
+      r = new Ctor(n);
+      r.s = x.s;
     } else {
-      value += rt * Math.pow(2, 1 - eBias)
-    }
-    if (value * c >= 2) {
-      e++
-      c /= 2
+      r = new Ctor(s.toString());
     }
 
-    if (e + eBias >= eMax) {
-      m = 0
-      e = eMax
-    } else if (e + eBias >= 1) {
-      m = ((value * c) - 1) * Math.pow(2, mLen)
-      e = e + eBias
+    sd = (e = Ctor.precision) + 3;
+
+    // Halley's method.
+    // TODO? Compare Newton's method.
+    for (;;) {
+      t = r;
+      t3 = t.times(t).times(t);
+      t3plusx = t3.plus(x);
+      r = divide(t3plusx.plus(x).times(t), t3plusx.plus(t3), sd + 2, 1);
+
+      // TODO? Replace with for-loop and checkRoundingDigits.
+      if (digitsToString(t.d).slice(0, sd) === (n = digitsToString(r.d)).slice(0, sd)) {
+        n = n.slice(sd - 3, sd + 1);
+
+        // The 4th rounding digit may be in error by -1 so if the 4 rounding digits are 9999 or 4999
+        // , i.e. approaching a rounding boundary, continue the iteration.
+        if (n == '9999' || !rep && n == '4999') {
+
+          // On the first iteration only, check to see if rounding up gives the exact result as the
+          // nines may infinitely repeat.
+          if (!rep) {
+            finalise(t, e + 1, 0);
+
+            if (t.times(t).times(t).eq(x)) {
+              r = t;
+              break;
+            }
+          }
+
+          sd += 4;
+          rep = 1;
+        } else {
+
+          // If the rounding digits are null, 0{0,4} or 50{0,3}, check for an exact result.
+          // If not, then there are further digits and m will be truthy.
+          if (!+n || !+n.slice(1) && n.charAt(0) == '5') {
+
+            // Truncate to the first rounding digit.
+            finalise(r, e + 1, 1);
+            m = !r.times(r).times(r).eq(x);
+          }
+
+          break;
+        }
+      }
+    }
+
+    external = true;
+
+    return finalise(r, e, Ctor.rounding, m);
+  };
+
+
+  /*
+   * Return the number of decimal places of the value of this Decimal.
+   *
+   */
+  P.decimalPlaces = P.dp = function () {
+    var w,
+      d = this.d,
+      n = NaN;
+
+    if (d) {
+      w = d.length - 1;
+      n = (w - mathfloor(this.e / LOG_BASE)) * LOG_BASE;
+
+      // Subtract the number of trailing zeros of the last word.
+      w = d[w];
+      if (w) for (; w % 10 == 0; w /= 10) n--;
+      if (n < 0) n = 0;
+    }
+
+    return n;
+  };
+
+
+  /*
+   *  n / 0 = I
+   *  n / N = N
+   *  n / I = 0
+   *  0 / n = 0
+   *  0 / 0 = N
+   *  0 / N = N
+   *  0 / I = 0
+   *  N / n = N
+   *  N / 0 = N
+   *  N / N = N
+   *  N / I = N
+   *  I / n = I
+   *  I / 0 = I
+   *  I / N = N
+   *  I / I = N
+   *
+   * Return a new Decimal whose value is the value of this Decimal divided by `y`, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   */
+  P.dividedBy = P.div = function (y) {
+    return divide(this, new this.constructor(y));
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the integer part of dividing the value of this Decimal
+   * by the value of `y`, rounded to `precision` significant digits using rounding mode `rounding`.
+   *
+   */
+  P.dividedToIntegerBy = P.divToInt = function (y) {
+    var x = this,
+      Ctor = x.constructor;
+    return finalise(divide(x, new Ctor(y), 0, 1, 1), Ctor.precision, Ctor.rounding);
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is equal to the value of `y`, otherwise return false.
+   *
+   */
+  P.equals = P.eq = function (y) {
+    return this.cmp(y) === 0;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal rounded to a whole number in the
+   * direction of negative Infinity.
+   *
+   */
+  P.floor = function () {
+    return finalise(new this.constructor(this), this.e + 1, 3);
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is greater than the value of `y`, otherwise return
+   * false.
+   *
+   */
+  P.greaterThan = P.gt = function (y) {
+    return this.cmp(y) > 0;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is greater than or equal to the value of `y`,
+   * otherwise return false.
+   *
+   */
+  P.greaterThanOrEqualTo = P.gte = function (y) {
+    var k = this.cmp(y);
+    return k == 1 || k === 0;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic cosine of the value in radians of this
+   * Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [1, Infinity]
+   *
+   * cosh(x) = 1 + x^2/2! + x^4/4! + x^6/6! + ...
+   *
+   * cosh(0)         = 1
+   * cosh(-0)        = 1
+   * cosh(Infinity)  = Infinity
+   * cosh(-Infinity) = Infinity
+   * cosh(NaN)       = NaN
+   *
+   *  x        time taken (ms)   result
+   * 1000      9                 9.8503555700852349694e+433
+   * 10000     25                4.4034091128314607936e+4342
+   * 100000    171               1.4033316802130615897e+43429
+   * 1000000   3817              1.5166076984010437725e+434294
+   * 10000000  abandoned after 2 minute wait
+   *
+   * TODO? Compare performance of cosh(x) = 0.5 * (exp(x) + exp(-x))
+   *
+   */
+  P.hyperbolicCosine = P.cosh = function () {
+    var k, n, pr, rm, len,
+      x = this,
+      Ctor = x.constructor,
+      one = new Ctor(1);
+
+    if (!x.isFinite()) return new Ctor(x.s ? 1 / 0 : NaN);
+    if (x.isZero()) return one;
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + Math.max(x.e, x.sd()) + 4;
+    Ctor.rounding = 1;
+    len = x.d.length;
+
+    // Argument reduction: cos(4x) = 1 - 8cos^2(x) + 8cos^4(x) + 1
+    // i.e. cos(x) = 1 - cos^2(x/4)(8 - 8cos^2(x/4))
+
+    // Estimate the optimum number of times to use the argument reduction.
+    // TODO? Estimation reused from cosine() and may not be optimal here.
+    if (len < 32) {
+      k = Math.ceil(len / 3);
+      n = (1 / tinyPow(4, k)).toString();
     } else {
-      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
-      e = 0
+      k = 16;
+      n = '2.3283064365386962890625e-10';
+    }
+
+    x = taylorSeries(Ctor, 1, x.times(n), new Ctor(1), true);
+
+    // Reverse argument reduction
+    var cosh2_x,
+      i = k,
+      d8 = new Ctor(8);
+    for (; i--;) {
+      cosh2_x = x.times(x);
+      x = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
+    }
+
+    return finalise(x, Ctor.precision = pr, Ctor.rounding = rm, true);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic sine of the value in radians of this
+   * Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-Infinity, Infinity]
+   *
+   * sinh(x) = x + x^3/3! + x^5/5! + x^7/7! + ...
+   *
+   * sinh(0)         = 0
+   * sinh(-0)        = -0
+   * sinh(Infinity)  = Infinity
+   * sinh(-Infinity) = -Infinity
+   * sinh(NaN)       = NaN
+   *
+   * x        time taken (ms)
+   * 10       2 ms
+   * 100      5 ms
+   * 1000     14 ms
+   * 10000    82 ms
+   * 100000   886 ms            1.4033316802130615897e+43429
+   * 200000   2613 ms
+   * 300000   5407 ms
+   * 400000   8824 ms
+   * 500000   13026 ms          8.7080643612718084129e+217146
+   * 1000000  48543 ms
+   *
+   * TODO? Compare performance of sinh(x) = 0.5 * (exp(x) - exp(-x))
+   *
+   */
+  P.hyperbolicSine = P.sinh = function () {
+    var k, pr, rm, len,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite() || x.isZero()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + Math.max(x.e, x.sd()) + 4;
+    Ctor.rounding = 1;
+    len = x.d.length;
+
+    if (len < 3) {
+      x = taylorSeries(Ctor, 2, x, x, true);
+    } else {
+
+      // Alternative argument reduction: sinh(3x) = sinh(x)(3 + 4sinh^2(x))
+      // i.e. sinh(x) = sinh(x/3)(3 + 4sinh^2(x/3))
+      // 3 multiplications and 1 addition
+
+      // Argument reduction: sinh(5x) = sinh(x)(5 + sinh^2(x)(20 + 16sinh^2(x)))
+      // i.e. sinh(x) = sinh(x/5)(5 + sinh^2(x/5)(20 + 16sinh^2(x/5)))
+      // 4 multiplications and 2 additions
+
+      // Estimate the optimum number of times to use the argument reduction.
+      k = 1.4 * Math.sqrt(len);
+      k = k > 16 ? 16 : k | 0;
+
+      x = x.times(1 / tinyPow(5, k));
+      x = taylorSeries(Ctor, 2, x, x, true);
+
+      // Reverse argument reduction
+      var sinh2_x,
+        d5 = new Ctor(5),
+        d16 = new Ctor(16),
+        d20 = new Ctor(20);
+      for (; k--;) {
+        sinh2_x = x.times(x);
+        x = x.times(d5.plus(sinh2_x.times(d16.times(sinh2_x).plus(d20))));
+      }
+    }
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return finalise(x, pr, rm, true);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic tangent of the value in radians of this
+   * Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-1, 1]
+   *
+   * tanh(x) = sinh(x) / cosh(x)
+   *
+   * tanh(0)         = 0
+   * tanh(-0)        = -0
+   * tanh(Infinity)  = 1
+   * tanh(-Infinity) = -1
+   * tanh(NaN)       = NaN
+   *
+   */
+  P.hyperbolicTangent = P.tanh = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite()) return new Ctor(x.s);
+    if (x.isZero()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + 7;
+    Ctor.rounding = 1;
+
+    return divide(x.sinh(), x.cosh(), Ctor.precision = pr, Ctor.rounding = rm);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the arccosine (inverse cosine) in radians of the value of
+   * this Decimal.
+   *
+   * Domain: [-1, 1]
+   * Range: [0, pi]
+   *
+   * acos(x) = pi/2 - asin(x)
+   *
+   * acos(0)       = pi/2
+   * acos(-0)      = pi/2
+   * acos(1)       = 0
+   * acos(-1)      = pi
+   * acos(1/2)     = pi/3
+   * acos(-1/2)    = 2*pi/3
+   * acos(|x| > 1) = NaN
+   * acos(NaN)     = NaN
+   *
+   */
+  P.inverseCosine = P.acos = function () {
+    var halfPi,
+      x = this,
+      Ctor = x.constructor,
+      k = x.abs().cmp(1),
+      pr = Ctor.precision,
+      rm = Ctor.rounding;
+
+    if (k !== -1) {
+      return k === 0
+        // |x| is 1
+        ? x.isNeg() ? getPi(Ctor, pr, rm) : new Ctor(0)
+        // |x| > 1 or x is NaN
+        : new Ctor(NaN);
+    }
+
+    if (x.isZero()) return getPi(Ctor, pr + 4, rm).times(0.5);
+
+    // TODO? Special case acos(0.5) = pi/3 and acos(-0.5) = 2*pi/3
+
+    Ctor.precision = pr + 6;
+    Ctor.rounding = 1;
+
+    x = x.asin();
+    halfPi = getPi(Ctor, pr + 4, rm).times(0.5);
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return halfPi.minus(x);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic cosine in radians of the
+   * value of this Decimal.
+   *
+   * Domain: [1, Infinity]
+   * Range: [0, Infinity]
+   *
+   * acosh(x) = ln(x + sqrt(x^2 - 1))
+   *
+   * acosh(x < 1)     = NaN
+   * acosh(NaN)       = NaN
+   * acosh(Infinity)  = Infinity
+   * acosh(-Infinity) = NaN
+   * acosh(0)         = NaN
+   * acosh(-0)        = NaN
+   * acosh(1)         = 0
+   * acosh(-1)        = NaN
+   *
+   */
+  P.inverseHyperbolicCosine = P.acosh = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (x.lte(1)) return new Ctor(x.eq(1) ? 0 : NaN);
+    if (!x.isFinite()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + Math.max(Math.abs(x.e), x.sd()) + 4;
+    Ctor.rounding = 1;
+    external = false;
+
+    x = x.times(x).minus(1).sqrt().plus(x);
+
+    external = true;
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return x.ln();
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic sine in radians of the value
+   * of this Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-Infinity, Infinity]
+   *
+   * asinh(x) = ln(x + sqrt(x^2 + 1))
+   *
+   * asinh(NaN)       = NaN
+   * asinh(Infinity)  = Infinity
+   * asinh(-Infinity) = -Infinity
+   * asinh(0)         = 0
+   * asinh(-0)        = -0
+   *
+   */
+  P.inverseHyperbolicSine = P.asinh = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite() || x.isZero()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + 2 * Math.max(Math.abs(x.e), x.sd()) + 6;
+    Ctor.rounding = 1;
+    external = false;
+
+    x = x.times(x).plus(1).sqrt().plus(x);
+
+    external = true;
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return x.ln();
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic tangent in radians of the
+   * value of this Decimal.
+   *
+   * Domain: [-1, 1]
+   * Range: [-Infinity, Infinity]
+   *
+   * atanh(x) = 0.5 * ln((1 + x) / (1 - x))
+   *
+   * atanh(|x| > 1)   = NaN
+   * atanh(NaN)       = NaN
+   * atanh(Infinity)  = NaN
+   * atanh(-Infinity) = NaN
+   * atanh(0)         = 0
+   * atanh(-0)        = -0
+   * atanh(1)         = Infinity
+   * atanh(-1)        = -Infinity
+   *
+   */
+  P.inverseHyperbolicTangent = P.atanh = function () {
+    var pr, rm, wpr, xsd,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite()) return new Ctor(NaN);
+    if (x.e >= 0) return new Ctor(x.abs().eq(1) ? x.s / 0 : x.isZero() ? x : NaN);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    xsd = x.sd();
+
+    if (Math.max(xsd, pr) < 2 * -x.e - 1) return finalise(new Ctor(x), pr, rm, true);
+
+    Ctor.precision = wpr = xsd - x.e;
+
+    x = divide(x.plus(1), new Ctor(1).minus(x), wpr + pr, 1);
+
+    Ctor.precision = pr + 4;
+    Ctor.rounding = 1;
+
+    x = x.ln();
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return x.times(0.5);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the arcsine (inverse sine) in radians of the value of this
+   * Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-pi/2, pi/2]
+   *
+   * asin(x) = 2*atan(x/(1 + sqrt(1 - x^2)))
+   *
+   * asin(0)       = 0
+   * asin(-0)      = -0
+   * asin(1/2)     = pi/6
+   * asin(-1/2)    = -pi/6
+   * asin(1)       = pi/2
+   * asin(-1)      = -pi/2
+   * asin(|x| > 1) = NaN
+   * asin(NaN)     = NaN
+   *
+   * TODO? Compare performance of Taylor series.
+   *
+   */
+  P.inverseSine = P.asin = function () {
+    var halfPi, k,
+      pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (x.isZero()) return new Ctor(x);
+
+    k = x.abs().cmp(1);
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+
+    if (k !== -1) {
+
+      // |x| is 1
+      if (k === 0) {
+        halfPi = getPi(Ctor, pr + 4, rm).times(0.5);
+        halfPi.s = x.s;
+        return halfPi;
+      }
+
+      // |x| > 1 or x is NaN
+      return new Ctor(NaN);
+    }
+
+    // TODO? Special case asin(1/2) = pi/6 and asin(-1/2) = -pi/6
+
+    Ctor.precision = pr + 6;
+    Ctor.rounding = 1;
+
+    x = x.div(new Ctor(1).minus(x.times(x)).sqrt().plus(1)).atan();
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return x.times(2);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the arctangent (inverse tangent) in radians of the value
+   * of this Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-pi/2, pi/2]
+   *
+   * atan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
+   *
+   * atan(0)         = 0
+   * atan(-0)        = -0
+   * atan(1)         = pi/4
+   * atan(-1)        = -pi/4
+   * atan(Infinity)  = pi/2
+   * atan(-Infinity) = -pi/2
+   * atan(NaN)       = NaN
+   *
+   */
+  P.inverseTangent = P.atan = function () {
+    var i, j, k, n, px, t, r, wpr, x2,
+      x = this,
+      Ctor = x.constructor,
+      pr = Ctor.precision,
+      rm = Ctor.rounding;
+
+    if (!x.isFinite()) {
+      if (!x.s) return new Ctor(NaN);
+      if (pr + 4 <= PI_PRECISION) {
+        r = getPi(Ctor, pr + 4, rm).times(0.5);
+        r.s = x.s;
+        return r;
+      }
+    } else if (x.isZero()) {
+      return new Ctor(x);
+    } else if (x.abs().eq(1) && pr + 4 <= PI_PRECISION) {
+      r = getPi(Ctor, pr + 4, rm).times(0.25);
+      r.s = x.s;
+      return r;
+    }
+
+    Ctor.precision = wpr = pr + 10;
+    Ctor.rounding = 1;
+
+    // TODO? if (x >= 1 && pr <= PI_PRECISION) atan(x) = halfPi * x.s - atan(1 / x);
+
+    // Argument reduction
+    // Ensure |x| < 0.42
+    // atan(x) = 2 * atan(x / (1 + sqrt(1 + x^2)))
+
+    k = Math.min(28, wpr / LOG_BASE + 2 | 0);
+
+    for (i = k; i; --i) x = x.div(x.times(x).plus(1).sqrt().plus(1));
+
+    external = false;
+
+    j = Math.ceil(wpr / LOG_BASE);
+    n = 1;
+    x2 = x.times(x);
+    r = new Ctor(x);
+    px = x;
+
+    // atan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
+    for (; i !== -1;) {
+      px = px.times(x2);
+      t = r.minus(px.div(n += 2));
+
+      px = px.times(x2);
+      r = t.plus(px.div(n += 2));
+
+      if (r.d[j] !== void 0) for (i = j; r.d[i] === t.d[i] && i--;);
+    }
+
+    if (k) r = r.times(2 << (k - 1));
+
+    external = true;
+
+    return finalise(r, Ctor.precision = pr, Ctor.rounding = rm, true);
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is a finite number, otherwise return false.
+   *
+   */
+  P.isFinite = function () {
+    return !!this.d;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is an integer, otherwise return false.
+   *
+   */
+  P.isInteger = P.isInt = function () {
+    return !!this.d && mathfloor(this.e / LOG_BASE) > this.d.length - 2;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is NaN, otherwise return false.
+   *
+   */
+  P.isNaN = function () {
+    return !this.s;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is negative, otherwise return false.
+   *
+   */
+  P.isNegative = P.isNeg = function () {
+    return this.s < 0;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is positive, otherwise return false.
+   *
+   */
+  P.isPositive = P.isPos = function () {
+    return this.s > 0;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is 0 or -0, otherwise return false.
+   *
+   */
+  P.isZero = function () {
+    return !!this.d && this.d[0] === 0;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is less than `y`, otherwise return false.
+   *
+   */
+  P.lessThan = P.lt = function (y) {
+    return this.cmp(y) < 0;
+  };
+
+
+  /*
+   * Return true if the value of this Decimal is less than or equal to `y`, otherwise return false.
+   *
+   */
+  P.lessThanOrEqualTo = P.lte = function (y) {
+    return this.cmp(y) < 1;
+  };
+
+
+  /*
+   * Return the logarithm of the value of this Decimal to the specified base, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * If no base is specified, return log[10](arg).
+   *
+   * log[base](arg) = ln(arg) / ln(base)
+   *
+   * The result will always be correctly rounded if the base of the log is 10, and 'almost always'
+   * otherwise:
+   *
+   * Depending on the rounding mode, the result may be incorrectly rounded if the first fifteen
+   * rounding digits are [49]99999999999999 or [50]00000000000000. In that case, the maximum error
+   * between the result and the correctly rounded result will be one ulp (unit in the last place).
+   *
+   * log[-b](a)       = NaN
+   * log[0](a)        = NaN
+   * log[1](a)        = NaN
+   * log[NaN](a)      = NaN
+   * log[Infinity](a) = NaN
+   * log[b](0)        = -Infinity
+   * log[b](-0)       = -Infinity
+   * log[b](-a)       = NaN
+   * log[b](1)        = 0
+   * log[b](Infinity) = Infinity
+   * log[b](NaN)      = NaN
+   *
+   * [base] {number|string|Decimal} The base of the logarithm.
+   *
+   */
+  P.logarithm = P.log = function (base) {
+    var isBase10, d, denominator, k, inf, num, sd, r,
+      arg = this,
+      Ctor = arg.constructor,
+      pr = Ctor.precision,
+      rm = Ctor.rounding,
+      guard = 5;
+
+    // Default base is 10.
+    if (base == null) {
+      base = new Ctor(10);
+      isBase10 = true;
+    } else {
+      base = new Ctor(base);
+      d = base.d;
+
+      // Return NaN if base is negative, or non-finite, or is 0 or 1.
+      if (base.s < 0 || !d || !d[0] || base.eq(1)) return new Ctor(NaN);
+
+      isBase10 = base.eq(10);
+    }
+
+    d = arg.d;
+
+    // Is arg negative, non-finite, 0 or 1?
+    if (arg.s < 0 || !d || !d[0] || arg.eq(1)) {
+      return new Ctor(d && !d[0] ? -1 / 0 : arg.s != 1 ? NaN : d ? 0 : 1 / 0);
+    }
+
+    // The result will have a non-terminating decimal expansion if base is 10 and arg is not an
+    // integer power of 10.
+    if (isBase10) {
+      if (d.length > 1) {
+        inf = true;
+      } else {
+        for (k = d[0]; k % 10 === 0;) k /= 10;
+        inf = k !== 1;
+      }
+    }
+
+    external = false;
+    sd = pr + guard;
+    num = naturalLogarithm(arg, sd);
+    denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base, sd);
+
+    // The result will have 5 rounding digits.
+    r = divide(num, denominator, sd, 1);
+
+    // If at a rounding boundary, i.e. the result's rounding digits are [49]9999 or [50]0000,
+    // calculate 10 further digits.
+    //
+    // If the result is known to have an infinite decimal expansion, repeat this until it is clear
+    // that the result is above or below the boundary. Otherwise, if after calculating the 10
+    // further digits, the last 14 are nines, round up and assume the result is exact.
+    // Also assume the result is exact if the last 14 are zero.
+    //
+    // Example of a result that will be incorrectly rounded:
+    // log[1048576](4503599627370502) = 2.60000000000000009610279511444746...
+    // The above result correctly rounded using ROUND_CEIL to 1 decimal place should be 2.7, but it
+    // will be given as 2.6 as there are 15 zeros immediately after the requested decimal place, so
+    // the exact result would be assumed to be 2.6, which rounded using ROUND_CEIL to 1 decimal
+    // place is still 2.6.
+    if (checkRoundingDigits(r.d, k = pr, rm)) {
+
+      do {
+        sd += 10;
+        num = naturalLogarithm(arg, sd);
+        denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base, sd);
+        r = divide(num, denominator, sd, 1);
+
+        if (!inf) {
+
+          // Check for 14 nines from the 2nd rounding digit, as the first may be 4.
+          if (+digitsToString(r.d).slice(k + 1, k + 15) + 1 == 1e14) {
+            r = finalise(r, pr + 1, 0);
+          }
+
+          break;
+        }
+      } while (checkRoundingDigits(r.d, k += 10, rm));
+    }
+
+    external = true;
+
+    return finalise(r, pr, rm);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the maximum of the arguments and the value of this Decimal.
+   *
+   * arguments {number|string|Decimal}
+   *
+  P.max = function () {
+    Array.prototype.push.call(arguments, this);
+    return maxOrMin(this.constructor, arguments, 'lt');
+  };
+   */
+
+
+  /*
+   * Return a new Decimal whose value is the minimum of the arguments and the value of this Decimal.
+   *
+   * arguments {number|string|Decimal}
+   *
+  P.min = function () {
+    Array.prototype.push.call(arguments, this);
+    return maxOrMin(this.constructor, arguments, 'gt');
+  };
+   */
+
+
+  /*
+   *  n - 0 = n
+   *  n - N = N
+   *  n - I = -I
+   *  0 - n = -n
+   *  0 - 0 = 0
+   *  0 - N = N
+   *  0 - I = -I
+   *  N - n = N
+   *  N - 0 = N
+   *  N - N = N
+   *  N - I = N
+   *  I - n = I
+   *  I - 0 = I
+   *  I - N = N
+   *  I - I = N
+   *
+   * Return a new Decimal whose value is the value of this Decimal minus `y`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   */
+  P.minus = P.sub = function (y) {
+    var d, e, i, j, k, len, pr, rm, xd, xe, xLTy, yd,
+      x = this,
+      Ctor = x.constructor;
+
+    y = new Ctor(y);
+
+    // If either is not finite...
+    if (!x.d || !y.d) {
+
+      // Return NaN if either is NaN.
+      if (!x.s || !y.s) y = new Ctor(NaN);
+
+      // Return y negated if x is finite and y is ±Infinity.
+      else if (x.d) y.s = -y.s;
+
+      // Return x if y is finite and x is ±Infinity.
+      // Return x if both are ±Infinity with different signs.
+      // Return NaN if both are ±Infinity with the same sign.
+      else y = new Ctor(y.d || x.s !== y.s ? x : NaN);
+
+      return y;
+    }
+
+    // If signs differ...
+    if (x.s != y.s) {
+      y.s = -y.s;
+      return x.plus(y);
+    }
+
+    xd = x.d;
+    yd = y.d;
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+
+    // If either is zero...
+    if (!xd[0] || !yd[0]) {
+
+      // Return y negated if x is zero and y is non-zero.
+      if (yd[0]) y.s = -y.s;
+
+      // Return x if y is zero and x is non-zero.
+      else if (xd[0]) y = new Ctor(x);
+
+      // Return zero if both are zero.
+      // From IEEE 754 (2008) 6.3: 0 - 0 = -0 - -0 = -0 when rounding to -Infinity.
+      else return new Ctor(rm === 3 ? -0 : 0);
+
+      return external ? finalise(y, pr, rm) : y;
+    }
+
+    // x and y are finite, non-zero numbers with the same sign.
+
+    // Calculate base 1e7 exponents.
+    e = mathfloor(y.e / LOG_BASE);
+    xe = mathfloor(x.e / LOG_BASE);
+
+    xd = xd.slice();
+    k = xe - e;
+
+    // If base 1e7 exponents differ...
+    if (k) {
+      xLTy = k < 0;
+
+      if (xLTy) {
+        d = xd;
+        k = -k;
+        len = yd.length;
+      } else {
+        d = yd;
+        e = xe;
+        len = xd.length;
+      }
+
+      // Numbers with massively different exponents would result in a very high number of
+      // zeros needing to be prepended, but this can be avoided while still ensuring correct
+      // rounding by limiting the number of zeros to `Math.ceil(pr / LOG_BASE) + 2`.
+      i = Math.max(Math.ceil(pr / LOG_BASE), len) + 2;
+
+      if (k > i) {
+        k = i;
+        d.length = 1;
+      }
+
+      // Prepend zeros to equalise exponents.
+      d.reverse();
+      for (i = k; i--;) d.push(0);
+      d.reverse();
+
+    // Base 1e7 exponents equal.
+    } else {
+
+      // Check digits to determine which is the bigger number.
+
+      i = xd.length;
+      len = yd.length;
+      xLTy = i < len;
+      if (xLTy) len = i;
+
+      for (i = 0; i < len; i++) {
+        if (xd[i] != yd[i]) {
+          xLTy = xd[i] < yd[i];
+          break;
+        }
+      }
+
+      k = 0;
+    }
+
+    if (xLTy) {
+      d = xd;
+      xd = yd;
+      yd = d;
+      y.s = -y.s;
+    }
+
+    len = xd.length;
+
+    // Append zeros to `xd` if shorter.
+    // Don't add zeros to `yd` if shorter as subtraction only needs to start at `yd` length.
+    for (i = yd.length - len; i > 0; --i) xd[len++] = 0;
+
+    // Subtract yd from xd.
+    for (i = yd.length; i > k;) {
+
+      if (xd[--i] < yd[i]) {
+        for (j = i; j && xd[--j] === 0;) xd[j] = BASE - 1;
+        --xd[j];
+        xd[i] += BASE;
+      }
+
+      xd[i] -= yd[i];
+    }
+
+    // Remove trailing zeros.
+    for (; xd[--len] === 0;) xd.pop();
+
+    // Remove leading zeros and adjust exponent accordingly.
+    for (; xd[0] === 0; xd.shift()) --e;
+
+    // Zero?
+    if (!xd[0]) return new Ctor(rm === 3 ? -0 : 0);
+
+    y.d = xd;
+    y.e = getBase10Exponent(xd, e);
+
+    return external ? finalise(y, pr, rm) : y;
+  };
+
+
+  /*
+   *   n % 0 =  N
+   *   n % N =  N
+   *   n % I =  n
+   *   0 % n =  0
+   *  -0 % n = -0
+   *   0 % 0 =  N
+   *   0 % N =  N
+   *   0 % I =  0
+   *   N % n =  N
+   *   N % 0 =  N
+   *   N % N =  N
+   *   N % I =  N
+   *   I % n =  N
+   *   I % 0 =  N
+   *   I % N =  N
+   *   I % I =  N
+   *
+   * Return a new Decimal whose value is the value of this Decimal modulo `y`, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   * The result depends on the modulo mode.
+   *
+   */
+  P.modulo = P.mod = function (y) {
+    var q,
+      x = this,
+      Ctor = x.constructor;
+
+    y = new Ctor(y);
+
+    // Return NaN if x is ±Infinity or NaN, or y is NaN or ±0.
+    if (!x.d || !y.s || y.d && !y.d[0]) return new Ctor(NaN);
+
+    // Return x if y is ±Infinity or x is ±0.
+    if (!y.d || x.d && !x.d[0]) {
+      return finalise(new Ctor(x), Ctor.precision, Ctor.rounding);
+    }
+
+    // Prevent rounding of intermediate calculations.
+    external = false;
+
+    if (Ctor.modulo == 9) {
+
+      // Euclidian division: q = sign(y) * floor(x / abs(y))
+      // result = x - q * y    where  0 <= result < abs(y)
+      q = divide(x, y.abs(), 0, 3, 1);
+      q.s *= y.s;
+    } else {
+      q = divide(x, y, 0, Ctor.modulo, 1);
+    }
+
+    q = q.times(y);
+
+    external = true;
+
+    return x.minus(q);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the natural exponential of the value of this Decimal,
+   * i.e. the base e raised to the power the value of this Decimal, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   */
+  P.naturalExponential = P.exp = function () {
+    return naturalExponential(this);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the natural logarithm of the value of this Decimal,
+   * rounded to `precision` significant digits using rounding mode `rounding`.
+   *
+   */
+  P.naturalLogarithm = P.ln = function () {
+    return naturalLogarithm(this);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal negated, i.e. as if multiplied by
+   * -1.
+   *
+   */
+  P.negated = P.neg = function () {
+    var x = new this.constructor(this);
+    x.s = -x.s;
+    return finalise(x);
+  };
+
+
+  /*
+   *  n + 0 = n
+   *  n + N = N
+   *  n + I = I
+   *  0 + n = n
+   *  0 + 0 = 0
+   *  0 + N = N
+   *  0 + I = I
+   *  N + n = N
+   *  N + 0 = N
+   *  N + N = N
+   *  N + I = N
+   *  I + n = I
+   *  I + 0 = I
+   *  I + N = N
+   *  I + I = I
+   *
+   * Return a new Decimal whose value is the value of this Decimal plus `y`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   */
+  P.plus = P.add = function (y) {
+    var carry, d, e, i, k, len, pr, rm, xd, yd,
+      x = this,
+      Ctor = x.constructor;
+
+    y = new Ctor(y);
+
+    // If either is not finite...
+    if (!x.d || !y.d) {
+
+      // Return NaN if either is NaN.
+      if (!x.s || !y.s) y = new Ctor(NaN);
+
+      // Return x if y is finite and x is ±Infinity.
+      // Return x if both are ±Infinity with the same sign.
+      // Return NaN if both are ±Infinity with different signs.
+      // Return y if x is finite and y is ±Infinity.
+      else if (!x.d) y = new Ctor(y.d || x.s === y.s ? x : NaN);
+
+      return y;
+    }
+
+     // If signs differ...
+    if (x.s != y.s) {
+      y.s = -y.s;
+      return x.minus(y);
+    }
+
+    xd = x.d;
+    yd = y.d;
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+
+    // If either is zero...
+    if (!xd[0] || !yd[0]) {
+
+      // Return x if y is zero.
+      // Return y if y is non-zero.
+      if (!yd[0]) y = new Ctor(x);
+
+      return external ? finalise(y, pr, rm) : y;
+    }
+
+    // x and y are finite, non-zero numbers with the same sign.
+
+    // Calculate base 1e7 exponents.
+    k = mathfloor(x.e / LOG_BASE);
+    e = mathfloor(y.e / LOG_BASE);
+
+    xd = xd.slice();
+    i = k - e;
+
+    // If base 1e7 exponents differ...
+    if (i) {
+
+      if (i < 0) {
+        d = xd;
+        i = -i;
+        len = yd.length;
+      } else {
+        d = yd;
+        e = k;
+        len = xd.length;
+      }
+
+      // Limit number of zeros prepended to max(ceil(pr / LOG_BASE), len) + 1.
+      k = Math.ceil(pr / LOG_BASE);
+      len = k > len ? k + 1 : len + 1;
+
+      if (i > len) {
+        i = len;
+        d.length = 1;
+      }
+
+      // Prepend zeros to equalise exponents. Note: Faster to use reverse then do unshifts.
+      d.reverse();
+      for (; i--;) d.push(0);
+      d.reverse();
+    }
+
+    len = xd.length;
+    i = yd.length;
+
+    // If yd is longer than xd, swap xd and yd so xd points to the longer array.
+    if (len - i < 0) {
+      i = len;
+      d = yd;
+      yd = xd;
+      xd = d;
+    }
+
+    // Only start adding at yd.length - 1 as the further digits of xd can be left as they are.
+    for (carry = 0; i;) {
+      carry = (xd[--i] = xd[i] + yd[i] + carry) / BASE | 0;
+      xd[i] %= BASE;
+    }
+
+    if (carry) {
+      xd.unshift(carry);
+      ++e;
+    }
+
+    // Remove trailing zeros.
+    // No need to check for zero, as +x + +y != 0 && -x + -y != 0
+    for (len = xd.length; xd[--len] == 0;) xd.pop();
+
+    y.d = xd;
+    y.e = getBase10Exponent(xd, e);
+
+    return external ? finalise(y, pr, rm) : y;
+  };
+
+
+  /*
+   * Return the number of significant digits of the value of this Decimal.
+   *
+   * [z] {boolean|number} Whether to count integer-part trailing zeros: true, false, 1 or 0.
+   *
+   */
+  P.precision = P.sd = function (z) {
+    var k,
+      x = this;
+
+    if (z !== void 0 && z !== !!z && z !== 1 && z !== 0) throw Error(invalidArgument + z);
+
+    if (x.d) {
+      k = getPrecision(x.d);
+      if (z && x.e + 1 > k) k = x.e + 1;
+    } else {
+      k = NaN;
+    }
+
+    return k;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal rounded to a whole number using
+   * rounding mode `rounding`.
+   *
+   */
+  P.round = function () {
+    var x = this,
+      Ctor = x.constructor;
+
+    return finalise(new Ctor(x), x.e + 1, Ctor.rounding);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the sine of the value in radians of this Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-1, 1]
+   *
+   * sin(x) = x - x^3/3! + x^5/5! - ...
+   *
+   * sin(0)         = 0
+   * sin(-0)        = -0
+   * sin(Infinity)  = NaN
+   * sin(-Infinity) = NaN
+   * sin(NaN)       = NaN
+   *
+   */
+  P.sine = P.sin = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite()) return new Ctor(NaN);
+    if (x.isZero()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + Math.max(x.e, x.sd()) + LOG_BASE;
+    Ctor.rounding = 1;
+
+    x = sine(Ctor, toLessThanHalfPi(Ctor, x));
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return finalise(quadrant > 2 ? x.neg() : x, pr, rm, true);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the square root of this Decimal, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   *  sqrt(-n) =  N
+   *  sqrt(N)  =  N
+   *  sqrt(-I) =  N
+   *  sqrt(I)  =  I
+   *  sqrt(0)  =  0
+   *  sqrt(-0) = -0
+   *
+   */
+  P.squareRoot = P.sqrt = function () {
+    var m, n, sd, r, rep, t,
+      x = this,
+      d = x.d,
+      e = x.e,
+      s = x.s,
+      Ctor = x.constructor;
+
+    // Negative/NaN/Infinity/zero?
+    if (s !== 1 || !d || !d[0]) {
+      return new Ctor(!s || s < 0 && (!d || d[0]) ? NaN : d ? x : 1 / 0);
+    }
+
+    external = false;
+
+    // Initial estimate.
+    s = Math.sqrt(+x);
+
+    // Math.sqrt underflow/overflow?
+    // Pass x to Math.sqrt as integer, then adjust the exponent of the result.
+    if (s == 0 || s == 1 / 0) {
+      n = digitsToString(d);
+
+      if ((n.length + e) % 2 == 0) n += '0';
+      s = Math.sqrt(n);
+      e = mathfloor((e + 1) / 2) - (e < 0 || e % 2);
+
+      if (s == 1 / 0) {
+        n = '5e' + e;
+      } else {
+        n = s.toExponential();
+        n = n.slice(0, n.indexOf('e') + 1) + e;
+      }
+
+      r = new Ctor(n);
+    } else {
+      r = new Ctor(s.toString());
+    }
+
+    sd = (e = Ctor.precision) + 3;
+
+    // Newton-Raphson iteration.
+    for (;;) {
+      t = r;
+      r = t.plus(divide(x, t, sd + 2, 1)).times(0.5);
+
+      // TODO? Replace with for-loop and checkRoundingDigits.
+      if (digitsToString(t.d).slice(0, sd) === (n = digitsToString(r.d)).slice(0, sd)) {
+        n = n.slice(sd - 3, sd + 1);
+
+        // The 4th rounding digit may be in error by -1 so if the 4 rounding digits are 9999 or
+        // 4999, i.e. approaching a rounding boundary, continue the iteration.
+        if (n == '9999' || !rep && n == '4999') {
+
+          // On the first iteration only, check to see if rounding up gives the exact result as the
+          // nines may infinitely repeat.
+          if (!rep) {
+            finalise(t, e + 1, 0);
+
+            if (t.times(t).eq(x)) {
+              r = t;
+              break;
+            }
+          }
+
+          sd += 4;
+          rep = 1;
+        } else {
+
+          // If the rounding digits are null, 0{0,4} or 50{0,3}, check for an exact result.
+          // If not, then there are further digits and m will be truthy.
+          if (!+n || !+n.slice(1) && n.charAt(0) == '5') {
+
+            // Truncate to the first rounding digit.
+            finalise(r, e + 1, 1);
+            m = !r.times(r).eq(x);
+          }
+
+          break;
+        }
+      }
+    }
+
+    external = true;
+
+    return finalise(r, e, Ctor.rounding, m);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the tangent of the value in radians of this Decimal.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-Infinity, Infinity]
+   *
+   * tan(0)         = 0
+   * tan(-0)        = -0
+   * tan(Infinity)  = NaN
+   * tan(-Infinity) = NaN
+   * tan(NaN)       = NaN
+   *
+   */
+  P.tangent = P.tan = function () {
+    var pr, rm,
+      x = this,
+      Ctor = x.constructor;
+
+    if (!x.isFinite()) return new Ctor(NaN);
+    if (x.isZero()) return new Ctor(x);
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+    Ctor.precision = pr + 10;
+    Ctor.rounding = 1;
+
+    x = x.sin();
+    x.s = 1;
+    x = divide(x, new Ctor(1).minus(x.times(x)).sqrt(), pr + 10, 0);
+
+    Ctor.precision = pr;
+    Ctor.rounding = rm;
+
+    return finalise(quadrant == 2 || quadrant == 4 ? x.neg() : x, pr, rm, true);
+  };
+
+
+  /*
+   *  n * 0 = 0
+   *  n * N = N
+   *  n * I = I
+   *  0 * n = 0
+   *  0 * 0 = 0
+   *  0 * N = N
+   *  0 * I = N
+   *  N * n = N
+   *  N * 0 = N
+   *  N * N = N
+   *  N * I = N
+   *  I * n = I
+   *  I * 0 = N
+   *  I * N = N
+   *  I * I = I
+   *
+   * Return a new Decimal whose value is this Decimal times `y`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   */
+  P.times = P.mul = function (y) {
+    var carry, e, i, k, r, rL, t, xdL, ydL,
+      x = this,
+      Ctor = x.constructor,
+      xd = x.d,
+      yd = (y = new Ctor(y)).d;
+
+    y.s *= x.s;
+
+     // If either is NaN, ±Infinity or ±0...
+    if (!xd || !xd[0] || !yd || !yd[0]) {
+
+      return new Ctor(!y.s || xd && !xd[0] && !yd || yd && !yd[0] && !xd
+
+        // Return NaN if either is NaN.
+        // Return NaN if x is ±0 and y is ±Infinity, or y is ±0 and x is ±Infinity.
+        ? NaN
+
+        // Return ±Infinity if either is ±Infinity.
+        // Return ±0 if either is ±0.
+        : !xd || !yd ? y.s / 0 : y.s * 0);
+    }
+
+    e = mathfloor(x.e / LOG_BASE) + mathfloor(y.e / LOG_BASE);
+    xdL = xd.length;
+    ydL = yd.length;
+
+    // Ensure xd points to the longer array.
+    if (xdL < ydL) {
+      r = xd;
+      xd = yd;
+      yd = r;
+      rL = xdL;
+      xdL = ydL;
+      ydL = rL;
+    }
+
+    // Initialise the result array with zeros.
+    r = [];
+    rL = xdL + ydL;
+    for (i = rL; i--;) r.push(0);
+
+    // Multiply!
+    for (i = ydL; --i >= 0;) {
+      carry = 0;
+      for (k = xdL + i; k > i;) {
+        t = r[k] + yd[i] * xd[k - i - 1] + carry;
+        r[k--] = t % BASE | 0;
+        carry = t / BASE | 0;
+      }
+
+      r[k] = (r[k] + carry) % BASE | 0;
+    }
+
+    // Remove trailing zeros.
+    for (; !r[--rL];) r.pop();
+
+    if (carry) ++e;
+    else r.shift();
+
+    y.d = r;
+    y.e = getBase10Exponent(r, e);
+
+    return external ? finalise(y, Ctor.precision, Ctor.rounding) : y;
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal in base 2, round to `sd` significant
+   * digits using rounding mode `rm`.
+   *
+   * If the optional `sd` argument is present then return binary exponential notation.
+   *
+   * [sd] {number} Significant digits. Integer, 1 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toBinary = function (sd, rm) {
+    return toStringBinary(this, 2, sd, rm);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal rounded to a maximum of `dp`
+   * decimal places using rounding mode `rm` or `rounding` if `rm` is omitted.
+   *
+   * If `dp` is omitted, return a new Decimal whose value is the value of this Decimal.
+   *
+   * [dp] {number} Decimal places. Integer, 0 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toDecimalPlaces = P.toDP = function (dp, rm) {
+    var x = this,
+      Ctor = x.constructor;
+
+    x = new Ctor(x);
+    if (dp === void 0) return x;
+
+    checkInt32(dp, 0, MAX_DIGITS);
+
+    if (rm === void 0) rm = Ctor.rounding;
+    else checkInt32(rm, 0, 8);
+
+    return finalise(x, dp + x.e + 1, rm);
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal in exponential notation rounded to
+   * `dp` fixed decimal places using rounding mode `rounding`.
+   *
+   * [dp] {number} Decimal places. Integer, 0 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toExponential = function (dp, rm) {
+    var str,
+      x = this,
+      Ctor = x.constructor;
+
+    if (dp === void 0) {
+      str = finiteToString(x, true);
+    } else {
+      checkInt32(dp, 0, MAX_DIGITS);
+
+      if (rm === void 0) rm = Ctor.rounding;
+      else checkInt32(rm, 0, 8);
+
+      x = finalise(new Ctor(x), dp + 1, rm);
+      str = finiteToString(x, true, dp + 1);
+    }
+
+    return x.isNeg() && !x.isZero() ? '-' + str : str;
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal in normal (fixed-point) notation to
+   * `dp` fixed decimal places and rounded using rounding mode `rm` or `rounding` if `rm` is
+   * omitted.
+   *
+   * As with JavaScript numbers, (-0).toFixed(0) is '0', but e.g. (-0.00001).toFixed(0) is '-0'.
+   *
+   * [dp] {number} Decimal places. Integer, 0 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   * (-0).toFixed(0) is '0', but (-0.1).toFixed(0) is '-0'.
+   * (-0).toFixed(1) is '0.0', but (-0.01).toFixed(1) is '-0.0'.
+   * (-0).toFixed(3) is '0.000'.
+   * (-0.5).toFixed(0) is '-0'.
+   *
+   */
+  P.toFixed = function (dp, rm) {
+    var str, y,
+      x = this,
+      Ctor = x.constructor;
+
+    if (dp === void 0) {
+      str = finiteToString(x);
+    } else {
+      checkInt32(dp, 0, MAX_DIGITS);
+
+      if (rm === void 0) rm = Ctor.rounding;
+      else checkInt32(rm, 0, 8);
+
+      y = finalise(new Ctor(x), dp + x.e + 1, rm);
+      str = finiteToString(y, false, dp + y.e + 1);
+    }
+
+    // To determine whether to add the minus sign look at the value before it was rounded,
+    // i.e. look at `x` rather than `y`.
+    return x.isNeg() && !x.isZero() ? '-' + str : str;
+  };
+
+
+  /*
+   * Return an array representing the value of this Decimal as a simple fraction with an integer
+   * numerator and an integer denominator.
+   *
+   * The denominator will be a positive non-zero value less than or equal to the specified maximum
+   * denominator. If a maximum denominator is not specified, the denominator will be the lowest
+   * value necessary to represent the number exactly.
+   *
+   * [maxD] {number|string|Decimal} Maximum denominator. Integer >= 1 and < Infinity.
+   *
+   */
+  P.toFraction = function (maxD) {
+    var d, d0, d1, d2, e, k, n, n0, n1, pr, q, r,
+      x = this,
+      xd = x.d,
+      Ctor = x.constructor;
+
+    if (!xd) return new Ctor(x);
+
+    n1 = d0 = new Ctor(1);
+    d1 = n0 = new Ctor(0);
+
+    d = new Ctor(d1);
+    e = d.e = getPrecision(xd) - x.e - 1;
+    k = e % LOG_BASE;
+    d.d[0] = mathpow(10, k < 0 ? LOG_BASE + k : k);
+
+    if (maxD == null) {
+
+      // d is 10**e, the minimum max-denominator needed.
+      maxD = e > 0 ? d : n1;
+    } else {
+      n = new Ctor(maxD);
+      if (!n.isInt() || n.lt(n1)) throw Error(invalidArgument + n);
+      maxD = n.gt(d) ? (e > 0 ? d : n1) : n;
+    }
+
+    external = false;
+    n = new Ctor(digitsToString(xd));
+    pr = Ctor.precision;
+    Ctor.precision = e = xd.length * LOG_BASE * 2;
+
+    for (;;)  {
+      q = divide(n, d, 0, 1, 1);
+      d2 = d0.plus(q.times(d1));
+      if (d2.cmp(maxD) == 1) break;
+      d0 = d1;
+      d1 = d2;
+      d2 = n1;
+      n1 = n0.plus(q.times(d2));
+      n0 = d2;
+      d2 = d;
+      d = n.minus(q.times(d2));
+      n = d2;
+    }
+
+    d2 = divide(maxD.minus(d0), d1, 0, 1, 1);
+    n0 = n0.plus(d2.times(n1));
+    d0 = d0.plus(d2.times(d1));
+    n0.s = n1.s = x.s;
+
+    // Determine which fraction is closer to x, n0/d0 or n1/d1?
+    r = divide(n1, d1, e, 1).minus(x).abs().cmp(divide(n0, d0, e, 1).minus(x).abs()) < 1
+        ? [n1, d1] : [n0, d0];
+
+    Ctor.precision = pr;
+    external = true;
+
+    return r;
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal in base 16, round to `sd` significant
+   * digits using rounding mode `rm`.
+   *
+   * If the optional `sd` argument is present then return binary exponential notation.
+   *
+   * [sd] {number} Significant digits. Integer, 1 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toHexadecimal = P.toHex = function (sd, rm) {
+    return toStringBinary(this, 16, sd, rm);
+  };
+
+
+  /*
+   * Returns a new Decimal whose value is the nearest multiple of `y` in the direction of rounding
+   * mode `rm`, or `Decimal.rounding` if `rm` is omitted, to the value of this Decimal.
+   *
+   * The return value will always have the same sign as this Decimal, unless either this Decimal
+   * or `y` is NaN, in which case the return value will be also be NaN.
+   *
+   * The return value is not affected by the value of `precision`.
+   *
+   * y {number|string|Decimal} The magnitude to round to a multiple of.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   * 'toNearest() rounding mode not an integer: {rm}'
+   * 'toNearest() rounding mode out of range: {rm}'
+   *
+   */
+  P.toNearest = function (y, rm) {
+    var x = this,
+      Ctor = x.constructor;
+
+    x = new Ctor(x);
+
+    if (y == null) {
+
+      // If x is not finite, return x.
+      if (!x.d) return x;
+
+      y = new Ctor(1);
+      rm = Ctor.rounding;
+    } else {
+      y = new Ctor(y);
+      if (rm === void 0) {
+        rm = Ctor.rounding;
+      } else {
+        checkInt32(rm, 0, 8);
+      }
+
+      // If x is not finite, return x if y is not NaN, else NaN.
+      if (!x.d) return y.s ? x : y;
+
+      // If y is not finite, return Infinity with the sign of x if y is Infinity, else NaN.
+      if (!y.d) {
+        if (y.s) y.s = x.s;
+        return y;
+      }
+    }
+
+    // If y is not zero, calculate the nearest multiple of y to x.
+    if (y.d[0]) {
+      external = false;
+      x = divide(x, y, 0, rm, 1).times(y);
+      external = true;
+      finalise(x);
+
+    // If y is zero, return zero with the sign of x.
+    } else {
+      y.s = x.s;
+      x = y;
+    }
+
+    return x;
+  };
+
+
+  /*
+   * Return the value of this Decimal converted to a number primitive.
+   * Zero keeps its sign.
+   *
+   */
+  P.toNumber = function () {
+    return +this;
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal in base 8, round to `sd` significant
+   * digits using rounding mode `rm`.
+   *
+   * If the optional `sd` argument is present then return binary exponential notation.
+   *
+   * [sd] {number} Significant digits. Integer, 1 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toOctal = function (sd, rm) {
+    return toStringBinary(this, 8, sd, rm);
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal raised to the power `y`, rounded
+   * to `precision` significant digits using rounding mode `rounding`.
+   *
+   * ECMAScript compliant.
+   *
+   *   pow(x, NaN)                           = NaN
+   *   pow(x, ±0)                            = 1
+
+   *   pow(NaN, non-zero)                    = NaN
+   *   pow(abs(x) > 1, +Infinity)            = +Infinity
+   *   pow(abs(x) > 1, -Infinity)            = +0
+   *   pow(abs(x) == 1, ±Infinity)           = NaN
+   *   pow(abs(x) < 1, +Infinity)            = +0
+   *   pow(abs(x) < 1, -Infinity)            = +Infinity
+   *   pow(+Infinity, y > 0)                 = +Infinity
+   *   pow(+Infinity, y < 0)                 = +0
+   *   pow(-Infinity, odd integer > 0)       = -Infinity
+   *   pow(-Infinity, even integer > 0)      = +Infinity
+   *   pow(-Infinity, odd integer < 0)       = -0
+   *   pow(-Infinity, even integer < 0)      = +0
+   *   pow(+0, y > 0)                        = +0
+   *   pow(+0, y < 0)                        = +Infinity
+   *   pow(-0, odd integer > 0)              = -0
+   *   pow(-0, even integer > 0)             = +0
+   *   pow(-0, odd integer < 0)              = -Infinity
+   *   pow(-0, even integer < 0)             = +Infinity
+   *   pow(finite x < 0, finite non-integer) = NaN
+   *
+   * For non-integer or very large exponents pow(x, y) is calculated using
+   *
+   *   x^y = exp(y*ln(x))
+   *
+   * Assuming the first 15 rounding digits are each equally likely to be any digit 0-9, the
+   * probability of an incorrectly rounded result
+   * P([49]9{14} | [50]0{14}) = 2 * 0.2 * 10^-14 = 4e-15 = 1/2.5e+14
+   * i.e. 1 in 250,000,000,000,000
+   *
+   * If a result is incorrectly rounded the maximum error will be 1 ulp (unit in last place).
+   *
+   * y {number|string|Decimal} The power to which to raise this Decimal.
+   *
+   */
+  P.toPower = P.pow = function (y) {
+    var e, k, pr, r, rm, s,
+      x = this,
+      Ctor = x.constructor,
+      yn = +(y = new Ctor(y));
+
+    // Either ±Infinity, NaN or ±0?
+    if (!x.d || !y.d || !x.d[0] || !y.d[0]) return new Ctor(mathpow(+x, yn));
+
+    x = new Ctor(x);
+
+    if (x.eq(1)) return x;
+
+    pr = Ctor.precision;
+    rm = Ctor.rounding;
+
+    if (y.eq(1)) return finalise(x, pr, rm);
+
+    // y exponent
+    e = mathfloor(y.e / LOG_BASE);
+
+    // If y is a small integer use the 'exponentiation by squaring' algorithm.
+    if (e >= y.d.length - 1 && (k = yn < 0 ? -yn : yn) <= MAX_SAFE_INTEGER) {
+      r = intPow(Ctor, x, k, pr);
+      return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm);
+    }
+
+    s = x.s;
+
+    // if x is negative
+    if (s < 0) {
+
+      // if y is not an integer
+      if (e < y.d.length - 1) return new Ctor(NaN);
+
+      // Result is positive if x is negative and the last digit of integer y is even.
+      if ((y.d[e] & 1) == 0) s = 1;
+
+      // if x.eq(-1)
+      if (x.e == 0 && x.d[0] == 1 && x.d.length == 1) {
+        x.s = s;
+        return x;
+      }
+    }
+
+    // Estimate result exponent.
+    // x^y = 10^e,  where e = y * log10(x)
+    // log10(x) = log10(x_significand) + x_exponent
+    // log10(x_significand) = ln(x_significand) / ln(10)
+    k = mathpow(+x, yn);
+    e = k == 0 || !isFinite(k)
+      ? mathfloor(yn * (Math.log('0.' + digitsToString(x.d)) / Math.LN10 + x.e + 1))
+      : new Ctor(k + '').e;
+
+    // Exponent estimate may be incorrect e.g. x: 0.999999999999999999, y: 2.29, e: 0, r.e: -1.
+
+    // Overflow/underflow?
+    if (e > Ctor.maxE + 1 || e < Ctor.minE - 1) return new Ctor(e > 0 ? s / 0 : 0);
+
+    external = false;
+    Ctor.rounding = x.s = 1;
+
+    // Estimate the extra guard digits needed to ensure five correct rounding digits from
+    // naturalLogarithm(x). Example of failure without these extra digits (precision: 10):
+    // new Decimal(2.32456).pow('2087987436534566.46411')
+    // should be 1.162377823e+764914905173815, but is 1.162355823e+764914905173815
+    k = Math.min(12, (e + '').length);
+
+    // r = x^y = exp(y*ln(x))
+    r = naturalExponential(y.times(naturalLogarithm(x, pr + k)), pr);
+
+    // r may be Infinity, e.g. (0.9999999999999999).pow(-1e+40)
+    if (r.d) {
+
+      // Truncate to the required precision plus five rounding digits.
+      r = finalise(r, pr + 5, 1);
+
+      // If the rounding digits are [49]9999 or [50]0000 increase the precision by 10 and recalculate
+      // the result.
+      if (checkRoundingDigits(r.d, pr, rm)) {
+        e = pr + 10;
+
+        // Truncate to the increased precision plus five rounding digits.
+        r = finalise(naturalExponential(y.times(naturalLogarithm(x, e + k)), e), e + 5, 1);
+
+        // Check for 14 nines from the 2nd rounding digit (the first rounding digit may be 4 or 9).
+        if (+digitsToString(r.d).slice(pr + 1, pr + 15) + 1 == 1e14) {
+          r = finalise(r, pr + 1, 0);
+        }
+      }
+    }
+
+    r.s = s;
+    external = true;
+    Ctor.rounding = rm;
+
+    return finalise(r, pr, rm);
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal rounded to `sd` significant digits
+   * using rounding mode `rounding`.
+   *
+   * Return exponential notation if `sd` is less than the number of digits necessary to represent
+   * the integer part of the value in normal notation.
+   *
+   * [sd] {number} Significant digits. Integer, 1 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   */
+  P.toPrecision = function (sd, rm) {
+    var str,
+      x = this,
+      Ctor = x.constructor;
+
+    if (sd === void 0) {
+      str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
+    } else {
+      checkInt32(sd, 1, MAX_DIGITS);
+
+      if (rm === void 0) rm = Ctor.rounding;
+      else checkInt32(rm, 0, 8);
+
+      x = finalise(new Ctor(x), sd, rm);
+      str = finiteToString(x, sd <= x.e || x.e <= Ctor.toExpNeg, sd);
+    }
+
+    return x.isNeg() && !x.isZero() ? '-' + str : str;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal rounded to a maximum of `sd`
+   * significant digits using rounding mode `rm`, or to `precision` and `rounding` respectively if
+   * omitted.
+   *
+   * [sd] {number} Significant digits. Integer, 1 to MAX_DIGITS inclusive.
+   * [rm] {number} Rounding mode. Integer, 0 to 8 inclusive.
+   *
+   * 'toSD() digits out of range: {sd}'
+   * 'toSD() digits not an integer: {sd}'
+   * 'toSD() rounding mode not an integer: {rm}'
+   * 'toSD() rounding mode out of range: {rm}'
+   *
+   */
+  P.toSignificantDigits = P.toSD = function (sd, rm) {
+    var x = this,
+      Ctor = x.constructor;
+
+    if (sd === void 0) {
+      sd = Ctor.precision;
+      rm = Ctor.rounding;
+    } else {
+      checkInt32(sd, 1, MAX_DIGITS);
+
+      if (rm === void 0) rm = Ctor.rounding;
+      else checkInt32(rm, 0, 8);
+    }
+
+    return finalise(new Ctor(x), sd, rm);
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal.
+   *
+   * Return exponential notation if this Decimal has a positive exponent equal to or greater than
+   * `toExpPos`, or a negative exponent equal to or less than `toExpNeg`.
+   *
+   */
+  P.toString = function () {
+    var x = this,
+      Ctor = x.constructor,
+      str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
+
+    return x.isNeg() && !x.isZero() ? '-' + str : str;
+  };
+
+
+  /*
+   * Return a new Decimal whose value is the value of this Decimal truncated to a whole number.
+   *
+   */
+  P.truncated = P.trunc = function () {
+    return finalise(new this.constructor(this), this.e + 1, 1);
+  };
+
+
+  /*
+   * Return a string representing the value of this Decimal.
+   * Unlike `toString`, negative zero will include the minus sign.
+   *
+   */
+  P.valueOf = P.toJSON = function () {
+    var x = this,
+      Ctor = x.constructor,
+      str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
+
+    return x.isNeg() ? '-' + str : str;
+  };
+
+
+  // Helper functions for Decimal.prototype (P) and/or Decimal methods, and their callers.
+
+
+  /*
+   *  digitsToString           P.cubeRoot, P.logarithm, P.squareRoot, P.toFraction, P.toPower,
+   *                           finiteToString, naturalExponential, naturalLogarithm
+   *  checkInt32               P.toDecimalPlaces, P.toExponential, P.toFixed, P.toNearest,
+   *                           P.toPrecision, P.toSignificantDigits, toStringBinary, random
+   *  checkRoundingDigits      P.logarithm, P.toPower, naturalExponential, naturalLogarithm
+   *  convertBase              toStringBinary, parseOther
+   *  cos                      P.cos
+   *  divide                   P.atanh, P.cubeRoot, P.dividedBy, P.dividedToIntegerBy,
+   *                           P.logarithm, P.modulo, P.squareRoot, P.tan, P.tanh, P.toFraction,
+   *                           P.toNearest, toStringBinary, naturalExponential, naturalLogarithm,
+   *                           taylorSeries, atan2, parseOther
+   *  finalise                 P.absoluteValue, P.atan, P.atanh, P.ceil, P.cos, P.cosh,
+   *                           P.cubeRoot, P.dividedToIntegerBy, P.floor, P.logarithm, P.minus,
+   *                           P.modulo, P.negated, P.plus, P.round, P.sin, P.sinh, P.squareRoot,
+   *                           P.tan, P.times, P.toDecimalPlaces, P.toExponential, P.toFixed,
+   *                           P.toNearest, P.toPower, P.toPrecision, P.toSignificantDigits,
+   *                           P.truncated, divide, getLn10, getPi, naturalExponential,
+   *                           naturalLogarithm, ceil, floor, round, trunc
+   *  finiteToString           P.toExponential, P.toFixed, P.toPrecision, P.toString, P.valueOf,
+   *                           toStringBinary
+   *  getBase10Exponent        P.minus, P.plus, P.times, parseOther
+   *  getLn10                  P.logarithm, naturalLogarithm
+   *  getPi                    P.acos, P.asin, P.atan, toLessThanHalfPi, atan2
+   *  getPrecision             P.precision, P.toFraction
+   *  getZeroString            digitsToString, finiteToString
+   *  intPow                   P.toPower, parseOther
+   *  isOdd                    toLessThanHalfPi
+   *  maxOrMin                 max, min
+   *  naturalExponential       P.naturalExponential, P.toPower
+   *  naturalLogarithm         P.acosh, P.asinh, P.atanh, P.logarithm, P.naturalLogarithm,
+   *                           P.toPower, naturalExponential
+   *  nonFiniteToString        finiteToString, toStringBinary
+   *  parseDecimal             Decimal
+   *  parseOther               Decimal
+   *  sin                      P.sin
+   *  taylorSeries             P.cosh, P.sinh, cos, sin
+   *  toLessThanHalfPi         P.cos, P.sin
+   *  toStringBinary           P.toBinary, P.toHexadecimal, P.toOctal
+   *  truncate                 intPow
+   *
+   *  Throws:                  P.logarithm, P.precision, P.toFraction, checkInt32, getLn10, getPi,
+   *                           naturalLogarithm, config, parseOther, random, Decimal
+   */
+
+
+  function digitsToString(d) {
+    var i, k, ws,
+      indexOfLastWord = d.length - 1,
+      str = '',
+      w = d[0];
+
+    if (indexOfLastWord > 0) {
+      str += w;
+      for (i = 1; i < indexOfLastWord; i++) {
+        ws = d[i] + '';
+        k = LOG_BASE - ws.length;
+        if (k) str += getZeroString(k);
+        str += ws;
+      }
+
+      w = d[i];
+      ws = w + '';
+      k = LOG_BASE - ws.length;
+      if (k) str += getZeroString(k);
+    } else if (w === 0) {
+      return '0';
+    }
+
+    // Remove trailing zeros of last w.
+    for (; w % 10 === 0;) w /= 10;
+
+    return str + w;
+  }
+
+
+  function checkInt32(i, min, max) {
+    if (i !== ~~i || i < min || i > max) {
+      throw Error(invalidArgument + i);
     }
   }
 
-  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
 
-  e = (e << mLen) | m
-  eLen += mLen
-  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+  /*
+   * Check 5 rounding digits if `repeating` is null, 4 otherwise.
+   * `repeating == null` if caller is `log` or `pow`,
+   * `repeating != null` if caller is `naturalLogarithm` or `naturalExponential`.
+   */
+  function checkRoundingDigits(d, i, rm, repeating) {
+    var di, k, r, rd;
 
-  buffer[offset + i - d] |= s * 128
-}
+    // Get the length of the first word of the array d.
+    for (k = d[0]; k >= 10; k /= 10) --i;
 
-},{}],31:[function(require,module,exports){
+    // Is the rounding digit in the first word of d?
+    if (--i < 0) {
+      i += LOG_BASE;
+      di = 0;
+    } else {
+      di = Math.ceil((i + 1) / LOG_BASE);
+      i %= LOG_BASE;
+    }
+
+    // i is the index (0 - 6) of the rounding digit.
+    // E.g. if within the word 3487563 the first rounding digit is 5,
+    // then i = 4, k = 1000, rd = 3487563 % 1000 = 563
+    k = mathpow(10, LOG_BASE - i);
+    rd = d[di] % k | 0;
+
+    if (repeating == null) {
+      if (i < 3) {
+        if (i == 0) rd = rd / 100 | 0;
+        else if (i == 1) rd = rd / 10 | 0;
+        r = rm < 4 && rd == 99999 || rm > 3 && rd == 49999 || rd == 50000 || rd == 0;
+      } else {
+        r = (rm < 4 && rd + 1 == k || rm > 3 && rd + 1 == k / 2) &&
+          (d[di + 1] / k / 100 | 0) == mathpow(10, i - 2) - 1 ||
+            (rd == k / 2 || rd == 0) && (d[di + 1] / k / 100 | 0) == 0;
+      }
+    } else {
+      if (i < 4) {
+        if (i == 0) rd = rd / 1000 | 0;
+        else if (i == 1) rd = rd / 100 | 0;
+        else if (i == 2) rd = rd / 10 | 0;
+        r = (repeating || rm < 4) && rd == 9999 || !repeating && rm > 3 && rd == 4999;
+      } else {
+        r = ((repeating || rm < 4) && rd + 1 == k ||
+        (!repeating && rm > 3) && rd + 1 == k / 2) &&
+          (d[di + 1] / k / 1000 | 0) == mathpow(10, i - 3) - 1;
+      }
+    }
+
+    return r;
+  }
+
+
+  // Convert string of `baseIn` to an array of numbers of `baseOut`.
+  // Eg. convertBase('255', 10, 16) returns [15, 15].
+  // Eg. convertBase('ff', 16, 10) returns [2, 5, 5].
+  function convertBase(str, baseIn, baseOut) {
+    var j,
+      arr = [0],
+      arrL,
+      i = 0,
+      strL = str.length;
+
+    for (; i < strL;) {
+      for (arrL = arr.length; arrL--;) arr[arrL] *= baseIn;
+      arr[0] += NUMERALS.indexOf(str.charAt(i++));
+      for (j = 0; j < arr.length; j++) {
+        if (arr[j] > baseOut - 1) {
+          if (arr[j + 1] === void 0) arr[j + 1] = 0;
+          arr[j + 1] += arr[j] / baseOut | 0;
+          arr[j] %= baseOut;
+        }
+      }
+    }
+
+    return arr.reverse();
+  }
+
+
+  /*
+   * cos(x) = 1 - x^2/2! + x^4/4! - ...
+   * |x| < pi/2
+   *
+   */
+  function cosine(Ctor, x) {
+    var k, len, y;
+
+    if (x.isZero()) return x;
+
+    // Argument reduction: cos(4x) = 8*(cos^4(x) - cos^2(x)) + 1
+    // i.e. cos(x) = 8*(cos^4(x/4) - cos^2(x/4)) + 1
+
+    // Estimate the optimum number of times to use the argument reduction.
+    len = x.d.length;
+    if (len < 32) {
+      k = Math.ceil(len / 3);
+      y = (1 / tinyPow(4, k)).toString();
+    } else {
+      k = 16;
+      y = '2.3283064365386962890625e-10';
+    }
+
+    Ctor.precision += k;
+
+    x = taylorSeries(Ctor, 1, x.times(y), new Ctor(1));
+
+    // Reverse argument reduction
+    for (var i = k; i--;) {
+      var cos2x = x.times(x);
+      x = cos2x.times(cos2x).minus(cos2x).times(8).plus(1);
+    }
+
+    Ctor.precision -= k;
+
+    return x;
+  }
+
+
+  /*
+   * Perform division in the specified base.
+   */
+  var divide = (function () {
+
+    // Assumes non-zero x and k, and hence non-zero result.
+    function multiplyInteger(x, k, base) {
+      var temp,
+        carry = 0,
+        i = x.length;
+
+      for (x = x.slice(); i--;) {
+        temp = x[i] * k + carry;
+        x[i] = temp % base | 0;
+        carry = temp / base | 0;
+      }
+
+      if (carry) x.unshift(carry);
+
+      return x;
+    }
+
+    function compare(a, b, aL, bL) {
+      var i, r;
+
+      if (aL != bL) {
+        r = aL > bL ? 1 : -1;
+      } else {
+        for (i = r = 0; i < aL; i++) {
+          if (a[i] != b[i]) {
+            r = a[i] > b[i] ? 1 : -1;
+            break;
+          }
+        }
+      }
+
+      return r;
+    }
+
+    function subtract(a, b, aL, base) {
+      var i = 0;
+
+      // Subtract b from a.
+      for (; aL--;) {
+        a[aL] -= i;
+        i = a[aL] < b[aL] ? 1 : 0;
+        a[aL] = i * base + a[aL] - b[aL];
+      }
+
+      // Remove leading zeros.
+      for (; !a[0] && a.length > 1;) a.shift();
+    }
+
+    return function (x, y, pr, rm, dp, base) {
+      var cmp, e, i, k, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0,
+        yL, yz,
+        Ctor = x.constructor,
+        sign = x.s == y.s ? 1 : -1,
+        xd = x.d,
+        yd = y.d;
+
+      // Either NaN, Infinity or 0?
+      if (!xd || !xd[0] || !yd || !yd[0]) {
+
+        return new Ctor(// Return NaN if either NaN, or both Infinity or 0.
+          !x.s || !y.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN :
+
+          // Return ±0 if x is 0 or y is ±Infinity, or return ±Infinity as y is 0.
+          xd && xd[0] == 0 || !yd ? sign * 0 : sign / 0);
+      }
+
+      if (base) {
+        logBase = 1;
+        e = x.e - y.e;
+      } else {
+        base = BASE;
+        logBase = LOG_BASE;
+        e = mathfloor(x.e / logBase) - mathfloor(y.e / logBase);
+      }
+
+      yL = yd.length;
+      xL = xd.length;
+      q = new Ctor(sign);
+      qd = q.d = [];
+
+      // Result exponent may be one less than e.
+      // The digit array of a Decimal from toStringBinary may have trailing zeros.
+      for (i = 0; yd[i] == (xd[i] || 0); i++);
+
+      if (yd[i] > (xd[i] || 0)) e--;
+
+      if (pr == null) {
+        sd = pr = Ctor.precision;
+        rm = Ctor.rounding;
+      } else if (dp) {
+        sd = pr + (x.e - y.e) + 1;
+      } else {
+        sd = pr;
+      }
+
+      if (sd < 0) {
+        qd.push(1);
+        more = true;
+      } else {
+
+        // Convert precision in number of base 10 digits to base 1e7 digits.
+        sd = sd / logBase + 2 | 0;
+        i = 0;
+
+        // divisor < 1e7
+        if (yL == 1) {
+          k = 0;
+          yd = yd[0];
+          sd++;
+
+          // k is the carry.
+          for (; (i < xL || k) && sd--; i++) {
+            t = k * base + (xd[i] || 0);
+            qd[i] = t / yd | 0;
+            k = t % yd | 0;
+          }
+
+          more = k || i < xL;
+
+        // divisor >= 1e7
+        } else {
+
+          // Normalise xd and yd so highest order digit of yd is >= base/2
+          k = base / (yd[0] + 1) | 0;
+
+          if (k > 1) {
+            yd = multiplyInteger(yd, k, base);
+            xd = multiplyInteger(xd, k, base);
+            yL = yd.length;
+            xL = xd.length;
+          }
+
+          xi = yL;
+          rem = xd.slice(0, yL);
+          remL = rem.length;
+
+          // Add zeros to make remainder as long as divisor.
+          for (; remL < yL;) rem[remL++] = 0;
+
+          yz = yd.slice();
+          yz.unshift(0);
+          yd0 = yd[0];
+
+          if (yd[1] >= base / 2) ++yd0;
+
+          do {
+            k = 0;
+
+            // Compare divisor and remainder.
+            cmp = compare(yd, rem, yL, remL);
+
+            // If divisor < remainder.
+            if (cmp < 0) {
+
+              // Calculate trial digit, k.
+              rem0 = rem[0];
+              if (yL != remL) rem0 = rem0 * base + (rem[1] || 0);
+
+              // k will be how many times the divisor goes into the current remainder.
+              k = rem0 / yd0 | 0;
+
+              //  Algorithm:
+              //  1. product = divisor * trial digit (k)
+              //  2. if product > remainder: product -= divisor, k--
+              //  3. remainder -= product
+              //  4. if product was < remainder at 2:
+              //    5. compare new remainder and divisor
+              //    6. If remainder > divisor: remainder -= divisor, k++
+
+              if (k > 1) {
+                if (k >= base) k = base - 1;
+
+                // product = divisor * trial digit.
+                prod = multiplyInteger(yd, k, base);
+                prodL = prod.length;
+                remL = rem.length;
+
+                // Compare product and remainder.
+                cmp = compare(prod, rem, prodL, remL);
+
+                // product > remainder.
+                if (cmp == 1) {
+                  k--;
+
+                  // Subtract divisor from product.
+                  subtract(prod, yL < prodL ? yz : yd, prodL, base);
+                }
+              } else {
+
+                // cmp is -1.
+                // If k is 0, there is no need to compare yd and rem again below, so change cmp to 1
+                // to avoid it. If k is 1 there is a need to compare yd and rem again below.
+                if (k == 0) cmp = k = 1;
+                prod = yd.slice();
+              }
+
+              prodL = prod.length;
+              if (prodL < remL) prod.unshift(0);
+
+              // Subtract product from remainder.
+              subtract(rem, prod, remL, base);
+
+              // If product was < previous remainder.
+              if (cmp == -1) {
+                remL = rem.length;
+
+                // Compare divisor and new remainder.
+                cmp = compare(yd, rem, yL, remL);
+
+                // If divisor < new remainder, subtract divisor from remainder.
+                if (cmp < 1) {
+                  k++;
+
+                  // Subtract divisor from remainder.
+                  subtract(rem, yL < remL ? yz : yd, remL, base);
+                }
+              }
+
+              remL = rem.length;
+            } else if (cmp === 0) {
+              k++;
+              rem = [0];
+            }    // if cmp === 1, k will be 0
+
+            // Add the next digit, k, to the result array.
+            qd[i++] = k;
+
+            // Update the remainder.
+            if (cmp && rem[0]) {
+              rem[remL++] = xd[xi] || 0;
+            } else {
+              rem = [xd[xi]];
+              remL = 1;
+            }
+
+          } while ((xi++ < xL || rem[0] !== void 0) && sd--);
+
+          more = rem[0] !== void 0;
+        }
+
+        // Leading zero?
+        if (!qd[0]) qd.shift();
+      }
+
+      // logBase is 1 when divide is being used for base conversion.
+      if (logBase == 1) {
+        q.e = e;
+        inexact = more;
+      } else {
+
+        // To calculate q.e, first get the number of digits of qd[0].
+        for (i = 1, k = qd[0]; k >= 10; k /= 10) i++;
+        q.e = i + e * logBase - 1;
+
+        finalise(q, dp ? pr + q.e + 1 : pr, rm, more);
+      }
+
+      return q;
+    };
+  })();
+
+
+  /*
+   * Round `x` to `sd` significant digits using rounding mode `rm`.
+   * Check for over/under-flow.
+   */
+   function finalise(x, sd, rm, isTruncated) {
+    var digits, i, j, k, rd, roundUp, w, xd, xdi,
+      Ctor = x.constructor;
+
+    // Don't round if sd is null or undefined.
+    out: if (sd != null) {
+      xd = x.d;
+
+      // Infinity/NaN.
+      if (!xd) return x;
+
+      // rd: the rounding digit, i.e. the digit after the digit that may be rounded up.
+      // w: the word of xd containing rd, a base 1e7 number.
+      // xdi: the index of w within xd.
+      // digits: the number of digits of w.
+      // i: what would be the index of rd within w if all the numbers were 7 digits long (i.e. if
+      // they had leading zeros)
+      // j: if > 0, the actual index of rd within w (if < 0, rd is a leading zero).
+
+      // Get the length of the first word of the digits array xd.
+      for (digits = 1, k = xd[0]; k >= 10; k /= 10) digits++;
+      i = sd - digits;
+
+      // Is the rounding digit in the first word of xd?
+      if (i < 0) {
+        i += LOG_BASE;
+        j = sd;
+        w = xd[xdi = 0];
+
+        // Get the rounding digit at index j of w.
+        rd = w / mathpow(10, digits - j - 1) % 10 | 0;
+      } else {
+        xdi = Math.ceil((i + 1) / LOG_BASE);
+        k = xd.length;
+        if (xdi >= k) {
+          if (isTruncated) {
+
+            // Needed by `naturalExponential`, `naturalLogarithm` and `squareRoot`.
+            for (; k++ <= xdi;) xd.push(0);
+            w = rd = 0;
+            digits = 1;
+            i %= LOG_BASE;
+            j = i - LOG_BASE + 1;
+          } else {
+            break out;
+          }
+        } else {
+          w = k = xd[xdi];
+
+          // Get the number of digits of w.
+          for (digits = 1; k >= 10; k /= 10) digits++;
+
+          // Get the index of rd within w.
+          i %= LOG_BASE;
+
+          // Get the index of rd within w, adjusted for leading zeros.
+          // The number of leading zeros of w is given by LOG_BASE - digits.
+          j = i - LOG_BASE + digits;
+
+          // Get the rounding digit at index j of w.
+          rd = j < 0 ? 0 : w / mathpow(10, digits - j - 1) % 10 | 0;
+        }
+      }
+
+      // Are there any non-zero digits after the rounding digit?
+      isTruncated = isTruncated || sd < 0 ||
+        xd[xdi + 1] !== void 0 || (j < 0 ? w : w % mathpow(10, digits - j - 1));
+
+      // The expression `w % mathpow(10, digits - j - 1)` returns all the digits of w to the right
+      // of the digit at (left-to-right) index j, e.g. if w is 908714 and j is 2, the expression
+      // will give 714.
+
+      roundUp = rm < 4
+        ? (rd || isTruncated) && (rm == 0 || rm == (x.s < 0 ? 3 : 2))
+        : rd > 5 || rd == 5 && (rm == 4 || isTruncated || rm == 6 &&
+
+          // Check whether the digit to the left of the rounding digit is odd.
+          ((i > 0 ? j > 0 ? w / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10) & 1 ||
+            rm == (x.s < 0 ? 8 : 7));
+
+      if (sd < 1 || !xd[0]) {
+        xd.length = 0;
+        if (roundUp) {
+
+          // Convert sd to decimal places.
+          sd -= x.e + 1;
+
+          // 1, 0.1, 0.01, 0.001, 0.0001 etc.
+          xd[0] = mathpow(10, (LOG_BASE - sd % LOG_BASE) % LOG_BASE);
+          x.e = -sd || 0;
+        } else {
+
+          // Zero.
+          xd[0] = x.e = 0;
+        }
+
+        return x;
+      }
+
+      // Remove excess digits.
+      if (i == 0) {
+        xd.length = xdi;
+        k = 1;
+        xdi--;
+      } else {
+        xd.length = xdi + 1;
+        k = mathpow(10, LOG_BASE - i);
+
+        // E.g. 56700 becomes 56000 if 7 is the rounding digit.
+        // j > 0 means i > number of leading zeros of w.
+        xd[xdi] = j > 0 ? (w / mathpow(10, digits - j) % mathpow(10, j) | 0) * k : 0;
+      }
+
+      if (roundUp) {
+        for (;;) {
+
+          // Is the digit to be rounded up in the first word of xd?
+          if (xdi == 0) {
+
+            // i will be the length of xd[0] before k is added.
+            for (i = 1, j = xd[0]; j >= 10; j /= 10) i++;
+            j = xd[0] += k;
+            for (k = 1; j >= 10; j /= 10) k++;
+
+            // if i != k the length has increased.
+            if (i != k) {
+              x.e++;
+              if (xd[0] == BASE) xd[0] = 1;
+            }
+
+            break;
+          } else {
+            xd[xdi] += k;
+            if (xd[xdi] != BASE) break;
+            xd[xdi--] = 0;
+            k = 1;
+          }
+        }
+      }
+
+      // Remove trailing zeros.
+      for (i = xd.length; xd[--i] === 0;) xd.pop();
+    }
+
+    if (external) {
+
+      // Overflow?
+      if (x.e > Ctor.maxE) {
+
+        // Infinity.
+        x.d = null;
+        x.e = NaN;
+
+      // Underflow?
+      } else if (x.e < Ctor.minE) {
+
+        // Zero.
+        x.e = 0;
+        x.d = [0];
+        // Ctor.underflow = true;
+      } // else Ctor.underflow = false;
+    }
+
+    return x;
+  }
+
+
+  function finiteToString(x, isExp, sd) {
+    if (!x.isFinite()) return nonFiniteToString(x);
+    var k,
+      e = x.e,
+      str = digitsToString(x.d),
+      len = str.length;
+
+    if (isExp) {
+      if (sd && (k = sd - len) > 0) {
+        str = str.charAt(0) + '.' + str.slice(1) + getZeroString(k);
+      } else if (len > 1) {
+        str = str.charAt(0) + '.' + str.slice(1);
+      }
+
+      str = str + (x.e < 0 ? 'e' : 'e+') + x.e;
+    } else if (e < 0) {
+      str = '0.' + getZeroString(-e - 1) + str;
+      if (sd && (k = sd - len) > 0) str += getZeroString(k);
+    } else if (e >= len) {
+      str += getZeroString(e + 1 - len);
+      if (sd && (k = sd - e - 1) > 0) str = str + '.' + getZeroString(k);
+    } else {
+      if ((k = e + 1) < len) str = str.slice(0, k) + '.' + str.slice(k);
+      if (sd && (k = sd - len) > 0) {
+        if (e + 1 === len) str += '.';
+        str += getZeroString(k);
+      }
+    }
+
+    return str;
+  }
+
+
+  // Calculate the base 10 exponent from the base 1e7 exponent.
+  function getBase10Exponent(digits, e) {
+    var w = digits[0];
+
+    // Add the number of digits of the first word of the digits array.
+    for ( e *= LOG_BASE; w >= 10; w /= 10) e++;
+    return e;
+  }
+
+
+  function getLn10(Ctor, sd, pr) {
+    if (sd > LN10_PRECISION) {
+
+      // Reset global state in case the exception is caught.
+      external = true;
+      if (pr) Ctor.precision = pr;
+      throw Error(precisionLimitExceeded);
+    }
+    return finalise(new Ctor(LN10), sd, 1, true);
+  }
+
+
+  function getPi(Ctor, sd, rm) {
+    if (sd > PI_PRECISION) throw Error(precisionLimitExceeded);
+    return finalise(new Ctor(PI), sd, rm, true);
+  }
+
+
+  function getPrecision(digits) {
+    var w = digits.length - 1,
+      len = w * LOG_BASE + 1;
+
+    w = digits[w];
+
+    // If non-zero...
+    if (w) {
+
+      // Subtract the number of trailing zeros of the last word.
+      for (; w % 10 == 0; w /= 10) len--;
+
+      // Add the number of digits of the first word.
+      for (w = digits[0]; w >= 10; w /= 10) len++;
+    }
+
+    return len;
+  }
+
+
+  function getZeroString(k) {
+    var zs = '';
+    for (; k--;) zs += '0';
+    return zs;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the value of Decimal `x` to the power `n`, where `n` is an
+   * integer of type number.
+   *
+   * Implements 'exponentiation by squaring'. Called by `pow` and `parseOther`.
+   *
+   */
+  function intPow(Ctor, x, n, pr) {
+    var isTruncated,
+      r = new Ctor(1),
+
+      // Max n of 9007199254740991 takes 53 loop iterations.
+      // Maximum digits array length; leaves [28, 34] guard digits.
+      k = Math.ceil(pr / LOG_BASE + 4);
+
+    external = false;
+
+    for (;;) {
+      if (n % 2) {
+        r = r.times(x);
+        if (truncate(r.d, k)) isTruncated = true;
+      }
+
+      n = mathfloor(n / 2);
+      if (n === 0) {
+
+        // To ensure correct rounding when r.d is truncated, increment the last word if it is zero.
+        n = r.d.length - 1;
+        if (isTruncated && r.d[n] === 0) ++r.d[n];
+        break;
+      }
+
+      x = x.times(x);
+      truncate(x.d, k);
+    }
+
+    external = true;
+
+    return r;
+  }
+
+
+  function isOdd(n) {
+    return n.d[n.d.length - 1] & 1;
+  }
+
+
+  /*
+   * Handle `max` and `min`. `ltgt` is 'lt' or 'gt'.
+   */
+  function maxOrMin(Ctor, args, ltgt) {
+    var y,
+      x = new Ctor(args[0]),
+      i = 0;
+
+    for (; ++i < args.length;) {
+      y = new Ctor(args[i]);
+      if (!y.s) {
+        x = y;
+        break;
+      } else if (x[ltgt](y)) {
+        x = y;
+      }
+    }
+
+    return x;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the natural exponential of `x` rounded to `sd` significant
+   * digits.
+   *
+   * Taylor/Maclaurin series.
+   *
+   * exp(x) = x^0/0! + x^1/1! + x^2/2! + x^3/3! + ...
+   *
+   * Argument reduction:
+   *   Repeat x = x / 32, k += 5, until |x| < 0.1
+   *   exp(x) = exp(x / 2^k)^(2^k)
+   *
+   * Previously, the argument was initially reduced by
+   * exp(x) = exp(r) * 10^k  where r = x - k * ln10, k = floor(x / ln10)
+   * to first put r in the range [0, ln10], before dividing by 32 until |x| < 0.1, but this was
+   * found to be slower than just dividing repeatedly by 32 as above.
+   *
+   * Max integer argument: exp('20723265836946413') = 6.3e+9000000000000000
+   * Min integer argument: exp('-20723265836946411') = 1.2e-9000000000000000
+   * (Math object integer min/max: Math.exp(709) = 8.2e+307, Math.exp(-745) = 5e-324)
+   *
+   *  exp(Infinity)  = Infinity
+   *  exp(-Infinity) = 0
+   *  exp(NaN)       = NaN
+   *  exp(±0)        = 1
+   *
+   *  exp(x) is non-terminating for any finite, non-zero x.
+   *
+   *  The result will always be correctly rounded.
+   *
+   */
+  function naturalExponential(x, sd) {
+    var denominator, guard, j, pow, sum, t, wpr,
+      rep = 0,
+      i = 0,
+      k = 0,
+      Ctor = x.constructor,
+      rm = Ctor.rounding,
+      pr = Ctor.precision;
+
+    // 0/NaN/Infinity?
+    if (!x.d || !x.d[0] || x.e > 17) {
+
+      return new Ctor(x.d
+        ? !x.d[0] ? 1 : x.s < 0 ? 0 : 1 / 0
+        : x.s ? x.s < 0 ? 0 : x : 0 / 0);
+    }
+
+    if (sd == null) {
+      external = false;
+      wpr = pr;
+    } else {
+      wpr = sd;
+    }
+
+    t = new Ctor(0.03125);
+
+    // while abs(x) >= 0.1
+    while (x.e > -2) {
+
+      // x = x / 2^5
+      x = x.times(t);
+      k += 5;
+    }
+
+    // Use 2 * log10(2^k) + 5 (empirically derived) to estimate the increase in precision
+    // necessary to ensure the first 4 rounding digits are correct.
+    guard = Math.log(mathpow(2, k)) / Math.LN10 * 2 + 5 | 0;
+    wpr += guard;
+    denominator = pow = sum = new Ctor(1);
+    Ctor.precision = wpr;
+
+    for (;;) {
+      pow = finalise(pow.times(x), wpr, 1);
+      denominator = denominator.times(++i);
+      t = sum.plus(divide(pow, denominator, wpr, 1));
+
+      if (digitsToString(t.d).slice(0, wpr) === digitsToString(sum.d).slice(0, wpr)) {
+        j = k;
+        while (j--) sum = finalise(sum.times(sum), wpr, 1);
+
+        // Check to see if the first 4 rounding digits are [49]999.
+        // If so, repeat the summation with a higher precision, otherwise
+        // e.g. with precision: 18, rounding: 1
+        // exp(18.404272462595034083567793919843761) = 98372560.1229999999 (should be 98372560.123)
+        // `wpr - guard` is the index of first rounding digit.
+        if (sd == null) {
+
+          if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm, rep)) {
+            Ctor.precision = wpr += 10;
+            denominator = pow = t = new Ctor(1);
+            i = 0;
+            rep++;
+          } else {
+            return finalise(sum, Ctor.precision = pr, rm, external = true);
+          }
+        } else {
+          Ctor.precision = pr;
+          return sum;
+        }
+      }
+
+      sum = t;
+    }
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the natural logarithm of `x` rounded to `sd` significant
+   * digits.
+   *
+   *  ln(-n)        = NaN
+   *  ln(0)         = -Infinity
+   *  ln(-0)        = -Infinity
+   *  ln(1)         = 0
+   *  ln(Infinity)  = Infinity
+   *  ln(-Infinity) = NaN
+   *  ln(NaN)       = NaN
+   *
+   *  ln(n) (n != 1) is non-terminating.
+   *
+   */
+  function naturalLogarithm(y, sd) {
+    var c, c0, denominator, e, numerator, rep, sum, t, wpr, x1, x2,
+      n = 1,
+      guard = 10,
+      x = y,
+      xd = x.d,
+      Ctor = x.constructor,
+      rm = Ctor.rounding,
+      pr = Ctor.precision;
+
+    // Is x negative or Infinity, NaN, 0 or 1?
+    if (x.s < 0 || !xd || !xd[0] || !x.e && xd[0] == 1 && xd.length == 1) {
+      return new Ctor(xd && !xd[0] ? -1 / 0 : x.s != 1 ? NaN : xd ? 0 : x);
+    }
+
+    if (sd == null) {
+      external = false;
+      wpr = pr;
+    } else {
+      wpr = sd;
+    }
+
+    Ctor.precision = wpr += guard;
+    c = digitsToString(xd);
+    c0 = c.charAt(0);
+
+    if (Math.abs(e = x.e) < 1.5e15) {
+
+      // Argument reduction.
+      // The series converges faster the closer the argument is to 1, so using
+      // ln(a^b) = b * ln(a),   ln(a) = ln(a^b) / b
+      // multiply the argument by itself until the leading digits of the significand are 7, 8, 9,
+      // 10, 11, 12 or 13, recording the number of multiplications so the sum of the series can
+      // later be divided by this number, then separate out the power of 10 using
+      // ln(a*10^b) = ln(a) + b*ln(10).
+
+      // max n is 21 (gives 0.9, 1.0 or 1.1) (9e15 / 21 = 4.2e14).
+      //while (c0 < 9 && c0 != 1 || c0 == 1 && c.charAt(1) > 1) {
+      // max n is 6 (gives 0.7 - 1.3)
+      while (c0 < 7 && c0 != 1 || c0 == 1 && c.charAt(1) > 3) {
+        x = x.times(y);
+        c = digitsToString(x.d);
+        c0 = c.charAt(0);
+        n++;
+      }
+
+      e = x.e;
+
+      if (c0 > 1) {
+        x = new Ctor('0.' + c);
+        e++;
+      } else {
+        x = new Ctor(c0 + '.' + c.slice(1));
+      }
+    } else {
+
+      // The argument reduction method above may result in overflow if the argument y is a massive
+      // number with exponent >= 1500000000000000 (9e15 / 6 = 1.5e15), so instead recall this
+      // function using ln(x*10^e) = ln(x) + e*ln(10).
+      t = getLn10(Ctor, wpr + 2, pr).times(e + '');
+      x = naturalLogarithm(new Ctor(c0 + '.' + c.slice(1)), wpr - guard).plus(t);
+      Ctor.precision = pr;
+
+      return sd == null ? finalise(x, pr, rm, external = true) : x;
+    }
+
+    // x1 is x reduced to a value near 1.
+    x1 = x;
+
+    // Taylor series.
+    // ln(y) = ln((1 + x)/(1 - x)) = 2(x + x^3/3 + x^5/5 + x^7/7 + ...)
+    // where x = (y - 1)/(y + 1)    (|x| < 1)
+    sum = numerator = x = divide(x.minus(1), x.plus(1), wpr, 1);
+    x2 = finalise(x.times(x), wpr, 1);
+    denominator = 3;
+
+    for (;;) {
+      numerator = finalise(numerator.times(x2), wpr, 1);
+      t = sum.plus(divide(numerator, new Ctor(denominator), wpr, 1));
+
+      if (digitsToString(t.d).slice(0, wpr) === digitsToString(sum.d).slice(0, wpr)) {
+        sum = sum.times(2);
+
+        // Reverse the argument reduction. Check that e is not 0 because, besides preventing an
+        // unnecessary calculation, -0 + 0 = +0 and to ensure correct rounding -0 needs to stay -0.
+        if (e !== 0) sum = sum.plus(getLn10(Ctor, wpr + 2, pr).times(e + ''));
+        sum = divide(sum, new Ctor(n), wpr, 1);
+
+        // Is rm > 3 and the first 4 rounding digits 4999, or rm < 4 (or the summation has
+        // been repeated previously) and the first 4 rounding digits 9999?
+        // If so, restart the summation with a higher precision, otherwise
+        // e.g. with precision: 12, rounding: 1
+        // ln(135520028.6126091714265381533) = 18.7246299999 when it should be 18.72463.
+        // `wpr - guard` is the index of first rounding digit.
+        if (sd == null) {
+          if (checkRoundingDigits(sum.d, wpr - guard, rm, rep)) {
+            Ctor.precision = wpr += guard;
+            t = numerator = x = divide(x1.minus(1), x1.plus(1), wpr, 1);
+            x2 = finalise(x.times(x), wpr, 1);
+            denominator = rep = 1;
+          } else {
+            return finalise(sum, Ctor.precision = pr, rm, external = true);
+          }
+        } else {
+          Ctor.precision = pr;
+          return sum;
+        }
+      }
+
+      sum = t;
+      denominator += 2;
+    }
+  }
+
+
+  // ±Infinity, NaN.
+  function nonFiniteToString(x) {
+    // Unsigned.
+    return String(x.s * x.s / 0);
+  }
+
+
+  /*
+   * Parse the value of a new Decimal `x` from string `str`.
+   */
+  function parseDecimal(x, str) {
+    var e, i, len;
+
+    // Decimal point?
+    if ((e = str.indexOf('.')) > -1) str = str.replace('.', '');
+
+    // Exponential form?
+    if ((i = str.search(/e/i)) > 0) {
+
+      // Determine exponent.
+      if (e < 0) e = i;
+      e += +str.slice(i + 1);
+      str = str.substring(0, i);
+    } else if (e < 0) {
+
+      // Integer.
+      e = str.length;
+    }
+
+    // Determine leading zeros.
+    for (i = 0; str.charCodeAt(i) === 48; i++);
+
+    // Determine trailing zeros.
+    for (len = str.length; str.charCodeAt(len - 1) === 48; --len);
+    str = str.slice(i, len);
+
+    if (str) {
+      len -= i;
+      x.e = e = e - i - 1;
+      x.d = [];
+
+      // Transform base
+
+      // e is the base 10 exponent.
+      // i is where to slice str to get the first word of the digits array.
+      i = (e + 1) % LOG_BASE;
+      if (e < 0) i += LOG_BASE;
+
+      if (i < len) {
+        if (i) x.d.push(+str.slice(0, i));
+        for (len -= LOG_BASE; i < len;) x.d.push(+str.slice(i, i += LOG_BASE));
+        str = str.slice(i);
+        i = LOG_BASE - str.length;
+      } else {
+        i -= len;
+      }
+
+      for (; i--;) str += '0';
+      x.d.push(+str);
+
+      if (external) {
+
+        // Overflow?
+        if (x.e > x.constructor.maxE) {
+
+          // Infinity.
+          x.d = null;
+          x.e = NaN;
+
+        // Underflow?
+        } else if (x.e < x.constructor.minE) {
+
+          // Zero.
+          x.e = 0;
+          x.d = [0];
+          // x.constructor.underflow = true;
+        } // else x.constructor.underflow = false;
+      }
+    } else {
+
+      // Zero.
+      x.e = 0;
+      x.d = [0];
+    }
+
+    return x;
+  }
+
+
+  /*
+   * Parse the value of a new Decimal `x` from a string `str`, which is not a decimal value.
+   */
+  function parseOther(x, str) {
+    var base, Ctor, divisor, i, isFloat, len, p, xd, xe;
+
+    if (str.indexOf('_') > -1) {
+      str = str.replace(/(\d)_(?=\d)/g, '$1');
+      if (isDecimal.test(str)) return parseDecimal(x, str);
+    } else if (str === 'Infinity' || str === 'NaN') {
+      if (!+str) x.s = NaN;
+      x.e = NaN;
+      x.d = null;
+      return x;
+    }
+
+    if (isHex.test(str))  {
+      base = 16;
+      str = str.toLowerCase();
+    } else if (isBinary.test(str))  {
+      base = 2;
+    } else if (isOctal.test(str))  {
+      base = 8;
+    } else {
+      throw Error(invalidArgument + str);
+    }
+
+    // Is there a binary exponent part?
+    i = str.search(/p/i);
+
+    if (i > 0) {
+      p = +str.slice(i + 1);
+      str = str.substring(2, i);
+    } else {
+      str = str.slice(2);
+    }
+
+    // Convert `str` as an integer then divide the result by `base` raised to a power such that the
+    // fraction part will be restored.
+    i = str.indexOf('.');
+    isFloat = i >= 0;
+    Ctor = x.constructor;
+
+    if (isFloat) {
+      str = str.replace('.', '');
+      len = str.length;
+      i = len - i;
+
+      // log[10](16) = 1.2041... , log[10](88) = 1.9444....
+      divisor = intPow(Ctor, new Ctor(base), i, i * 2);
+    }
+
+    xd = convertBase(str, base, BASE);
+    xe = xd.length - 1;
+
+    // Remove trailing zeros.
+    for (i = xe; xd[i] === 0; --i) xd.pop();
+    if (i < 0) return new Ctor(x.s * 0);
+    x.e = getBase10Exponent(xd, xe);
+    x.d = xd;
+    external = false;
+
+    // At what precision to perform the division to ensure exact conversion?
+    // maxDecimalIntegerPartDigitCount = ceil(log[10](b) * otherBaseIntegerPartDigitCount)
+    // log[10](2) = 0.30103, log[10](8) = 0.90309, log[10](16) = 1.20412
+    // E.g. ceil(1.2 * 3) = 4, so up to 4 decimal digits are needed to represent 3 hex int digits.
+    // maxDecimalFractionPartDigitCount = {Hex:4|Oct:3|Bin:1} * otherBaseFractionPartDigitCount
+    // Therefore using 4 * the number of digits of str will always be enough.
+    if (isFloat) x = divide(x, divisor, len * 4);
+
+    // Multiply by the binary exponent part if present.
+    if (p) x = x.times(Math.abs(p) < 54 ? mathpow(2, p) : Decimal.pow(2, p));
+    external = true;
+
+    return x;
+  }
+
+
+  /*
+   * sin(x) = x - x^3/3! + x^5/5! - ...
+   * |x| < pi/2
+   *
+   */
+  function sine(Ctor, x) {
+    var k,
+      len = x.d.length;
+
+    if (len < 3) {
+      return x.isZero() ? x : taylorSeries(Ctor, 2, x, x);
+    }
+
+    // Argument reduction: sin(5x) = 16*sin^5(x) - 20*sin^3(x) + 5*sin(x)
+    // i.e. sin(x) = 16*sin^5(x/5) - 20*sin^3(x/5) + 5*sin(x/5)
+    // and  sin(x) = sin(x/5)(5 + sin^2(x/5)(16sin^2(x/5) - 20))
+
+    // Estimate the optimum number of times to use the argument reduction.
+    k = 1.4 * Math.sqrt(len);
+    k = k > 16 ? 16 : k | 0;
+
+    x = x.times(1 / tinyPow(5, k));
+    x = taylorSeries(Ctor, 2, x, x);
+
+    // Reverse argument reduction
+    var sin2_x,
+      d5 = new Ctor(5),
+      d16 = new Ctor(16),
+      d20 = new Ctor(20);
+    for (; k--;) {
+      sin2_x = x.times(x);
+      x = x.times(d5.plus(sin2_x.times(d16.times(sin2_x).minus(d20))));
+    }
+
+    return x;
+  }
+
+
+  // Calculate Taylor series for `cos`, `cosh`, `sin` and `sinh`.
+  function taylorSeries(Ctor, n, x, y, isHyperbolic) {
+    var j, t, u, x2,
+      i = 1,
+      pr = Ctor.precision,
+      k = Math.ceil(pr / LOG_BASE);
+
+    external = false;
+    x2 = x.times(x);
+    u = new Ctor(y);
+
+    for (;;) {
+      t = divide(u.times(x2), new Ctor(n++ * n++), pr, 1);
+      u = isHyperbolic ? y.plus(t) : y.minus(t);
+      y = divide(t.times(x2), new Ctor(n++ * n++), pr, 1);
+      t = u.plus(y);
+
+      if (t.d[k] !== void 0) {
+        for (j = k; t.d[j] === u.d[j] && j--;);
+        if (j == -1) break;
+      }
+
+      j = u;
+      u = y;
+      y = t;
+      t = j;
+      i++;
+    }
+
+    external = true;
+    t.d.length = k + 1;
+
+    return t;
+  }
+
+
+  // Exponent e must be positive and non-zero.
+  function tinyPow(b, e) {
+    var n = b;
+    while (--e) n *= b;
+    return n;
+  }
+
+
+  // Return the absolute value of `x` reduced to less than or equal to half pi.
+  function toLessThanHalfPi(Ctor, x) {
+    var t,
+      isNeg = x.s < 0,
+      pi = getPi(Ctor, Ctor.precision, 1),
+      halfPi = pi.times(0.5);
+
+    x = x.abs();
+
+    if (x.lte(halfPi)) {
+      quadrant = isNeg ? 4 : 1;
+      return x;
+    }
+
+    t = x.divToInt(pi);
+
+    if (t.isZero()) {
+      quadrant = isNeg ? 3 : 2;
+    } else {
+      x = x.minus(t.times(pi));
+
+      // 0 <= x < pi
+      if (x.lte(halfPi)) {
+        quadrant = isOdd(t) ? (isNeg ? 2 : 3) : (isNeg ? 4 : 1);
+        return x;
+      }
+
+      quadrant = isOdd(t) ? (isNeg ? 1 : 4) : (isNeg ? 3 : 2);
+    }
+
+    return x.minus(pi).abs();
+  }
+
+
+  /*
+   * Return the value of Decimal `x` as a string in base `baseOut`.
+   *
+   * If the optional `sd` argument is present include a binary exponent suffix.
+   */
+  function toStringBinary(x, baseOut, sd, rm) {
+    var base, e, i, k, len, roundUp, str, xd, y,
+      Ctor = x.constructor,
+      isExp = sd !== void 0;
+
+    if (isExp) {
+      checkInt32(sd, 1, MAX_DIGITS);
+      if (rm === void 0) rm = Ctor.rounding;
+      else checkInt32(rm, 0, 8);
+    } else {
+      sd = Ctor.precision;
+      rm = Ctor.rounding;
+    }
+
+    if (!x.isFinite()) {
+      str = nonFiniteToString(x);
+    } else {
+      str = finiteToString(x);
+      i = str.indexOf('.');
+
+      // Use exponential notation according to `toExpPos` and `toExpNeg`? No, but if required:
+      // maxBinaryExponent = floor((decimalExponent + 1) * log[2](10))
+      // minBinaryExponent = floor(decimalExponent * log[2](10))
+      // log[2](10) = 3.321928094887362347870319429489390175864
+
+      if (isExp) {
+        base = 2;
+        if (baseOut == 16) {
+          sd = sd * 4 - 3;
+        } else if (baseOut == 8) {
+          sd = sd * 3 - 2;
+        }
+      } else {
+        base = baseOut;
+      }
+
+      // Convert the number as an integer then divide the result by its base raised to a power such
+      // that the fraction part will be restored.
+
+      // Non-integer.
+      if (i >= 0) {
+        str = str.replace('.', '');
+        y = new Ctor(1);
+        y.e = str.length - i;
+        y.d = convertBase(finiteToString(y), 10, base);
+        y.e = y.d.length;
+      }
+
+      xd = convertBase(str, 10, base);
+      e = len = xd.length;
+
+      // Remove trailing zeros.
+      for (; xd[--len] == 0;) xd.pop();
+
+      if (!xd[0]) {
+        str = isExp ? '0p+0' : '0';
+      } else {
+        if (i < 0) {
+          e--;
+        } else {
+          x = new Ctor(x);
+          x.d = xd;
+          x.e = e;
+          x = divide(x, y, sd, rm, 0, base);
+          xd = x.d;
+          e = x.e;
+          roundUp = inexact;
+        }
+
+        // The rounding digit, i.e. the digit after the digit that may be rounded up.
+        i = xd[sd];
+        k = base / 2;
+        roundUp = roundUp || xd[sd + 1] !== void 0;
+
+        roundUp = rm < 4
+          ? (i !== void 0 || roundUp) && (rm === 0 || rm === (x.s < 0 ? 3 : 2))
+          : i > k || i === k && (rm === 4 || roundUp || rm === 6 && xd[sd - 1] & 1 ||
+            rm === (x.s < 0 ? 8 : 7));
+
+        xd.length = sd;
+
+        if (roundUp) {
+
+          // Rounding up may mean the previous digit has to be rounded up and so on.
+          for (; ++xd[--sd] > base - 1;) {
+            xd[sd] = 0;
+            if (!sd) {
+              ++e;
+              xd.unshift(1);
+            }
+          }
+        }
+
+        // Determine trailing zeros.
+        for (len = xd.length; !xd[len - 1]; --len);
+
+        // E.g. [4, 11, 15] becomes 4bf.
+        for (i = 0, str = ''; i < len; i++) str += NUMERALS.charAt(xd[i]);
+
+        // Add binary exponent suffix?
+        if (isExp) {
+          if (len > 1) {
+            if (baseOut == 16 || baseOut == 8) {
+              i = baseOut == 16 ? 4 : 3;
+              for (--len; len % i; len++) str += '0';
+              xd = convertBase(str, base, baseOut);
+              for (len = xd.length; !xd[len - 1]; --len);
+
+              // xd[0] will always be be 1
+              for (i = 1, str = '1.'; i < len; i++) str += NUMERALS.charAt(xd[i]);
+            } else {
+              str = str.charAt(0) + '.' + str.slice(1);
+            }
+          }
+
+          str =  str + (e < 0 ? 'p' : 'p+') + e;
+        } else if (e < 0) {
+          for (; ++e;) str = '0' + str;
+          str = '0.' + str;
+        } else {
+          if (++e > len) for (e -= len; e-- ;) str += '0';
+          else if (e < len) str = str.slice(0, e) + '.' + str.slice(e);
+        }
+      }
+
+      str = (baseOut == 16 ? '0x' : baseOut == 2 ? '0b' : baseOut == 8 ? '0o' : '') + str;
+    }
+
+    return x.s < 0 ? '-' + str : str;
+  }
+
+
+  // Does not strip trailing zeros.
+  function truncate(arr, len) {
+    if (arr.length > len) {
+      arr.length = len;
+      return true;
+    }
+  }
+
+
+  // Decimal methods
+
+
+  /*
+   *  abs
+   *  acos
+   *  acosh
+   *  add
+   *  asin
+   *  asinh
+   *  atan
+   *  atanh
+   *  atan2
+   *  cbrt
+   *  ceil
+   *  clamp
+   *  clone
+   *  config
+   *  cos
+   *  cosh
+   *  div
+   *  exp
+   *  floor
+   *  hypot
+   *  ln
+   *  log
+   *  log2
+   *  log10
+   *  max
+   *  min
+   *  mod
+   *  mul
+   *  pow
+   *  random
+   *  round
+   *  set
+   *  sign
+   *  sin
+   *  sinh
+   *  sqrt
+   *  sub
+   *  sum
+   *  tan
+   *  tanh
+   *  trunc
+   */
+
+
+  /*
+   * Return a new Decimal whose value is the absolute value of `x`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function abs(x) {
+    return new this(x).abs();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the arccosine in radians of `x`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function acos(x) {
+    return new this(x).acos();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic cosine of `x`, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function acosh(x) {
+    return new this(x).acosh();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the sum of `x` and `y`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   * y {number|string|Decimal}
+   *
+   */
+  function add(x, y) {
+    return new this(x).plus(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the arcsine in radians of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function asin(x) {
+    return new this(x).asin();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic sine of `x`, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function asinh(x) {
+    return new this(x).asinh();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the arctangent in radians of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function atan(x) {
+    return new this(x).atan();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the inverse of the hyperbolic tangent of `x`, rounded to
+   * `precision` significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function atanh(x) {
+    return new this(x).atanh();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the arctangent in radians of `y/x` in the range -pi to pi
+   * (inclusive), rounded to `precision` significant digits using rounding mode `rounding`.
+   *
+   * Domain: [-Infinity, Infinity]
+   * Range: [-pi, pi]
+   *
+   * y {number|string|Decimal} The y-coordinate.
+   * x {number|string|Decimal} The x-coordinate.
+   *
+   * atan2(±0, -0)               = ±pi
+   * atan2(±0, +0)               = ±0
+   * atan2(±0, -x)               = ±pi for x > 0
+   * atan2(±0, x)                = ±0 for x > 0
+   * atan2(-y, ±0)               = -pi/2 for y > 0
+   * atan2(y, ±0)                = pi/2 for y > 0
+   * atan2(±y, -Infinity)        = ±pi for finite y > 0
+   * atan2(±y, +Infinity)        = ±0 for finite y > 0
+   * atan2(±Infinity, x)         = ±pi/2 for finite x
+   * atan2(±Infinity, -Infinity) = ±3*pi/4
+   * atan2(±Infinity, +Infinity) = ±pi/4
+   * atan2(NaN, x) = NaN
+   * atan2(y, NaN) = NaN
+   *
+   */
+  function atan2(y, x) {
+    y = new this(y);
+    x = new this(x);
+    var r,
+      pr = this.precision,
+      rm = this.rounding,
+      wpr = pr + 4;
+
+    // Either NaN
+    if (!y.s || !x.s) {
+      r = new this(NaN);
+
+    // Both ±Infinity
+    } else if (!y.d && !x.d) {
+      r = getPi(this, wpr, 1).times(x.s > 0 ? 0.25 : 0.75);
+      r.s = y.s;
+
+    // x is ±Infinity or y is ±0
+    } else if (!x.d || y.isZero()) {
+      r = x.s < 0 ? getPi(this, pr, rm) : new this(0);
+      r.s = y.s;
+
+    // y is ±Infinity or x is ±0
+    } else if (!y.d || x.isZero()) {
+      r = getPi(this, wpr, 1).times(0.5);
+      r.s = y.s;
+
+    // Both non-zero and finite
+    } else if (x.s < 0) {
+      this.precision = wpr;
+      this.rounding = 1;
+      r = this.atan(divide(y, x, wpr, 1));
+      x = getPi(this, wpr, 1);
+      this.precision = pr;
+      this.rounding = rm;
+      r = y.s < 0 ? r.minus(x) : r.plus(x);
+    } else {
+      r = this.atan(divide(y, x, wpr, 1));
+    }
+
+    return r;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the cube root of `x`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function cbrt(x) {
+    return new this(x).cbrt();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` rounded to an integer using `ROUND_CEIL`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function ceil(x) {
+    return finalise(x = new this(x), x.e + 1, 2);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` clamped to the range delineated by `min` and `max`.
+   *
+   * x {number|string|Decimal}
+   * min {number|string|Decimal}
+   * max {number|string|Decimal}
+   *
+   */
+  function clamp(x, min, max) {
+    return new this(x).clamp(min, max);
+  }
+
+
+  /*
+   * Configure global settings for a Decimal constructor.
+   *
+   * `obj` is an object with one or more of the following properties,
+   *
+   *   precision  {number}
+   *   rounding   {number}
+   *   toExpNeg   {number}
+   *   toExpPos   {number}
+   *   maxE       {number}
+   *   minE       {number}
+   *   modulo     {number}
+   *   crypto     {boolean|number}
+   *   defaults   {true}
+   *
+   * E.g. Decimal.config({ precision: 20, rounding: 4 })
+   *
+   */
+  function config(obj) {
+    if (!obj || typeof obj !== 'object') throw Error(decimalError + 'Object expected');
+    var i, p, v,
+      useDefaults = obj.defaults === true,
+      ps = [
+        'precision', 1, MAX_DIGITS,
+        'rounding', 0, 8,
+        'toExpNeg', -EXP_LIMIT, 0,
+        'toExpPos', 0, EXP_LIMIT,
+        'maxE', 0, EXP_LIMIT,
+        'minE', -EXP_LIMIT, 0,
+        'modulo', 0, 9
+      ];
+
+    for (i = 0; i < ps.length; i += 3) {
+      if (p = ps[i], useDefaults) this[p] = DEFAULTS[p];
+      if ((v = obj[p]) !== void 0) {
+        if (mathfloor(v) === v && v >= ps[i + 1] && v <= ps[i + 2]) this[p] = v;
+        else throw Error(invalidArgument + p + ': ' + v);
+      }
+    }
+
+    if (p = 'crypto', useDefaults) this[p] = DEFAULTS[p];
+    if ((v = obj[p]) !== void 0) {
+      if (v === true || v === false || v === 0 || v === 1) {
+        if (v) {
+          if (typeof crypto != 'undefined' && crypto &&
+            (crypto.getRandomValues || crypto.randomBytes)) {
+            this[p] = true;
+          } else {
+            throw Error(cryptoUnavailable);
+          }
+        } else {
+          this[p] = false;
+        }
+      } else {
+        throw Error(invalidArgument + p + ': ' + v);
+      }
+    }
+
+    return this;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the cosine of `x`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function cos(x) {
+    return new this(x).cos();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic cosine of `x`, rounded to precision
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function cosh(x) {
+    return new this(x).cosh();
+  }
+
+
+  /*
+   * Create and return a Decimal constructor with the same configuration properties as this Decimal
+   * constructor.
+   *
+   */
+  function clone(obj) {
+    var i, p, ps;
+
+    /*
+     * The Decimal constructor and exported function.
+     * Return a new Decimal instance.
+     *
+     * v {number|string|Decimal} A numeric value.
+     *
+     */
+    function Decimal(v) {
+      var e, i, t,
+        x = this;
+
+      // Decimal called without new.
+      if (!(x instanceof Decimal)) return new Decimal(v);
+
+      // Retain a reference to this Decimal constructor, and shadow Decimal.prototype.constructor
+      // which points to Object.
+      x.constructor = Decimal;
+
+      // Duplicate.
+      if (isDecimalInstance(v)) {
+        x.s = v.s;
+
+        if (external) {
+          if (!v.d || v.e > Decimal.maxE) {
+
+            // Infinity.
+            x.e = NaN;
+            x.d = null;
+          } else if (v.e < Decimal.minE) {
+
+            // Zero.
+            x.e = 0;
+            x.d = [0];
+          } else {
+            x.e = v.e;
+            x.d = v.d.slice();
+          }
+        } else {
+          x.e = v.e;
+          x.d = v.d ? v.d.slice() : v.d;
+        }
+
+        return;
+      }
+
+      t = typeof v;
+
+      if (t === 'number') {
+        if (v === 0) {
+          x.s = 1 / v < 0 ? -1 : 1;
+          x.e = 0;
+          x.d = [0];
+          return;
+        }
+
+        if (v < 0) {
+          v = -v;
+          x.s = -1;
+        } else {
+          x.s = 1;
+        }
+
+        // Fast path for small integers.
+        if (v === ~~v && v < 1e7) {
+          for (e = 0, i = v; i >= 10; i /= 10) e++;
+
+          if (external) {
+            if (e > Decimal.maxE) {
+              x.e = NaN;
+              x.d = null;
+            } else if (e < Decimal.minE) {
+              x.e = 0;
+              x.d = [0];
+            } else {
+              x.e = e;
+              x.d = [v];
+            }
+          } else {
+            x.e = e;
+            x.d = [v];
+          }
+
+          return;
+
+        // Infinity, NaN.
+        } else if (v * 0 !== 0) {
+          if (!v) x.s = NaN;
+          x.e = NaN;
+          x.d = null;
+          return;
+        }
+
+        return parseDecimal(x, v.toString());
+
+      } else if (t !== 'string') {
+        throw Error(invalidArgument + v);
+      }
+
+      // Minus sign?
+      if ((i = v.charCodeAt(0)) === 45) {
+        v = v.slice(1);
+        x.s = -1;
+      } else {
+        // Plus sign?
+        if (i === 43) v = v.slice(1);
+        x.s = 1;
+      }
+
+      return isDecimal.test(v) ? parseDecimal(x, v) : parseOther(x, v);
+    }
+
+    Decimal.prototype = P;
+
+    Decimal.ROUND_UP = 0;
+    Decimal.ROUND_DOWN = 1;
+    Decimal.ROUND_CEIL = 2;
+    Decimal.ROUND_FLOOR = 3;
+    Decimal.ROUND_HALF_UP = 4;
+    Decimal.ROUND_HALF_DOWN = 5;
+    Decimal.ROUND_HALF_EVEN = 6;
+    Decimal.ROUND_HALF_CEIL = 7;
+    Decimal.ROUND_HALF_FLOOR = 8;
+    Decimal.EUCLID = 9;
+
+    Decimal.config = Decimal.set = config;
+    Decimal.clone = clone;
+    Decimal.isDecimal = isDecimalInstance;
+
+    Decimal.abs = abs;
+    Decimal.acos = acos;
+    Decimal.acosh = acosh;        // ES6
+    Decimal.add = add;
+    Decimal.asin = asin;
+    Decimal.asinh = asinh;        // ES6
+    Decimal.atan = atan;
+    Decimal.atanh = atanh;        // ES6
+    Decimal.atan2 = atan2;
+    Decimal.cbrt = cbrt;          // ES6
+    Decimal.ceil = ceil;
+    Decimal.clamp = clamp;
+    Decimal.cos = cos;
+    Decimal.cosh = cosh;          // ES6
+    Decimal.div = div;
+    Decimal.exp = exp;
+    Decimal.floor = floor;
+    Decimal.hypot = hypot;        // ES6
+    Decimal.ln = ln;
+    Decimal.log = log;
+    Decimal.log10 = log10;        // ES6
+    Decimal.log2 = log2;          // ES6
+    Decimal.max = max;
+    Decimal.min = min;
+    Decimal.mod = mod;
+    Decimal.mul = mul;
+    Decimal.pow = pow;
+    Decimal.random = random;
+    Decimal.round = round;
+    Decimal.sign = sign;          // ES6
+    Decimal.sin = sin;
+    Decimal.sinh = sinh;          // ES6
+    Decimal.sqrt = sqrt;
+    Decimal.sub = sub;
+    Decimal.sum = sum;
+    Decimal.tan = tan;
+    Decimal.tanh = tanh;          // ES6
+    Decimal.trunc = trunc;        // ES6
+
+    if (obj === void 0) obj = {};
+    if (obj) {
+      if (obj.defaults !== true) {
+        ps = ['precision', 'rounding', 'toExpNeg', 'toExpPos', 'maxE', 'minE', 'modulo', 'crypto'];
+        for (i = 0; i < ps.length;) if (!obj.hasOwnProperty(p = ps[i++])) obj[p] = this[p];
+      }
+    }
+
+    Decimal.config(obj);
+
+    return Decimal;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` divided by `y`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   * y {number|string|Decimal}
+   *
+   */
+  function div(x, y) {
+    return new this(x).div(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the natural exponential of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} The power to which to raise the base of the natural log.
+   *
+   */
+  function exp(x) {
+    return new this(x).exp();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` round to an integer using `ROUND_FLOOR`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function floor(x) {
+    return finalise(x = new this(x), x.e + 1, 3);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the square root of the sum of the squares of the arguments,
+   * rounded to `precision` significant digits using rounding mode `rounding`.
+   *
+   * hypot(a, b, ...) = sqrt(a^2 + b^2 + ...)
+   *
+   * arguments {number|string|Decimal}
+   *
+   */
+  function hypot() {
+    var i, n,
+      t = new this(0);
+
+    external = false;
+
+    for (i = 0; i < arguments.length;) {
+      n = new this(arguments[i++]);
+      if (!n.d) {
+        if (n.s) {
+          external = true;
+          return new this(1 / 0);
+        }
+        t = n;
+      } else if (t.d) {
+        t = t.plus(n.times(n));
+      }
+    }
+
+    external = true;
+
+    return t.sqrt();
+  }
+
+
+  /*
+   * Return true if object is a Decimal instance (where Decimal is any Decimal constructor),
+   * otherwise return false.
+   *
+   */
+  function isDecimalInstance(obj) {
+    return obj instanceof Decimal || obj && obj.toStringTag === tag || false;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the natural logarithm of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function ln(x) {
+    return new this(x).ln();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the log of `x` to the base `y`, or to base 10 if no base
+   * is specified, rounded to `precision` significant digits using rounding mode `rounding`.
+   *
+   * log[y](x)
+   *
+   * x {number|string|Decimal} The argument of the logarithm.
+   * y {number|string|Decimal} The base of the logarithm.
+   *
+   */
+  function log(x, y) {
+    return new this(x).log(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the base 2 logarithm of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function log2(x) {
+    return new this(x).log(2);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the base 10 logarithm of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function log10(x) {
+    return new this(x).log(10);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the maximum of the arguments.
+   *
+   * arguments {number|string|Decimal}
+   *
+   */
+  function max() {
+    return maxOrMin(this, arguments, 'lt');
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the minimum of the arguments.
+   *
+   * arguments {number|string|Decimal}
+   *
+   */
+  function min() {
+    return maxOrMin(this, arguments, 'gt');
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` modulo `y`, rounded to `precision` significant digits
+   * using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   * y {number|string|Decimal}
+   *
+   */
+  function mod(x, y) {
+    return new this(x).mod(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` multiplied by `y`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   * y {number|string|Decimal}
+   *
+   */
+  function mul(x, y) {
+    return new this(x).mul(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` raised to the power `y`, rounded to precision
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} The base.
+   * y {number|string|Decimal} The exponent.
+   *
+   */
+  function pow(x, y) {
+    return new this(x).pow(y);
+  }
+
+
+  /*
+   * Returns a new Decimal with a random value equal to or greater than 0 and less than 1, and with
+   * `sd`, or `Decimal.precision` if `sd` is omitted, significant digits (or less if trailing zeros
+   * are produced).
+   *
+   * [sd] {number} Significant digits. Integer, 0 to MAX_DIGITS inclusive.
+   *
+   */
+  function random(sd) {
+    var d, e, k, n,
+      i = 0,
+      r = new this(1),
+      rd = [];
+
+    if (sd === void 0) sd = this.precision;
+    else checkInt32(sd, 1, MAX_DIGITS);
+
+    k = Math.ceil(sd / LOG_BASE);
+
+    if (!this.crypto) {
+      for (; i < k;) rd[i++] = Math.random() * 1e7 | 0;
+
+    // Browsers supporting crypto.getRandomValues.
+    } else if (crypto.getRandomValues) {
+      d = crypto.getRandomValues(new Uint32Array(k));
+
+      for (; i < k;) {
+        n = d[i];
+
+        // 0 <= n < 4294967296
+        // Probability n >= 4.29e9, is 4967296 / 4294967296 = 0.00116 (1 in 865).
+        if (n >= 4.29e9) {
+          d[i] = crypto.getRandomValues(new Uint32Array(1))[0];
+        } else {
+
+          // 0 <= n <= 4289999999
+          // 0 <= (n % 1e7) <= 9999999
+          rd[i++] = n % 1e7;
+        }
+      }
+
+    // Node.js supporting crypto.randomBytes.
+    } else if (crypto.randomBytes) {
+
+      // buffer
+      d = crypto.randomBytes(k *= 4);
+
+      for (; i < k;) {
+
+        // 0 <= n < 2147483648
+        n = d[i] + (d[i + 1] << 8) + (d[i + 2] << 16) + ((d[i + 3] & 0x7f) << 24);
+
+        // Probability n >= 2.14e9, is 7483648 / 2147483648 = 0.0035 (1 in 286).
+        if (n >= 2.14e9) {
+          crypto.randomBytes(4).copy(d, i);
+        } else {
+
+          // 0 <= n <= 2139999999
+          // 0 <= (n % 1e7) <= 9999999
+          rd.push(n % 1e7);
+          i += 4;
+        }
+      }
+
+      i = k / 4;
+    } else {
+      throw Error(cryptoUnavailable);
+    }
+
+    k = rd[--i];
+    sd %= LOG_BASE;
+
+    // Convert trailing digits to zeros according to sd.
+    if (k && sd) {
+      n = mathpow(10, LOG_BASE - sd);
+      rd[i] = (k / n | 0) * n;
+    }
+
+    // Remove trailing words which are zero.
+    for (; rd[i] === 0; i--) rd.pop();
+
+    // Zero?
+    if (i < 0) {
+      e = 0;
+      rd = [0];
+    } else {
+      e = -1;
+
+      // Remove leading words which are zero and adjust exponent accordingly.
+      for (; rd[0] === 0; e -= LOG_BASE) rd.shift();
+
+      // Count the digits of the first word of rd to determine leading zeros.
+      for (k = 1, n = rd[0]; n >= 10; n /= 10) k++;
+
+      // Adjust the exponent for leading zeros of the first word of rd.
+      if (k < LOG_BASE) e -= LOG_BASE - k;
+    }
+
+    r.e = e;
+    r.d = rd;
+
+    return r;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` rounded to an integer using rounding mode `rounding`.
+   *
+   * To emulate `Math.round`, set rounding to 7 (ROUND_HALF_CEIL).
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function round(x) {
+    return finalise(x = new this(x), x.e + 1, this.rounding);
+  }
+
+
+  /*
+   * Return
+   *   1    if x > 0,
+   *  -1    if x < 0,
+   *   0    if x is 0,
+   *  -0    if x is -0,
+   *   NaN  otherwise
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function sign(x) {
+    x = new this(x);
+    return x.d ? (x.d[0] ? x.s : 0 * x.s) : x.s || NaN;
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the sine of `x`, rounded to `precision` significant digits
+   * using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function sin(x) {
+    return new this(x).sin();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic sine of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function sinh(x) {
+    return new this(x).sinh();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the square root of `x`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function sqrt(x) {
+    return new this(x).sqrt();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` minus `y`, rounded to `precision` significant digits
+   * using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal}
+   * y {number|string|Decimal}
+   *
+   */
+  function sub(x, y) {
+    return new this(x).sub(y);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the sum of the arguments, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * Only the result is rounded, not the intermediate calculations.
+   *
+   * arguments {number|string|Decimal}
+   *
+   */
+  function sum() {
+    var i = 0,
+      args = arguments,
+      x = new this(args[i]);
+
+    external = false;
+    for (; x.s && ++i < args.length;) x = x.plus(args[i]);
+    external = true;
+
+    return finalise(x, this.precision, this.rounding);
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the tangent of `x`, rounded to `precision` significant
+   * digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function tan(x) {
+    return new this(x).tan();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is the hyperbolic tangent of `x`, rounded to `precision`
+   * significant digits using rounding mode `rounding`.
+   *
+   * x {number|string|Decimal} A value in radians.
+   *
+   */
+  function tanh(x) {
+    return new this(x).tanh();
+  }
+
+
+  /*
+   * Return a new Decimal whose value is `x` truncated to an integer.
+   *
+   * x {number|string|Decimal}
+   *
+   */
+  function trunc(x) {
+    return finalise(x = new this(x), x.e + 1, 1);
+  }
+
+
+  // Create and configure initial Decimal constructor.
+  Decimal = clone(DEFAULTS);
+  Decimal.prototype.constructor = Decimal;
+  Decimal['default'] = Decimal.Decimal = Decimal;
+
+  // Create the internal constants from their string values.
+  LN10 = new Decimal(LN10);
+  PI = new Decimal(PI);
+
+
+  // Export.
+
+
+  // AMD.
+  if (typeof define == 'function' && define.amd) {
+    define(function () {
+      return Decimal;
+    });
+
+  // Node and other environments that support module.exports.
+  } else if (typeof module != 'undefined' && module.exports) {
+    if (typeof Symbol == 'function' && typeof Symbol.iterator == 'symbol') {
+      P[Symbol['for']('nodejs.util.inspect.custom')] = P.toString;
+      P[Symbol.toStringTag] = 'Decimal';
+    }
+
+    module.exports = Decimal;
+
+  // Browser.
+  } else {
+    if (!globalScope) {
+      globalScope = typeof self != 'undefined' && self && self.self == self ? self : window;
+    }
+
+    noConflict = globalScope.Decimal;
+    Decimal.noConflict = function () {
+      globalScope.Decimal = noConflict;
+      return Decimal;
+    };
+
+    globalScope.Decimal = Decimal;
+  }
+})(this);
+
+},{}],6:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v3.6.0
  * https://jquery.com/
@@ -51038,1326 +50575,4 @@ if ( typeof noGlobal === "undefined" ) {
 return jQuery;
 } );
 
-},{}],32:[function(require,module,exports){
-(function (global,Buffer,setImmediate){
-/*!
-
-JSZip v3.7.1 - A JavaScript class for generating and reading zip files
-<http://stuartk.com/jszip>
-
-(c) 2009-2016 Stuart Knightley <stuart [at] stuartk.com>
-Dual licenced under the MIT license or GPLv3. See https://raw.github.com/Stuk/jszip/master/LICENSE.markdown.
-
-JSZip uses the library pako released under the MIT license :
-https://github.com/nodeca/pako/blob/master/LICENSE
-*/
-
-!function(t){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=t();else if("function"==typeof define&&define.amd)define([],t);else{("undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:this).JSZip=t()}}(function(){return function s(a,o,h){function u(r,t){if(!o[r]){if(!a[r]){var e="function"==typeof require&&require;if(!t&&e)return e(r,!0);if(l)return l(r,!0);var i=new Error("Cannot find module '"+r+"'");throw i.code="MODULE_NOT_FOUND",i}var n=o[r]={exports:{}};a[r][0].call(n.exports,function(t){var e=a[r][1][t];return u(e||t)},n,n.exports,s,a,o,h)}return o[r].exports}for(var l="function"==typeof require&&require,t=0;t<h.length;t++)u(h[t]);return u}({1:[function(t,e,r){"use strict";var c=t("./utils"),d=t("./support"),p="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";r.encode=function(t){for(var e,r,i,n,s,a,o,h=[],u=0,l=t.length,f=l,d="string"!==c.getTypeOf(t);u<t.length;)f=l-u,i=d?(e=t[u++],r=u<l?t[u++]:0,u<l?t[u++]:0):(e=t.charCodeAt(u++),r=u<l?t.charCodeAt(u++):0,u<l?t.charCodeAt(u++):0),n=e>>2,s=(3&e)<<4|r>>4,a=1<f?(15&r)<<2|i>>6:64,o=2<f?63&i:64,h.push(p.charAt(n)+p.charAt(s)+p.charAt(a)+p.charAt(o));return h.join("")},r.decode=function(t){var e,r,i,n,s,a,o=0,h=0,u="data:";if(t.substr(0,u.length)===u)throw new Error("Invalid base64 input, it looks like a data url.");var l,f=3*(t=t.replace(/[^A-Za-z0-9\+\/\=]/g,"")).length/4;if(t.charAt(t.length-1)===p.charAt(64)&&f--,t.charAt(t.length-2)===p.charAt(64)&&f--,f%1!=0)throw new Error("Invalid base64 input, bad content length.");for(l=d.uint8array?new Uint8Array(0|f):new Array(0|f);o<t.length;)e=p.indexOf(t.charAt(o++))<<2|(n=p.indexOf(t.charAt(o++)))>>4,r=(15&n)<<4|(s=p.indexOf(t.charAt(o++)))>>2,i=(3&s)<<6|(a=p.indexOf(t.charAt(o++))),l[h++]=e,64!==s&&(l[h++]=r),64!==a&&(l[h++]=i);return l}},{"./support":30,"./utils":32}],2:[function(t,e,r){"use strict";var i=t("./external"),n=t("./stream/DataWorker"),s=t("./stream/Crc32Probe"),a=t("./stream/DataLengthProbe");function o(t,e,r,i,n){this.compressedSize=t,this.uncompressedSize=e,this.crc32=r,this.compression=i,this.compressedContent=n}o.prototype={getContentWorker:function(){var t=new n(i.Promise.resolve(this.compressedContent)).pipe(this.compression.uncompressWorker()).pipe(new a("data_length")),e=this;return t.on("end",function(){if(this.streamInfo.data_length!==e.uncompressedSize)throw new Error("Bug : uncompressed data size mismatch")}),t},getCompressedWorker:function(){return new n(i.Promise.resolve(this.compressedContent)).withStreamInfo("compressedSize",this.compressedSize).withStreamInfo("uncompressedSize",this.uncompressedSize).withStreamInfo("crc32",this.crc32).withStreamInfo("compression",this.compression)}},o.createWorkerFrom=function(t,e,r){return t.pipe(new s).pipe(new a("uncompressedSize")).pipe(e.compressWorker(r)).pipe(new a("compressedSize")).withStreamInfo("compression",e)},e.exports=o},{"./external":6,"./stream/Crc32Probe":25,"./stream/DataLengthProbe":26,"./stream/DataWorker":27}],3:[function(t,e,r){"use strict";var i=t("./stream/GenericWorker");r.STORE={magic:"\0\0",compressWorker:function(t){return new i("STORE compression")},uncompressWorker:function(){return new i("STORE decompression")}},r.DEFLATE=t("./flate")},{"./flate":7,"./stream/GenericWorker":28}],4:[function(t,e,r){"use strict";var i=t("./utils");var o=function(){for(var t,e=[],r=0;r<256;r++){t=r;for(var i=0;i<8;i++)t=1&t?3988292384^t>>>1:t>>>1;e[r]=t}return e}();e.exports=function(t,e){return void 0!==t&&t.length?"string"!==i.getTypeOf(t)?function(t,e,r,i){var n=o,s=i+r;t^=-1;for(var a=i;a<s;a++)t=t>>>8^n[255&(t^e[a])];return-1^t}(0|e,t,t.length,0):function(t,e,r,i){var n=o,s=i+r;t^=-1;for(var a=i;a<s;a++)t=t>>>8^n[255&(t^e.charCodeAt(a))];return-1^t}(0|e,t,t.length,0):0}},{"./utils":32}],5:[function(t,e,r){"use strict";r.base64=!1,r.binary=!1,r.dir=!1,r.createFolders=!0,r.date=null,r.compression=null,r.compressionOptions=null,r.comment=null,r.unixPermissions=null,r.dosPermissions=null},{}],6:[function(t,e,r){"use strict";var i=null;i="undefined"!=typeof Promise?Promise:t("lie"),e.exports={Promise:i}},{lie:37}],7:[function(t,e,r){"use strict";var i="undefined"!=typeof Uint8Array&&"undefined"!=typeof Uint16Array&&"undefined"!=typeof Uint32Array,n=t("pako"),s=t("./utils"),a=t("./stream/GenericWorker"),o=i?"uint8array":"array";function h(t,e){a.call(this,"FlateWorker/"+t),this._pako=null,this._pakoAction=t,this._pakoOptions=e,this.meta={}}r.magic="\b\0",s.inherits(h,a),h.prototype.processChunk=function(t){this.meta=t.meta,null===this._pako&&this._createPako(),this._pako.push(s.transformTo(o,t.data),!1)},h.prototype.flush=function(){a.prototype.flush.call(this),null===this._pako&&this._createPako(),this._pako.push([],!0)},h.prototype.cleanUp=function(){a.prototype.cleanUp.call(this),this._pako=null},h.prototype._createPako=function(){this._pako=new n[this._pakoAction]({raw:!0,level:this._pakoOptions.level||-1});var e=this;this._pako.onData=function(t){e.push({data:t,meta:e.meta})}},r.compressWorker=function(t){return new h("Deflate",t)},r.uncompressWorker=function(){return new h("Inflate",{})}},{"./stream/GenericWorker":28,"./utils":32,pako:38}],8:[function(t,e,r){"use strict";function A(t,e){var r,i="";for(r=0;r<e;r++)i+=String.fromCharCode(255&t),t>>>=8;return i}function i(t,e,r,i,n,s){var a,o,h=t.file,u=t.compression,l=s!==O.utf8encode,f=I.transformTo("string",s(h.name)),d=I.transformTo("string",O.utf8encode(h.name)),c=h.comment,p=I.transformTo("string",s(c)),m=I.transformTo("string",O.utf8encode(c)),_=d.length!==h.name.length,g=m.length!==c.length,b="",v="",y="",w=h.dir,k=h.date,x={crc32:0,compressedSize:0,uncompressedSize:0};e&&!r||(x.crc32=t.crc32,x.compressedSize=t.compressedSize,x.uncompressedSize=t.uncompressedSize);var S=0;e&&(S|=8),l||!_&&!g||(S|=2048);var z=0,C=0;w&&(z|=16),"UNIX"===n?(C=798,z|=function(t,e){var r=t;return t||(r=e?16893:33204),(65535&r)<<16}(h.unixPermissions,w)):(C=20,z|=function(t){return 63&(t||0)}(h.dosPermissions)),a=k.getUTCHours(),a<<=6,a|=k.getUTCMinutes(),a<<=5,a|=k.getUTCSeconds()/2,o=k.getUTCFullYear()-1980,o<<=4,o|=k.getUTCMonth()+1,o<<=5,o|=k.getUTCDate(),_&&(v=A(1,1)+A(B(f),4)+d,b+="up"+A(v.length,2)+v),g&&(y=A(1,1)+A(B(p),4)+m,b+="uc"+A(y.length,2)+y);var E="";return E+="\n\0",E+=A(S,2),E+=u.magic,E+=A(a,2),E+=A(o,2),E+=A(x.crc32,4),E+=A(x.compressedSize,4),E+=A(x.uncompressedSize,4),E+=A(f.length,2),E+=A(b.length,2),{fileRecord:R.LOCAL_FILE_HEADER+E+f+b,dirRecord:R.CENTRAL_FILE_HEADER+A(C,2)+E+A(p.length,2)+"\0\0\0\0"+A(z,4)+A(i,4)+f+b+p}}var I=t("../utils"),n=t("../stream/GenericWorker"),O=t("../utf8"),B=t("../crc32"),R=t("../signature");function s(t,e,r,i){n.call(this,"ZipFileWorker"),this.bytesWritten=0,this.zipComment=e,this.zipPlatform=r,this.encodeFileName=i,this.streamFiles=t,this.accumulate=!1,this.contentBuffer=[],this.dirRecords=[],this.currentSourceOffset=0,this.entriesCount=0,this.currentFile=null,this._sources=[]}I.inherits(s,n),s.prototype.push=function(t){var e=t.meta.percent||0,r=this.entriesCount,i=this._sources.length;this.accumulate?this.contentBuffer.push(t):(this.bytesWritten+=t.data.length,n.prototype.push.call(this,{data:t.data,meta:{currentFile:this.currentFile,percent:r?(e+100*(r-i-1))/r:100}}))},s.prototype.openedSource=function(t){this.currentSourceOffset=this.bytesWritten,this.currentFile=t.file.name;var e=this.streamFiles&&!t.file.dir;if(e){var r=i(t,e,!1,this.currentSourceOffset,this.zipPlatform,this.encodeFileName);this.push({data:r.fileRecord,meta:{percent:0}})}else this.accumulate=!0},s.prototype.closedSource=function(t){this.accumulate=!1;var e=this.streamFiles&&!t.file.dir,r=i(t,e,!0,this.currentSourceOffset,this.zipPlatform,this.encodeFileName);if(this.dirRecords.push(r.dirRecord),e)this.push({data:function(t){return R.DATA_DESCRIPTOR+A(t.crc32,4)+A(t.compressedSize,4)+A(t.uncompressedSize,4)}(t),meta:{percent:100}});else for(this.push({data:r.fileRecord,meta:{percent:0}});this.contentBuffer.length;)this.push(this.contentBuffer.shift());this.currentFile=null},s.prototype.flush=function(){for(var t=this.bytesWritten,e=0;e<this.dirRecords.length;e++)this.push({data:this.dirRecords[e],meta:{percent:100}});var r=this.bytesWritten-t,i=function(t,e,r,i,n){var s=I.transformTo("string",n(i));return R.CENTRAL_DIRECTORY_END+"\0\0\0\0"+A(t,2)+A(t,2)+A(e,4)+A(r,4)+A(s.length,2)+s}(this.dirRecords.length,r,t,this.zipComment,this.encodeFileName);this.push({data:i,meta:{percent:100}})},s.prototype.prepareNextSource=function(){this.previous=this._sources.shift(),this.openedSource(this.previous.streamInfo),this.isPaused?this.previous.pause():this.previous.resume()},s.prototype.registerPrevious=function(t){this._sources.push(t);var e=this;return t.on("data",function(t){e.processChunk(t)}),t.on("end",function(){e.closedSource(e.previous.streamInfo),e._sources.length?e.prepareNextSource():e.end()}),t.on("error",function(t){e.error(t)}),this},s.prototype.resume=function(){return!!n.prototype.resume.call(this)&&(!this.previous&&this._sources.length?(this.prepareNextSource(),!0):this.previous||this._sources.length||this.generatedError?void 0:(this.end(),!0))},s.prototype.error=function(t){var e=this._sources;if(!n.prototype.error.call(this,t))return!1;for(var r=0;r<e.length;r++)try{e[r].error(t)}catch(t){}return!0},s.prototype.lock=function(){n.prototype.lock.call(this);for(var t=this._sources,e=0;e<t.length;e++)t[e].lock()},e.exports=s},{"../crc32":4,"../signature":23,"../stream/GenericWorker":28,"../utf8":31,"../utils":32}],9:[function(t,e,r){"use strict";var u=t("../compressions"),i=t("./ZipFileWorker");r.generateWorker=function(t,a,e){var o=new i(a.streamFiles,e,a.platform,a.encodeFileName),h=0;try{t.forEach(function(t,e){h++;var r=function(t,e){var r=t||e,i=u[r];if(!i)throw new Error(r+" is not a valid compression method !");return i}(e.options.compression,a.compression),i=e.options.compressionOptions||a.compressionOptions||{},n=e.dir,s=e.date;e._compressWorker(r,i).withStreamInfo("file",{name:t,dir:n,date:s,comment:e.comment||"",unixPermissions:e.unixPermissions,dosPermissions:e.dosPermissions}).pipe(o)}),o.entriesCount=h}catch(t){o.error(t)}return o}},{"../compressions":3,"./ZipFileWorker":8}],10:[function(t,e,r){"use strict";function i(){if(!(this instanceof i))return new i;if(arguments.length)throw new Error("The constructor with parameters has been removed in JSZip 3.0, please check the upgrade guide.");this.files=Object.create(null),this.comment=null,this.root="",this.clone=function(){var t=new i;for(var e in this)"function"!=typeof this[e]&&(t[e]=this[e]);return t}}(i.prototype=t("./object")).loadAsync=t("./load"),i.support=t("./support"),i.defaults=t("./defaults"),i.version="3.7.1",i.loadAsync=function(t,e){return(new i).loadAsync(t,e)},i.external=t("./external"),e.exports=i},{"./defaults":5,"./external":6,"./load":11,"./object":15,"./support":30}],11:[function(t,e,r){"use strict";var i=t("./utils"),n=t("./external"),o=t("./utf8"),h=t("./zipEntries"),s=t("./stream/Crc32Probe"),u=t("./nodejsUtils");function l(i){return new n.Promise(function(t,e){var r=i.decompressed.getContentWorker().pipe(new s);r.on("error",function(t){e(t)}).on("end",function(){r.streamInfo.crc32!==i.decompressed.crc32?e(new Error("Corrupted zip : CRC32 mismatch")):t()}).resume()})}e.exports=function(t,s){var a=this;return s=i.extend(s||{},{base64:!1,checkCRC32:!1,optimizedBinaryString:!1,createFolders:!1,decodeFileName:o.utf8decode}),u.isNode&&u.isStream(t)?n.Promise.reject(new Error("JSZip can't accept a stream when loading a zip file.")):i.prepareContent("the loaded zip file",t,!0,s.optimizedBinaryString,s.base64).then(function(t){var e=new h(s);return e.load(t),e}).then(function(t){var e=[n.Promise.resolve(t)],r=t.files;if(s.checkCRC32)for(var i=0;i<r.length;i++)e.push(l(r[i]));return n.Promise.all(e)}).then(function(t){for(var e=t.shift(),r=e.files,i=0;i<r.length;i++){var n=r[i];a.file(n.fileNameStr,n.decompressed,{binary:!0,optimizedBinaryString:!0,date:n.date,dir:n.dir,comment:n.fileCommentStr.length?n.fileCommentStr:null,unixPermissions:n.unixPermissions,dosPermissions:n.dosPermissions,createFolders:s.createFolders})}return e.zipComment.length&&(a.comment=e.zipComment),a})}},{"./external":6,"./nodejsUtils":14,"./stream/Crc32Probe":25,"./utf8":31,"./utils":32,"./zipEntries":33}],12:[function(t,e,r){"use strict";var i=t("../utils"),n=t("../stream/GenericWorker");function s(t,e){n.call(this,"Nodejs stream input adapter for "+t),this._upstreamEnded=!1,this._bindStream(e)}i.inherits(s,n),s.prototype._bindStream=function(t){var e=this;(this._stream=t).pause(),t.on("data",function(t){e.push({data:t,meta:{percent:0}})}).on("error",function(t){e.isPaused?this.generatedError=t:e.error(t)}).on("end",function(){e.isPaused?e._upstreamEnded=!0:e.end()})},s.prototype.pause=function(){return!!n.prototype.pause.call(this)&&(this._stream.pause(),!0)},s.prototype.resume=function(){return!!n.prototype.resume.call(this)&&(this._upstreamEnded?this.end():this._stream.resume(),!0)},e.exports=s},{"../stream/GenericWorker":28,"../utils":32}],13:[function(t,e,r){"use strict";var n=t("readable-stream").Readable;function i(t,e,r){n.call(this,e),this._helper=t;var i=this;t.on("data",function(t,e){i.push(t)||i._helper.pause(),r&&r(e)}).on("error",function(t){i.emit("error",t)}).on("end",function(){i.push(null)})}t("../utils").inherits(i,n),i.prototype._read=function(){this._helper.resume()},e.exports=i},{"../utils":32,"readable-stream":16}],14:[function(t,e,r){"use strict";e.exports={isNode:"undefined"!=typeof Buffer,newBufferFrom:function(t,e){if(Buffer.from&&Buffer.from!==Uint8Array.from)return Buffer.from(t,e);if("number"==typeof t)throw new Error('The "data" argument must not be a number');return new Buffer(t,e)},allocBuffer:function(t){if(Buffer.alloc)return Buffer.alloc(t);var e=new Buffer(t);return e.fill(0),e},isBuffer:function(t){return Buffer.isBuffer(t)},isStream:function(t){return t&&"function"==typeof t.on&&"function"==typeof t.pause&&"function"==typeof t.resume}}},{}],15:[function(t,e,r){"use strict";function s(t,e,r){var i,n=u.getTypeOf(e),s=u.extend(r||{},f);s.date=s.date||new Date,null!==s.compression&&(s.compression=s.compression.toUpperCase()),"string"==typeof s.unixPermissions&&(s.unixPermissions=parseInt(s.unixPermissions,8)),s.unixPermissions&&16384&s.unixPermissions&&(s.dir=!0),s.dosPermissions&&16&s.dosPermissions&&(s.dir=!0),s.dir&&(t=g(t)),s.createFolders&&(i=_(t))&&b.call(this,i,!0);var a="string"===n&&!1===s.binary&&!1===s.base64;r&&void 0!==r.binary||(s.binary=!a),(e instanceof d&&0===e.uncompressedSize||s.dir||!e||0===e.length)&&(s.base64=!1,s.binary=!0,e="",s.compression="STORE",n="string");var o=null;o=e instanceof d||e instanceof l?e:p.isNode&&p.isStream(e)?new m(t,e):u.prepareContent(t,e,s.binary,s.optimizedBinaryString,s.base64);var h=new c(t,o,s);this.files[t]=h}var n=t("./utf8"),u=t("./utils"),l=t("./stream/GenericWorker"),a=t("./stream/StreamHelper"),f=t("./defaults"),d=t("./compressedObject"),c=t("./zipObject"),o=t("./generate"),p=t("./nodejsUtils"),m=t("./nodejs/NodejsStreamInputAdapter"),_=function(t){"/"===t.slice(-1)&&(t=t.substring(0,t.length-1));var e=t.lastIndexOf("/");return 0<e?t.substring(0,e):""},g=function(t){return"/"!==t.slice(-1)&&(t+="/"),t},b=function(t,e){return e=void 0!==e?e:f.createFolders,t=g(t),this.files[t]||s.call(this,t,null,{dir:!0,createFolders:e}),this.files[t]};function h(t){return"[object RegExp]"===Object.prototype.toString.call(t)}var i={load:function(){throw new Error("This method has been removed in JSZip 3.0, please check the upgrade guide.")},forEach:function(t){var e,r,i;for(e in this.files)i=this.files[e],(r=e.slice(this.root.length,e.length))&&e.slice(0,this.root.length)===this.root&&t(r,i)},filter:function(r){var i=[];return this.forEach(function(t,e){r(t,e)&&i.push(e)}),i},file:function(t,e,r){if(1!==arguments.length)return t=this.root+t,s.call(this,t,e,r),this;if(h(t)){var i=t;return this.filter(function(t,e){return!e.dir&&i.test(t)})}var n=this.files[this.root+t];return n&&!n.dir?n:null},folder:function(r){if(!r)return this;if(h(r))return this.filter(function(t,e){return e.dir&&r.test(t)});var t=this.root+r,e=b.call(this,t),i=this.clone();return i.root=e.name,i},remove:function(r){r=this.root+r;var t=this.files[r];if(t||("/"!==r.slice(-1)&&(r+="/"),t=this.files[r]),t&&!t.dir)delete this.files[r];else for(var e=this.filter(function(t,e){return e.name.slice(0,r.length)===r}),i=0;i<e.length;i++)delete this.files[e[i].name];return this},generate:function(t){throw new Error("This method has been removed in JSZip 3.0, please check the upgrade guide.")},generateInternalStream:function(t){var e,r={};try{if((r=u.extend(t||{},{streamFiles:!1,compression:"STORE",compressionOptions:null,type:"",platform:"DOS",comment:null,mimeType:"application/zip",encodeFileName:n.utf8encode})).type=r.type.toLowerCase(),r.compression=r.compression.toUpperCase(),"binarystring"===r.type&&(r.type="string"),!r.type)throw new Error("No output type specified.");u.checkSupport(r.type),"darwin"!==r.platform&&"freebsd"!==r.platform&&"linux"!==r.platform&&"sunos"!==r.platform||(r.platform="UNIX"),"win32"===r.platform&&(r.platform="DOS");var i=r.comment||this.comment||"";e=o.generateWorker(this,r,i)}catch(t){(e=new l("error")).error(t)}return new a(e,r.type||"string",r.mimeType)},generateAsync:function(t,e){return this.generateInternalStream(t).accumulate(e)},generateNodeStream:function(t,e){return(t=t||{}).type||(t.type="nodebuffer"),this.generateInternalStream(t).toNodejsStream(e)}};e.exports=i},{"./compressedObject":2,"./defaults":5,"./generate":9,"./nodejs/NodejsStreamInputAdapter":12,"./nodejsUtils":14,"./stream/GenericWorker":28,"./stream/StreamHelper":29,"./utf8":31,"./utils":32,"./zipObject":35}],16:[function(t,e,r){e.exports=t("stream")},{stream:void 0}],17:[function(t,e,r){"use strict";var i=t("./DataReader");function n(t){i.call(this,t);for(var e=0;e<this.data.length;e++)t[e]=255&t[e]}t("../utils").inherits(n,i),n.prototype.byteAt=function(t){return this.data[this.zero+t]},n.prototype.lastIndexOfSignature=function(t){for(var e=t.charCodeAt(0),r=t.charCodeAt(1),i=t.charCodeAt(2),n=t.charCodeAt(3),s=this.length-4;0<=s;--s)if(this.data[s]===e&&this.data[s+1]===r&&this.data[s+2]===i&&this.data[s+3]===n)return s-this.zero;return-1},n.prototype.readAndCheckSignature=function(t){var e=t.charCodeAt(0),r=t.charCodeAt(1),i=t.charCodeAt(2),n=t.charCodeAt(3),s=this.readData(4);return e===s[0]&&r===s[1]&&i===s[2]&&n===s[3]},n.prototype.readData=function(t){if(this.checkOffset(t),0===t)return[];var e=this.data.slice(this.zero+this.index,this.zero+this.index+t);return this.index+=t,e},e.exports=n},{"../utils":32,"./DataReader":18}],18:[function(t,e,r){"use strict";var i=t("../utils");function n(t){this.data=t,this.length=t.length,this.index=0,this.zero=0}n.prototype={checkOffset:function(t){this.checkIndex(this.index+t)},checkIndex:function(t){if(this.length<this.zero+t||t<0)throw new Error("End of data reached (data length = "+this.length+", asked index = "+t+"). Corrupted zip ?")},setIndex:function(t){this.checkIndex(t),this.index=t},skip:function(t){this.setIndex(this.index+t)},byteAt:function(t){},readInt:function(t){var e,r=0;for(this.checkOffset(t),e=this.index+t-1;e>=this.index;e--)r=(r<<8)+this.byteAt(e);return this.index+=t,r},readString:function(t){return i.transformTo("string",this.readData(t))},readData:function(t){},lastIndexOfSignature:function(t){},readAndCheckSignature:function(t){},readDate:function(){var t=this.readInt(4);return new Date(Date.UTC(1980+(t>>25&127),(t>>21&15)-1,t>>16&31,t>>11&31,t>>5&63,(31&t)<<1))}},e.exports=n},{"../utils":32}],19:[function(t,e,r){"use strict";var i=t("./Uint8ArrayReader");function n(t){i.call(this,t)}t("../utils").inherits(n,i),n.prototype.readData=function(t){this.checkOffset(t);var e=this.data.slice(this.zero+this.index,this.zero+this.index+t);return this.index+=t,e},e.exports=n},{"../utils":32,"./Uint8ArrayReader":21}],20:[function(t,e,r){"use strict";var i=t("./DataReader");function n(t){i.call(this,t)}t("../utils").inherits(n,i),n.prototype.byteAt=function(t){return this.data.charCodeAt(this.zero+t)},n.prototype.lastIndexOfSignature=function(t){return this.data.lastIndexOf(t)-this.zero},n.prototype.readAndCheckSignature=function(t){return t===this.readData(4)},n.prototype.readData=function(t){this.checkOffset(t);var e=this.data.slice(this.zero+this.index,this.zero+this.index+t);return this.index+=t,e},e.exports=n},{"../utils":32,"./DataReader":18}],21:[function(t,e,r){"use strict";var i=t("./ArrayReader");function n(t){i.call(this,t)}t("../utils").inherits(n,i),n.prototype.readData=function(t){if(this.checkOffset(t),0===t)return new Uint8Array(0);var e=this.data.subarray(this.zero+this.index,this.zero+this.index+t);return this.index+=t,e},e.exports=n},{"../utils":32,"./ArrayReader":17}],22:[function(t,e,r){"use strict";var i=t("../utils"),n=t("../support"),s=t("./ArrayReader"),a=t("./StringReader"),o=t("./NodeBufferReader"),h=t("./Uint8ArrayReader");e.exports=function(t){var e=i.getTypeOf(t);return i.checkSupport(e),"string"!==e||n.uint8array?"nodebuffer"===e?new o(t):n.uint8array?new h(i.transformTo("uint8array",t)):new s(i.transformTo("array",t)):new a(t)}},{"../support":30,"../utils":32,"./ArrayReader":17,"./NodeBufferReader":19,"./StringReader":20,"./Uint8ArrayReader":21}],23:[function(t,e,r){"use strict";r.LOCAL_FILE_HEADER="PK",r.CENTRAL_FILE_HEADER="PK",r.CENTRAL_DIRECTORY_END="PK",r.ZIP64_CENTRAL_DIRECTORY_LOCATOR="PK",r.ZIP64_CENTRAL_DIRECTORY_END="PK",r.DATA_DESCRIPTOR="PK\b"},{}],24:[function(t,e,r){"use strict";var i=t("./GenericWorker"),n=t("../utils");function s(t){i.call(this,"ConvertWorker to "+t),this.destType=t}n.inherits(s,i),s.prototype.processChunk=function(t){this.push({data:n.transformTo(this.destType,t.data),meta:t.meta})},e.exports=s},{"../utils":32,"./GenericWorker":28}],25:[function(t,e,r){"use strict";var i=t("./GenericWorker"),n=t("../crc32");function s(){i.call(this,"Crc32Probe"),this.withStreamInfo("crc32",0)}t("../utils").inherits(s,i),s.prototype.processChunk=function(t){this.streamInfo.crc32=n(t.data,this.streamInfo.crc32||0),this.push(t)},e.exports=s},{"../crc32":4,"../utils":32,"./GenericWorker":28}],26:[function(t,e,r){"use strict";var i=t("../utils"),n=t("./GenericWorker");function s(t){n.call(this,"DataLengthProbe for "+t),this.propName=t,this.withStreamInfo(t,0)}i.inherits(s,n),s.prototype.processChunk=function(t){if(t){var e=this.streamInfo[this.propName]||0;this.streamInfo[this.propName]=e+t.data.length}n.prototype.processChunk.call(this,t)},e.exports=s},{"../utils":32,"./GenericWorker":28}],27:[function(t,e,r){"use strict";var i=t("../utils"),n=t("./GenericWorker");function s(t){n.call(this,"DataWorker");var e=this;this.dataIsReady=!1,this.index=0,this.max=0,this.data=null,this.type="",this._tickScheduled=!1,t.then(function(t){e.dataIsReady=!0,e.data=t,e.max=t&&t.length||0,e.type=i.getTypeOf(t),e.isPaused||e._tickAndRepeat()},function(t){e.error(t)})}i.inherits(s,n),s.prototype.cleanUp=function(){n.prototype.cleanUp.call(this),this.data=null},s.prototype.resume=function(){return!!n.prototype.resume.call(this)&&(!this._tickScheduled&&this.dataIsReady&&(this._tickScheduled=!0,i.delay(this._tickAndRepeat,[],this)),!0)},s.prototype._tickAndRepeat=function(){this._tickScheduled=!1,this.isPaused||this.isFinished||(this._tick(),this.isFinished||(i.delay(this._tickAndRepeat,[],this),this._tickScheduled=!0))},s.prototype._tick=function(){if(this.isPaused||this.isFinished)return!1;var t=null,e=Math.min(this.max,this.index+16384);if(this.index>=this.max)return this.end();switch(this.type){case"string":t=this.data.substring(this.index,e);break;case"uint8array":t=this.data.subarray(this.index,e);break;case"array":case"nodebuffer":t=this.data.slice(this.index,e)}return this.index=e,this.push({data:t,meta:{percent:this.max?this.index/this.max*100:0}})},e.exports=s},{"../utils":32,"./GenericWorker":28}],28:[function(t,e,r){"use strict";function i(t){this.name=t||"default",this.streamInfo={},this.generatedError=null,this.extraStreamInfo={},this.isPaused=!0,this.isFinished=!1,this.isLocked=!1,this._listeners={data:[],end:[],error:[]},this.previous=null}i.prototype={push:function(t){this.emit("data",t)},end:function(){if(this.isFinished)return!1;this.flush();try{this.emit("end"),this.cleanUp(),this.isFinished=!0}catch(t){this.emit("error",t)}return!0},error:function(t){return!this.isFinished&&(this.isPaused?this.generatedError=t:(this.isFinished=!0,this.emit("error",t),this.previous&&this.previous.error(t),this.cleanUp()),!0)},on:function(t,e){return this._listeners[t].push(e),this},cleanUp:function(){this.streamInfo=this.generatedError=this.extraStreamInfo=null,this._listeners=[]},emit:function(t,e){if(this._listeners[t])for(var r=0;r<this._listeners[t].length;r++)this._listeners[t][r].call(this,e)},pipe:function(t){return t.registerPrevious(this)},registerPrevious:function(t){if(this.isLocked)throw new Error("The stream '"+this+"' has already been used.");this.streamInfo=t.streamInfo,this.mergeStreamInfo(),this.previous=t;var e=this;return t.on("data",function(t){e.processChunk(t)}),t.on("end",function(){e.end()}),t.on("error",function(t){e.error(t)}),this},pause:function(){return!this.isPaused&&!this.isFinished&&(this.isPaused=!0,this.previous&&this.previous.pause(),!0)},resume:function(){if(!this.isPaused||this.isFinished)return!1;var t=this.isPaused=!1;return this.generatedError&&(this.error(this.generatedError),t=!0),this.previous&&this.previous.resume(),!t},flush:function(){},processChunk:function(t){this.push(t)},withStreamInfo:function(t,e){return this.extraStreamInfo[t]=e,this.mergeStreamInfo(),this},mergeStreamInfo:function(){for(var t in this.extraStreamInfo)this.extraStreamInfo.hasOwnProperty(t)&&(this.streamInfo[t]=this.extraStreamInfo[t])},lock:function(){if(this.isLocked)throw new Error("The stream '"+this+"' has already been used.");this.isLocked=!0,this.previous&&this.previous.lock()},toString:function(){var t="Worker "+this.name;return this.previous?this.previous+" -> "+t:t}},e.exports=i},{}],29:[function(t,e,r){"use strict";var h=t("../utils"),n=t("./ConvertWorker"),s=t("./GenericWorker"),u=t("../base64"),i=t("../support"),a=t("../external"),o=null;if(i.nodestream)try{o=t("../nodejs/NodejsStreamOutputAdapter")}catch(t){}function l(t,o){return new a.Promise(function(e,r){var i=[],n=t._internalType,s=t._outputType,a=t._mimeType;t.on("data",function(t,e){i.push(t),o&&o(e)}).on("error",function(t){i=[],r(t)}).on("end",function(){try{var t=function(t,e,r){switch(t){case"blob":return h.newBlob(h.transformTo("arraybuffer",e),r);case"base64":return u.encode(e);default:return h.transformTo(t,e)}}(s,function(t,e){var r,i=0,n=null,s=0;for(r=0;r<e.length;r++)s+=e[r].length;switch(t){case"string":return e.join("");case"array":return Array.prototype.concat.apply([],e);case"uint8array":for(n=new Uint8Array(s),r=0;r<e.length;r++)n.set(e[r],i),i+=e[r].length;return n;case"nodebuffer":return Buffer.concat(e);default:throw new Error("concat : unsupported type '"+t+"'")}}(n,i),a);e(t)}catch(t){r(t)}i=[]}).resume()})}function f(t,e,r){var i=e;switch(e){case"blob":case"arraybuffer":i="uint8array";break;case"base64":i="string"}try{this._internalType=i,this._outputType=e,this._mimeType=r,h.checkSupport(i),this._worker=t.pipe(new n(i)),t.lock()}catch(t){this._worker=new s("error"),this._worker.error(t)}}f.prototype={accumulate:function(t){return l(this,t)},on:function(t,e){var r=this;return"data"===t?this._worker.on(t,function(t){e.call(r,t.data,t.meta)}):this._worker.on(t,function(){h.delay(e,arguments,r)}),this},resume:function(){return h.delay(this._worker.resume,[],this._worker),this},pause:function(){return this._worker.pause(),this},toNodejsStream:function(t){if(h.checkSupport("nodestream"),"nodebuffer"!==this._outputType)throw new Error(this._outputType+" is not supported by this method");return new o(this,{objectMode:"nodebuffer"!==this._outputType},t)}},e.exports=f},{"../base64":1,"../external":6,"../nodejs/NodejsStreamOutputAdapter":13,"../support":30,"../utils":32,"./ConvertWorker":24,"./GenericWorker":28}],30:[function(t,e,r){"use strict";if(r.base64=!0,r.array=!0,r.string=!0,r.arraybuffer="undefined"!=typeof ArrayBuffer&&"undefined"!=typeof Uint8Array,r.nodebuffer="undefined"!=typeof Buffer,r.uint8array="undefined"!=typeof Uint8Array,"undefined"==typeof ArrayBuffer)r.blob=!1;else{var i=new ArrayBuffer(0);try{r.blob=0===new Blob([i],{type:"application/zip"}).size}catch(t){try{var n=new(self.BlobBuilder||self.WebKitBlobBuilder||self.MozBlobBuilder||self.MSBlobBuilder);n.append(i),r.blob=0===n.getBlob("application/zip").size}catch(t){r.blob=!1}}}try{r.nodestream=!!t("readable-stream").Readable}catch(t){r.nodestream=!1}},{"readable-stream":16}],31:[function(t,e,s){"use strict";for(var o=t("./utils"),h=t("./support"),r=t("./nodejsUtils"),i=t("./stream/GenericWorker"),u=new Array(256),n=0;n<256;n++)u[n]=252<=n?6:248<=n?5:240<=n?4:224<=n?3:192<=n?2:1;u[254]=u[254]=1;function a(){i.call(this,"utf-8 decode"),this.leftOver=null}function l(){i.call(this,"utf-8 encode")}s.utf8encode=function(t){return h.nodebuffer?r.newBufferFrom(t,"utf-8"):function(t){var e,r,i,n,s,a=t.length,o=0;for(n=0;n<a;n++)55296==(64512&(r=t.charCodeAt(n)))&&n+1<a&&56320==(64512&(i=t.charCodeAt(n+1)))&&(r=65536+(r-55296<<10)+(i-56320),n++),o+=r<128?1:r<2048?2:r<65536?3:4;for(e=h.uint8array?new Uint8Array(o):new Array(o),n=s=0;s<o;n++)55296==(64512&(r=t.charCodeAt(n)))&&n+1<a&&56320==(64512&(i=t.charCodeAt(n+1)))&&(r=65536+(r-55296<<10)+(i-56320),n++),r<128?e[s++]=r:(r<2048?e[s++]=192|r>>>6:(r<65536?e[s++]=224|r>>>12:(e[s++]=240|r>>>18,e[s++]=128|r>>>12&63),e[s++]=128|r>>>6&63),e[s++]=128|63&r);return e}(t)},s.utf8decode=function(t){return h.nodebuffer?o.transformTo("nodebuffer",t).toString("utf-8"):function(t){var e,r,i,n,s=t.length,a=new Array(2*s);for(e=r=0;e<s;)if((i=t[e++])<128)a[r++]=i;else if(4<(n=u[i]))a[r++]=65533,e+=n-1;else{for(i&=2===n?31:3===n?15:7;1<n&&e<s;)i=i<<6|63&t[e++],n--;1<n?a[r++]=65533:i<65536?a[r++]=i:(i-=65536,a[r++]=55296|i>>10&1023,a[r++]=56320|1023&i)}return a.length!==r&&(a.subarray?a=a.subarray(0,r):a.length=r),o.applyFromCharCode(a)}(t=o.transformTo(h.uint8array?"uint8array":"array",t))},o.inherits(a,i),a.prototype.processChunk=function(t){var e=o.transformTo(h.uint8array?"uint8array":"array",t.data);if(this.leftOver&&this.leftOver.length){if(h.uint8array){var r=e;(e=new Uint8Array(r.length+this.leftOver.length)).set(this.leftOver,0),e.set(r,this.leftOver.length)}else e=this.leftOver.concat(e);this.leftOver=null}var i=function(t,e){var r;for((e=e||t.length)>t.length&&(e=t.length),r=e-1;0<=r&&128==(192&t[r]);)r--;return r<0?e:0===r?e:r+u[t[r]]>e?r:e}(e),n=e;i!==e.length&&(h.uint8array?(n=e.subarray(0,i),this.leftOver=e.subarray(i,e.length)):(n=e.slice(0,i),this.leftOver=e.slice(i,e.length))),this.push({data:s.utf8decode(n),meta:t.meta})},a.prototype.flush=function(){this.leftOver&&this.leftOver.length&&(this.push({data:s.utf8decode(this.leftOver),meta:{}}),this.leftOver=null)},s.Utf8DecodeWorker=a,o.inherits(l,i),l.prototype.processChunk=function(t){this.push({data:s.utf8encode(t.data),meta:t.meta})},s.Utf8EncodeWorker=l},{"./nodejsUtils":14,"./stream/GenericWorker":28,"./support":30,"./utils":32}],32:[function(t,e,a){"use strict";var o=t("./support"),h=t("./base64"),r=t("./nodejsUtils"),i=t("set-immediate-shim"),u=t("./external");function n(t){return t}function l(t,e){for(var r=0;r<t.length;++r)e[r]=255&t.charCodeAt(r);return e}a.newBlob=function(e,r){a.checkSupport("blob");try{return new Blob([e],{type:r})}catch(t){try{var i=new(self.BlobBuilder||self.WebKitBlobBuilder||self.MozBlobBuilder||self.MSBlobBuilder);return i.append(e),i.getBlob(r)}catch(t){throw new Error("Bug : can't construct the Blob.")}}};var s={stringifyByChunk:function(t,e,r){var i=[],n=0,s=t.length;if(s<=r)return String.fromCharCode.apply(null,t);for(;n<s;)"array"===e||"nodebuffer"===e?i.push(String.fromCharCode.apply(null,t.slice(n,Math.min(n+r,s)))):i.push(String.fromCharCode.apply(null,t.subarray(n,Math.min(n+r,s)))),n+=r;return i.join("")},stringifyByChar:function(t){for(var e="",r=0;r<t.length;r++)e+=String.fromCharCode(t[r]);return e},applyCanBeUsed:{uint8array:function(){try{return o.uint8array&&1===String.fromCharCode.apply(null,new Uint8Array(1)).length}catch(t){return!1}}(),nodebuffer:function(){try{return o.nodebuffer&&1===String.fromCharCode.apply(null,r.allocBuffer(1)).length}catch(t){return!1}}()}};function f(t){var e=65536,r=a.getTypeOf(t),i=!0;if("uint8array"===r?i=s.applyCanBeUsed.uint8array:"nodebuffer"===r&&(i=s.applyCanBeUsed.nodebuffer),i)for(;1<e;)try{return s.stringifyByChunk(t,r,e)}catch(t){e=Math.floor(e/2)}return s.stringifyByChar(t)}function d(t,e){for(var r=0;r<t.length;r++)e[r]=t[r];return e}a.applyFromCharCode=f;var c={};c.string={string:n,array:function(t){return l(t,new Array(t.length))},arraybuffer:function(t){return c.string.uint8array(t).buffer},uint8array:function(t){return l(t,new Uint8Array(t.length))},nodebuffer:function(t){return l(t,r.allocBuffer(t.length))}},c.array={string:f,array:n,arraybuffer:function(t){return new Uint8Array(t).buffer},uint8array:function(t){return new Uint8Array(t)},nodebuffer:function(t){return r.newBufferFrom(t)}},c.arraybuffer={string:function(t){return f(new Uint8Array(t))},array:function(t){return d(new Uint8Array(t),new Array(t.byteLength))},arraybuffer:n,uint8array:function(t){return new Uint8Array(t)},nodebuffer:function(t){return r.newBufferFrom(new Uint8Array(t))}},c.uint8array={string:f,array:function(t){return d(t,new Array(t.length))},arraybuffer:function(t){return t.buffer},uint8array:n,nodebuffer:function(t){return r.newBufferFrom(t)}},c.nodebuffer={string:f,array:function(t){return d(t,new Array(t.length))},arraybuffer:function(t){return c.nodebuffer.uint8array(t).buffer},uint8array:function(t){return d(t,new Uint8Array(t.length))},nodebuffer:n},a.transformTo=function(t,e){if(e=e||"",!t)return e;a.checkSupport(t);var r=a.getTypeOf(e);return c[r][t](e)},a.getTypeOf=function(t){return"string"==typeof t?"string":"[object Array]"===Object.prototype.toString.call(t)?"array":o.nodebuffer&&r.isBuffer(t)?"nodebuffer":o.uint8array&&t instanceof Uint8Array?"uint8array":o.arraybuffer&&t instanceof ArrayBuffer?"arraybuffer":void 0},a.checkSupport=function(t){if(!o[t.toLowerCase()])throw new Error(t+" is not supported by this platform")},a.MAX_VALUE_16BITS=65535,a.MAX_VALUE_32BITS=-1,a.pretty=function(t){var e,r,i="";for(r=0;r<(t||"").length;r++)i+="\\x"+((e=t.charCodeAt(r))<16?"0":"")+e.toString(16).toUpperCase();return i},a.delay=function(t,e,r){i(function(){t.apply(r||null,e||[])})},a.inherits=function(t,e){function r(){}r.prototype=e.prototype,t.prototype=new r},a.extend=function(){var t,e,r={};for(t=0;t<arguments.length;t++)for(e in arguments[t])arguments[t].hasOwnProperty(e)&&void 0===r[e]&&(r[e]=arguments[t][e]);return r},a.prepareContent=function(r,t,i,n,s){return u.Promise.resolve(t).then(function(i){return o.blob&&(i instanceof Blob||-1!==["[object File]","[object Blob]"].indexOf(Object.prototype.toString.call(i)))&&"undefined"!=typeof FileReader?new u.Promise(function(e,r){var t=new FileReader;t.onload=function(t){e(t.target.result)},t.onerror=function(t){r(t.target.error)},t.readAsArrayBuffer(i)}):i}).then(function(t){var e=a.getTypeOf(t);return e?("arraybuffer"===e?t=a.transformTo("uint8array",t):"string"===e&&(s?t=h.decode(t):i&&!0!==n&&(t=function(t){return l(t,o.uint8array?new Uint8Array(t.length):new Array(t.length))}(t))),t):u.Promise.reject(new Error("Can't read the data of '"+r+"'. Is it in a supported JavaScript type (String, Blob, ArrayBuffer, etc) ?"))})}},{"./base64":1,"./external":6,"./nodejsUtils":14,"./support":30,"set-immediate-shim":54}],33:[function(t,e,r){"use strict";var i=t("./reader/readerFor"),n=t("./utils"),s=t("./signature"),a=t("./zipEntry"),o=(t("./utf8"),t("./support"));function h(t){this.files=[],this.loadOptions=t}h.prototype={checkSignature:function(t){if(!this.reader.readAndCheckSignature(t)){this.reader.index-=4;var e=this.reader.readString(4);throw new Error("Corrupted zip or bug: unexpected signature ("+n.pretty(e)+", expected "+n.pretty(t)+")")}},isSignature:function(t,e){var r=this.reader.index;this.reader.setIndex(t);var i=this.reader.readString(4)===e;return this.reader.setIndex(r),i},readBlockEndOfCentral:function(){this.diskNumber=this.reader.readInt(2),this.diskWithCentralDirStart=this.reader.readInt(2),this.centralDirRecordsOnThisDisk=this.reader.readInt(2),this.centralDirRecords=this.reader.readInt(2),this.centralDirSize=this.reader.readInt(4),this.centralDirOffset=this.reader.readInt(4),this.zipCommentLength=this.reader.readInt(2);var t=this.reader.readData(this.zipCommentLength),e=o.uint8array?"uint8array":"array",r=n.transformTo(e,t);this.zipComment=this.loadOptions.decodeFileName(r)},readBlockZip64EndOfCentral:function(){this.zip64EndOfCentralSize=this.reader.readInt(8),this.reader.skip(4),this.diskNumber=this.reader.readInt(4),this.diskWithCentralDirStart=this.reader.readInt(4),this.centralDirRecordsOnThisDisk=this.reader.readInt(8),this.centralDirRecords=this.reader.readInt(8),this.centralDirSize=this.reader.readInt(8),this.centralDirOffset=this.reader.readInt(8),this.zip64ExtensibleData={};for(var t,e,r,i=this.zip64EndOfCentralSize-44;0<i;)t=this.reader.readInt(2),e=this.reader.readInt(4),r=this.reader.readData(e),this.zip64ExtensibleData[t]={id:t,length:e,value:r}},readBlockZip64EndOfCentralLocator:function(){if(this.diskWithZip64CentralDirStart=this.reader.readInt(4),this.relativeOffsetEndOfZip64CentralDir=this.reader.readInt(8),this.disksCount=this.reader.readInt(4),1<this.disksCount)throw new Error("Multi-volumes zip are not supported")},readLocalFiles:function(){var t,e;for(t=0;t<this.files.length;t++)e=this.files[t],this.reader.setIndex(e.localHeaderOffset),this.checkSignature(s.LOCAL_FILE_HEADER),e.readLocalPart(this.reader),e.handleUTF8(),e.processAttributes()},readCentralDir:function(){var t;for(this.reader.setIndex(this.centralDirOffset);this.reader.readAndCheckSignature(s.CENTRAL_FILE_HEADER);)(t=new a({zip64:this.zip64},this.loadOptions)).readCentralPart(this.reader),this.files.push(t);if(this.centralDirRecords!==this.files.length&&0!==this.centralDirRecords&&0===this.files.length)throw new Error("Corrupted zip or bug: expected "+this.centralDirRecords+" records in central dir, got "+this.files.length)},readEndOfCentral:function(){var t=this.reader.lastIndexOfSignature(s.CENTRAL_DIRECTORY_END);if(t<0)throw!this.isSignature(0,s.LOCAL_FILE_HEADER)?new Error("Can't find end of central directory : is this a zip file ? If it is, see https://stuk.github.io/jszip/documentation/howto/read_zip.html"):new Error("Corrupted zip: can't find end of central directory");this.reader.setIndex(t);var e=t;if(this.checkSignature(s.CENTRAL_DIRECTORY_END),this.readBlockEndOfCentral(),this.diskNumber===n.MAX_VALUE_16BITS||this.diskWithCentralDirStart===n.MAX_VALUE_16BITS||this.centralDirRecordsOnThisDisk===n.MAX_VALUE_16BITS||this.centralDirRecords===n.MAX_VALUE_16BITS||this.centralDirSize===n.MAX_VALUE_32BITS||this.centralDirOffset===n.MAX_VALUE_32BITS){if(this.zip64=!0,(t=this.reader.lastIndexOfSignature(s.ZIP64_CENTRAL_DIRECTORY_LOCATOR))<0)throw new Error("Corrupted zip: can't find the ZIP64 end of central directory locator");if(this.reader.setIndex(t),this.checkSignature(s.ZIP64_CENTRAL_DIRECTORY_LOCATOR),this.readBlockZip64EndOfCentralLocator(),!this.isSignature(this.relativeOffsetEndOfZip64CentralDir,s.ZIP64_CENTRAL_DIRECTORY_END)&&(this.relativeOffsetEndOfZip64CentralDir=this.reader.lastIndexOfSignature(s.ZIP64_CENTRAL_DIRECTORY_END),this.relativeOffsetEndOfZip64CentralDir<0))throw new Error("Corrupted zip: can't find the ZIP64 end of central directory");this.reader.setIndex(this.relativeOffsetEndOfZip64CentralDir),this.checkSignature(s.ZIP64_CENTRAL_DIRECTORY_END),this.readBlockZip64EndOfCentral()}var r=this.centralDirOffset+this.centralDirSize;this.zip64&&(r+=20,r+=12+this.zip64EndOfCentralSize);var i=e-r;if(0<i)this.isSignature(e,s.CENTRAL_FILE_HEADER)||(this.reader.zero=i);else if(i<0)throw new Error("Corrupted zip: missing "+Math.abs(i)+" bytes.")},prepareReader:function(t){this.reader=i(t)},load:function(t){this.prepareReader(t),this.readEndOfCentral(),this.readCentralDir(),this.readLocalFiles()}},e.exports=h},{"./reader/readerFor":22,"./signature":23,"./support":30,"./utf8":31,"./utils":32,"./zipEntry":34}],34:[function(t,e,r){"use strict";var i=t("./reader/readerFor"),s=t("./utils"),n=t("./compressedObject"),a=t("./crc32"),o=t("./utf8"),h=t("./compressions"),u=t("./support");function l(t,e){this.options=t,this.loadOptions=e}l.prototype={isEncrypted:function(){return 1==(1&this.bitFlag)},useUTF8:function(){return 2048==(2048&this.bitFlag)},readLocalPart:function(t){var e,r;if(t.skip(22),this.fileNameLength=t.readInt(2),r=t.readInt(2),this.fileName=t.readData(this.fileNameLength),t.skip(r),-1===this.compressedSize||-1===this.uncompressedSize)throw new Error("Bug or corrupted zip : didn't get enough information from the central directory (compressedSize === -1 || uncompressedSize === -1)");if(null===(e=function(t){for(var e in h)if(h.hasOwnProperty(e)&&h[e].magic===t)return h[e];return null}(this.compressionMethod)))throw new Error("Corrupted zip : compression "+s.pretty(this.compressionMethod)+" unknown (inner file : "+s.transformTo("string",this.fileName)+")");this.decompressed=new n(this.compressedSize,this.uncompressedSize,this.crc32,e,t.readData(this.compressedSize))},readCentralPart:function(t){this.versionMadeBy=t.readInt(2),t.skip(2),this.bitFlag=t.readInt(2),this.compressionMethod=t.readString(2),this.date=t.readDate(),this.crc32=t.readInt(4),this.compressedSize=t.readInt(4),this.uncompressedSize=t.readInt(4);var e=t.readInt(2);if(this.extraFieldsLength=t.readInt(2),this.fileCommentLength=t.readInt(2),this.diskNumberStart=t.readInt(2),this.internalFileAttributes=t.readInt(2),this.externalFileAttributes=t.readInt(4),this.localHeaderOffset=t.readInt(4),this.isEncrypted())throw new Error("Encrypted zip are not supported");t.skip(e),this.readExtraFields(t),this.parseZIP64ExtraField(t),this.fileComment=t.readData(this.fileCommentLength)},processAttributes:function(){this.unixPermissions=null,this.dosPermissions=null;var t=this.versionMadeBy>>8;this.dir=!!(16&this.externalFileAttributes),0==t&&(this.dosPermissions=63&this.externalFileAttributes),3==t&&(this.unixPermissions=this.externalFileAttributes>>16&65535),this.dir||"/"!==this.fileNameStr.slice(-1)||(this.dir=!0)},parseZIP64ExtraField:function(t){if(this.extraFields[1]){var e=i(this.extraFields[1].value);this.uncompressedSize===s.MAX_VALUE_32BITS&&(this.uncompressedSize=e.readInt(8)),this.compressedSize===s.MAX_VALUE_32BITS&&(this.compressedSize=e.readInt(8)),this.localHeaderOffset===s.MAX_VALUE_32BITS&&(this.localHeaderOffset=e.readInt(8)),this.diskNumberStart===s.MAX_VALUE_32BITS&&(this.diskNumberStart=e.readInt(4))}},readExtraFields:function(t){var e,r,i,n=t.index+this.extraFieldsLength;for(this.extraFields||(this.extraFields={});t.index+4<n;)e=t.readInt(2),r=t.readInt(2),i=t.readData(r),this.extraFields[e]={id:e,length:r,value:i};t.setIndex(n)},handleUTF8:function(){var t=u.uint8array?"uint8array":"array";if(this.useUTF8())this.fileNameStr=o.utf8decode(this.fileName),this.fileCommentStr=o.utf8decode(this.fileComment);else{var e=this.findExtraFieldUnicodePath();if(null!==e)this.fileNameStr=e;else{var r=s.transformTo(t,this.fileName);this.fileNameStr=this.loadOptions.decodeFileName(r)}var i=this.findExtraFieldUnicodeComment();if(null!==i)this.fileCommentStr=i;else{var n=s.transformTo(t,this.fileComment);this.fileCommentStr=this.loadOptions.decodeFileName(n)}}},findExtraFieldUnicodePath:function(){var t=this.extraFields[28789];if(t){var e=i(t.value);return 1!==e.readInt(1)?null:a(this.fileName)!==e.readInt(4)?null:o.utf8decode(e.readData(t.length-5))}return null},findExtraFieldUnicodeComment:function(){var t=this.extraFields[25461];if(t){var e=i(t.value);return 1!==e.readInt(1)?null:a(this.fileComment)!==e.readInt(4)?null:o.utf8decode(e.readData(t.length-5))}return null}},e.exports=l},{"./compressedObject":2,"./compressions":3,"./crc32":4,"./reader/readerFor":22,"./support":30,"./utf8":31,"./utils":32}],35:[function(t,e,r){"use strict";function i(t,e,r){this.name=t,this.dir=r.dir,this.date=r.date,this.comment=r.comment,this.unixPermissions=r.unixPermissions,this.dosPermissions=r.dosPermissions,this._data=e,this._dataBinary=r.binary,this.options={compression:r.compression,compressionOptions:r.compressionOptions}}var s=t("./stream/StreamHelper"),n=t("./stream/DataWorker"),a=t("./utf8"),o=t("./compressedObject"),h=t("./stream/GenericWorker");i.prototype={internalStream:function(t){var e=null,r="string";try{if(!t)throw new Error("No output type specified.");var i="string"===(r=t.toLowerCase())||"text"===r;"binarystring"!==r&&"text"!==r||(r="string"),e=this._decompressWorker();var n=!this._dataBinary;n&&!i&&(e=e.pipe(new a.Utf8EncodeWorker)),!n&&i&&(e=e.pipe(new a.Utf8DecodeWorker))}catch(t){(e=new h("error")).error(t)}return new s(e,r,"")},async:function(t,e){return this.internalStream(t).accumulate(e)},nodeStream:function(t,e){return this.internalStream(t||"nodebuffer").toNodejsStream(e)},_compressWorker:function(t,e){if(this._data instanceof o&&this._data.compression.magic===t.magic)return this._data.getCompressedWorker();var r=this._decompressWorker();return this._dataBinary||(r=r.pipe(new a.Utf8EncodeWorker)),o.createWorkerFrom(r,t,e)},_decompressWorker:function(){return this._data instanceof o?this._data.getContentWorker():this._data instanceof h?this._data:new n(this._data)}};for(var u=["asText","asBinary","asNodeBuffer","asUint8Array","asArrayBuffer"],l=function(){throw new Error("This method has been removed in JSZip 3.0, please check the upgrade guide.")},f=0;f<u.length;f++)i.prototype[u[f]]=l;e.exports=i},{"./compressedObject":2,"./stream/DataWorker":27,"./stream/GenericWorker":28,"./stream/StreamHelper":29,"./utf8":31}],36:[function(t,l,e){(function(e){"use strict";var r,i,t=e.MutationObserver||e.WebKitMutationObserver;if(t){var n=0,s=new t(u),a=e.document.createTextNode("");s.observe(a,{characterData:!0}),r=function(){a.data=n=++n%2}}else if(e.setImmediate||void 0===e.MessageChannel)r="document"in e&&"onreadystatechange"in e.document.createElement("script")?function(){var t=e.document.createElement("script");t.onreadystatechange=function(){u(),t.onreadystatechange=null,t.parentNode.removeChild(t),t=null},e.document.documentElement.appendChild(t)}:function(){setTimeout(u,0)};else{var o=new e.MessageChannel;o.port1.onmessage=u,r=function(){o.port2.postMessage(0)}}var h=[];function u(){var t,e;i=!0;for(var r=h.length;r;){for(e=h,h=[],t=-1;++t<r;)e[t]();r=h.length}i=!1}l.exports=function(t){1!==h.push(t)||i||r()}}).call(this,"undefined"!=typeof global?global:"undefined"!=typeof self?self:"undefined"!=typeof window?window:{})},{}],37:[function(t,e,r){"use strict";var n=t("immediate");function u(){}var l={},s=["REJECTED"],a=["FULFILLED"],i=["PENDING"];function o(t){if("function"!=typeof t)throw new TypeError("resolver must be a function");this.state=i,this.queue=[],this.outcome=void 0,t!==u&&c(this,t)}function h(t,e,r){this.promise=t,"function"==typeof e&&(this.onFulfilled=e,this.callFulfilled=this.otherCallFulfilled),"function"==typeof r&&(this.onRejected=r,this.callRejected=this.otherCallRejected)}function f(e,r,i){n(function(){var t;try{t=r(i)}catch(t){return l.reject(e,t)}t===e?l.reject(e,new TypeError("Cannot resolve promise with itself")):l.resolve(e,t)})}function d(t){var e=t&&t.then;if(t&&("object"==typeof t||"function"==typeof t)&&"function"==typeof e)return function(){e.apply(t,arguments)}}function c(e,t){var r=!1;function i(t){r||(r=!0,l.reject(e,t))}function n(t){r||(r=!0,l.resolve(e,t))}var s=p(function(){t(n,i)});"error"===s.status&&i(s.value)}function p(t,e){var r={};try{r.value=t(e),r.status="success"}catch(t){r.status="error",r.value=t}return r}(e.exports=o).prototype.finally=function(e){if("function"!=typeof e)return this;var r=this.constructor;return this.then(function(t){return r.resolve(e()).then(function(){return t})},function(t){return r.resolve(e()).then(function(){throw t})})},o.prototype.catch=function(t){return this.then(null,t)},o.prototype.then=function(t,e){if("function"!=typeof t&&this.state===a||"function"!=typeof e&&this.state===s)return this;var r=new this.constructor(u);this.state!==i?f(r,this.state===a?t:e,this.outcome):this.queue.push(new h(r,t,e));return r},h.prototype.callFulfilled=function(t){l.resolve(this.promise,t)},h.prototype.otherCallFulfilled=function(t){f(this.promise,this.onFulfilled,t)},h.prototype.callRejected=function(t){l.reject(this.promise,t)},h.prototype.otherCallRejected=function(t){f(this.promise,this.onRejected,t)},l.resolve=function(t,e){var r=p(d,e);if("error"===r.status)return l.reject(t,r.value);var i=r.value;if(i)c(t,i);else{t.state=a,t.outcome=e;for(var n=-1,s=t.queue.length;++n<s;)t.queue[n].callFulfilled(e)}return t},l.reject=function(t,e){t.state=s,t.outcome=e;for(var r=-1,i=t.queue.length;++r<i;)t.queue[r].callRejected(e);return t},o.resolve=function(t){if(t instanceof this)return t;return l.resolve(new this(u),t)},o.reject=function(t){var e=new this(u);return l.reject(e,t)},o.all=function(t){var r=this;if("[object Array]"!==Object.prototype.toString.call(t))return this.reject(new TypeError("must be an array"));var i=t.length,n=!1;if(!i)return this.resolve([]);var s=new Array(i),a=0,e=-1,o=new this(u);for(;++e<i;)h(t[e],e);return o;function h(t,e){r.resolve(t).then(function(t){s[e]=t,++a!==i||n||(n=!0,l.resolve(o,s))},function(t){n||(n=!0,l.reject(o,t))})}},o.race=function(t){var e=this;if("[object Array]"!==Object.prototype.toString.call(t))return this.reject(new TypeError("must be an array"));var r=t.length,i=!1;if(!r)return this.resolve([]);var n=-1,s=new this(u);for(;++n<r;)a=t[n],e.resolve(a).then(function(t){i||(i=!0,l.resolve(s,t))},function(t){i||(i=!0,l.reject(s,t))});var a;return s}},{immediate:36}],38:[function(t,e,r){"use strict";var i={};(0,t("./lib/utils/common").assign)(i,t("./lib/deflate"),t("./lib/inflate"),t("./lib/zlib/constants")),e.exports=i},{"./lib/deflate":39,"./lib/inflate":40,"./lib/utils/common":41,"./lib/zlib/constants":44}],39:[function(t,e,r){"use strict";var a=t("./zlib/deflate"),o=t("./utils/common"),h=t("./utils/strings"),n=t("./zlib/messages"),s=t("./zlib/zstream"),u=Object.prototype.toString,l=0,f=-1,d=0,c=8;function p(t){if(!(this instanceof p))return new p(t);this.options=o.assign({level:f,method:c,chunkSize:16384,windowBits:15,memLevel:8,strategy:d,to:""},t||{});var e=this.options;e.raw&&0<e.windowBits?e.windowBits=-e.windowBits:e.gzip&&0<e.windowBits&&e.windowBits<16&&(e.windowBits+=16),this.err=0,this.msg="",this.ended=!1,this.chunks=[],this.strm=new s,this.strm.avail_out=0;var r=a.deflateInit2(this.strm,e.level,e.method,e.windowBits,e.memLevel,e.strategy);if(r!==l)throw new Error(n[r]);if(e.header&&a.deflateSetHeader(this.strm,e.header),e.dictionary){var i;if(i="string"==typeof e.dictionary?h.string2buf(e.dictionary):"[object ArrayBuffer]"===u.call(e.dictionary)?new Uint8Array(e.dictionary):e.dictionary,(r=a.deflateSetDictionary(this.strm,i))!==l)throw new Error(n[r]);this._dict_set=!0}}function i(t,e){var r=new p(e);if(r.push(t,!0),r.err)throw r.msg||n[r.err];return r.result}p.prototype.push=function(t,e){var r,i,n=this.strm,s=this.options.chunkSize;if(this.ended)return!1;i=e===~~e?e:!0===e?4:0,"string"==typeof t?n.input=h.string2buf(t):"[object ArrayBuffer]"===u.call(t)?n.input=new Uint8Array(t):n.input=t,n.next_in=0,n.avail_in=n.input.length;do{if(0===n.avail_out&&(n.output=new o.Buf8(s),n.next_out=0,n.avail_out=s),1!==(r=a.deflate(n,i))&&r!==l)return this.onEnd(r),!(this.ended=!0);0!==n.avail_out&&(0!==n.avail_in||4!==i&&2!==i)||("string"===this.options.to?this.onData(h.buf2binstring(o.shrinkBuf(n.output,n.next_out))):this.onData(o.shrinkBuf(n.output,n.next_out)))}while((0<n.avail_in||0===n.avail_out)&&1!==r);return 4===i?(r=a.deflateEnd(this.strm),this.onEnd(r),this.ended=!0,r===l):2!==i||(this.onEnd(l),!(n.avail_out=0))},p.prototype.onData=function(t){this.chunks.push(t)},p.prototype.onEnd=function(t){t===l&&("string"===this.options.to?this.result=this.chunks.join(""):this.result=o.flattenChunks(this.chunks)),this.chunks=[],this.err=t,this.msg=this.strm.msg},r.Deflate=p,r.deflate=i,r.deflateRaw=function(t,e){return(e=e||{}).raw=!0,i(t,e)},r.gzip=function(t,e){return(e=e||{}).gzip=!0,i(t,e)}},{"./utils/common":41,"./utils/strings":42,"./zlib/deflate":46,"./zlib/messages":51,"./zlib/zstream":53}],40:[function(t,e,r){"use strict";var d=t("./zlib/inflate"),c=t("./utils/common"),p=t("./utils/strings"),m=t("./zlib/constants"),i=t("./zlib/messages"),n=t("./zlib/zstream"),s=t("./zlib/gzheader"),_=Object.prototype.toString;function a(t){if(!(this instanceof a))return new a(t);this.options=c.assign({chunkSize:16384,windowBits:0,to:""},t||{});var e=this.options;e.raw&&0<=e.windowBits&&e.windowBits<16&&(e.windowBits=-e.windowBits,0===e.windowBits&&(e.windowBits=-15)),!(0<=e.windowBits&&e.windowBits<16)||t&&t.windowBits||(e.windowBits+=32),15<e.windowBits&&e.windowBits<48&&0==(15&e.windowBits)&&(e.windowBits|=15),this.err=0,this.msg="",this.ended=!1,this.chunks=[],this.strm=new n,this.strm.avail_out=0;var r=d.inflateInit2(this.strm,e.windowBits);if(r!==m.Z_OK)throw new Error(i[r]);this.header=new s,d.inflateGetHeader(this.strm,this.header)}function o(t,e){var r=new a(e);if(r.push(t,!0),r.err)throw r.msg||i[r.err];return r.result}a.prototype.push=function(t,e){var r,i,n,s,a,o,h=this.strm,u=this.options.chunkSize,l=this.options.dictionary,f=!1;if(this.ended)return!1;i=e===~~e?e:!0===e?m.Z_FINISH:m.Z_NO_FLUSH,"string"==typeof t?h.input=p.binstring2buf(t):"[object ArrayBuffer]"===_.call(t)?h.input=new Uint8Array(t):h.input=t,h.next_in=0,h.avail_in=h.input.length;do{if(0===h.avail_out&&(h.output=new c.Buf8(u),h.next_out=0,h.avail_out=u),(r=d.inflate(h,m.Z_NO_FLUSH))===m.Z_NEED_DICT&&l&&(o="string"==typeof l?p.string2buf(l):"[object ArrayBuffer]"===_.call(l)?new Uint8Array(l):l,r=d.inflateSetDictionary(this.strm,o)),r===m.Z_BUF_ERROR&&!0===f&&(r=m.Z_OK,f=!1),r!==m.Z_STREAM_END&&r!==m.Z_OK)return this.onEnd(r),!(this.ended=!0);h.next_out&&(0!==h.avail_out&&r!==m.Z_STREAM_END&&(0!==h.avail_in||i!==m.Z_FINISH&&i!==m.Z_SYNC_FLUSH)||("string"===this.options.to?(n=p.utf8border(h.output,h.next_out),s=h.next_out-n,a=p.buf2string(h.output,n),h.next_out=s,h.avail_out=u-s,s&&c.arraySet(h.output,h.output,n,s,0),this.onData(a)):this.onData(c.shrinkBuf(h.output,h.next_out)))),0===h.avail_in&&0===h.avail_out&&(f=!0)}while((0<h.avail_in||0===h.avail_out)&&r!==m.Z_STREAM_END);return r===m.Z_STREAM_END&&(i=m.Z_FINISH),i===m.Z_FINISH?(r=d.inflateEnd(this.strm),this.onEnd(r),this.ended=!0,r===m.Z_OK):i!==m.Z_SYNC_FLUSH||(this.onEnd(m.Z_OK),!(h.avail_out=0))},a.prototype.onData=function(t){this.chunks.push(t)},a.prototype.onEnd=function(t){t===m.Z_OK&&("string"===this.options.to?this.result=this.chunks.join(""):this.result=c.flattenChunks(this.chunks)),this.chunks=[],this.err=t,this.msg=this.strm.msg},r.Inflate=a,r.inflate=o,r.inflateRaw=function(t,e){return(e=e||{}).raw=!0,o(t,e)},r.ungzip=o},{"./utils/common":41,"./utils/strings":42,"./zlib/constants":44,"./zlib/gzheader":47,"./zlib/inflate":49,"./zlib/messages":51,"./zlib/zstream":53}],41:[function(t,e,r){"use strict";var i="undefined"!=typeof Uint8Array&&"undefined"!=typeof Uint16Array&&"undefined"!=typeof Int32Array;r.assign=function(t){for(var e=Array.prototype.slice.call(arguments,1);e.length;){var r=e.shift();if(r){if("object"!=typeof r)throw new TypeError(r+"must be non-object");for(var i in r)r.hasOwnProperty(i)&&(t[i]=r[i])}}return t},r.shrinkBuf=function(t,e){return t.length===e?t:t.subarray?t.subarray(0,e):(t.length=e,t)};var n={arraySet:function(t,e,r,i,n){if(e.subarray&&t.subarray)t.set(e.subarray(r,r+i),n);else for(var s=0;s<i;s++)t[n+s]=e[r+s]},flattenChunks:function(t){var e,r,i,n,s,a;for(e=i=0,r=t.length;e<r;e++)i+=t[e].length;for(a=new Uint8Array(i),e=n=0,r=t.length;e<r;e++)s=t[e],a.set(s,n),n+=s.length;return a}},s={arraySet:function(t,e,r,i,n){for(var s=0;s<i;s++)t[n+s]=e[r+s]},flattenChunks:function(t){return[].concat.apply([],t)}};r.setTyped=function(t){t?(r.Buf8=Uint8Array,r.Buf16=Uint16Array,r.Buf32=Int32Array,r.assign(r,n)):(r.Buf8=Array,r.Buf16=Array,r.Buf32=Array,r.assign(r,s))},r.setTyped(i)},{}],42:[function(t,e,r){"use strict";var h=t("./common"),n=!0,s=!0;try{String.fromCharCode.apply(null,[0])}catch(t){n=!1}try{String.fromCharCode.apply(null,new Uint8Array(1))}catch(t){s=!1}for(var u=new h.Buf8(256),i=0;i<256;i++)u[i]=252<=i?6:248<=i?5:240<=i?4:224<=i?3:192<=i?2:1;function l(t,e){if(e<65537&&(t.subarray&&s||!t.subarray&&n))return String.fromCharCode.apply(null,h.shrinkBuf(t,e));for(var r="",i=0;i<e;i++)r+=String.fromCharCode(t[i]);return r}u[254]=u[254]=1,r.string2buf=function(t){var e,r,i,n,s,a=t.length,o=0;for(n=0;n<a;n++)55296==(64512&(r=t.charCodeAt(n)))&&n+1<a&&56320==(64512&(i=t.charCodeAt(n+1)))&&(r=65536+(r-55296<<10)+(i-56320),n++),o+=r<128?1:r<2048?2:r<65536?3:4;for(e=new h.Buf8(o),n=s=0;s<o;n++)55296==(64512&(r=t.charCodeAt(n)))&&n+1<a&&56320==(64512&(i=t.charCodeAt(n+1)))&&(r=65536+(r-55296<<10)+(i-56320),n++),r<128?e[s++]=r:(r<2048?e[s++]=192|r>>>6:(r<65536?e[s++]=224|r>>>12:(e[s++]=240|r>>>18,e[s++]=128|r>>>12&63),e[s++]=128|r>>>6&63),e[s++]=128|63&r);return e},r.buf2binstring=function(t){return l(t,t.length)},r.binstring2buf=function(t){for(var e=new h.Buf8(t.length),r=0,i=e.length;r<i;r++)e[r]=t.charCodeAt(r);return e},r.buf2string=function(t,e){var r,i,n,s,a=e||t.length,o=new Array(2*a);for(r=i=0;r<a;)if((n=t[r++])<128)o[i++]=n;else if(4<(s=u[n]))o[i++]=65533,r+=s-1;else{for(n&=2===s?31:3===s?15:7;1<s&&r<a;)n=n<<6|63&t[r++],s--;1<s?o[i++]=65533:n<65536?o[i++]=n:(n-=65536,o[i++]=55296|n>>10&1023,o[i++]=56320|1023&n)}return l(o,i)},r.utf8border=function(t,e){var r;for((e=e||t.length)>t.length&&(e=t.length),r=e-1;0<=r&&128==(192&t[r]);)r--;return r<0?e:0===r?e:r+u[t[r]]>e?r:e}},{"./common":41}],43:[function(t,e,r){"use strict";e.exports=function(t,e,r,i){for(var n=65535&t|0,s=t>>>16&65535|0,a=0;0!==r;){for(r-=a=2e3<r?2e3:r;s=s+(n=n+e[i++]|0)|0,--a;);n%=65521,s%=65521}return n|s<<16|0}},{}],44:[function(t,e,r){"use strict";e.exports={Z_NO_FLUSH:0,Z_PARTIAL_FLUSH:1,Z_SYNC_FLUSH:2,Z_FULL_FLUSH:3,Z_FINISH:4,Z_BLOCK:5,Z_TREES:6,Z_OK:0,Z_STREAM_END:1,Z_NEED_DICT:2,Z_ERRNO:-1,Z_STREAM_ERROR:-2,Z_DATA_ERROR:-3,Z_BUF_ERROR:-5,Z_NO_COMPRESSION:0,Z_BEST_SPEED:1,Z_BEST_COMPRESSION:9,Z_DEFAULT_COMPRESSION:-1,Z_FILTERED:1,Z_HUFFMAN_ONLY:2,Z_RLE:3,Z_FIXED:4,Z_DEFAULT_STRATEGY:0,Z_BINARY:0,Z_TEXT:1,Z_UNKNOWN:2,Z_DEFLATED:8}},{}],45:[function(t,e,r){"use strict";var o=function(){for(var t,e=[],r=0;r<256;r++){t=r;for(var i=0;i<8;i++)t=1&t?3988292384^t>>>1:t>>>1;e[r]=t}return e}();e.exports=function(t,e,r,i){var n=o,s=i+r;t^=-1;for(var a=i;a<s;a++)t=t>>>8^n[255&(t^e[a])];return-1^t}},{}],46:[function(t,e,r){"use strict";var h,d=t("../utils/common"),u=t("./trees"),c=t("./adler32"),p=t("./crc32"),i=t("./messages"),l=0,f=4,m=0,_=-2,g=-1,b=4,n=2,v=8,y=9,s=286,a=30,o=19,w=2*s+1,k=15,x=3,S=258,z=S+x+1,C=42,E=113,A=1,I=2,O=3,B=4;function R(t,e){return t.msg=i[e],e}function T(t){return(t<<1)-(4<t?9:0)}function D(t){for(var e=t.length;0<=--e;)t[e]=0}function F(t){var e=t.state,r=e.pending;r>t.avail_out&&(r=t.avail_out),0!==r&&(d.arraySet(t.output,e.pending_buf,e.pending_out,r,t.next_out),t.next_out+=r,e.pending_out+=r,t.total_out+=r,t.avail_out-=r,e.pending-=r,0===e.pending&&(e.pending_out=0))}function N(t,e){u._tr_flush_block(t,0<=t.block_start?t.block_start:-1,t.strstart-t.block_start,e),t.block_start=t.strstart,F(t.strm)}function U(t,e){t.pending_buf[t.pending++]=e}function P(t,e){t.pending_buf[t.pending++]=e>>>8&255,t.pending_buf[t.pending++]=255&e}function L(t,e){var r,i,n=t.max_chain_length,s=t.strstart,a=t.prev_length,o=t.nice_match,h=t.strstart>t.w_size-z?t.strstart-(t.w_size-z):0,u=t.window,l=t.w_mask,f=t.prev,d=t.strstart+S,c=u[s+a-1],p=u[s+a];t.prev_length>=t.good_match&&(n>>=2),o>t.lookahead&&(o=t.lookahead);do{if(u[(r=e)+a]===p&&u[r+a-1]===c&&u[r]===u[s]&&u[++r]===u[s+1]){s+=2,r++;do{}while(u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&u[++s]===u[++r]&&s<d);if(i=S-(d-s),s=d-S,a<i){if(t.match_start=e,o<=(a=i))break;c=u[s+a-1],p=u[s+a]}}}while((e=f[e&l])>h&&0!=--n);return a<=t.lookahead?a:t.lookahead}function j(t){var e,r,i,n,s,a,o,h,u,l,f=t.w_size;do{if(n=t.window_size-t.lookahead-t.strstart,t.strstart>=f+(f-z)){for(d.arraySet(t.window,t.window,f,f,0),t.match_start-=f,t.strstart-=f,t.block_start-=f,e=r=t.hash_size;i=t.head[--e],t.head[e]=f<=i?i-f:0,--r;);for(e=r=f;i=t.prev[--e],t.prev[e]=f<=i?i-f:0,--r;);n+=f}if(0===t.strm.avail_in)break;if(a=t.strm,o=t.window,h=t.strstart+t.lookahead,u=n,l=void 0,l=a.avail_in,u<l&&(l=u),r=0===l?0:(a.avail_in-=l,d.arraySet(o,a.input,a.next_in,l,h),1===a.state.wrap?a.adler=c(a.adler,o,l,h):2===a.state.wrap&&(a.adler=p(a.adler,o,l,h)),a.next_in+=l,a.total_in+=l,l),t.lookahead+=r,t.lookahead+t.insert>=x)for(s=t.strstart-t.insert,t.ins_h=t.window[s],t.ins_h=(t.ins_h<<t.hash_shift^t.window[s+1])&t.hash_mask;t.insert&&(t.ins_h=(t.ins_h<<t.hash_shift^t.window[s+x-1])&t.hash_mask,t.prev[s&t.w_mask]=t.head[t.ins_h],t.head[t.ins_h]=s,s++,t.insert--,!(t.lookahead+t.insert<x)););}while(t.lookahead<z&&0!==t.strm.avail_in)}function Z(t,e){for(var r,i;;){if(t.lookahead<z){if(j(t),t.lookahead<z&&e===l)return A;if(0===t.lookahead)break}if(r=0,t.lookahead>=x&&(t.ins_h=(t.ins_h<<t.hash_shift^t.window[t.strstart+x-1])&t.hash_mask,r=t.prev[t.strstart&t.w_mask]=t.head[t.ins_h],t.head[t.ins_h]=t.strstart),0!==r&&t.strstart-r<=t.w_size-z&&(t.match_length=L(t,r)),t.match_length>=x)if(i=u._tr_tally(t,t.strstart-t.match_start,t.match_length-x),t.lookahead-=t.match_length,t.match_length<=t.max_lazy_match&&t.lookahead>=x){for(t.match_length--;t.strstart++,t.ins_h=(t.ins_h<<t.hash_shift^t.window[t.strstart+x-1])&t.hash_mask,r=t.prev[t.strstart&t.w_mask]=t.head[t.ins_h],t.head[t.ins_h]=t.strstart,0!=--t.match_length;);t.strstart++}else t.strstart+=t.match_length,t.match_length=0,t.ins_h=t.window[t.strstart],t.ins_h=(t.ins_h<<t.hash_shift^t.window[t.strstart+1])&t.hash_mask;else i=u._tr_tally(t,0,t.window[t.strstart]),t.lookahead--,t.strstart++;if(i&&(N(t,!1),0===t.strm.avail_out))return A}return t.insert=t.strstart<x-1?t.strstart:x-1,e===f?(N(t,!0),0===t.strm.avail_out?O:B):t.last_lit&&(N(t,!1),0===t.strm.avail_out)?A:I}function W(t,e){for(var r,i,n;;){if(t.lookahead<z){if(j(t),t.lookahead<z&&e===l)return A;if(0===t.lookahead)break}if(r=0,t.lookahead>=x&&(t.ins_h=(t.ins_h<<t.hash_shift^t.window[t.strstart+x-1])&t.hash_mask,r=t.prev[t.strstart&t.w_mask]=t.head[t.ins_h],t.head[t.ins_h]=t.strstart),t.prev_length=t.match_length,t.prev_match=t.match_start,t.match_length=x-1,0!==r&&t.prev_length<t.max_lazy_match&&t.strstart-r<=t.w_size-z&&(t.match_length=L(t,r),t.match_length<=5&&(1===t.strategy||t.match_length===x&&4096<t.strstart-t.match_start)&&(t.match_length=x-1)),t.prev_length>=x&&t.match_length<=t.prev_length){for(n=t.strstart+t.lookahead-x,i=u._tr_tally(t,t.strstart-1-t.prev_match,t.prev_length-x),t.lookahead-=t.prev_length-1,t.prev_length-=2;++t.strstart<=n&&(t.ins_h=(t.ins_h<<t.hash_shift^t.window[t.strstart+x-1])&t.hash_mask,r=t.prev[t.strstart&t.w_mask]=t.head[t.ins_h],t.head[t.ins_h]=t.strstart),0!=--t.prev_length;);if(t.match_available=0,t.match_length=x-1,t.strstart++,i&&(N(t,!1),0===t.strm.avail_out))return A}else if(t.match_available){if((i=u._tr_tally(t,0,t.window[t.strstart-1]))&&N(t,!1),t.strstart++,t.lookahead--,0===t.strm.avail_out)return A}else t.match_available=1,t.strstart++,t.lookahead--}return t.match_available&&(i=u._tr_tally(t,0,t.window[t.strstart-1]),t.match_available=0),t.insert=t.strstart<x-1?t.strstart:x-1,e===f?(N(t,!0),0===t.strm.avail_out?O:B):t.last_lit&&(N(t,!1),0===t.strm.avail_out)?A:I}function M(t,e,r,i,n){this.good_length=t,this.max_lazy=e,this.nice_length=r,this.max_chain=i,this.func=n}function H(){this.strm=null,this.status=0,this.pending_buf=null,this.pending_buf_size=0,this.pending_out=0,this.pending=0,this.wrap=0,this.gzhead=null,this.gzindex=0,this.method=v,this.last_flush=-1,this.w_size=0,this.w_bits=0,this.w_mask=0,this.window=null,this.window_size=0,this.prev=null,this.head=null,this.ins_h=0,this.hash_size=0,this.hash_bits=0,this.hash_mask=0,this.hash_shift=0,this.block_start=0,this.match_length=0,this.prev_match=0,this.match_available=0,this.strstart=0,this.match_start=0,this.lookahead=0,this.prev_length=0,this.max_chain_length=0,this.max_lazy_match=0,this.level=0,this.strategy=0,this.good_match=0,this.nice_match=0,this.dyn_ltree=new d.Buf16(2*w),this.dyn_dtree=new d.Buf16(2*(2*a+1)),this.bl_tree=new d.Buf16(2*(2*o+1)),D(this.dyn_ltree),D(this.dyn_dtree),D(this.bl_tree),this.l_desc=null,this.d_desc=null,this.bl_desc=null,this.bl_count=new d.Buf16(k+1),this.heap=new d.Buf16(2*s+1),D(this.heap),this.heap_len=0,this.heap_max=0,this.depth=new d.Buf16(2*s+1),D(this.depth),this.l_buf=0,this.lit_bufsize=0,this.last_lit=0,this.d_buf=0,this.opt_len=0,this.static_len=0,this.matches=0,this.insert=0,this.bi_buf=0,this.bi_valid=0}function G(t){var e;return t&&t.state?(t.total_in=t.total_out=0,t.data_type=n,(e=t.state).pending=0,e.pending_out=0,e.wrap<0&&(e.wrap=-e.wrap),e.status=e.wrap?C:E,t.adler=2===e.wrap?0:1,e.last_flush=l,u._tr_init(e),m):R(t,_)}function K(t){var e=G(t);return e===m&&function(t){t.window_size=2*t.w_size,D(t.head),t.max_lazy_match=h[t.level].max_lazy,t.good_match=h[t.level].good_length,t.nice_match=h[t.level].nice_length,t.max_chain_length=h[t.level].max_chain,t.strstart=0,t.block_start=0,t.lookahead=0,t.insert=0,t.match_length=t.prev_length=x-1,t.match_available=0,t.ins_h=0}(t.state),e}function Y(t,e,r,i,n,s){if(!t)return _;var a=1;if(e===g&&(e=6),i<0?(a=0,i=-i):15<i&&(a=2,i-=16),n<1||y<n||r!==v||i<8||15<i||e<0||9<e||s<0||b<s)return R(t,_);8===i&&(i=9);var o=new H;return(t.state=o).strm=t,o.wrap=a,o.gzhead=null,o.w_bits=i,o.w_size=1<<o.w_bits,o.w_mask=o.w_size-1,o.hash_bits=n+7,o.hash_size=1<<o.hash_bits,o.hash_mask=o.hash_size-1,o.hash_shift=~~((o.hash_bits+x-1)/x),o.window=new d.Buf8(2*o.w_size),o.head=new d.Buf16(o.hash_size),o.prev=new d.Buf16(o.w_size),o.lit_bufsize=1<<n+6,o.pending_buf_size=4*o.lit_bufsize,o.pending_buf=new d.Buf8(o.pending_buf_size),o.d_buf=1*o.lit_bufsize,o.l_buf=3*o.lit_bufsize,o.level=e,o.strategy=s,o.method=r,K(t)}h=[new M(0,0,0,0,function(t,e){var r=65535;for(r>t.pending_buf_size-5&&(r=t.pending_buf_size-5);;){if(t.lookahead<=1){if(j(t),0===t.lookahead&&e===l)return A;if(0===t.lookahead)break}t.strstart+=t.lookahead,t.lookahead=0;var i=t.block_start+r;if((0===t.strstart||t.strstart>=i)&&(t.lookahead=t.strstart-i,t.strstart=i,N(t,!1),0===t.strm.avail_out))return A;if(t.strstart-t.block_start>=t.w_size-z&&(N(t,!1),0===t.strm.avail_out))return A}return t.insert=0,e===f?(N(t,!0),0===t.strm.avail_out?O:B):(t.strstart>t.block_start&&(N(t,!1),t.strm.avail_out),A)}),new M(4,4,8,4,Z),new M(4,5,16,8,Z),new M(4,6,32,32,Z),new M(4,4,16,16,W),new M(8,16,32,32,W),new M(8,16,128,128,W),new M(8,32,128,256,W),new M(32,128,258,1024,W),new M(32,258,258,4096,W)],r.deflateInit=function(t,e){return Y(t,e,v,15,8,0)},r.deflateInit2=Y,r.deflateReset=K,r.deflateResetKeep=G,r.deflateSetHeader=function(t,e){return t&&t.state?2!==t.state.wrap?_:(t.state.gzhead=e,m):_},r.deflate=function(t,e){var r,i,n,s;if(!t||!t.state||5<e||e<0)return t?R(t,_):_;if(i=t.state,!t.output||!t.input&&0!==t.avail_in||666===i.status&&e!==f)return R(t,0===t.avail_out?-5:_);if(i.strm=t,r=i.last_flush,i.last_flush=e,i.status===C)if(2===i.wrap)t.adler=0,U(i,31),U(i,139),U(i,8),i.gzhead?(U(i,(i.gzhead.text?1:0)+(i.gzhead.hcrc?2:0)+(i.gzhead.extra?4:0)+(i.gzhead.name?8:0)+(i.gzhead.comment?16:0)),U(i,255&i.gzhead.time),U(i,i.gzhead.time>>8&255),U(i,i.gzhead.time>>16&255),U(i,i.gzhead.time>>24&255),U(i,9===i.level?2:2<=i.strategy||i.level<2?4:0),U(i,255&i.gzhead.os),i.gzhead.extra&&i.gzhead.extra.length&&(U(i,255&i.gzhead.extra.length),U(i,i.gzhead.extra.length>>8&255)),i.gzhead.hcrc&&(t.adler=p(t.adler,i.pending_buf,i.pending,0)),i.gzindex=0,i.status=69):(U(i,0),U(i,0),U(i,0),U(i,0),U(i,0),U(i,9===i.level?2:2<=i.strategy||i.level<2?4:0),U(i,3),i.status=E);else{var a=v+(i.w_bits-8<<4)<<8;a|=(2<=i.strategy||i.level<2?0:i.level<6?1:6===i.level?2:3)<<6,0!==i.strstart&&(a|=32),a+=31-a%31,i.status=E,P(i,a),0!==i.strstart&&(P(i,t.adler>>>16),P(i,65535&t.adler)),t.adler=1}if(69===i.status)if(i.gzhead.extra){for(n=i.pending;i.gzindex<(65535&i.gzhead.extra.length)&&(i.pending!==i.pending_buf_size||(i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),F(t),n=i.pending,i.pending!==i.pending_buf_size));)U(i,255&i.gzhead.extra[i.gzindex]),i.gzindex++;i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),i.gzindex===i.gzhead.extra.length&&(i.gzindex=0,i.status=73)}else i.status=73;if(73===i.status)if(i.gzhead.name){n=i.pending;do{if(i.pending===i.pending_buf_size&&(i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),F(t),n=i.pending,i.pending===i.pending_buf_size)){s=1;break}s=i.gzindex<i.gzhead.name.length?255&i.gzhead.name.charCodeAt(i.gzindex++):0,U(i,s)}while(0!==s);i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),0===s&&(i.gzindex=0,i.status=91)}else i.status=91;if(91===i.status)if(i.gzhead.comment){n=i.pending;do{if(i.pending===i.pending_buf_size&&(i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),F(t),n=i.pending,i.pending===i.pending_buf_size)){s=1;break}s=i.gzindex<i.gzhead.comment.length?255&i.gzhead.comment.charCodeAt(i.gzindex++):0,U(i,s)}while(0!==s);i.gzhead.hcrc&&i.pending>n&&(t.adler=p(t.adler,i.pending_buf,i.pending-n,n)),0===s&&(i.status=103)}else i.status=103;if(103===i.status&&(i.gzhead.hcrc?(i.pending+2>i.pending_buf_size&&F(t),i.pending+2<=i.pending_buf_size&&(U(i,255&t.adler),U(i,t.adler>>8&255),t.adler=0,i.status=E)):i.status=E),0!==i.pending){if(F(t),0===t.avail_out)return i.last_flush=-1,m}else if(0===t.avail_in&&T(e)<=T(r)&&e!==f)return R(t,-5);if(666===i.status&&0!==t.avail_in)return R(t,-5);if(0!==t.avail_in||0!==i.lookahead||e!==l&&666!==i.status){var o=2===i.strategy?function(t,e){for(var r;;){if(0===t.lookahead&&(j(t),0===t.lookahead)){if(e===l)return A;break}if(t.match_length=0,r=u._tr_tally(t,0,t.window[t.strstart]),t.lookahead--,t.strstart++,r&&(N(t,!1),0===t.strm.avail_out))return A}return t.insert=0,e===f?(N(t,!0),0===t.strm.avail_out?O:B):t.last_lit&&(N(t,!1),0===t.strm.avail_out)?A:I}(i,e):3===i.strategy?function(t,e){for(var r,i,n,s,a=t.window;;){if(t.lookahead<=S){if(j(t),t.lookahead<=S&&e===l)return A;if(0===t.lookahead)break}if(t.match_length=0,t.lookahead>=x&&0<t.strstart&&(i=a[n=t.strstart-1])===a[++n]&&i===a[++n]&&i===a[++n]){s=t.strstart+S;do{}while(i===a[++n]&&i===a[++n]&&i===a[++n]&&i===a[++n]&&i===a[++n]&&i===a[++n]&&i===a[++n]&&i===a[++n]&&n<s);t.match_length=S-(s-n),t.match_length>t.lookahead&&(t.match_length=t.lookahead)}if(t.match_length>=x?(r=u._tr_tally(t,1,t.match_length-x),t.lookahead-=t.match_length,t.strstart+=t.match_length,t.match_length=0):(r=u._tr_tally(t,0,t.window[t.strstart]),t.lookahead--,t.strstart++),r&&(N(t,!1),0===t.strm.avail_out))return A}return t.insert=0,e===f?(N(t,!0),0===t.strm.avail_out?O:B):t.last_lit&&(N(t,!1),0===t.strm.avail_out)?A:I}(i,e):h[i.level].func(i,e);if(o!==O&&o!==B||(i.status=666),o===A||o===O)return 0===t.avail_out&&(i.last_flush=-1),m;if(o===I&&(1===e?u._tr_align(i):5!==e&&(u._tr_stored_block(i,0,0,!1),3===e&&(D(i.head),0===i.lookahead&&(i.strstart=0,i.block_start=0,i.insert=0))),F(t),0===t.avail_out))return i.last_flush=-1,m}return e!==f?m:i.wrap<=0?1:(2===i.wrap?(U(i,255&t.adler),U(i,t.adler>>8&255),U(i,t.adler>>16&255),U(i,t.adler>>24&255),U(i,255&t.total_in),U(i,t.total_in>>8&255),U(i,t.total_in>>16&255),U(i,t.total_in>>24&255)):(P(i,t.adler>>>16),P(i,65535&t.adler)),F(t),0<i.wrap&&(i.wrap=-i.wrap),0!==i.pending?m:1)},r.deflateEnd=function(t){var e;return t&&t.state?(e=t.state.status)!==C&&69!==e&&73!==e&&91!==e&&103!==e&&e!==E&&666!==e?R(t,_):(t.state=null,e===E?R(t,-3):m):_},r.deflateSetDictionary=function(t,e){var r,i,n,s,a,o,h,u,l=e.length;if(!t||!t.state)return _;if(2===(s=(r=t.state).wrap)||1===s&&r.status!==C||r.lookahead)return _;for(1===s&&(t.adler=c(t.adler,e,l,0)),r.wrap=0,l>=r.w_size&&(0===s&&(D(r.head),r.strstart=0,r.block_start=0,r.insert=0),u=new d.Buf8(r.w_size),d.arraySet(u,e,l-r.w_size,r.w_size,0),e=u,l=r.w_size),a=t.avail_in,o=t.next_in,h=t.input,t.avail_in=l,t.next_in=0,t.input=e,j(r);r.lookahead>=x;){for(i=r.strstart,n=r.lookahead-(x-1);r.ins_h=(r.ins_h<<r.hash_shift^r.window[i+x-1])&r.hash_mask,r.prev[i&r.w_mask]=r.head[r.ins_h],r.head[r.ins_h]=i,i++,--n;);r.strstart=i,r.lookahead=x-1,j(r)}return r.strstart+=r.lookahead,r.block_start=r.strstart,r.insert=r.lookahead,r.lookahead=0,r.match_length=r.prev_length=x-1,r.match_available=0,t.next_in=o,t.input=h,t.avail_in=a,r.wrap=s,m},r.deflateInfo="pako deflate (from Nodeca project)"},{"../utils/common":41,"./adler32":43,"./crc32":45,"./messages":51,"./trees":52}],47:[function(t,e,r){"use strict";e.exports=function(){this.text=0,this.time=0,this.xflags=0,this.os=0,this.extra=null,this.extra_len=0,this.name="",this.comment="",this.hcrc=0,this.done=!1}},{}],48:[function(t,e,r){"use strict";e.exports=function(t,e){var r,i,n,s,a,o,h,u,l,f,d,c,p,m,_,g,b,v,y,w,k,x,S,z,C;r=t.state,i=t.next_in,z=t.input,n=i+(t.avail_in-5),s=t.next_out,C=t.output,a=s-(e-t.avail_out),o=s+(t.avail_out-257),h=r.dmax,u=r.wsize,l=r.whave,f=r.wnext,d=r.window,c=r.hold,p=r.bits,m=r.lencode,_=r.distcode,g=(1<<r.lenbits)-1,b=(1<<r.distbits)-1;t:do{p<15&&(c+=z[i++]<<p,p+=8,c+=z[i++]<<p,p+=8),v=m[c&g];e:for(;;){if(c>>>=y=v>>>24,p-=y,0===(y=v>>>16&255))C[s++]=65535&v;else{if(!(16&y)){if(0==(64&y)){v=m[(65535&v)+(c&(1<<y)-1)];continue e}if(32&y){r.mode=12;break t}t.msg="invalid literal/length code",r.mode=30;break t}w=65535&v,(y&=15)&&(p<y&&(c+=z[i++]<<p,p+=8),w+=c&(1<<y)-1,c>>>=y,p-=y),p<15&&(c+=z[i++]<<p,p+=8,c+=z[i++]<<p,p+=8),v=_[c&b];r:for(;;){if(c>>>=y=v>>>24,p-=y,!(16&(y=v>>>16&255))){if(0==(64&y)){v=_[(65535&v)+(c&(1<<y)-1)];continue r}t.msg="invalid distance code",r.mode=30;break t}if(k=65535&v,p<(y&=15)&&(c+=z[i++]<<p,(p+=8)<y&&(c+=z[i++]<<p,p+=8)),h<(k+=c&(1<<y)-1)){t.msg="invalid distance too far back",r.mode=30;break t}if(c>>>=y,p-=y,(y=s-a)<k){if(l<(y=k-y)&&r.sane){t.msg="invalid distance too far back",r.mode=30;break t}if(S=d,(x=0)===f){if(x+=u-y,y<w){for(w-=y;C[s++]=d[x++],--y;);x=s-k,S=C}}else if(f<y){if(x+=u+f-y,(y-=f)<w){for(w-=y;C[s++]=d[x++],--y;);if(x=0,f<w){for(w-=y=f;C[s++]=d[x++],--y;);x=s-k,S=C}}}else if(x+=f-y,y<w){for(w-=y;C[s++]=d[x++],--y;);x=s-k,S=C}for(;2<w;)C[s++]=S[x++],C[s++]=S[x++],C[s++]=S[x++],w-=3;w&&(C[s++]=S[x++],1<w&&(C[s++]=S[x++]))}else{for(x=s-k;C[s++]=C[x++],C[s++]=C[x++],C[s++]=C[x++],2<(w-=3););w&&(C[s++]=C[x++],1<w&&(C[s++]=C[x++]))}break}}break}}while(i<n&&s<o);i-=w=p>>3,c&=(1<<(p-=w<<3))-1,t.next_in=i,t.next_out=s,t.avail_in=i<n?n-i+5:5-(i-n),t.avail_out=s<o?o-s+257:257-(s-o),r.hold=c,r.bits=p}},{}],49:[function(t,e,r){"use strict";var I=t("../utils/common"),O=t("./adler32"),B=t("./crc32"),R=t("./inffast"),T=t("./inftrees"),D=1,F=2,N=0,U=-2,P=1,i=852,n=592;function L(t){return(t>>>24&255)+(t>>>8&65280)+((65280&t)<<8)+((255&t)<<24)}function s(){this.mode=0,this.last=!1,this.wrap=0,this.havedict=!1,this.flags=0,this.dmax=0,this.check=0,this.total=0,this.head=null,this.wbits=0,this.wsize=0,this.whave=0,this.wnext=0,this.window=null,this.hold=0,this.bits=0,this.length=0,this.offset=0,this.extra=0,this.lencode=null,this.distcode=null,this.lenbits=0,this.distbits=0,this.ncode=0,this.nlen=0,this.ndist=0,this.have=0,this.next=null,this.lens=new I.Buf16(320),this.work=new I.Buf16(288),this.lendyn=null,this.distdyn=null,this.sane=0,this.back=0,this.was=0}function a(t){var e;return t&&t.state?(e=t.state,t.total_in=t.total_out=e.total=0,t.msg="",e.wrap&&(t.adler=1&e.wrap),e.mode=P,e.last=0,e.havedict=0,e.dmax=32768,e.head=null,e.hold=0,e.bits=0,e.lencode=e.lendyn=new I.Buf32(i),e.distcode=e.distdyn=new I.Buf32(n),e.sane=1,e.back=-1,N):U}function o(t){var e;return t&&t.state?((e=t.state).wsize=0,e.whave=0,e.wnext=0,a(t)):U}function h(t,e){var r,i;return t&&t.state?(i=t.state,e<0?(r=0,e=-e):(r=1+(e>>4),e<48&&(e&=15)),e&&(e<8||15<e)?U:(null!==i.window&&i.wbits!==e&&(i.window=null),i.wrap=r,i.wbits=e,o(t))):U}function u(t,e){var r,i;return t?(i=new s,(t.state=i).window=null,(r=h(t,e))!==N&&(t.state=null),r):U}var l,f,d=!0;function j(t){if(d){var e;for(l=new I.Buf32(512),f=new I.Buf32(32),e=0;e<144;)t.lens[e++]=8;for(;e<256;)t.lens[e++]=9;for(;e<280;)t.lens[e++]=7;for(;e<288;)t.lens[e++]=8;for(T(D,t.lens,0,288,l,0,t.work,{bits:9}),e=0;e<32;)t.lens[e++]=5;T(F,t.lens,0,32,f,0,t.work,{bits:5}),d=!1}t.lencode=l,t.lenbits=9,t.distcode=f,t.distbits=5}function Z(t,e,r,i){var n,s=t.state;return null===s.window&&(s.wsize=1<<s.wbits,s.wnext=0,s.whave=0,s.window=new I.Buf8(s.wsize)),i>=s.wsize?(I.arraySet(s.window,e,r-s.wsize,s.wsize,0),s.wnext=0,s.whave=s.wsize):(i<(n=s.wsize-s.wnext)&&(n=i),I.arraySet(s.window,e,r-i,n,s.wnext),(i-=n)?(I.arraySet(s.window,e,r-i,i,0),s.wnext=i,s.whave=s.wsize):(s.wnext+=n,s.wnext===s.wsize&&(s.wnext=0),s.whave<s.wsize&&(s.whave+=n))),0}r.inflateReset=o,r.inflateReset2=h,r.inflateResetKeep=a,r.inflateInit=function(t){return u(t,15)},r.inflateInit2=u,r.inflate=function(t,e){var r,i,n,s,a,o,h,u,l,f,d,c,p,m,_,g,b,v,y,w,k,x,S,z,C=0,E=new I.Buf8(4),A=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];if(!t||!t.state||!t.output||!t.input&&0!==t.avail_in)return U;12===(r=t.state).mode&&(r.mode=13),a=t.next_out,n=t.output,h=t.avail_out,s=t.next_in,i=t.input,o=t.avail_in,u=r.hold,l=r.bits,f=o,d=h,x=N;t:for(;;)switch(r.mode){case P:if(0===r.wrap){r.mode=13;break}for(;l<16;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(2&r.wrap&&35615===u){E[r.check=0]=255&u,E[1]=u>>>8&255,r.check=B(r.check,E,2,0),l=u=0,r.mode=2;break}if(r.flags=0,r.head&&(r.head.done=!1),!(1&r.wrap)||(((255&u)<<8)+(u>>8))%31){t.msg="incorrect header check",r.mode=30;break}if(8!=(15&u)){t.msg="unknown compression method",r.mode=30;break}if(l-=4,k=8+(15&(u>>>=4)),0===r.wbits)r.wbits=k;else if(k>r.wbits){t.msg="invalid window size",r.mode=30;break}r.dmax=1<<k,t.adler=r.check=1,r.mode=512&u?10:12,l=u=0;break;case 2:for(;l<16;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(r.flags=u,8!=(255&r.flags)){t.msg="unknown compression method",r.mode=30;break}if(57344&r.flags){t.msg="unknown header flags set",r.mode=30;break}r.head&&(r.head.text=u>>8&1),512&r.flags&&(E[0]=255&u,E[1]=u>>>8&255,r.check=B(r.check,E,2,0)),l=u=0,r.mode=3;case 3:for(;l<32;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.head&&(r.head.time=u),512&r.flags&&(E[0]=255&u,E[1]=u>>>8&255,E[2]=u>>>16&255,E[3]=u>>>24&255,r.check=B(r.check,E,4,0)),l=u=0,r.mode=4;case 4:for(;l<16;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.head&&(r.head.xflags=255&u,r.head.os=u>>8),512&r.flags&&(E[0]=255&u,E[1]=u>>>8&255,r.check=B(r.check,E,2,0)),l=u=0,r.mode=5;case 5:if(1024&r.flags){for(;l<16;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.length=u,r.head&&(r.head.extra_len=u),512&r.flags&&(E[0]=255&u,E[1]=u>>>8&255,r.check=B(r.check,E,2,0)),l=u=0}else r.head&&(r.head.extra=null);r.mode=6;case 6:if(1024&r.flags&&(o<(c=r.length)&&(c=o),c&&(r.head&&(k=r.head.extra_len-r.length,r.head.extra||(r.head.extra=new Array(r.head.extra_len)),I.arraySet(r.head.extra,i,s,c,k)),512&r.flags&&(r.check=B(r.check,i,c,s)),o-=c,s+=c,r.length-=c),r.length))break t;r.length=0,r.mode=7;case 7:if(2048&r.flags){if(0===o)break t;for(c=0;k=i[s+c++],r.head&&k&&r.length<65536&&(r.head.name+=String.fromCharCode(k)),k&&c<o;);if(512&r.flags&&(r.check=B(r.check,i,c,s)),o-=c,s+=c,k)break t}else r.head&&(r.head.name=null);r.length=0,r.mode=8;case 8:if(4096&r.flags){if(0===o)break t;for(c=0;k=i[s+c++],r.head&&k&&r.length<65536&&(r.head.comment+=String.fromCharCode(k)),k&&c<o;);if(512&r.flags&&(r.check=B(r.check,i,c,s)),o-=c,s+=c,k)break t}else r.head&&(r.head.comment=null);r.mode=9;case 9:if(512&r.flags){for(;l<16;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(u!==(65535&r.check)){t.msg="header crc mismatch",r.mode=30;break}l=u=0}r.head&&(r.head.hcrc=r.flags>>9&1,r.head.done=!0),t.adler=r.check=0,r.mode=12;break;case 10:for(;l<32;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}t.adler=r.check=L(u),l=u=0,r.mode=11;case 11:if(0===r.havedict)return t.next_out=a,t.avail_out=h,t.next_in=s,t.avail_in=o,r.hold=u,r.bits=l,2;t.adler=r.check=1,r.mode=12;case 12:if(5===e||6===e)break t;case 13:if(r.last){u>>>=7&l,l-=7&l,r.mode=27;break}for(;l<3;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}switch(r.last=1&u,l-=1,3&(u>>>=1)){case 0:r.mode=14;break;case 1:if(j(r),r.mode=20,6!==e)break;u>>>=2,l-=2;break t;case 2:r.mode=17;break;case 3:t.msg="invalid block type",r.mode=30}u>>>=2,l-=2;break;case 14:for(u>>>=7&l,l-=7&l;l<32;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if((65535&u)!=(u>>>16^65535)){t.msg="invalid stored block lengths",r.mode=30;break}if(r.length=65535&u,l=u=0,r.mode=15,6===e)break t;case 15:r.mode=16;case 16:if(c=r.length){if(o<c&&(c=o),h<c&&(c=h),0===c)break t;I.arraySet(n,i,s,c,a),o-=c,s+=c,h-=c,a+=c,r.length-=c;break}r.mode=12;break;case 17:for(;l<14;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(r.nlen=257+(31&u),u>>>=5,l-=5,r.ndist=1+(31&u),u>>>=5,l-=5,r.ncode=4+(15&u),u>>>=4,l-=4,286<r.nlen||30<r.ndist){t.msg="too many length or distance symbols",r.mode=30;break}r.have=0,r.mode=18;case 18:for(;r.have<r.ncode;){for(;l<3;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.lens[A[r.have++]]=7&u,u>>>=3,l-=3}for(;r.have<19;)r.lens[A[r.have++]]=0;if(r.lencode=r.lendyn,r.lenbits=7,S={bits:r.lenbits},x=T(0,r.lens,0,19,r.lencode,0,r.work,S),r.lenbits=S.bits,x){t.msg="invalid code lengths set",r.mode=30;break}r.have=0,r.mode=19;case 19:for(;r.have<r.nlen+r.ndist;){for(;g=(C=r.lencode[u&(1<<r.lenbits)-1])>>>16&255,b=65535&C,!((_=C>>>24)<=l);){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(b<16)u>>>=_,l-=_,r.lens[r.have++]=b;else{if(16===b){for(z=_+2;l<z;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(u>>>=_,l-=_,0===r.have){t.msg="invalid bit length repeat",r.mode=30;break}k=r.lens[r.have-1],c=3+(3&u),u>>>=2,l-=2}else if(17===b){for(z=_+3;l<z;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}l-=_,k=0,c=3+(7&(u>>>=_)),u>>>=3,l-=3}else{for(z=_+7;l<z;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}l-=_,k=0,c=11+(127&(u>>>=_)),u>>>=7,l-=7}if(r.have+c>r.nlen+r.ndist){t.msg="invalid bit length repeat",r.mode=30;break}for(;c--;)r.lens[r.have++]=k}}if(30===r.mode)break;if(0===r.lens[256]){t.msg="invalid code -- missing end-of-block",r.mode=30;break}if(r.lenbits=9,S={bits:r.lenbits},x=T(D,r.lens,0,r.nlen,r.lencode,0,r.work,S),r.lenbits=S.bits,x){t.msg="invalid literal/lengths set",r.mode=30;break}if(r.distbits=6,r.distcode=r.distdyn,S={bits:r.distbits},x=T(F,r.lens,r.nlen,r.ndist,r.distcode,0,r.work,S),r.distbits=S.bits,x){t.msg="invalid distances set",r.mode=30;break}if(r.mode=20,6===e)break t;case 20:r.mode=21;case 21:if(6<=o&&258<=h){t.next_out=a,t.avail_out=h,t.next_in=s,t.avail_in=o,r.hold=u,r.bits=l,R(t,d),a=t.next_out,n=t.output,h=t.avail_out,s=t.next_in,i=t.input,o=t.avail_in,u=r.hold,l=r.bits,12===r.mode&&(r.back=-1);break}for(r.back=0;g=(C=r.lencode[u&(1<<r.lenbits)-1])>>>16&255,b=65535&C,!((_=C>>>24)<=l);){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(g&&0==(240&g)){for(v=_,y=g,w=b;g=(C=r.lencode[w+((u&(1<<v+y)-1)>>v)])>>>16&255,b=65535&C,!(v+(_=C>>>24)<=l);){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}u>>>=v,l-=v,r.back+=v}if(u>>>=_,l-=_,r.back+=_,r.length=b,0===g){r.mode=26;break}if(32&g){r.back=-1,r.mode=12;break}if(64&g){t.msg="invalid literal/length code",r.mode=30;break}r.extra=15&g,r.mode=22;case 22:if(r.extra){for(z=r.extra;l<z;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.length+=u&(1<<r.extra)-1,u>>>=r.extra,l-=r.extra,r.back+=r.extra}r.was=r.length,r.mode=23;case 23:for(;g=(C=r.distcode[u&(1<<r.distbits)-1])>>>16&255,b=65535&C,!((_=C>>>24)<=l);){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(0==(240&g)){for(v=_,y=g,w=b;g=(C=r.distcode[w+((u&(1<<v+y)-1)>>v)])>>>16&255,b=65535&C,!(v+(_=C>>>24)<=l);){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}u>>>=v,l-=v,r.back+=v}if(u>>>=_,l-=_,r.back+=_,64&g){t.msg="invalid distance code",r.mode=30;break}r.offset=b,r.extra=15&g,r.mode=24;case 24:if(r.extra){for(z=r.extra;l<z;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}r.offset+=u&(1<<r.extra)-1,u>>>=r.extra,l-=r.extra,r.back+=r.extra}if(r.offset>r.dmax){t.msg="invalid distance too far back",r.mode=30;break}r.mode=25;case 25:if(0===h)break t;if(c=d-h,r.offset>c){if((c=r.offset-c)>r.whave&&r.sane){t.msg="invalid distance too far back",r.mode=30;break}p=c>r.wnext?(c-=r.wnext,r.wsize-c):r.wnext-c,c>r.length&&(c=r.length),m=r.window}else m=n,p=a-r.offset,c=r.length;for(h<c&&(c=h),h-=c,r.length-=c;n[a++]=m[p++],--c;);0===r.length&&(r.mode=21);break;case 26:if(0===h)break t;n[a++]=r.length,h--,r.mode=21;break;case 27:if(r.wrap){for(;l<32;){if(0===o)break t;o--,u|=i[s++]<<l,l+=8}if(d-=h,t.total_out+=d,r.total+=d,d&&(t.adler=r.check=r.flags?B(r.check,n,d,a-d):O(r.check,n,d,a-d)),d=h,(r.flags?u:L(u))!==r.check){t.msg="incorrect data check",r.mode=30;break}l=u=0}r.mode=28;case 28:if(r.wrap&&r.flags){for(;l<32;){if(0===o)break t;o--,u+=i[s++]<<l,l+=8}if(u!==(4294967295&r.total)){t.msg="incorrect length check",r.mode=30;break}l=u=0}r.mode=29;case 29:x=1;break t;case 30:x=-3;break t;case 31:return-4;case 32:default:return U}return t.next_out=a,t.avail_out=h,t.next_in=s,t.avail_in=o,r.hold=u,r.bits=l,(r.wsize||d!==t.avail_out&&r.mode<30&&(r.mode<27||4!==e))&&Z(t,t.output,t.next_out,d-t.avail_out)?(r.mode=31,-4):(f-=t.avail_in,d-=t.avail_out,t.total_in+=f,t.total_out+=d,r.total+=d,r.wrap&&d&&(t.adler=r.check=r.flags?B(r.check,n,d,t.next_out-d):O(r.check,n,d,t.next_out-d)),t.data_type=r.bits+(r.last?64:0)+(12===r.mode?128:0)+(20===r.mode||15===r.mode?256:0),(0==f&&0===d||4===e)&&x===N&&(x=-5),x)},r.inflateEnd=function(t){if(!t||!t.state)return U;var e=t.state;return e.window&&(e.window=null),t.state=null,N},r.inflateGetHeader=function(t,e){var r;return t&&t.state?0==(2&(r=t.state).wrap)?U:((r.head=e).done=!1,N):U},r.inflateSetDictionary=function(t,e){var r,i=e.length;return t&&t.state?0!==(r=t.state).wrap&&11!==r.mode?U:11===r.mode&&O(1,e,i,0)!==r.check?-3:Z(t,e,i,i)?(r.mode=31,-4):(r.havedict=1,N):U},r.inflateInfo="pako inflate (from Nodeca project)"},{"../utils/common":41,"./adler32":43,"./crc32":45,"./inffast":48,"./inftrees":50}],50:[function(t,e,r){"use strict";var D=t("../utils/common"),F=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0],N=[16,16,16,16,16,16,16,16,17,17,17,17,18,18,18,18,19,19,19,19,20,20,20,20,21,21,21,21,16,72,78],U=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0],P=[16,16,16,16,17,17,18,18,19,19,20,20,21,21,22,22,23,23,24,24,25,25,26,26,27,27,28,28,29,29,64,64];e.exports=function(t,e,r,i,n,s,a,o){var h,u,l,f,d,c,p,m,_,g=o.bits,b=0,v=0,y=0,w=0,k=0,x=0,S=0,z=0,C=0,E=0,A=null,I=0,O=new D.Buf16(16),B=new D.Buf16(16),R=null,T=0;for(b=0;b<=15;b++)O[b]=0;for(v=0;v<i;v++)O[e[r+v]]++;for(k=g,w=15;1<=w&&0===O[w];w--);if(w<k&&(k=w),0===w)return n[s++]=20971520,n[s++]=20971520,o.bits=1,0;for(y=1;y<w&&0===O[y];y++);for(k<y&&(k=y),b=z=1;b<=15;b++)if(z<<=1,(z-=O[b])<0)return-1;if(0<z&&(0===t||1!==w))return-1;for(B[1]=0,b=1;b<15;b++)B[b+1]=B[b]+O[b];for(v=0;v<i;v++)0!==e[r+v]&&(a[B[e[r+v]]++]=v);if(c=0===t?(A=R=a,19):1===t?(A=F,I-=257,R=N,T-=257,256):(A=U,R=P,-1),b=y,d=s,S=v=E=0,l=-1,f=(C=1<<(x=k))-1,1===t&&852<C||2===t&&592<C)return 1;for(;;){for(p=b-S,_=a[v]<c?(m=0,a[v]):a[v]>c?(m=R[T+a[v]],A[I+a[v]]):(m=96,0),h=1<<b-S,y=u=1<<x;n[d+(E>>S)+(u-=h)]=p<<24|m<<16|_|0,0!==u;);for(h=1<<b-1;E&h;)h>>=1;if(0!==h?(E&=h-1,E+=h):E=0,v++,0==--O[b]){if(b===w)break;b=e[r+a[v]]}if(k<b&&(E&f)!==l){for(0===S&&(S=k),d+=y,z=1<<(x=b-S);x+S<w&&!((z-=O[x+S])<=0);)x++,z<<=1;if(C+=1<<x,1===t&&852<C||2===t&&592<C)return 1;n[l=E&f]=k<<24|x<<16|d-s|0}}return 0!==E&&(n[d+E]=b-S<<24|64<<16|0),o.bits=k,0}},{"../utils/common":41}],51:[function(t,e,r){"use strict";e.exports={2:"need dictionary",1:"stream end",0:"","-1":"file error","-2":"stream error","-3":"data error","-4":"insufficient memory","-5":"buffer error","-6":"incompatible version"}},{}],52:[function(t,e,r){"use strict";var n=t("../utils/common"),o=0,h=1;function i(t){for(var e=t.length;0<=--e;)t[e]=0}var s=0,a=29,u=256,l=u+1+a,f=30,d=19,_=2*l+1,g=15,c=16,p=7,m=256,b=16,v=17,y=18,w=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0],k=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13],x=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7],S=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15],z=new Array(2*(l+2));i(z);var C=new Array(2*f);i(C);var E=new Array(512);i(E);var A=new Array(256);i(A);var I=new Array(a);i(I);var O,B,R,T=new Array(f);function D(t,e,r,i,n){this.static_tree=t,this.extra_bits=e,this.extra_base=r,this.elems=i,this.max_length=n,this.has_stree=t&&t.length}function F(t,e){this.dyn_tree=t,this.max_code=0,this.stat_desc=e}function N(t){return t<256?E[t]:E[256+(t>>>7)]}function U(t,e){t.pending_buf[t.pending++]=255&e,t.pending_buf[t.pending++]=e>>>8&255}function P(t,e,r){t.bi_valid>c-r?(t.bi_buf|=e<<t.bi_valid&65535,U(t,t.bi_buf),t.bi_buf=e>>c-t.bi_valid,t.bi_valid+=r-c):(t.bi_buf|=e<<t.bi_valid&65535,t.bi_valid+=r)}function L(t,e,r){P(t,r[2*e],r[2*e+1])}function j(t,e){for(var r=0;r|=1&t,t>>>=1,r<<=1,0<--e;);return r>>>1}function Z(t,e,r){var i,n,s=new Array(g+1),a=0;for(i=1;i<=g;i++)s[i]=a=a+r[i-1]<<1;for(n=0;n<=e;n++){var o=t[2*n+1];0!==o&&(t[2*n]=j(s[o]++,o))}}function W(t){var e;for(e=0;e<l;e++)t.dyn_ltree[2*e]=0;for(e=0;e<f;e++)t.dyn_dtree[2*e]=0;for(e=0;e<d;e++)t.bl_tree[2*e]=0;t.dyn_ltree[2*m]=1,t.opt_len=t.static_len=0,t.last_lit=t.matches=0}function M(t){8<t.bi_valid?U(t,t.bi_buf):0<t.bi_valid&&(t.pending_buf[t.pending++]=t.bi_buf),t.bi_buf=0,t.bi_valid=0}function H(t,e,r,i){var n=2*e,s=2*r;return t[n]<t[s]||t[n]===t[s]&&i[e]<=i[r]}function G(t,e,r){for(var i=t.heap[r],n=r<<1;n<=t.heap_len&&(n<t.heap_len&&H(e,t.heap[n+1],t.heap[n],t.depth)&&n++,!H(e,i,t.heap[n],t.depth));)t.heap[r]=t.heap[n],r=n,n<<=1;t.heap[r]=i}function K(t,e,r){var i,n,s,a,o=0;if(0!==t.last_lit)for(;i=t.pending_buf[t.d_buf+2*o]<<8|t.pending_buf[t.d_buf+2*o+1],n=t.pending_buf[t.l_buf+o],o++,0===i?L(t,n,e):(L(t,(s=A[n])+u+1,e),0!==(a=w[s])&&P(t,n-=I[s],a),L(t,s=N(--i),r),0!==(a=k[s])&&P(t,i-=T[s],a)),o<t.last_lit;);L(t,m,e)}function Y(t,e){var r,i,n,s=e.dyn_tree,a=e.stat_desc.static_tree,o=e.stat_desc.has_stree,h=e.stat_desc.elems,u=-1;for(t.heap_len=0,t.heap_max=_,r=0;r<h;r++)0!==s[2*r]?(t.heap[++t.heap_len]=u=r,t.depth[r]=0):s[2*r+1]=0;for(;t.heap_len<2;)s[2*(n=t.heap[++t.heap_len]=u<2?++u:0)]=1,t.depth[n]=0,t.opt_len--,o&&(t.static_len-=a[2*n+1]);for(e.max_code=u,r=t.heap_len>>1;1<=r;r--)G(t,s,r);for(n=h;r=t.heap[1],t.heap[1]=t.heap[t.heap_len--],G(t,s,1),i=t.heap[1],t.heap[--t.heap_max]=r,t.heap[--t.heap_max]=i,s[2*n]=s[2*r]+s[2*i],t.depth[n]=(t.depth[r]>=t.depth[i]?t.depth[r]:t.depth[i])+1,s[2*r+1]=s[2*i+1]=n,t.heap[1]=n++,G(t,s,1),2<=t.heap_len;);t.heap[--t.heap_max]=t.heap[1],function(t,e){var r,i,n,s,a,o,h=e.dyn_tree,u=e.max_code,l=e.stat_desc.static_tree,f=e.stat_desc.has_stree,d=e.stat_desc.extra_bits,c=e.stat_desc.extra_base,p=e.stat_desc.max_length,m=0;for(s=0;s<=g;s++)t.bl_count[s]=0;for(h[2*t.heap[t.heap_max]+1]=0,r=t.heap_max+1;r<_;r++)p<(s=h[2*h[2*(i=t.heap[r])+1]+1]+1)&&(s=p,m++),h[2*i+1]=s,u<i||(t.bl_count[s]++,a=0,c<=i&&(a=d[i-c]),o=h[2*i],t.opt_len+=o*(s+a),f&&(t.static_len+=o*(l[2*i+1]+a)));if(0!==m){do{for(s=p-1;0===t.bl_count[s];)s--;t.bl_count[s]--,t.bl_count[s+1]+=2,t.bl_count[p]--,m-=2}while(0<m);for(s=p;0!==s;s--)for(i=t.bl_count[s];0!==i;)u<(n=t.heap[--r])||(h[2*n+1]!==s&&(t.opt_len+=(s-h[2*n+1])*h[2*n],h[2*n+1]=s),i--)}}(t,e),Z(s,u,t.bl_count)}function X(t,e,r){var i,n,s=-1,a=e[1],o=0,h=7,u=4;for(0===a&&(h=138,u=3),e[2*(r+1)+1]=65535,i=0;i<=r;i++)n=a,a=e[2*(i+1)+1],++o<h&&n===a||(o<u?t.bl_tree[2*n]+=o:0!==n?(n!==s&&t.bl_tree[2*n]++,t.bl_tree[2*b]++):o<=10?t.bl_tree[2*v]++:t.bl_tree[2*y]++,s=n,u=(o=0)===a?(h=138,3):n===a?(h=6,3):(h=7,4))}function V(t,e,r){var i,n,s=-1,a=e[1],o=0,h=7,u=4;for(0===a&&(h=138,u=3),i=0;i<=r;i++)if(n=a,a=e[2*(i+1)+1],!(++o<h&&n===a)){if(o<u)for(;L(t,n,t.bl_tree),0!=--o;);else 0!==n?(n!==s&&(L(t,n,t.bl_tree),o--),L(t,b,t.bl_tree),P(t,o-3,2)):o<=10?(L(t,v,t.bl_tree),P(t,o-3,3)):(L(t,y,t.bl_tree),P(t,o-11,7));s=n,u=(o=0)===a?(h=138,3):n===a?(h=6,3):(h=7,4)}}i(T);var q=!1;function J(t,e,r,i){P(t,(s<<1)+(i?1:0),3),function(t,e,r,i){M(t),i&&(U(t,r),U(t,~r)),n.arraySet(t.pending_buf,t.window,e,r,t.pending),t.pending+=r}(t,e,r,!0)}r._tr_init=function(t){q||(function(){var t,e,r,i,n,s=new Array(g+1);for(i=r=0;i<a-1;i++)for(I[i]=r,t=0;t<1<<w[i];t++)A[r++]=i;for(A[r-1]=i,i=n=0;i<16;i++)for(T[i]=n,t=0;t<1<<k[i];t++)E[n++]=i;for(n>>=7;i<f;i++)for(T[i]=n<<7,t=0;t<1<<k[i]-7;t++)E[256+n++]=i;for(e=0;e<=g;e++)s[e]=0;for(t=0;t<=143;)z[2*t+1]=8,t++,s[8]++;for(;t<=255;)z[2*t+1]=9,t++,s[9]++;for(;t<=279;)z[2*t+1]=7,t++,s[7]++;for(;t<=287;)z[2*t+1]=8,t++,s[8]++;for(Z(z,l+1,s),t=0;t<f;t++)C[2*t+1]=5,C[2*t]=j(t,5);O=new D(z,w,u+1,l,g),B=new D(C,k,0,f,g),R=new D(new Array(0),x,0,d,p)}(),q=!0),t.l_desc=new F(t.dyn_ltree,O),t.d_desc=new F(t.dyn_dtree,B),t.bl_desc=new F(t.bl_tree,R),t.bi_buf=0,t.bi_valid=0,W(t)},r._tr_stored_block=J,r._tr_flush_block=function(t,e,r,i){var n,s,a=0;0<t.level?(2===t.strm.data_type&&(t.strm.data_type=function(t){var e,r=4093624447;for(e=0;e<=31;e++,r>>>=1)if(1&r&&0!==t.dyn_ltree[2*e])return o;if(0!==t.dyn_ltree[18]||0!==t.dyn_ltree[20]||0!==t.dyn_ltree[26])return h;for(e=32;e<u;e++)if(0!==t.dyn_ltree[2*e])return h;return o}(t)),Y(t,t.l_desc),Y(t,t.d_desc),a=function(t){var e;for(X(t,t.dyn_ltree,t.l_desc.max_code),X(t,t.dyn_dtree,t.d_desc.max_code),Y(t,t.bl_desc),e=d-1;3<=e&&0===t.bl_tree[2*S[e]+1];e--);return t.opt_len+=3*(e+1)+5+5+4,e}(t),n=t.opt_len+3+7>>>3,(s=t.static_len+3+7>>>3)<=n&&(n=s)):n=s=r+5,r+4<=n&&-1!==e?J(t,e,r,i):4===t.strategy||s===n?(P(t,2+(i?1:0),3),K(t,z,C)):(P(t,4+(i?1:0),3),function(t,e,r,i){var n;for(P(t,e-257,5),P(t,r-1,5),P(t,i-4,4),n=0;n<i;n++)P(t,t.bl_tree[2*S[n]+1],3);V(t,t.dyn_ltree,e-1),V(t,t.dyn_dtree,r-1)}(t,t.l_desc.max_code+1,t.d_desc.max_code+1,a+1),K(t,t.dyn_ltree,t.dyn_dtree)),W(t),i&&M(t)},r._tr_tally=function(t,e,r){return t.pending_buf[t.d_buf+2*t.last_lit]=e>>>8&255,t.pending_buf[t.d_buf+2*t.last_lit+1]=255&e,t.pending_buf[t.l_buf+t.last_lit]=255&r,t.last_lit++,0===e?t.dyn_ltree[2*r]++:(t.matches++,e--,t.dyn_ltree[2*(A[r]+u+1)]++,t.dyn_dtree[2*N(e)]++),t.last_lit===t.lit_bufsize-1},r._tr_align=function(t){P(t,2,3),L(t,m,z),function(t){16===t.bi_valid?(U(t,t.bi_buf),t.bi_buf=0,t.bi_valid=0):8<=t.bi_valid&&(t.pending_buf[t.pending++]=255&t.bi_buf,t.bi_buf>>=8,t.bi_valid-=8)}(t)}},{"../utils/common":41}],53:[function(t,e,r){"use strict";e.exports=function(){this.input=null,this.next_in=0,this.avail_in=0,this.total_in=0,this.output=null,this.next_out=0,this.avail_out=0,this.total_out=0,this.msg="",this.state=null,this.data_type=2,this.adler=0}},{}],54:[function(t,e,r){"use strict";e.exports="function"==typeof setImmediate?setImmediate:function(){var t=[].slice.apply(arguments);t.splice(1,0,0),setTimeout.apply(null,t)}},{}]},{},[10])(10)});
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer,require("timers").setImmediate)
-},{"buffer":16,"timers":35}],33:[function(require,module,exports){
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-},{}],34:[function(require,module,exports){
-'use strict';
-
-function isArray(x) {
-  return Array.isArray(x) || ArrayBuffer.isView(x) && !(x instanceof DataView);
-}
-
-function Summary(data, sorted) {
-  if (!(this instanceof Summary)) return new Summary(data, sorted);
-
-  if (!isArray(data)) {
-    throw TypeError('data must be an array');
-  }
-
-  this._data = data;
-  this._sorted = sorted ? data : null;
-  this._length = data.length;
-
-  this._cache_sum = null;
-  this._cache_mode = null;
-  this._cache_mean = null;
-  this._cache_quartiles = {};
-  this._cache_variance = null;
-  this._cache_sd = null;
-  this._cache_max = null;
-  this._cache_min = null;
-}
-module.exports = Summary;
-
-//
-// Not all values are in lazy calculated since that wouldn't do any good
-//
-Summary.prototype.data = function() {
-  return this._data;
-};
-
-Summary.prototype.sort = function() {
-  if (this._sorted === null) {
-    this._sorted = this._data.slice(0).sort(function (a, b) { return a - b; });
-  }
-
-  return this._sorted;
-};
-
-Summary.prototype.size = function () {
-  return this._length;
-};
-
-//
-// Always lazy calculated functions
-//
-Summary.prototype.sum = function () {
-  if (this._cache_sum === null) {
-    // Numerically stable sum
-    // https://en.m.wikipedia.org/wiki/Pairwise_summation
-    const partials = [];
-    for (let i = 0; i < this._length; i++) {
-      partials.push(this._data[i]);
-      for (let j = i; j % 2 == 1; j = j >> 1) {
-        const p = partials.pop();
-        const q = partials.pop();
-        partials.push(p + q);
-      }
-    }
-
-    let total = 0.0;
-    for (let i = 0; i < partials.length; i++) {
-      total += partials[i];
-    }
-    this._cache_sum = total;
-  }
-  return this._cache_sum;
-};
-
-Summary.prototype.mode = function () {
-  if (this._cache_mode === null) {
-    const data = this.sort();
-
-    let modeValue = NaN;
-    let modeCount = 0;
-    let currValue = data[0];
-    let currCount = 1;
-
-    // Count the amount of repeat and update mode variables
-    for (let i = 1; i < this._length; i++) {
-      if (data[i] === currValue) {
-        currCount += 1;
-      } else {
-        if (currCount >= modeCount) {
-          modeCount = currCount;
-          modeValue = currValue;
-        }
-
-        currValue = data[i];
-        currCount = 1;
-      }
-    }
-
-    // Check the last count
-    if (currCount >= modeCount) {
-      modeCount = currCount;
-      modeValue = currValue;
-    }
-
-    this._cache_mode = modeValue;
-  }
-
-  return this._cache_mode;
-};
-
-Summary.prototype.mean = function () {
-  if (this._cache_mean === null) {
-    // Numerically stable mean algorithm
-    let mean = 0;
-    for (let i = 0; i < this._length; i++) {
-        mean += (this._data[i] - mean) / (i+1);
-    }
-    this._cache_mean = mean;
-  }
-
-  return this._cache_mean;
-};
-
-Summary.prototype.quartile = function (prob) {
-  if (!this._cache_quartiles.hasOwnProperty(prob)) {
-    const data = this.sort();
-    const product = prob * this.size();
-    const ceil = Math.ceil(product);
-
-    if (ceil === product) {
-      if (ceil === 0) {
-        this._cache_quartiles[prob] = data[0];
-      } else if (ceil === data.length) {
-        this._cache_quartiles[prob] = data[data.length - 1];
-      } else {
-        this._cache_quartiles[prob] = (data[ceil - 1] + data[ceil]) / 2;
-      }
-    } else {
-      this._cache_quartiles[prob] = data[ceil - 1];
-    }
-  }
-
-  return this._cache_quartiles[prob];
-};
-
-Summary.prototype.median = function () {
-  return this.quartile(0.5);
-};
-
-Summary.prototype.variance = function () {
-  if (this._cache_variance === null) {
-    // Numerically stable variance algorithm
-    const mean = this.mean();
-    let biasedVariance = 0;
-    for (let i = 0; i < this._length; i++) {
-      const diff = this._data[i] - mean;
-      biasedVariance += (diff * diff - biasedVariance) / (i+1);
-    }
-
-    // Debias the variance
-    const debiasTerm = ((this._length) / (this._length - 1));
-    this._cache_variance = biasedVariance * debiasTerm;
-  }
-
-  return this._cache_variance;
-};
-
-Summary.prototype.sd = function () {
-  if (this._cache_sd === null) {
-    this._cache_sd = Math.sqrt(this.variance());
-  }
-
-  return this._cache_sd;
-};
-
-Summary.prototype.max = function () {
-  if (this._cache_max === null) {
-    this._cache_max = this.sort()[this._length - 1];
-  }
-
-  return this._cache_max;
-};
-
-Summary.prototype.min = function () {
-  if (this._cache_min === null) {
-    this._cache_min = this.sort()[0];
-  }
-
-  return this._cache_min;
-};
-
-},{}],35:[function(require,module,exports){
-(function (setImmediate,clearImmediate){
-var nextTick = require('process/browser.js').nextTick;
-var apply = Function.prototype.apply;
-var slice = Array.prototype.slice;
-var immediateIds = {};
-var nextImmediateId = 0;
-
-// DOM APIs, for completeness
-
-exports.setTimeout = function() {
-  return new Timeout(apply.call(setTimeout, window, arguments), clearTimeout);
-};
-exports.setInterval = function() {
-  return new Timeout(apply.call(setInterval, window, arguments), clearInterval);
-};
-exports.clearTimeout =
-exports.clearInterval = function(timeout) { timeout.close(); };
-
-function Timeout(id, clearFn) {
-  this._id = id;
-  this._clearFn = clearFn;
-}
-Timeout.prototype.unref = Timeout.prototype.ref = function() {};
-Timeout.prototype.close = function() {
-  this._clearFn.call(window, this._id);
-};
-
-// Does not start the time, just sets up the members needed.
-exports.enroll = function(item, msecs) {
-  clearTimeout(item._idleTimeoutId);
-  item._idleTimeout = msecs;
-};
-
-exports.unenroll = function(item) {
-  clearTimeout(item._idleTimeoutId);
-  item._idleTimeout = -1;
-};
-
-exports._unrefActive = exports.active = function(item) {
-  clearTimeout(item._idleTimeoutId);
-
-  var msecs = item._idleTimeout;
-  if (msecs >= 0) {
-    item._idleTimeoutId = setTimeout(function onTimeout() {
-      if (item._onTimeout)
-        item._onTimeout();
-    }, msecs);
-  }
-};
-
-// That's not how node.js implements it but the exposed api is the same.
-exports.setImmediate = typeof setImmediate === "function" ? setImmediate : function(fn) {
-  var id = nextImmediateId++;
-  var args = arguments.length < 2 ? false : slice.call(arguments, 1);
-
-  immediateIds[id] = true;
-
-  nextTick(function onNextTick() {
-    if (immediateIds[id]) {
-      // fn.call() is faster so we optimize for the common use-case
-      // @see http://jsperf.com/call-apply-segu
-      if (args) {
-        fn.apply(null, args);
-      } else {
-        fn.call(null);
-      }
-      // Prevent ids from leaking
-      exports.clearImmediate(id);
-    }
-  });
-
-  return id;
-};
-
-exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate : function(id) {
-  delete immediateIds[id];
-};
-}).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":33,"timers":35}],36:[function(require,module,exports){
-'use strict';
-
-const OneDataSet = require('./hypothesis/one-data-set.js');
-const TwoDataSet = require('./hypothesis/two-data-set.js');
-const Welch = require('./hypothesis/welch.js');
-
-const Summary = require('summary');
-
-const ALTERNATIVE_MAP = Object.assign(Object.create(null), {
-  'not equal': 0,
-  'less': -1,
-  'greater': 1
-});
-
-function isSummary(data) {
-  return data && (typeof data.mean === 'function' &&
-                  typeof data.variance === 'function' &&
-                  typeof data.size === 'function');
-}
-
-function isCalculated(data) {
-  return data && (typeof data.mean === 'number' &&
-                  typeof data.variance === 'number' &&
-                  typeof data.size === 'number');
-}
-
-function isCompatible(structure) {
-  return Array.isArray(structure) ||
-         isSummary(structure) ||
-         isCalculated(structure);
-}
-
-function toData(data) {
-  if (Array.isArray(data) || isSummary(data)) {
-    const summary = isSummary(data) ? data : new Summary(data);
-    return {
-      mean: summary.mean(),
-      variance: summary.variance(),
-      size: summary.size()
-    };
-  } else {
-    return data;
-  }
-}
-
-function hypothesis(left, right, options) {
-  // Vertify required arguments
-  if (!isCompatible(left)) {
-    throw new TypeError(
-      'left value in hypothesis test must be an array or data summary'
-    );
-  }
-
-  if (!isCompatible(right)) {
-    options = right;
-    right = undefined;
-  }
-
-  // Set the default options
-  options = Object.assign({
-    mu: 0,
-    varEqual: false,
-    alpha: 0.05,
-    alternative: 'not equal'
-  }, options);
-
-  // Convert alternative value
-  options.alternative = ALTERNATIVE_MAP[options.alternative];
-
-  // Vertify mu option
-  if (typeof options.mu !== 'number') {
-    throw new TypeError('mu option must be a number');
-  }
-
-  // Vertify varEqual option
-  if (typeof options.varEqual !== 'boolean') {
-    throw new TypeError('varEqual option must be a boolean');
-  }
-
-  // Vertify alpha option
-  if (typeof options.alpha !== 'number') {
-    throw new TypeError('alpha option must be a number');
-  }
-  if (options.alpha >= 1) {
-    throw new RangeError('alpha must be below 1.0');
-  }
-
-  // Vertify alternative option
-  if (typeof options.alternative === 'undefined') {
-    throw new Error('alternative must be either "not equal", "less" or "greater"');
-  }
-
-  // Perform the student's t test
-  if (isCompatible(right)) {
-    if (options.varEqual) {
-      return new TwoDataSet(toData(left), toData(right), options);
-    } else {
-      return new Welch(toData(left), toData(right), options);
-    }
-  } else {
-    return new OneDataSet(toData(left), options);
-  }
-}
-module.exports = hypothesis;
-
-},{"./hypothesis/one-data-set.js":38,"./hypothesis/two-data-set.js":39,"./hypothesis/welch.js":40,"summary":34}],37:[function(require,module,exports){
-'use strict';
-
-function AbstactStudentT(options) {
-  this._options = options;
-}
-module.exports = AbstactStudentT;
-
-AbstactStudentT.prototype.testValue = function () {
-  const diff = (this._mean - this._options.mu);
-  return diff / this._se;
-};
-
-// Use cdf(-t) instead of 1 - cdf(t), and cdf(-|t|) instead of 1 - cdf(|t|)
-// to avoid a numerical error when computing 1 - epsilon.
-AbstactStudentT.prototype.pValue = function () {
-  const t = this.testValue();
-
-  switch (this._options.alternative) {
-  case 1: // mu > mu[0]
-    return this._dist.cdf(-t);
-  case -1: // mu < mu[0]
-    return this._dist.cdf(t);
-  case 0: // mu != mu[0]
-    return 2 * (this._dist.cdf(-Math.abs(t)));
-  }
-};
-
-AbstactStudentT.prototype.confidence = function () {
-  let pm;
-  switch (this._options.alternative) {
-  case 1: // mu > mu[0]
-    pm = Math.abs(this._dist.inv(this._options.alpha)) * this._se;
-    return [this._mean - pm, Infinity];
-  case -1: // mu < mu[0]
-    pm = Math.abs(this._dist.inv(this._options.alpha)) * this._se;
-    return [-Infinity, this._mean + pm];
-  case 0: // mu != mu[0]
-    pm = Math.abs(this._dist.inv(this._options.alpha / 2)) * this._se;
-    return [this._mean - pm, this._mean + pm];
-  }
-};
-
-AbstactStudentT.prototype.valid = function () {
-  return this.pValue() >= this._options.alpha;
-};
-
-AbstactStudentT.prototype.freedom = function () {
-  return this._df;
-}
-
-},{}],38:[function(require,module,exports){
-'use strict';
-
-const Distribution = require('distributions').Studentt;
-
-const util = require('util');
-const AbstactStudentT = require('./abstact.js');
-
-function StudentT(data, options) {
-  AbstactStudentT.call(this, options);
-
-  this._df = data.size - 1;
-  this._dist = new Distribution(this._df);
-
-  this._se = Math.sqrt(data.variance / data.size);
-  this._mean = data.mean;
-}
-util.inherits(StudentT, AbstactStudentT);
-module.exports = StudentT;
-
-},{"./abstact.js":37,"distributions":24,"util":43}],39:[function(require,module,exports){
-'use strict';
-
-const Distribution = require('distributions').Studentt;
-
-const util = require('util');
-const AbstactStudentT = require('./abstact.js');
-
-function StudentT(left, right, options) {
-  AbstactStudentT.call(this, options);
-
-  this._df = left.size + right.size - 2;
-  this._dist = new Distribution(this._df);
-
-  const commonVariance = ((left.size - 1) * left.variance +
-                          (right.size - 1) * right.variance
-                         ) / this._df;
-
-  this._se = Math.sqrt(commonVariance * (1 / left.size + 1 / right.size));
-  this._mean = left.mean - right.mean;
-}
-util.inherits(StudentT, AbstactStudentT);
-module.exports = StudentT;
-
-},{"./abstact.js":37,"distributions":24,"util":43}],40:[function(require,module,exports){
-'use strict';
-
-const Distribution = require('distributions').Studentt;
-
-const util = require('util');
-const AbstactStudentT = require('./abstact.js');
-
-function StudentT(left, right, options) {
-  AbstactStudentT.call(this, options);
-
-  const leftSE = left.variance / left.size;
-  const rightSE = right.variance / right.size;
-  const commonVariance = leftSE + rightSE;
-
-  this._df = Math.pow(commonVariance, 2) / (
-    Math.pow(leftSE, 2) / (left.size - 1) +
-    Math.pow(rightSE, 2) / (right.size - 1)
-  );
-  this._dist = new Distribution(this._df);
-
-  this._se = Math.sqrt(commonVariance);
-  this._mean = left.mean - right.mean;
-}
-util.inherits(StudentT, AbstactStudentT);
-module.exports = StudentT;
-
-},{"./abstact.js":37,"distributions":24,"util":43}],41:[function(require,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-},{}],42:[function(require,module,exports){
-module.exports = function isBuffer(arg) {
-  return arg && typeof arg === 'object'
-    && typeof arg.copy === 'function'
-    && typeof arg.fill === 'function'
-    && typeof arg.readUInt8 === 'function';
-}
-},{}],43:[function(require,module,exports){
-(function (process,global){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var formatRegExp = /%[sdj%]/g;
-exports.format = function(f) {
-  if (!isString(f)) {
-    var objects = [];
-    for (var i = 0; i < arguments.length; i++) {
-      objects.push(inspect(arguments[i]));
-    }
-    return objects.join(' ');
-  }
-
-  var i = 1;
-  var args = arguments;
-  var len = args.length;
-  var str = String(f).replace(formatRegExp, function(x) {
-    if (x === '%%') return '%';
-    if (i >= len) return x;
-    switch (x) {
-      case '%s': return String(args[i++]);
-      case '%d': return Number(args[i++]);
-      case '%j':
-        try {
-          return JSON.stringify(args[i++]);
-        } catch (_) {
-          return '[Circular]';
-        }
-      default:
-        return x;
-    }
-  });
-  for (var x = args[i]; i < len; x = args[++i]) {
-    if (isNull(x) || !isObject(x)) {
-      str += ' ' + x;
-    } else {
-      str += ' ' + inspect(x);
-    }
-  }
-  return str;
-};
-
-
-// Mark that a method should not be used.
-// Returns a modified function which warns once by default.
-// If --no-deprecation is set, then it is a no-op.
-exports.deprecate = function(fn, msg) {
-  // Allow for deprecating things in the process of starting up.
-  if (isUndefined(global.process)) {
-    return function() {
-      return exports.deprecate(fn, msg).apply(this, arguments);
-    };
-  }
-
-  if (process.noDeprecation === true) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (process.throwDeprecation) {
-        throw new Error(msg);
-      } else if (process.traceDeprecation) {
-        console.trace(msg);
-      } else {
-        console.error(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-};
-
-
-var debugs = {};
-var debugEnviron;
-exports.debuglog = function(set) {
-  if (isUndefined(debugEnviron))
-    debugEnviron = process.env.NODE_DEBUG || '';
-  set = set.toUpperCase();
-  if (!debugs[set]) {
-    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-      var pid = process.pid;
-      debugs[set] = function() {
-        var msg = exports.format.apply(exports, arguments);
-        console.error('%s %d: %s', set, pid, msg);
-      };
-    } else {
-      debugs[set] = function() {};
-    }
-  }
-  return debugs[set];
-};
-
-
-/**
- * Echos the value of a value. Trys to print the value out
- * in the best way possible given the different types.
- *
- * @param {Object} obj The object to print out.
- * @param {Object} opts Optional options object that alters the output.
- */
-/* legacy: obj, showHidden, depth, colors*/
-function inspect(obj, opts) {
-  // default options
-  var ctx = {
-    seen: [],
-    stylize: stylizeNoColor
-  };
-  // legacy...
-  if (arguments.length >= 3) ctx.depth = arguments[2];
-  if (arguments.length >= 4) ctx.colors = arguments[3];
-  if (isBoolean(opts)) {
-    // legacy...
-    ctx.showHidden = opts;
-  } else if (opts) {
-    // got an "options" object
-    exports._extend(ctx, opts);
-  }
-  // set default options
-  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-  if (isUndefined(ctx.depth)) ctx.depth = 2;
-  if (isUndefined(ctx.colors)) ctx.colors = false;
-  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-  if (ctx.colors) ctx.stylize = stylizeWithColor;
-  return formatValue(ctx, obj, ctx.depth);
-}
-exports.inspect = inspect;
-
-
-// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
-};
-
-// Don't use 'blue' not visible on cmd.exe
-inspect.styles = {
-  'special': 'cyan',
-  'number': 'yellow',
-  'boolean': 'yellow',
-  'undefined': 'grey',
-  'null': 'bold',
-  'string': 'green',
-  'date': 'magenta',
-  // "name": intentionally not styling
-  'regexp': 'red'
-};
-
-
-function stylizeWithColor(str, styleType) {
-  var style = inspect.styles[styleType];
-
-  if (style) {
-    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
-  } else {
-    return str;
-  }
-}
-
-
-function stylizeNoColor(str, styleType) {
-  return str;
-}
-
-
-function arrayToHash(array) {
-  var hash = {};
-
-  array.forEach(function(val, idx) {
-    hash[val] = true;
-  });
-
-  return hash;
-}
-
-
-function formatValue(ctx, value, recurseTimes) {
-  // Provide a hook for user-specified inspect functions.
-  // Check that value is an object with an inspect function on it
-  if (ctx.customInspect &&
-      value &&
-      isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
-      value.inspect !== exports.inspect &&
-      // Also filter out any prototype objects using the circular check.
-      !(value.constructor && value.constructor.prototype === value)) {
-    var ret = value.inspect(recurseTimes, ctx);
-    if (!isString(ret)) {
-      ret = formatValue(ctx, ret, recurseTimes);
-    }
-    return ret;
-  }
-
-  // Primitive types cannot have properties
-  var primitive = formatPrimitive(ctx, value);
-  if (primitive) {
-    return primitive;
-  }
-
-  // Look up the keys of the object.
-  var keys = Object.keys(value);
-  var visibleKeys = arrayToHash(keys);
-
-  if (ctx.showHidden) {
-    keys = Object.getOwnPropertyNames(value);
-  }
-
-  // IE doesn't make error fields non-enumerable
-  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-  if (isError(value)
-      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-    return formatError(value);
-  }
-
-  // Some type of object without properties can be shortcutted.
-  if (keys.length === 0) {
-    if (isFunction(value)) {
-      var name = value.name ? ': ' + value.name : '';
-      return ctx.stylize('[Function' + name + ']', 'special');
-    }
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    }
-    if (isDate(value)) {
-      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-    }
-    if (isError(value)) {
-      return formatError(value);
-    }
-  }
-
-  var base = '', array = false, braces = ['{', '}'];
-
-  // Make Array say that they are Array
-  if (isArray(value)) {
-    array = true;
-    braces = ['[', ']'];
-  }
-
-  // Make functions say that they are functions
-  if (isFunction(value)) {
-    var n = value.name ? ': ' + value.name : '';
-    base = ' [Function' + n + ']';
-  }
-
-  // Make RegExps say that they are RegExps
-  if (isRegExp(value)) {
-    base = ' ' + RegExp.prototype.toString.call(value);
-  }
-
-  // Make dates with properties first say the date
-  if (isDate(value)) {
-    base = ' ' + Date.prototype.toUTCString.call(value);
-  }
-
-  // Make error with message first say the error
-  if (isError(value)) {
-    base = ' ' + formatError(value);
-  }
-
-  if (keys.length === 0 && (!array || value.length == 0)) {
-    return braces[0] + base + braces[1];
-  }
-
-  if (recurseTimes < 0) {
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    } else {
-      return ctx.stylize('[Object]', 'special');
-    }
-  }
-
-  ctx.seen.push(value);
-
-  var output;
-  if (array) {
-    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-  } else {
-    output = keys.map(function(key) {
-      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-    });
-  }
-
-  ctx.seen.pop();
-
-  return reduceToSingleString(output, base, braces);
-}
-
-
-function formatPrimitive(ctx, value) {
-  if (isUndefined(value))
-    return ctx.stylize('undefined', 'undefined');
-  if (isString(value)) {
-    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
-    return ctx.stylize(simple, 'string');
-  }
-  if (isNumber(value))
-    return ctx.stylize('' + value, 'number');
-  if (isBoolean(value))
-    return ctx.stylize('' + value, 'boolean');
-  // For some reason typeof null is "object", so special case here.
-  if (isNull(value))
-    return ctx.stylize('null', 'null');
-}
-
-
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
-
-function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-  var output = [];
-  for (var i = 0, l = value.length; i < l; ++i) {
-    if (hasOwnProperty(value, String(i))) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          String(i), true));
-    } else {
-      output.push('');
-    }
-  }
-  keys.forEach(function(key) {
-    if (!key.match(/^\d+$/)) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          key, true));
-    }
-  });
-  return output;
-}
-
-
-function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-  var name, str, desc;
-  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-  if (desc.get) {
-    if (desc.set) {
-      str = ctx.stylize('[Getter/Setter]', 'special');
-    } else {
-      str = ctx.stylize('[Getter]', 'special');
-    }
-  } else {
-    if (desc.set) {
-      str = ctx.stylize('[Setter]', 'special');
-    }
-  }
-  if (!hasOwnProperty(visibleKeys, key)) {
-    name = '[' + key + ']';
-  }
-  if (!str) {
-    if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) {
-        str = formatValue(ctx, desc.value, null);
-      } else {
-        str = formatValue(ctx, desc.value, recurseTimes - 1);
-      }
-      if (str.indexOf('\n') > -1) {
-        if (array) {
-          str = str.split('\n').map(function(line) {
-            return '  ' + line;
-          }).join('\n').substr(2);
-        } else {
-          str = '\n' + str.split('\n').map(function(line) {
-            return '   ' + line;
-          }).join('\n');
-        }
-      }
-    } else {
-      str = ctx.stylize('[Circular]', 'special');
-    }
-  }
-  if (isUndefined(name)) {
-    if (array && key.match(/^\d+$/)) {
-      return str;
-    }
-    name = JSON.stringify('' + key);
-    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-      name = name.substr(1, name.length - 2);
-      name = ctx.stylize(name, 'name');
-    } else {
-      name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
-      name = ctx.stylize(name, 'string');
-    }
-  }
-
-  return name + ': ' + str;
-}
-
-
-function reduceToSingleString(output, base, braces) {
-  var numLinesEst = 0;
-  var length = output.reduce(function(prev, cur) {
-    numLinesEst++;
-    if (cur.indexOf('\n') >= 0) numLinesEst++;
-    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-  }, 0);
-
-  if (length > 60) {
-    return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
-  }
-
-  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-}
-
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-function isArray(ar) {
-  return Array.isArray(ar);
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return isObject(re) && objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return isObject(d) && objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return isObject(e) &&
-      (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = require('./support/isBuffer');
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-
-function pad(n) {
-  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-}
-
-
-var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec'];
-
-// 26 Feb 16:19:34
-function timestamp() {
-  var d = new Date();
-  var time = [pad(d.getHours()),
-              pad(d.getMinutes()),
-              pad(d.getSeconds())].join(':');
-  return [d.getDate(), months[d.getMonth()], time].join(' ');
-}
-
-
-// log is just a thin wrapper to console.log that prepends a timestamp
-exports.log = function() {
-  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-};
-
-
-/**
- * Inherit the prototype methods from one constructor into another.
- *
- * The Function.prototype.inherits from lang.js rewritten as a standalone
- * function (not on Function.prototype). NOTE: If this file is to be loaded
- * during bootstrapping this function needs to be rewritten using some native
- * functions as prototype setup using normal JavaScript does not work as
- * expected during bootstrapping (see mirror.js in r114903).
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-exports.inherits = require('inherits');
-
-exports._extend = function(origin, add) {
-  // Don't do anything if add isn't an object
-  if (!add || !isObject(add)) return origin;
-
-  var keys = Object.keys(add);
-  var i = keys.length;
-  while (i--) {
-    origin[keys[i]] = add[keys[i]];
-  }
-  return origin;
-};
-
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":42,"_process":33,"inherits":41}]},{},[1]);
+},{}]},{},[1]);

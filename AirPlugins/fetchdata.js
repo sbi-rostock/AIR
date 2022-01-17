@@ -88,7 +88,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 
     return new Promise((resolve, reject) => {
 
-
+    
         minerva.ServerConnector.getLoggedUser().then(function (user) {
             globals.user = user._login.toString().toLowerCase();
 
@@ -106,6 +106,13 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
             Decimal = _decimal;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
+
+            
+            minervaProxy.project.map.addListener({
+                dbOverlayName: "search",
+                type: "onSearch",
+                callback: xp_searchListener
+            });        
 
             minerva.ServerConnector.getModels().then(models => {
                 models.forEach((model, ix) => {
@@ -329,6 +336,10 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                                         else
                                                             $(".air_tab_pane").css("height", "calc(100vh - 85px)");
                                                     });
+                                                    
+                                                    $('#air_btn_clear').on('click', function () {
+                                                        highlightSelected([]);
+                                                    });
                                                     resolve(height);
                                                 });
                                             })
@@ -435,6 +446,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 //         });
 
 // }
+
 
 function highlightSelected(_elements, hideprevious = true) {
 
@@ -550,8 +562,23 @@ function selectElementonMap(element, external) {
     globals.selected = [];
 
     if (AIR.MapElements.hasOwnProperty(namelower)) {
+
+        var submapid = (new URLSearchParams(window.location.search)).get('submap')
+
+        for(let e of AIR.MapElements[namelower])
+        {
+            if(e.getModelId() == submapid)
+            {
+
+                globals.selected.push(e);
+                focusOnSelected();
+                return
+            }
+        }
+
         globals.selected.push(AIR.MapElements[namelower][0]);
         focusOnSelected();
+
     }
     else if (external) {
         let link = getLink(element);
@@ -1148,7 +1175,7 @@ function union(setA, setB) {
     return _union
 }
 
-function findPhenotypePath(element, phenotype, perturbedElements = [], visualize = true) {
+function findPhenotypePath(element, phenotype, perturbedElements = [], hideprevious = true) {
 
     let pathdata = AIR.Phenotypes[phenotype].paths;
     let newpaths = Object.keys(pathdata).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
@@ -1163,7 +1190,7 @@ function findPhenotypePath(element, phenotype, perturbedElements = [], visualize
         }, {});
 
         let shortestpath = pathsfromelement.reduce((a, b) => (a.match(re) || []).length <= (b.match(re) || []).length ? a : b);
-        highlightPath(shortestpath.split("_"), pathdata[shortestpath] == -1 ? "#ff0000" : "#0000ff", _additionalelements);
+        highlightPath(shortestpath.split("_"), pathdata[shortestpath] == -1 ? "#ff0000" : "#0000ff", _additionalelements, hideprevious);
     }
 }
 
@@ -1901,4 +1928,19 @@ async function getInfluencesForElement(element) {
     AIR.InfluenceData[element] = output;
 
     return output;
+}
+
+
+function xp_searchListener(entites) {
+    globals.xplore.selected = entites[0];
+    if (globals.xplore.selected.length > 0) {
+        if (globals.xplore.selected[0].constructor.name === 'Alias') {
+            var tag = globals.xplore.selected[0]._other.structuralState;
+            if(tag && tag.toLowerCase() == "family")
+            {
+                tag = "";
+            }
+            xp_setSelectedElement(globals.xplore.selected[0].name+ (tag? ("_" + tag) : ""));
+        }
+    }
 }
