@@ -10,9 +10,10 @@ var Chart = require('chart.js');
 
 let Decimal = require('decimal.js');
 
-require('datatables.net-buttons')(window, $); //var URL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/"; var filetesting = false; var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/"
+require('datatables.net-buttons')(window, $);
 
-
+var globalURL = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/";
+var cssURL = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/";
 var URL = "http://localhost:3000/Energie/";
 var filetesting = false;
 const pluginName = 'EnErGie';
@@ -175,6 +176,7 @@ async function loadScript(script) {
 async function initMainPageStructure() {
   container = $('<div class="' + pluginName + '-container" id="sarco_plugincontainer"></div>').appendTo(pluginContainer);
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
+  if (!filetesting) URL = globalURL;
   $("<link/>", {
     rel: "stylesheet",
     type: "text/css",
