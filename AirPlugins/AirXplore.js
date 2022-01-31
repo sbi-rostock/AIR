@@ -29,7 +29,11 @@ function AirXplore() {
     }
 
     globals.xplore["container"] = document.getElementById("airxplore_tab_content")
-
+                                                    
+    $('#air_btn_clear').on('click', function () {
+        highlightSelected([]);
+    });
+    
     let t0 = performance.now();
 
     $("#airomics_tab").on('shown.bs.tab', function () {
@@ -490,6 +494,8 @@ function xp_EstimatePhenotypes() {
 
             var max_level = 0;
             var results = [];
+            var xysum, xxsum, xy;
+
             for (let p in AIR.Phenotypes) {
 
                 let phenotypeValues = globals.xplore.pe_influenceScores[p].values;
@@ -518,24 +524,22 @@ function xp_EstimatePhenotypes() {
                 var score = getEnrichmentScore(Object.values(regr_data))
                 let random_scores = [];
                 let random_en_scores = [];
+
+                xysum = 0;
+                xxsum = 2;
+
                 for (let shuffled_elements of shuffled_arrays) {
-                    var _regr_data = [];
-                    var _en_score = 0;
+
                     for (let i in FC_values) {
                         let element = shuffled_elements[i];
                         if (phenotypeValues.hasOwnProperty(element)) {
-                            var SP = phenotypeValues[element];
-                            var FC = FC_values[i].value
-                            _en_score += FC * SP;
-                            _regr_data.push([SP, FC]);
+                            xy = phenotypeValues[element] * FC_values[i].value
+                            xxsum += xy * xy
+                            xysum += xy * Math.abs(xy) 
                         }
                     }
-                    if (_regr_data.length > 0)
-                        random_scores.push(getEnrichmentScore(_regr_data))
-                    else
-                        random_scores.push(0)
-
-                    random_en_scores.push(_en_score)
+                    
+                    random_scores.push(xysum/xxsum)
                 }
 
                 globals.xplore.pe_results[p] = {
@@ -546,20 +550,16 @@ function xp_EstimatePhenotypes() {
                     dces: regr_data,
                 }
 
-                var std = standarddeviation(random_scores)
-                var _mean = mean(random_scores);
-                var z_score = std != 0 ? (score - _mean) / std : 0;
-                var pvalue = GetpValueFromZ(z_score);
-                if (!isNaN(pvalue))
-                    globals.xplore.pe_results[p]["pvalue"] = pvalue;
-                globals.xplore.pe_results[p]["std"] = [_mean + 1.96 * std, _mean - 1.96 * std];
+
+                var pvalueresults = GetpValueFromValues(score, random_scores)
+
+                globals.xplore.pe_results[p]["pvalue"] = pvalueresults.pvalue;
+                globals.xplore.pe_results[p]["std"] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
                 globals.xplore.pe_results[p]["slope"] = score;
 
-                std = standarddeviation(random_en_scores)
-                z_score = std != 0 ? (level - mean(random_en_scores)) / std : 0;
-                pvalue = GetpValueFromZ(z_score);
-                if (!isNaN(pvalue) && pvalue < globals.xplore.pe_results[p]["pvalue"])
-                    globals.xplore.pe_results[p]["pvalue"] = pvalue
+                pvalue = GetpValueFromValues(level, random_en_scores).pvalue
+                if (pvalue < globals.xplore.pe_results[p]["pvalue"])
+                    globals.xplore.pe_results[p]["pvalue"] =  pvalueresults
 
                 if (Math.abs(level) > max_level) {
                     max_level = Math.abs(level)
@@ -606,8 +606,38 @@ function xp_EstimatePhenotypes() {
     });
 }
 $(document).on('click', '.xp_pe_popup_btn', function () {
-    xp_createpopup(this, $(this).attr("data"));
+    var phenotype = $(this).attr("data")
+    var parameter = {
+        "function": xp_getphenotypeValues,
+        "functionparam": {
+            "phenotype": phenotype,
+        },
+        "distribution": true,
+        "slope": globals.xplore.pe_results[phenotype]["slope"],
+        "CI": globals.xplore.pe_results[phenotype]["std"],
+        "title": "Regulators for '" + AIR.Phenotypes[phenotype].name,
+    }
+
+    air_createpopup(this, parameter);
 });
+function xp_getphenotypeValues(param) 
+{
+    var DCEs = {}
+
+    for (let [element, data] of Object.entries(globals.xplore.pe_results[param.phenotype]["dces"])) {
+        
+        DCEs[element] = {
+            "SP": data[0],
+            "FC": data[1],
+            "pvalue": "N/A",
+        }
+    }
+
+    return {
+        "DCEs": DCEs,
+        "Baseline": [[-1,0],[-1,0]],
+    };
+}
 
 async function recalculateInfluenceScores() {
     await disablediv('airxplore_tab_content');
@@ -677,6 +707,7 @@ async function setPeTable() {
                 globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
                 let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
 
+                let _value = _data[e].value
                 delete _data[e];
 
                 if (JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]) == JSON.stringify(_data)) {
@@ -690,7 +721,10 @@ async function setPeTable() {
                 $("#xp_import_undo").removeClass("air_disabledbutton");
 
                 await setPeTable()
-                await xp_EstimatePhenotypes();
+
+                if(_value != 0)
+                    await xp_EstimatePhenotypes();
+                    
                 xp_updatePathgraph()
                 adjustPanels(globals.xplore.container);
             };
@@ -1170,7 +1204,7 @@ async function getPhenotypePanel() {
                     $("#xp_import_undo").removeClass("air_disabledbutton");
 
                     await setPeTable()
-                    await xp_EstimatePhenotypes();
+                    //await xp_EstimatePhenotypes();
                     adjustPanels(globals.xplore.container);
                 }
             }
@@ -1206,7 +1240,7 @@ async function getPhenotypePanel() {
             $("#xp_import_undo").removeClass("air_disabledbutton");
 
             await setPeTable()
-            await xp_EstimatePhenotypes();
+            //await xp_EstimatePhenotypes();
             adjustPanels(globals.xplore.container);
         });
 
@@ -2974,384 +3008,384 @@ function createCentralityTable(phenotype) {
 }
 
 
-function xp_createpopup(button, phenotype) {
+// function xp_createpopup(button, phenotype) {
 
-    var $target = $('#xp_chart_popover');
-    var $btn = $(button);
+//     var $target = $('#xp_chart_popover');
+//     var $btn = $(button);
 
-    if ($target) {
+//     if ($target) {
 
 
-        $('#xp_clickedpopupcell').css('background-color', 'transparent');
-        $('#xp_clickedpopupcell').removeAttr('id');
+//         $('#xp_clickedpopupcell').css('background-color', 'transparent');
+//         $('#xp_clickedpopupcell').removeAttr('id');
 
-        if ($target.siblings().is($btn)) {
-            $target.remove();
-            $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
-                minHeight: "0px",
-            });
-            return;
-        }
-        $target.remove();
+//         if ($target.siblings().is($btn)) {
+//             $target.remove();
+//             $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+//                 minHeight: "0px",
+//             });
+//             return;
+//         }
+//         $target.remove();
 
-    }
+//     }
 
-    $(button).attr('id', 'xp_clickedpopupcell');
-    $(button).css('background-color', 'lightgray');
+//     $(button).attr('id', 'xp_clickedpopupcell');
+//     $(button).css('background-color', 'lightgray');
 
-    $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="width: 100%; top: 55px; z-index: 2; border: none;">
-                    <div class="arrow" style="left: 9.375%;"></div>
-                    <div id="xp_chart_popover_content" class="popover-content" style="width: 100% !important;">
-                        <button type="button" id="xp_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                        <div class="cbcontainer mt-1 mb-2 ml-2">
-                            <input type="checkbox" class="air_checkbox" id="xp_popup_showregression">
-                            <label class="air_checkbox" for="xp_popup_showregression">Show Confidence Intervall</label>
-                        </div>
-                        <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
-                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#C00000"></span>
-                                Activates Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#0070C0"></span>
-                                Represses Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="triangle_small"></span>
-                                External Link</li>
-                        </div>
-                        <div style="height: 80%">
-                            <canvas class="popup_chart" id="xp_popup_chart"></canvas>
-                        </div>
-                    </div>
-                </div>`);
+//     $target = $(`<div id="xp_chart_popover" class="popover bottom in" style="width: 100%; top: 55px; z-index: 2; border: none;">
+//                     <div class="arrow" style="left: 9.375%;"></div>
+//                     <div id="xp_chart_popover_content" class="popover-content" style="width: 100% !important;">
+//                         <button type="button" id="xp_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
+//                             <span aria-hidden="true">&times;</span>
+//                         </button>
+//                         <div class="cbcontainer mt-1 mb-2 ml-2">
+//                             <input type="checkbox" class="air_checkbox" id="xp_popup_showregression">
+//                             <label class="air_checkbox" for="xp_popup_showregression">Show Confidence Intervall</label>
+//                         </div>
+//                         <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+//                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="legendspan_small" style="background-color:#C00000"></span>
+//                                 Activates Phenotype</li>
+//                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="legendspan_small" style="background-color:#0070C0"></span>
+//                                 Represses Phenotype</li>
+//                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="triangle_small"></span>
+//                                 External Link</li>
+//                         </div>
+//                         <div style="height: 80%">
+//                             <canvas class="popup_chart" id="xp_popup_chart"></canvas>
+//                         </div>
+//                     </div>
+//                 </div>`);
 
     
-    $btn.after($target);
+//     $btn.after($target);
 
-    let close_btn = document.getElementById("xp_popup_close");
-    // When the user clicks on <span> (x), close the modal
-    close_btn.onclick = function () {
-        $target.remove();
-        $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
-            minHeight: "0px",
-        });
-    }
+//     let close_btn = document.getElementById("xp_popup_close");
+//     // When the user clicks on <span> (x), close the modal
+//     close_btn.onclick = function () {
+//         $target.remove();
+//         $("#xp_table_pe_results").parents(".dataTables_scrollBody").css({
+//             minHeight: "0px",
+//         });
+//     }
 
-    let targets = []
-    var dist_targets = [
-        {
-            label: "",
-            data: [{
-                x: 1,
-                y: 0,
-                r: 4
-            }],
-        },
-        {
-            label: "",
-            data: [{
-                x: -1,
-                y: 0,
-                r: 4
-            }],
-        }
-    ]
-    var maxx_dist = 0;
-    for (let [element, data] of Object.entries(globals.xplore.pe_results[phenotype]["dces"])) {
+//     let targets = []
+//     var dist_targets = [
+//         {
+//             label: "",
+//             data: [{
+//                 x: 1,
+//                 y: 0,
+//                 r: 4
+//             }],
+//         },
+//         {
+//             label: "",
+//             data: [{
+//                 x: -1,
+//                 y: 0,
+//                 r: 4
+//             }],
+//         }
+//     ]
+//     var maxx_dist = 0;
+//     for (let [element, data] of Object.entries(globals.xplore.pe_results[phenotype]["dces"])) {
 
-        let SP = data[0];
-        let hex = "#cccccc";
-        let rad = 3;
-        let FC = data[1]
+//         let SP = data[0];
+//         let hex = "#cccccc";
+//         let rad = 3;
+//         let FC = data[1]
 
-        var aggr = SP * FC
-        rad = 6
+//         var aggr = SP * FC
+//         rad = 6
 
-        if (aggr < 0) {
-            hex = "#0070C0";
-        }
-        else if (aggr > 0) {
-            hex = "#C00000"
-        }
-        if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
-        dist_targets.push(
-            {
-                label: element,
-                data: [{
-                    x: Math.abs(aggr) * Math.sign(FC),
-                    y: Math.abs(aggr) * Math.sign(SP),
-                    r: rad
-                }],
-                pointStyle: pstyle,
-                backgroundColor: hex,
-                hoverBackgroundColor: hex,
-            })
+//         if (aggr < 0) {
+//             hex = "#0070C0";
+//         }
+//         else if (aggr > 0) {
+//             hex = "#C00000"
+//         }
+//         if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
+//         dist_targets.push(
+//             {
+//                 label: element,
+//                 data: [{
+//                     x: Math.abs(aggr) * Math.sign(FC),
+//                     y: Math.abs(aggr) * Math.sign(SP),
+//                     r: rad
+//                 }],
+//                 pointStyle: pstyle,
+//                 backgroundColor: hex,
+//                 hoverBackgroundColor: hex,
+//             })
         
 
-        var pstyle = 'circle';
-        if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
-            pstyle = 'triangle'
-        }
+//         var pstyle = 'circle';
+//         if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
+//             pstyle = 'triangle'
+//         }
 
 
-        targets.push(
-            {
-                label: element,
-                data: [{
-                    x: FC,
-                    y: SP,
-                    r: rad
-                }],
-                pointStyle: pstyle,
-                backgroundColor: hex,
-                hoverBackgroundColor: hex,
-            }
-        );
-    }
+//         targets.push(
+//             {
+//                 label: element,
+//                 data: [{
+//                     x: FC,
+//                     y: SP,
+//                     r: rad
+//                 }],
+//                 pointStyle: pstyle,
+//                 backgroundColor: hex,
+//                 hoverBackgroundColor: hex,
+//             }
+//         );
+//     }
 
-    maxx_dist = maxx_dist < 1? 1 : maxx_dist;
+//     maxx_dist = maxx_dist < 1? 1 : maxx_dist;
     
-    var m = globals.xplore.pe_results[phenotype]["slope"];
-    var [std1,std2] = globals.xplore.pe_results[phenotype]["std"];
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * m,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * m,
-                r: 0,
-            }],
-            type: 'line',
-            fill: false,
-            pointRadius: 0,
-            backgroundColor: m < 0 ? "#0070C0" : "#C00000",
-            borderColor: m < 0 ? "#0070C0" : "#C00000",
-            borderWidth: 2,
-        }
-    );
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * std2,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * std2,
-                r: 0,
-            }],
-            type: 'line',
-            fill: "+1",
-            pointRadius: 0,
-        }
-    );
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * std1,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * std1,
-                r: 0,
-            }],
-            type: 'line',
-            fill: false,
-            pointRadius: 0,
-        }
-    );
+//     var m = globals.xplore.pe_results[phenotype]["slope"];
+//     var [std1,std2] = globals.xplore.pe_results[phenotype]["std"];
+//     dist_targets.push(
+//         {
+//             data: [{
+//                 x: -maxx_dist,
+//                 y: -maxx_dist * m,
+//                 r: 0,
+//             },
+//             {
+//                 x: maxx_dist,
+//                 y: maxx_dist * m,
+//                 r: 0,
+//             }],
+//             type: 'line',
+//             fill: false,
+//             pointRadius: 0,
+//             backgroundColor: m < 0 ? "#0070C0" : "#C00000",
+//             borderColor: m < 0 ? "#0070C0" : "#C00000",
+//             borderWidth: 2,
+//         }
+//     );
+//     dist_targets.push(
+//         {
+//             data: [{
+//                 x: -maxx_dist,
+//                 y: -maxx_dist * std2,
+//                 r: 0,
+//             },
+//             {
+//                 x: maxx_dist,
+//                 y: maxx_dist * std2,
+//                 r: 0,
+//             }],
+//             type: 'line',
+//             fill: "+1",
+//             pointRadius: 0,
+//         }
+//     );
+//     dist_targets.push(
+//         {
+//             data: [{
+//                 x: -maxx_dist,
+//                 y: -maxx_dist * std1,
+//                 r: 0,
+//             },
+//             {
+//                 x: maxx_dist,
+//                 y: maxx_dist * std1,
+//                 r: 0,
+//             }],
+//             type: 'line',
+//             fill: false,
+//             pointRadius: 0,
+//         }
+//     );
 
-    var outputCanvas = document.getElementById('xp_popup_chart');
+//     var outputCanvas = document.getElementById('xp_popup_chart');
 
-    var chartOptions = {
-        type: 'bubble',
-        data: {
-            datasets: targets,
-        },
-        options: {
-            plugins: {
-                plugins: {
-                    filler: {
-                        propagate: false
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                zoom: {
-                    // Container for pan options
-                    pan: {
-                        // Boolean to enable panning
-                        enabled: true,
+//     var chartOptions = {
+//         type: 'bubble',
+//         data: {
+//             datasets: targets,
+//         },
+//         options: {
+//             plugins: {
+//                 plugins: {
+//                     filler: {
+//                         propagate: false
+//                     }
+//                 },
+//                 legend: {
+//                     display: false
+//                 },
+//                 zoom: {
+//                     // Container for pan options
+//                     pan: {
+//                         // Boolean to enable panning
+//                         enabled: true,
 
-                        // Panning directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow panning in the y direction
-                        mode: 'xy',
-                        rangeMin: {
-                            // Format of min pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
-                        rangeMax: {
-                            // Format of max pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
+//                         // Panning directions. Remove the appropriate direction to disable 
+//                         // Eg. 'y' would only allow panning in the y direction
+//                         mode: 'xy',
+//                         rangeMin: {
+//                             // Format of min pan range depends on scale type
+//                             x: null,
+//                             y: null
+//                         },
+//                         rangeMax: {
+//                             // Format of max pan range depends on scale type
+//                             x: null,
+//                             y: null
+//                         },
 
-                        // On category scale, factor of pan velocity
-                        speed: 20,
+//                         // On category scale, factor of pan velocity
+//                         speed: 20,
 
-                        // Minimal pan distance required before actually applying pan
-                        threshold: 10,
+//                         // Minimal pan distance required before actually applying pan
+//                         threshold: 10,
 
-                    },
+//                     },
 
-                    // Container for zoom options
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'xy',
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            var element = context.label || '';
+//                     // Container for zoom options
+//                     zoom: {
+//                         wheel: {
+//                             enabled: true,
+//                         },
+//                         pinch: {
+//                             enabled: true
+//                         },
+//                         mode: 'xy',
+//                     }
+//                 },
+//                 tooltip: {
+//                     callbacks: {
+//                         label: function (context) {
+//                             var element = context.label || '';
 
-                            if (element && globals.xplore.pe_results[phenotype].dces.hasOwnProperty(element)) {
-                                return [
-                                    'Name: ' + AIR.Molecules[element].name,
-                                    'Influence: ' + expo( globals.xplore.pe_results[phenotype].dces[element][0]),
-                                    'FC: ' + expo( globals.xplore.pe_results[phenotype].dces[element][1])
-                                ];
-                            }
-                            else
-                                return "";
+//                             if (element && globals.xplore.pe_results[phenotype].dces.hasOwnProperty(element)) {
+//                                 return [
+//                                     'Name: ' + AIR.Molecules[element].name,
+//                                     'Influence: ' + expo( globals.xplore.pe_results[phenotype].dces[element][0]),
+//                                     'FC: ' + expo( globals.xplore.pe_results[phenotype].dces[element][1])
+//                                 ];
+//                             }
+//                             else
+//                                 return "";
 
-                        }
-                    }
-                }
-            },
-            responsive: true,
-            maintainAspectRatio: false,
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
-            onClick: (event, chartElement) => {
-                if (chartElement[0]) {
-                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            },
-            layout: {
-                padding: {
-                    top: 0
-                }
-            },
-            title: {
-                display: true,
-                text: "Regulators for '" + AIR.Phenotypes[phenotype].name,
-                fontFamily: 'Helvetica',
-            },
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Influence on Phenotype'
-                    },
-                    max: 1,
-                    min: -1,
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    }
-                },
-                x:
-                {
-                    title: {
-                        display: true,
-                        text: 'Fold Change in Data'
-                    },
-                    ticks: {
-                        //beginAtZero: false,
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    },
-                },
-            }
-        }
+//                         }
+//                     }
+//                 }
+//             },
+//             responsive: true,
+//             maintainAspectRatio: false,
+//             onHover: (event, chartElement) => {
+//                 event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+//             },
+//             onClick: (event, chartElement) => {
+//                 if (chartElement[0]) {
+//                     let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+//                     selectElementonMap(name, true);
+//                     xp_setSelectedElement(name);
+//                 }
+//             },
+//             layout: {
+//                 padding: {
+//                     top: 0
+//                 }
+//             },
+//             title: {
+//                 display: true,
+//                 text: "Regulators for '" + AIR.Phenotypes[phenotype].name,
+//                 fontFamily: 'Helvetica',
+//             },
+//             scales: {
+//                 y: {
+//                     title: {
+//                         display: true,
+//                         text: 'Influence on Phenotype'
+//                     },
+//                     max: 1,
+//                     min: -1,
+//                     grid: {
+//                         drawBorder: false,
+//                         color: function (context) {
+//                             if (context.tick.value == 0)
+//                                 return '#000000';
+//                             else
+//                                 return "#D3D3D3";
+//                         },
+//                     }
+//                 },
+//                 x:
+//                 {
+//                     title: {
+//                         display: true,
+//                         text: 'Fold Change in Data'
+//                     },
+//                     ticks: {
+//                         //beginAtZero: false,
+//                     },
+//                     grid: {
+//                         drawBorder: false,
+//                         color: function (context) {
+//                             if (context.tick.value == 0)
+//                                 return '#000000';
+//                             else
+//                                 return "#D3D3D3";
+//                         },
+//                     },
+//                 },
+//             }
+//         }
 
-    };
+//     };
 
-    let popupchart = new Chart(outputCanvas, chartOptions);
-    $target.show();
+//     let popupchart = new Chart(outputCanvas, chartOptions);
+//     $target.show();
 
-    var popupheight = $("#xp_chart_popover").height() + 50;
-    $("#xp_resultstable").parents(".dataTables_scrollBody").css({
-        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
-    });
+//     var popupheight = $("#xp_chart_popover").height() + 50;
+//     $("#xp_resultstable").parents(".dataTables_scrollBody").css({
+//         minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
+//     });
 
 
-    $('#xp_popup_showregression').on('click', function () {
+//     $('#xp_popup_showregression').on('click', function () {
 
-        if (document.getElementById("xp_popup_showregression").checked === true) {
-            popupchart.data.datasets = dist_targets
-            $("#xp_legend_target").replaceWith(`
-            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
-                    Normalized Regression</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#cccccc"></span>
-                    95% Confidence Intervall (unadjusted)</li>
-            </div>
-            `);
-        }
-        else {
-            popupchart.data.datasets = targets
+//         if (document.getElementById("xp_popup_showregression").checked === true) {
+//             popupchart.data.datasets = dist_targets
+//             $("#xp_legend_target").replaceWith(`
+//             <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+//                 <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                     <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
+//                     Normalized Regression</li>
+//                 <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                     <span class="legendspan_small" style="background-color:#cccccc"></span>
+//                     95% Confidence Intervall (unadjusted)</li>
+//             </div>
+//             `);
+//         }
+//         else {
+//             popupchart.data.datasets = targets
 
-            $("#xp_legend_target").replaceWith(`            
-            <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#C00000"></span>
-                    Activates Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#0070C0"></span>
-                    Represses Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="triangle_small"></span>
-                    External Link</li>
-            </div>`);
-        }
+//             $("#xp_legend_target").replaceWith(`            
+//             <div id="xp_legend_target" class="d-flex justify-content-center mt-2 mb-2">
+//                 <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                     <span class="legendspan_small" style="background-color:#C00000"></span>
+//                     Activates Phenotype</li>
+//                 <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                     <span class="legendspan_small" style="background-color:#0070C0"></span>
+//                     Represses Phenotype</li>
+//                 <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                     <span class="triangle_small"></span>
+//                     External Link</li>
+//             </div>`);
+//         }
 
-        popupchart.update();
-    })
-};
+//         popupchart.update();
+//     })
+// };
 
 async function xp_updatePathgraph() {
     globals.xplore.pe_pathchart.data = {}

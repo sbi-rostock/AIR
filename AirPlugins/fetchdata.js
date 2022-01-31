@@ -336,10 +336,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                                         else
                                                             $(".air_tab_pane").css("height", "calc(100vh - 85px)");
                                                     });
-                                                    
-                                                    $('#air_btn_clear').on('click', function () {
-                                                        highlightSelected([]);
-                                                    });
+
                                                     resolve(height);
                                                 });
                                             })
@@ -1547,6 +1544,33 @@ async function fishers(a, b, c, d) {
     return parseFloat(factorialize(a + b).times(factorialize(c + d)).times(factorialize(a + c)).times(factorialize(b + d)).dividedBy(factorialize(a).times(factorialize(b)).times(factorialize(c)).times(factorialize(d)).times(factorialize(a + b + c + d))).toExponential(40))
 }
 
+function GetpValueFromValues(value, rndvalues)
+{
+    
+    var pos_random_scores = rndvalues.filter(x => x > 0)
+    pos_random_scores = pos_random_scores.concat(pos_random_scores.map(x => -x))
+
+    var neg_random_scores = rndvalues.filter(x => x < 0)
+    neg_random_scores = neg_random_scores.concat(neg_random_scores.map(x => -x))
+
+    var pos_std = standarddeviation(pos_random_scores)
+    var pos_mean = mean(pos_random_scores);
+
+    var neg_std = standarddeviation(neg_random_scores)
+    var neg_mean = mean(neg_random_scores);
+
+    var z_score = value < 0? (pos_std != 0 ? (value - pos_mean) / pos_std : 0) : (neg_std != 0 ? (value - neg_mean) / neg_std : 0);
+    var pvalue = GetpValueFromZ(z_score);
+
+    if (isNaN(pvalue))
+        pvalue = 1;
+
+    return {
+        "pvalue": pvalue,
+        "posStd": pos_std,
+        "negStd": neg_std
+    }
+}
 function GetpValueFromZ(_z, type = "twosided") {
     if (_z < -14) {
         _z = -14
@@ -1944,3 +1968,396 @@ function xp_searchListener(entites) {
         }
     }
 }
+
+
+async function air_createpopup(button, parameter, ylabel = "Influence Score", xlabel = "Fold Change in Data") {
+
+    var $target = $('#om_chart_popover');
+    var $btn = $(button);
+
+    let DCE_values = await parameter.function(parameter.functionparam)
+    let title = parameter.title
+
+    if ($target) {
+
+
+        $('#om_clickedpopupcell').css('background-color', 'transparent');
+        $('#om_clickedpopupcell').removeAttr('id');
+
+        if ($target.siblings().is($btn)) {
+            $target.remove();
+            $target.parents(".dataTables_scrollBody").css({
+                minHeight: "0px",
+            });
+            return;
+        }
+        $target.remove();
+
+    }
+
+    $(button).attr('id', 'om_clickedpopupcell');
+    $(button).css('background-color', 'lightgray');
+
+    $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2; border: none;">
+                    <div class="arrow" style="left: 9.375%;"></div>
+                    <div id="om_chart_popover_content" class="popover-content">
+                        <button type="button" id="om_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>` + (parameter.distribution? `
+                        <div class="cbcontainer mt-1 mb-2 ml-2">
+                            <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
+                            <label class="air_checkbox" for="om_popup_showregression">Show Confidence Intervall</label>
+                        </div>` : ``) + `
+                        <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#C00000"></span>
+                                Activates Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#0070C0"></span>
+                                Represses Phenotype</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                Not diff. expressed</li>
+                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                <span class="triangle_small"></span>
+                                External Link</li>
+                        </div>
+                        <div style="height: 80%">
+                            <canvas class="popup_chart" id="om_popup_chart"></canvas>
+                        </div>
+                    </div>
+                </div>`);
+
+    $btn.after($target);
+
+    let close_btn = document.getElementById("om_popup_close");
+    // When the user clicks on <span> (x), close the modal
+    close_btn.onclick = function () {
+        $target.parents(".dataTables_scrollBody").css({
+            minHeight: "0px",
+        });
+        $target.remove();
+        $('#om_clickedpopupcell').css('background-color', 'transparent');
+        $('#om_clickedpopupcell').removeAttr('id');
+
+    }
+    let targets = []
+    var dist_targets = []
+    for(let point of DCE_values.Baseline)
+    {
+        dist_targets.push({
+            label: "",
+            data: [{
+                x: point[0],
+                y: point[1],
+                r: 4
+            }],
+        })
+    }
+
+    var maxx_dist = 0;
+    for (let [element,values] of Object.entries(DCE_values.DCEs)) {
+
+        let hex = "#cccccc";
+        let rad = 3;
+        let FC = values.FC
+        let SP = values.SP
+
+        var aggr = SP * FC
+        rad = 6
+
+        if (aggr < 0) {
+            hex = "#0070C0";
+        }
+        else if (aggr > 0) {
+            hex = "#C00000"
+        }
+        if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
+        
+        if(SP != 0)
+            dist_targets.push(
+                {
+                    label: element,
+                    data: [{
+                        x: Math.abs(aggr) * Math.sign(FC),
+                        y: Math.abs(aggr) * Math.sign(SP),
+                        r: rad
+                    }],
+                    pointStyle: pstyle,
+                    backgroundColor: hex,
+                    hoverBackgroundColor: hex,
+                })
+        
+
+        var pstyle = 'circle';
+        if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
+            pstyle = 'triangle'
+        }
+
+
+        targets.push(
+            {
+                label: element,
+                data: [{
+                    x: FC,
+                    y: SP,
+                    r: rad
+                }],
+                pointStyle: pstyle,
+                backgroundColor: hex,
+                hoverBackgroundColor: hex,
+            }
+        );
+    }
+
+    maxx_dist = maxx_dist < 1? 1 : maxx_dist;
+    
+    var m = parameter.slope;
+    var [std1,std2] = parameter.CI;
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * m,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * m,
+                r: 0,
+            }],
+            type: 'line',
+            fill: false,
+            pointRadius: 0,
+            backgroundColor: m < 0 ? "#0070C0" : "#C00000",
+            borderColor: m < 0 ? "#0070C0" : "#C00000",
+            borderWidth: 2,
+        }
+    );
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * std2,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * std2,
+                r: 0,
+            }],
+            type: 'line',
+            fill: "+1",
+            pointRadius: 0,
+        }
+    );
+    dist_targets.push(
+        {
+            data: [{
+                x: -maxx_dist,
+                y: -maxx_dist * std1,
+                r: 0,
+            },
+            {
+                x: maxx_dist,
+                y: maxx_dist * std1,
+                r: 0,
+            }],
+            type: 'line',
+            fill: false,
+            pointRadius: 0,
+        }
+    );
+
+    var outputCanvas = document.getElementById('om_popup_chart');
+
+    var chartOptions = {
+        type: 'bubble',
+        data: {
+            datasets: targets,
+        },
+        options: {
+            plugins: {
+                plugins: {
+                    filler: {
+                        propagate: false
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                zoom: {
+                    // Container for pan options
+                    pan: {
+                        // Boolean to enable panning
+                        enabled: true,
+
+                        // Panning directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow panning in the y direction
+                        mode: 'xy',
+                        rangeMin: {
+                            // Format of min pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+                        rangeMax: {
+                            // Format of max pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+
+                        // On category scale, factor of pan velocity
+                        speed: 20,
+
+                        // Minimal pan distance required before actually applying pan
+                        threshold: 10,
+
+                    },
+
+                    // Container for zoom options
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy',
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var element = context.label || '';
+
+                            if (element) {
+                                return [
+                                    'Name: ' + AIR.Molecules[element].name,
+                                    'Influence: ' + expo(DCE_values.DCEs[element].SP, 4, 3),
+                                    'FC: ' + expo(DCE_values.DCEs[element].FC, 4, 3),
+                                    'p-value: ' + (expo(DCE_values.DCEs[element].pvalue,4,3)),
+                                ];
+                            }
+                            else
+                                return "";
+
+                        }
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
+            onClick: (event, chartElement) => {
+                if (chartElement[0]) {
+                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+            },
+            layout: {
+                padding: {
+                    top: 0
+                }
+            },
+            title: {
+                display: true,
+                text: title,
+                fontFamily: 'Helvetica',
+            },
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: ylabel,
+                    },
+                    ticks: {
+                        //beginAtZero: true,
+                        max: 1,
+                        min: -1
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    }
+                },
+                x:
+                {
+                    title: {
+                        display: true,
+                        text: xlabel,
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
+            }
+        }
+
+    };
+
+    let popupchart = new Chart(outputCanvas, chartOptions);
+    $target.show();
+
+    var popupheight = $("#om_chart_popover").height() + 50;
+    $target.parents("table").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
+    });
+
+
+    $('#om_popup_showregression').on('click', function () {
+
+        if (document.getElementById("om_popup_showregression").checked === true) {
+            popupchart.data.datasets = dist_targets
+            $("#om_legend_target").replaceWith(`
+            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span style="font-weight:bold; font-size: 50; color:#C00000">—</span>
+                    Norm. Regression Line
+                </li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#cccccc"></span>
+                    Regression Confidence Intervall (95%; unadj.)
+                </li>
+            </div>
+            `);
+        }
+        else {
+            popupchart.data.datasets = targets
+
+            $("#om_legend_target").replaceWith(`            
+            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#C00000"></span>
+                    Activates Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#0070C0"></span>
+                    Represses Phenotype</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="legendspan_small" style="background-color:#cccccc"></span>
+                    Not diff. expressed</li>
+                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                    <span class="triangle_small"></span>
+                    External Link</li>
+            </div>`);
+        }
+
+        popupchart.update();
+    })
+};

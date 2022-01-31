@@ -358,31 +358,11 @@ async function createDifferentialAnalysisPanel() {
     globals.omics.phenotab = $(`
     <div class="tab-pane air_sub_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
         <div id="om_pheno_startcontainer">
-            <div class="row mb-1">
-                <div class="col-auto">
-                    <div class="wrapper">
-                        <button type="button" class="air_btn_info btn btn-secondary om_popover"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalization"
-                                data-content="We recommend to normalize the results for each phenotype individually because different values between them cannot be directly associated to a different activity.<br/>However, If using absolute values, no normalization may be the best way to go.">
-                            ?
-                        </button>
-                    </div>
-                </div>
-                <div class="col">
-                    <select id="om_select_normalize" class="om_select browser-default custom-select mb-1 mt-1">
-                        <option value="0">No normalization</option>
-                        <option value="1" selected>Normalize each phenotype (recommended)</option>
-                        <option value="2">Normalize each sample</option>
-                    </select>
-                </div>
-            </div>
-                
-            <hr>
-            
+
             <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_advancedsettings_panel">Advanced Settings</button>
             <div id="om_advancedsettings_panel" class="collapse air_box_lightgray">
             
-                <h5>Filter Elements</h5>
+                <h3>Filter DCEs</h3>
 
                 <div class="row mb-3">
                     <div class="col-auto">
@@ -425,7 +405,7 @@ async function createDifferentialAnalysisPanel() {
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
                                     data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
-                                    data-content="Influence threshold (between 0 and 1) for regulators of phenotype to be considered for the analysis. Increasing the threshold may result in higher accuracy, if many significant probes are available.<br/>">
+                                    data-content="Absolute Influence Score threshold (between 0 and 1) for regulators of phenotype to be considered for the analysis. Increasing the threshold may result in higher accuracy, however, only if many significant probes are available.<br/>">
                                 ?
                             </button>
                         </div>
@@ -490,7 +470,7 @@ async function createDifferentialAnalysisPanel() {
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary ml-1"
                                     data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Statistical evaluation."
-                                    data-content="Number n of random samples to be generated for statistical evaluation. The p-values smaller than 1/n will be 0. The calculation time is proportional to n.">
+                                    data-content="Number n of random samples to be generated for statistical evaluation. A higher number increases computation time for p-value calculation.">
                                 ?
                             </button>
                         </div>
@@ -584,46 +564,6 @@ async function createDifferentialAnalysisPanel() {
         <select id="om_select_sample" class="browser-default om_select custom-select mb-1" style="border: solid 1px; font-weight: bold;">
         </select>
         <hr>
-        <label class="air_label mt-1">Regulator Type Filter:</label>
-        <select id="om_target_filter" class="browser-default om_select custom-select mb-1">
-            <option value="0">All Elements</option>
-            <option value="1">Proteins</option>
-            <option value="5">Receptors</option>
-            <option value="2">miRNAs</option>
-            <option value="3">lncRNAs</option>
-            <option value="4" selected>Transcription Factors</option>
-        </select>
-        <hr>
-        <div class="row mt-2 mb-2">
-            <div class="col-auto">
-                <div class="wrapper">
-                    <button type="button" class="air_btn_info btn btn-secondary"
-                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
-                            data-content="Number of targets combinations for which a combined score should be calculated. Increasing this value has drastic effect on calculation time and requires enabling memory storage.">
-                        ?
-                    </button>
-                </div>
-            </div>
-            <div class="col" style="width: 40%; padding-right: 0">
-                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">#Target Combinations:</span>
-            </div>
-            <div class="col-auto" style="width: 7%; padding: 0">
-                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;" id="om_targetcomb_value">1</span>
-            </div>
-            <div class="col-auto" style="width: 50%; padding-top: 5px; padding-right: 40px;">
-                <input type="range" style="width: 100%;" value="1" min="1" max="4" step="1" class="slider air_slider" id="om_targetcomb_slider">
-            </div>
-        </div>
-        <div id="om_target_pvaluethreshold-container" class="row mb-2">
-            <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Number of predicted targets:</span>
-            </div>
-            <div class="col">
-                <input type="text" class="textfield" value="" id="om_target_targetnumber" onkeypress="return isNumber(event)" />
-            </div>
-        </div>
-        
-        <hr>
         <div class="row mt-2 mb-2">
             <div class="col-auto">
                 <div class="wrapper">
@@ -639,7 +579,7 @@ async function createDifferentialAnalysisPanel() {
             </div>
         </div>
 
-        <div id="om_target_pvaluethreshold-container" class="row mb-2">
+        <div class="row mb-2">
             <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Abs logFC Threshold:</span>
             </div>
@@ -647,7 +587,7 @@ async function createDifferentialAnalysisPanel() {
                 <input type="text" class="textfield" value="1.0" id="om_target_fcthreshold" onkeypress="return isNumber(event)" />
             </div>
         </div>
-        <div id="om_target_pvaluethreshold-container" class="row mb-2">
+        <div class="row mb-2">
             <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value Threshold:</span>
             </div>
@@ -655,47 +595,34 @@ async function createDifferentialAnalysisPanel() {
                 <input type="text" class="textfield" value="0.05" id="om_target_pvaluethreshold" onkeypress="return isNumber(event)" />
             </div>
         </div>
-
-        <hr>
-
         <div class="row mt-2 mb-2">
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary"
                             data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Filter"
-                            data-content="If checked, targets with FCs contrary to their predicted regulation are filtered out.">
+                            data-content="If checked, only directly connected upstream targets will be analyzed.">
                         ?
                     </button>
                 </div>
             </div>
             <div class="col">
                 <div class="cbcontainer">
-                    <input type="checkbox" class="air_checkbox" id="om_target_filtercontrary" checked>
-                    <label class="air_checkbox" for="om_target_filtercontrary">Filter contrary results?</label>
+                    <input type="checkbox" class="air_checkbox" id="om_target_direct">
+                    <label class="air_checkbox" for="om_target_direct">Include only direct interactions?</label>
                 </div>
             </div>
-        </div>  
-        <button type="button" id="om_btn_predicttarget" class="air_btn btn btn-block mt-1 mb-1">Predict Targets</button>   
+        </div> 
+
         <hr>
+        <h3>Statistical Method</h3>
+        <select id="om_target_statistics" class="browser-default om_select custom-select mb-1">
+            <option value="0" selected>Distribution-based</option>
+            <option value="1">Sensitivity-based</option>
+        </select>
+        <hr>
+        <button type="button" id="om_btn_predicttarget" class="air_btn btn btn-block mt-1 mb-1">Predict Targets</button>   
     </div>`).appendTo('#om_tab');
 
-    $('#om_targetcomb_slider').on('input', function (e) {
-        $("#om_targetcomb_value").html($(this).val());
-        switch (parseFloat($(this).val())) {
-            case 1:
-                $("#om_target_targetnumber").val("")
-                break;
-            case 2:
-                $("#om_target_targetnumber").val(50)
-                break;
-            case 3:
-                $("#om_target_targetnumber").val(20)
-                break;
-            case 4:
-                $("#om_target_targetnumber").val(10)
-                break;
-        }
-    });
 
 
     let sampleSelect = document.getElementById('om_select_sample');
@@ -784,6 +711,11 @@ async function createDifferentialAnalysisPanel() {
     });
 
     globals.omics.targettab.append($(`
+        <hr>    
+        <div id="om_target_resultstab" class="mt-4 mb-2">
+            
+        </div> 
+
         <ul class="air_nav_tabs nav nav-tabs" role="tablist">
             <li class="air_nav_item nav-item" style="width: 50%;">
                 <a class="air_tab air_tab_sub active nav-link om_target_tabs" id="om_target_chart-tab" data-toggle="tab" href="#om_target_chart" role="tab" aria-controls="om_target_chart" aria-selected="true">Chart</a>
@@ -797,7 +729,7 @@ async function createDifferentialAnalysisPanel() {
                 <div style="position: relative; max-height: 400px;">
                     <canvas id="om_target_chart_canvas" style="height: 400px;"></canvas>
                 </div>
-                <div id="om_legend_target" class="d-flex justify-content-center mt-2">
+                <div class="d-flex justify-content-center mt-2">
                     <li class="legendli" style="color:#C00000; font-size:90%;"><span class="triangle" style="background-color:#FFFFFF"></span>positive Targets</li>
                     <li class="legendli" style="margin-left:20px; color:#0070C0; font-size:90%;"><span class="triangle_down" style="background-color:#FFFFFF"></span>negative Targets</li>
                     <li class="legendli" style="margin-left:20px; color:#a9a9a9; font-size:100%;"><span class="legendspan" style="background-color:#a9a9a9"></span>combined</li>
@@ -1251,7 +1183,7 @@ function createScAnalysisPanel() {
             <div style="position: relative; max-height: 400px;">
                 <canvas id="om_sc_results_canvas" style="height: 400px;"></canvas>
             </div>
-            <div id="om_legend_target" class="d-flex justify-content-center mt-2">
+            <div class="d-flex justify-content-center mt-2">
                 <li class="legendli" style="margin-left:20px; color:#6d6d6d; font-size:90%;"><span class="legendspan" style="background-color:#808080"></span>in Submap</li>
                 <li class="legendli" style="margin-left:16px; color:#6d6d6d; font-size:90%;"><span class="triangle"></span>External Link</li>
             </div>
@@ -1736,8 +1668,8 @@ async function om_createTable(param) {
 
             <h4 class="mt-4 mb-4">Results</h4> 
 
-            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_outputtable_panel">Table</button>
-            <div id="om_outputtable_panel" class="collapse air_box_lightgray">
+            <button type="button" class="air_collapsible_smallgrey collapsed" data-toggle="collapse" data-target="#om_outputtable_panel" aria-expanded="true">Table</button>
+            <div id="om_outputtable_panel" class="collapse air_box_lightgray show" show style>
                 <div id="om_select_pvalue-container" class="row mb-2">
                     <div class="col-auto air_select_label" style="padding:0; width: 30%; text-align: right; ">
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Statistical method:</span>
@@ -1751,6 +1683,25 @@ async function om_createTable(param) {
                         </select>
                     </div>
                 </div>
+                <div class="row mb-2">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary om_popover"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalization"
+                                    data-content="We recommend to normalize the results for each phenotype individually because different values between them cannot be directly associated to a different activity.<br/>However, If using absolute values, no normalization may be the best way to go.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <select id="om_select_normalize" class="om_select browser-default custom-select mb-1 mt-1">
+                            <option value="0">No normalization</option>
+                            <option value="1" selected>Normalize each phenotype (recommended)</option>
+                            <option value="2">Normalize each sample</option>
+                        </select>
+                    </div>
+                </div>
+                    
                 <div class="row mb-2">
                     <div class="col-auto">
                         <div class="wrapper">
@@ -1768,7 +1719,7 @@ async function om_createTable(param) {
                         </div>
                     </div>
                 </div>
-                <p class="mt-4 mb-0">Clicking on a column header will highlight results of the respective sample on the maps.</p>
+                <p class="mt-4 mb-0">Clicking on a column header will color phenotypes and DCEs on the map by their fold change in the respective sample.</p>
                 <div id="om_overlay_pvalue_threshold-container" class="row mb-4">
                     <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
                         <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">p-value threshold:</span>
@@ -1907,6 +1858,7 @@ async function om_createTable(param) {
             if (!globals.omics.resultsTable)
                 return;
 
+            let pvalue_threshold = pvalueThreshold();
             let onlysignificant = document.getElementById("om_checkbox_exclude_ns").checked === true ? true : false;
             globals.omics.resultsTable.rows().every(function (rowIdx, tableLoop, rowLoop) {
 
@@ -1921,16 +1873,16 @@ async function om_createTable(param) {
                         let sample = $(this).attr("data");
                         let pvalue = getPvalue(phenotype, sample);
 
-                        let level = onlysignificant && pvalue > 0.05 ? 0 : AIR.Phenotypes[phenotype].norm_results[sample];
+                        let level = onlysignificant && pvalue > pvalue_threshold ? 0 : AIR.Phenotypes[phenotype].norm_results[sample];
 
                         $('b:first', this).html(level);
                         $('span:first', this).html(`(${expo(pvalue)})`);
                         $(this).attr("data-order", pvalue);
-                        if (pvalue < 0.05) {
+                        if (pvalue < pvalue_threshold) {
                             $(this).css('background-color', '#ffcccb');
                             numberofsignsamples++;
                         }
-                        else if (pvalue < 0.1) {
+                        else if (pvalue < (pvalue_threshold * 2)) {
                             $(this).css('background-color', '#ffffa7');
                         }
                         else {
@@ -1943,21 +1895,16 @@ async function om_createTable(param) {
                         $(this).html(numberofsignsamples)
                     }
                 });
-                $(rowNode).find("td").each(function () {
-
-                });
                 this.invalidate();
             });
 
             globals.omics.resultsTable.draw(false);
         }
 
-        if (!globals.phenotypeMapID) {
-            $("#om_showonmapbtn").addClass("air_disabledbutton")
-        }
         $("#om_cb_fdr").on('click', updatepvalues);
         $("#om_checkbox_exclude_ns").on('click', updatepvalues);
         $("#om_select_pvalue").on('change', updatepvalues);
+        $("#om_highlight_pvalue_threshold").on('input', updatepvalues);
         $("#om_checkbox_pregulator_sign").on('change', updateRegulatorChart);
         $("#om_pregulatorchart_sample_select").on('change', updateRegulatorChart);
         $("#om_export_rankedphenotypes").on('click', exportPhenotypeRegulators);
@@ -1989,7 +1936,7 @@ async function om_createTable(param) {
                 for (let value in AIR.Phenotypes[id].norm_results) {
                     chartresult.push({
                         y: AIR.Phenotypes[id].norm_results[value],
-                        //x: globals.omics.samples[j - 1]
+                        x: globals.omics.samples[value]
                     });
                 }
 
@@ -2001,14 +1948,14 @@ async function om_createTable(param) {
                         alert('Deselect an item before adding a new one');
                         return;
                     }
-                    var dataid = globals.omics.plevelchart_config.data.datasets.length;
+                    var dataid = globals.omics.plevelchart.data.datasets.length;
                     var color = globals.omics.colors[0];
 
                     globals.omics.colors.shift();
                     globals.omics.pickedcolors.push(color);
 
-                    globals.omics.plevelchart_config.data.datasets.push({
-                        label: AIR.Phenotypes[id].name,
+                    globals.omics.plevelchart.data.datasets.push({
+                        label: id,
                         fill: false,
                         data: chartresult,
                         backgroundColor: color,
@@ -2017,14 +1964,14 @@ async function om_createTable(param) {
                 }
                 else {
                     let datasettoRemove = undefined;
-                    globals.omics.plevelchart_config.data.datasets.forEach(function (dataset) {
-                        if (dataset.label === AIR.Phenotypes[id].name) {
+                    globals.omics.plevelchart.data.datasets.forEach(function (dataset) {
+                        if (dataset.label == id) {
                             datasettoRemove = dataset
                         }
                     });
 
                     if (datasettoRemove) {
-                        var dataid = globals.omics.plevelchart_config.data.datasets.indexOf(datasettoRemove);
+                        var dataid = globals.omics.plevelchart.data.datasets.indexOf(datasettoRemove);
                         var color = globals.omics.pickedcolors[dataid];
                         globals.omics.colors.unshift(color);
                         globals.omics.pickedcolors.splice(dataid, 1);
@@ -2034,8 +1981,8 @@ async function om_createTable(param) {
                 }
 
                 globals.omics.plevelchart.update();
-                var html = globals.omics.plevelchart.generateLegend().replace(/\"1-legend"/g, 'legend');
-                document.getElementById('om_legend').innerHTML = html;
+                // var html = globals.omics.plevelchart.generateLegend().replace(/\"1-legend"/g, 'legend');
+                // document.getElementById('om_legend').innerHTML = html;
             };
 
             let phenocell = createButtonCell(result_row, 'th', "<b>" + pname + "</b>", 'center');
@@ -2050,7 +1997,18 @@ async function om_createTable(param) {
             for (let sample in globals.omics.samples) {
 
                 let pvalue = getPvalue(phenotype, sample);
-                let samplecell = createPopupCell(result_row, 'td', "<b>" + AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue, 2, 2) + ")", 'col-auto om_resultvalue', 'center', om_createpopup, { "sample": sample, "phenotype": phenotype, "FilteredElements": param.FilteredElements, "FilteredRegulators": param.correctSPs }, order = pvalue);
+                let parameter = {
+                    "function": om_getphenotypeValues,
+                    "functionparam": {
+                        "phenotype": phenotype,
+                        "sample": sample,
+                    },
+                    "distribution": true,
+                    "title": "Regulators for '" + AIR.Phenotypes[phenotype].name + "' in '" + globals.omics.samples[sample] + "'",
+                    "slope": AIR.Phenotypes[phenotype].slope[sample],
+                    "CI": AIR.Phenotypes[phenotype].std[sample],
+                }
+                let samplecell = createPopupCell(result_row, 'td', "<b>" + AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue, 2, 2) + ")", 'col-auto om_resultvalue', 'center', air_createpopup, parameter, order = pvalue);
                 samplecell.setAttribute('data', sample);
                 genenumber.push(AIR.Phenotypes[phenotype].genenumbers[sample]);
                 if (pvalue < 0.05) {
@@ -2118,7 +2076,7 @@ async function om_createTable(param) {
             $(headercell.getElementsByTagName('a')[0]).click("click", function (event) {
 
                 
-                let pvalue_threshold = parseFloat($("#om_highlight_pvalue_threshold").val().replace(',', '.'))
+                let pvalue_threshold = pvalueThreshold()
                 if (isNaN(pvalue_threshold)) {
                     alert("Only (decimal) numbers are allowed as an p-value threshold. p-value threshold was set to 0.05.")
                     pvalue_threshold = 0.05;
@@ -2200,6 +2158,7 @@ async function om_createTable(param) {
         $('#om_table_modal').on('shown.bs.modal', function (e) {
             $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
         });
+        
         // Get the <span> element that closes the modal
         let span = document.getElementById("om_img_close");
         // When the user clicks on <span> (x), close the modal
@@ -2226,7 +2185,7 @@ async function om_createTable(param) {
             let text = await disablebutton('om_showonmapbtn');
             hideOverlays([], true).then(r => {
                 showOverlays(globals.omics.samplesResults).then(s => {
-                    minervaProxy.project.map.openMap({ id: globals.phenotypeMapID });
+                    minervaProxy.project.map.openMap({ id: globals.phenotypeImageMapID });
                     setTimeout(
                         enablebtn('om_showonmapbtn', text)
                         , 1000);
@@ -2236,11 +2195,28 @@ async function om_createTable(param) {
         $('#om_addimagebtn').on('click', async function () {
             let text = await disablebutton('om_addimagebtn');
             getImageSource().then(imglink => {
-
+            // <div class="carousel slide" data-ride="carousel">
+            //     <div class="carousel-inner">
+            //         <div class="carousel-item active">
+            //         <img class="air_image d-block w-100" id="om_resultsimg1" src="${imglink[0]}" alt="Phenotype Results" style="width:100%">
+            //         </div>
+            //         <div class="carousel-item">
+            //         <img class="air_image d-block w-100" id="om_resultsimg2" src="${imglink[1]}" alt="Phenotype Results" style="width:100%">
+            //         </div>
+            //     </div>
+            //     <a class="carousel-control-prev" href="#carouselExampleControls" role="button" data-slide="prev">
+            //         <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            //         <span class="sr-only">Previous</span>
+            //     </a>
+            //     <a class="carousel-control-next" href="#carouselExampleControls" role="button" data-slide="next">
+            //         <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            //         <span class="sr-only">Next</span>
+            //     </a>
+            // </div>
                 $("#om_img_container").html(`
             <!-- Trigger the Modal -->
-            <img id="om_resultsimg" class="air_image" src="${imglink}" alt="Phenotype Results" style="width:100%">
-    
+            <img class="air_image" id="om_resultsimg1" src="${imglink[1]}" alt="Phenotype Results" style="width:100%">
+
             <!-- The Modal -->
             <div id="om_om_resultsimg-modal" class="air_modal">
     
@@ -2258,14 +2234,22 @@ async function om_createTable(param) {
                 var image_modal = document.getElementById("om_om_resultsimg-modal");
 
                 // Get the image and insert it inside the modal - use its "alt" text as a caption
-                var img = document.getElementById("om_resultsimg");
+                var img1 = document.getElementById("om_resultsimg1");
+                // var img2 = document.getElementById("om_resultsimg2");
+
                 var modalImg = document.getElementById("om_img");
                 var captionText = document.getElementById("om_img-caption");
-                img.onclick = function () {
+
+                img1.onclick = function () {
                     image_modal.style.display = "block";
                     modalImg.src = this.src;
                     captionText.innerHTML = this.alt;
                 }
+                // img2.onclick = function () {
+                //     image_modal.style.display = "block";
+                //     modalImg.src = this.src;
+                //     captionText.innerHTML = this.alt;
+                // }
 
                 // Get the <span> element that closes the modal
                 var span = document.getElementById("om_img_close");
@@ -2288,7 +2272,7 @@ async function om_createTable(param) {
                     $('.minerva-overlay-tab-link').click();
                     enablebtn('om_addoverlaybtn', text);
 
-                    if (!globals.phenotypeMapID) {
+                    if (globals.phenotypeMapID) {
                         $("#om_showonmapbtn").removeClass("air_disabledbutton");
                         $("#om_addimagebtn").removeClass("air_disabledbutton");
                     }
@@ -2303,8 +2287,8 @@ async function om_createTable(param) {
             removeOverlays(globals.omics.samplesResults).finally(r => {
                 enablebtn('om_removeoverlaybtn', text);
 
-                if (!globals.phenotypeMapID) {
-                    $("#om_addimagebtn").removeClass("air_disabledbutton");
+                if (globals.phenotypeMapID) {
+                    $("#om_showonmapbtn").addClass("air_disabledbutton");
                     $("#om_addimagebtn").addClass("air_disabledbutton");
                 }
 
@@ -2347,7 +2331,28 @@ async function om_createTable(param) {
         var outputCanvas = document.getElementById('om_plevelchart').getContext('2d');
 
         globals.omics.plevelchart_config = {
-
+            plugins: [{
+                beforeInit: function(chart, args, options) {
+                  // Make sure we're applying the legend to the right chart
+                  if (chart.canvas.id === "chart-id") {
+                    const ul = document.createElement('ul');
+                    chart.data.labels.forEach((label, i) => {
+                      ul.innerHTML += `
+                        <li>
+                          <span style="background-color: ${ chart.data.datasets[0].backgroundColor[i] }">
+                            ${ chart.data.datasets[0].data[i] }
+                          </span>
+                          ${ label }
+                        </li>
+                      `;
+                    });
+            
+                    return document.getElementById("js-legend").appendChild(ul);
+                  }
+            
+                  return;
+                }
+              }],  
             type: 'line',
             options: {
                 plugins: {
@@ -2361,9 +2366,10 @@ async function om_createTable(param) {
                                 return context.label || '';
                             },
                             label: function (context) {
-                                var label = tooltipItem.xLabel;
-                                label += "; ";
-                                label += tooltipItem.yLabel;
+                                var p = globals.omics.plevelchart.data.datasets[context.datasetIndex].label;
+                                var label = AIR.Phenotypes[p].name + "; ";
+
+                                label += globals.omics.samples[context.dataIndex];
 
                                 return label;
                             }
@@ -2394,6 +2400,9 @@ async function om_createTable(param) {
                     fontColor: '#6E6EC8',
                     fontStyle: 'bold'
                 },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                },
                 scales: {
                     y: {
                         title: {
@@ -2422,9 +2431,6 @@ async function om_createTable(param) {
                         title: {
                             display: true,
                             text: "Sample"
-                        },
-                        ticks: {
-                            //beginAtZero: false,
                         },
                         grid: {
                             drawBorder: false,
@@ -2566,13 +2572,23 @@ async function om_createTable(param) {
 
         globals.omics.resultsTable = $('#om_resultstable').DataTable({
             "lengthMenu": [5, 6, 7, 8, 9, 10],
-            rowCallback: function (row, data, index) {
-                $(row).find('td').each(function () {
-                    if ($(this).hasClass("om_resultvalue") && (parseFloat($(this).attr("data-order")) < 0.05)) {
-                        $(this).css('background-color', '#ffcccb');
-                    }
-                });
-            },
+            // rowCallback: function (row, data, index) {
+            //     let pvalue_threshold = pvalueThreshold();
+            //     $(row).find('td').each(function () {
+            //         if ($(this).hasClass("om_resultvalue"))
+            //         {
+            //             if(parseFloat($(this).attr("data-order")) < pvalue_threshold) {
+            //                 $(this).css('background-color', '#ffcccb');
+            //             }
+            //             else if (pvalue < (pvalue_threshold * 2)) {
+            //                 $(this).css('background-color', '#ffffa7');
+            //             }
+            //             else {
+            //                 $(this).css('background-color', 'transparent');
+            //             }
+            //         }
+            //     });
+            // },
             "autoWidth": true,
             "order": [globals.omics.samples.length == 1 ? [2, "asc"] : [globals.omics.samples.length + 2, "desc"]],
             "scrollX": true,
@@ -2622,15 +2638,18 @@ function getImageSource() {
     return new Promise((resolve, reject) => {
         var ids = getOverlaysStrings();
 
-        var output = minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/models/' + globals.phenotypeMapID + ':downloadImage?handlerClass=lcsb.mapviewer.converter.graphics.PngImageGenerator';
+        var output1 = minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/models/' + globals.phenotypeImageMapID + ':downloadImage?handlerClass=lcsb.mapviewer.converter.graphics.PngImageGenerator';
+        var output2 = minerva.ServerConnector._serverBaseUrl + 'api/projects/' + minervaProxy.project.data.getProjectId() + '/models/' + globals.phenotypeMapID + ':downloadImage?handlerClass=lcsb.mapviewer.converter.graphics.PngImageGenerator';
         if (ids == "") {
             alert('Warning: No overlays available. Create Overlays to show them in the image.');
         }
         else {
-            output += '&overlayIds=' + getOverlaysStrings();
+            output1 += '&overlayIds=' + getOverlaysStrings();
+            output2 += '&overlayIds=' + getOverlaysStrings();
         }
-        output += '&zoomLevel=6';
-        resolve(output);
+        output1 += '&zoomLevel=6';
+        output2 += '&zoomLevel=6';
+        resolve([output1, output2]);
     });
 }
 
@@ -2723,28 +2742,31 @@ async function om_PhenotypeSP() {
         correct_SPs[phenotype] = getFilteredRegulators(phenotype, i_threshold, document.getElementById("checkbox_submap").checked)
 
         var accuracyvalues = [];
-
+        var xysum, xxsum, xy
         for (let sample in globals.omics.samples) {
 
             let activity = 0.0;
             let abs_activity = 0.0;
             var accuracy = 0;
-            var xysum = 0;
-            var xxsum = 2;
+            xysum = 0;
+            xxsum = 2;
             AIR.Phenotypes[phenotype].includedelements[sample] = [];
             AIR.Phenotypes[phenotype].genenumbers[sample] = 0;
 
-            for (let element in correct_SPs[phenotype]) {
+            for (let element in elements_with_FC[sample]) {
 
-                if (!elements_with_FC[sample].hasOwnProperty(element)) {
+                let FC = elements_with_FC[sample][element];
+
+                if (!correct_SPs[phenotype].hasOwnProperty(element)) {
+                    //xxsum += FC;
                     continue;
                 }
 
                 AIR.Phenotypes[phenotype].includedelements[sample].push(element);
                 let SP = correct_SPs[phenotype][element];
-                let FC = elements_with_FC[sample][element];
 
-                var xy = SP * FC;
+
+                xy = SP * FC;
                 
                 xxsum += xy * xy
                 xysum += xy * Math.abs(xy) 
@@ -2801,38 +2823,44 @@ async function om_PhenotypeSP() {
     let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
     let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
 
+    var FC_values, shuffled_arrays, shuffled_array, score, en_score, random_scores, random_en_scores, _en_score, shuffled_elements, element, pvalue
+
     for (let sample in globals.omics.samples) {
 
-        let FC_values = Object.values(elements_with_FC[sample]);
-        let shuffled_arrays = [];
+        FC_values = Object.values(elements_with_FC[sample]);
+        shuffled_arrays = [];
 
         for (let i = 0; i < globals.omics.numberOfRandomSamples; i++) {
-            let shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples[sample].protein);
+            shuffled_array = pickRandomElements(elementarray_proteins, typeNumbersinSamples[sample].protein);
             shuffled_array.push(...pickRandomElements(elementarray_metabolite, typeNumbersinSamples[sample].metabolite))
             shuffled_arrays.push(shuffle(shuffled_array))
         }
 
         for (let phenotype in AIR.Phenotypes) {
 
-            let score = AIR.Phenotypes[phenotype]["slope"][sample]
-            let en_score = AIR.Phenotypes[phenotype].results[sample]
+            score = AIR.Phenotypes[phenotype]["slope"][sample]
+            en_score = AIR.Phenotypes[phenotype].results[sample]
 
             await updateProgress(count++, total_iterations, "om_pheno_analyzebtn", text = " Calculate p-values..");
 
-            let random_scores = [];
-            let random_en_scores = [];
-            for (let shuffled_elements of shuffled_arrays) {
-                var _en_score = 0;
-                var xysum = 0;
-                var xxsum = 2;
+            random_scores = [];
+            random_en_scores = [];
+            for (shuffled_elements of shuffled_arrays) {
+                _en_score = 0;
+                xysum = 0;
+                xxsum = 2;
                 for (let i in FC_values) {
-                    let element = shuffled_elements[i];
+                    element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
-                        var xy = correct_SPs[phenotype][element] * FC_values[i]
+                        xy = correct_SPs[phenotype][element] * FC_values[i]
                         _en_score += xy;
                         xxsum += xy * xy
                         xysum += xy * Math.abs(xy) 
                     }
+                    // else
+                    // {
+                    //     xxsum += FC_values[i]
+                    // }
                 }
 
                 random_scores.push(xysum/xxsum)
@@ -2840,30 +2868,20 @@ async function om_PhenotypeSP() {
                 random_en_scores.push(_en_score)
             }
 
-            random_scores = random_scores.concat(random_scores.map(x => -x))
-            random_en_scores = random_en_scores.concat(random_en_scores.map(x => -x))
+            var pvalueresults = GetpValueFromValues(score, random_scores)
 
-            var std = standarddeviation(random_scores)
-            var _mean = mean(random_scores);
-            var z_score = std != 0 ? (score - _mean) / std : 0;
-            var pvalue = GetpValueFromZ(z_score);
-            if (isNaN(pvalue))
-                pvalue = 1;
-            AIR.Phenotypes[phenotype].pvalue[sample] = pvalue;
-            AIR.Phenotypes[phenotype].std[sample] = [_mean + 1.96 * std, _mean - 1.96 * std];
+            AIR.Phenotypes[phenotype].pvalue[sample] = pvalueresults.pvalue;
+            AIR.Phenotypes[phenotype].std[sample] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
 
-            std = standarddeviation(random_en_scores)
-            z_score = std != 0 ? (en_score - mean(random_en_scores)) / std : 0;
-            pvalue = GetpValueFromZ(z_score);
-            if (isNaN(pvalue))
-                pvalue = 1;
+            pvalueresults = GetpValueFromValues(en_score, random_en_scores)
 
-            AIR.Phenotypes[phenotype].en_pvalue[sample] = pvalue;
+            AIR.Phenotypes[phenotype].en_pvalue[sample] = pvalueresults.pvalue;
         }
     }
 
 
     for (let sample in globals.omics.samples) {
+
         var m_pvalues = []
         var en_pvalues = []
 
@@ -3727,24 +3745,16 @@ async function OM_PredictTargets() {
 }
 async function calculateTargets() {
 
+    globals.omics.Targets = {}
     let fc_threshold = 0;
     let pvalue_threshold = 1;
 
     var sample = $('#om_select_sample').val();
-    let n = parseFloat($('#om_targetcomb_slider').val());
-    let numberOfTargets = $("#om_target_targetnumber").val();
 
     let negativeCount = 0;
     let positiveCount = 0;
 
     activaTab("om_target_chart");
-
-    if (globals.omics.om_targettable)
-        globals.omics.om_targettable.destroy();
-    $("#om_target_chart_table").replaceWith(`
-        <table class="air_table order-column hover nowrap  mt-2" style="width:100%" id="om_target_chart_table" cellspacing=0>
-        </table>
-    `);
 
     if (globals.omics.pvalue) {
         pvalue_threshold = parseFloat($("#om_target_pvaluethreshold").val().replace(',', '.'))
@@ -3762,8 +3772,11 @@ async function calculateTargets() {
     }
     fc_threshold = Math.abs(fc_threshold)
 
+    let statistics = parseFloat($('#om_target_statistics').val());
+
+    let onlydirect = (document.getElementById("om_target_direct").checked === true);
     let elements_with_FC = getFilteredExpression(sample, fc_threshold, pvalue_threshold)
-    let FC_values = Object.values(elements_with_FC)
+    let elements_with_FC_values = Object.values(elements_with_FC)
     let possible_targets = []
     let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "PROTEIN")
     let elementarray_rnas = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "RNA")
@@ -3793,47 +3806,6 @@ async function calculateTargets() {
         else {
             negativeCount += 1;
         }
-
-        if (AIR.Molecules[e].emptySP == true) {
-            continue;
-        }
-
-        let { name: _name, type: _type, subtype: _subtype, phenotypes: _sp } = AIR.Molecules[e];
-
-        if (_type.toLowerCase() === "phenotype") {
-            continue;
-        }
-
-        switch (parseFloat($('#om_target_filter').val())) {
-            case 1:
-                if (_type != "PROTEIN") {
-                    continue;
-                }
-                break;
-            case 2:
-                if (_subtype != "miRNA") {
-                    continue;
-                }
-                break;
-            case 3:
-                if (_subtype != "lncRNA") {
-                    continue;
-                }
-                break;
-            case 4:
-                if (_subtype != "TF") {
-                    continue;
-                }
-                break;
-            case 5:
-                if (_subtype != "RECEPTOR") {
-                    continue;
-                }
-                break;
-            default:
-                break;
-        }
-
         possible_targets.push(e)
     }
 
@@ -3844,28 +3816,6 @@ async function calculateTargets() {
         shuffled_arrays.push(shuffle(shuffled_array))
     }
 
-    if (numberOfTargets == "") {
-        numberOfTargets = Object.keys(AIR.Molecules).length;
-    }
-    else {
-        numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
-        if (isNaN(numberOfTargets) || numberOfTargets < 0) {
-            alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
-            numberOfTargets = Object.keys(AIR.Molecules).length;
-            switch (parseFloat($('#om_targetcomb_slider').val())) {
-                case 2:
-                    numberOfTargets = 30;
-                    break;
-                case 3:
-                    numberOfTargets = 15;
-                    break;
-                case 4:
-                    numberOfTargets = 5;
-                    break;
-            }
-        }
-    }
-    $("#om_target_targetnumber").val(numberOfTargets)
 
     let molLength = possible_targets.length;
     await updateProgress(0, molLength, "om_regulator");
@@ -3884,175 +3834,390 @@ async function calculateTargets() {
         $("#airomics_tab_content").removeClass("air_disabledbutton");
     }
     else {
-        let _identifiedTargets = {}
         let count = 0
         for (let e of possible_targets) {
             if ((count++) % 20 == 0)
                 await updateProgress(count, molLength, "om_regulator", `  Analyzing Element ${count}/${molLength}`);
-            let _results = await analyzetargets([e]);
+            let _results = await analyzetargets([e], onlydirect);
             if (_results) {
-                _identifiedTargets[e] = _results
+                globals.omics.Targets[e] = _results
             }
         }
-        await updateProgress(0, molLength, "om_regulator", `  Ranking and filtering targets ...`);
-        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
 
-        _identifiedTargets = Object.filter(_identifiedTargets, t => _identifiedTargets[t].adj_pvalue < 0.05)
+        await getadjPvaluesForObject(globals.omics.Targets, "pvalue")
+    }
+
+    $("#om_target_resultstab").html(`
+        <label class="air_label mt-1">Regulator Type Filter:</label>
+        <select id="om_target_filter" class="browser-default om_select custom-select mb-1">
+            <option value="0">All Elements</option>
+            <option value="1">Proteins</option>
+            <option value="5">Receptors</option>
+            <option value="2">miRNAs</option>
+            <option value="3">lncRNAs</option>
+            <option value="4" selected>Transcription Factors</option>
+        </select>
+        <div class="row mt-2 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Filter"
+                            data-content="If checked, only targets with significant differential change will be considered.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col">
+                <div class="cbcontainer">
+                    <input type="checkbox" class="air_checkbox" id="om_target_onlyfc">
+                    <label class="air_checkbox" for="om_target_onlyfc">Only Targets with FC?</label>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="row mt-2 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
+                            data-content="Number of targets combinations for which a combined score should be calculated. Increasing this value has drastic effect on calculation time and requires enabling memory storage.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col" style="width: 40%; padding-right: 0">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">#k-mer Combinations:</span>
+            </div>
+            <div class="col-auto" style="width: 7%; padding: 0">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;" id="om_targetcomb_value">1</span>
+            </div>
+            <div class="col-auto" style="width: 50%; padding-top: 5px; padding-right: 40px;">
+                <input type="range" style="width: 100%;" value="1" min="1" max="4" step="1" class="slider air_slider" id="om_targetcomb_slider">
+            </div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
+                <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Number of ranked Targets to iterate combiantions:</span>
+            </div>
+            <div class="col">
+                <input type="text" class="textfield" value="" id="om_target_targetnumber" onkeypress="return isNumber(event)" />
+            </div>
+        </div>
+        <button type="button" id="om_btn_predictcomb" class="air_btn btn btn-block mt-1 mb-1">Predict Combinations</button>
+        <hr>
+    `);
+
+    $("#om_target_onlyfc").on('change', updateTargetChart);
+    $("#om_target_filter").on('change', updateTargetChart);
+
+    $('#om_targetcomb_slider').on('input', async function (e) {
+        $("#om_targetcomb_value").html($(this).val());
+        switch (parseFloat($(this).val())) {
+            case 1:
+                $("#om_target_targetnumber").val("")
+                break;
+            case 2:
+                $("#om_target_targetnumber").val(50)
+                break;
+            case 3:
+                $("#om_target_targetnumber").val(20)
+                break;
+            case 4:
+                $("#om_target_targetnumber").val(10)
+                break;
+        }
+    });
+
+    $('#om_btn_predictcomb').on('click', async function (e) {
+        await updateTargetChart();
+    })
+
+    await updateTargetChart()
+    $("#om_regulator_progress").hide();
+    $("#om_btn_predicttarget").html('Predict Targets');
+    $("#airomics_tab_content").removeClass("air_disabledbutton");
+
+    async function updateTargetChart()
+    {
+        $("#airomics_tab_content").addClass("air_disabledbutton");
+        
+        if (globals.omics.om_targettable)
+            globals.omics.om_targettable.destroy();
+    
+        $("#om_target_chart_table").replaceWith(`
+            <table class="air_table order-column hover nowrap  mt-2" style="width:100%" id="om_target_chart_table" cellspacing=0>
+            </table>
+        `);
+
+        let onlyfc = (document.getElementById("om_target_onlyfc").checked === true);
+        
+        globals.omics.om_targetchart.data.datasets = [];
+
+        let targestsforTable = {}
+        let n = parseFloat($('#om_targetcomb_slider').val());
+        let numberOfTargets = $("#om_target_targetnumber").val();
+    
+        if (numberOfTargets == "") {
+            numberOfTargets = Object.keys(AIR.Molecules).length;
+        }
+        else {
+            numberOfTargets = parseFloat(numberOfTargets.replace(',', '.'))
+            if (isNaN(numberOfTargets) || numberOfTargets < 0) {
+                alert("Only positive integer numbers are allowed as a number. Number of targets was set to 100.")
+                numberOfTargets = Object.keys(AIR.Molecules).length;
+                switch (parseFloat($('#om_targetcomb_slider').val())) {
+                    case 2:
+                        numberOfTargets = 30;
+                        break;
+                    case 3:
+                        numberOfTargets = 15;
+                        break;
+                    case 4:
+                        numberOfTargets = 5;
+                        break;
+                }
+            }
+        }
+        $("#om_target_targetnumber").val(numberOfTargets)
+
+        let targetfilterIndex = parseFloat($('#om_target_filter').val())
+        for(let e in AIR.Molecules)
+        {
+            if (!elements_with_FC.hasOwnProperty(e) && onlyfc) {
+                continue
+            }
+            if (AIR.Molecules[e].emptySP == true) {
+                continue;
+            }
+
+            let { name: _name, type: _type, subtype: _subtype, phenotypes: _sp } = AIR.Molecules[e];
+
+            if (_type.toLowerCase() === "phenotype") {
+                continue;
+            }
+
+            switch (targetfilterIndex) {
+                case 1:
+                    if (_type != "PROTEIN") {
+                        continue;
+                    }
+                    break;
+                case 2:
+                    if (_subtype != "miRNA") {
+                        continue;
+                    }
+                    break;
+                case 3:
+                    if (_subtype != "lncRNA") {
+                        continue;
+                    }
+                    break;
+                case 4:
+                    if (_subtype != "TF") {
+                        continue;
+                    }
+                    break;
+                case 5:
+                    if (_subtype != "RECEPTOR") {
+                        continue;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            
+            if(globals.omics.Targets.hasOwnProperty(e))
+            {
+                targestsforTable[e] = globals.omics.Targets[e];
+            }
+        }
 
         if (n > 1) {
-            _identifiedTargets = pickHighest(_identifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity");
-            let identifiedTargets = Object.keys(_identifiedTargets);
+
+            $("#om_btn_predictcomb").empty().append($(`
+                <div class="air_progress position-relative">
+                    <div id="om_targetcomb_progress" class="air_progress_value"></div>
+                    <span id="om_targetcomb_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
+                </div>  
+            `));
+
+            signidentifiedTargets = Object.filter(targestsforTable, t => targestsforTable[t].adj_pvalue < 0.01)
+            signidentifiedTargets = pickHighest(signidentifiedTargets, _num = numberOfTargets, ascendend = false, key = "sensitivity");
+            
+            targestsforTable = {};
+            let identifiedTargets = Object.keys(signidentifiedTargets);
 
             for (var i = 0; i < identifiedTargets.length - 1; i++) {
 
-                await updateProgress(i, identifiedTargets.length, "om_regulator", `  Iterating target combinations  ${i}/${identifiedTargets.length}`);
+                await updateProgress(i, identifiedTargets.length, "om_targetcomb", `  Iterating target combinations  ${i}/${identifiedTargets.length}`);
 
                 for (var j = i + 1; j < identifiedTargets.length; j++) {
                     if (n > 2) {
                         for (var k = j + 1; k < identifiedTargets.length; k++) {
                             if (n > 3)
                                 for (var m = k + 1; m < identifiedTargets.length; m++) {
-                                    let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]])
+                                    let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k], identifiedTargets[m]], onlydirect)
                                     if (result) {
-                                        _identifiedTargets[[i, j, k, m].join("_")] = result;
+                                        targestsforTable[[i, j, k, m].join("_")] = result;
                                     }
                                 }
                             else {
-                                let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]])
+                                let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j], identifiedTargets[k]], onlydirect)
                                 if (result) {
-                                    _identifiedTargets[[i, j, k].join("_")] = result;
+                                    targestsforTable[[i, j, k].join("_")] = result;
                                 }
                             }
                         }
                     }
                     else {
-                        let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j]])
+                        let result = await analyzetargets([identifiedTargets[i], identifiedTargets[j]], onlydirect)
                         if (result) {
-                            _identifiedTargets[[i, j].join("_")] = result;
+                            targestsforTable[[i, j].join("_")] = result;
                         }
                     }
                 }
+
+                await getadjPvaluesForObject(targestsforTable, "pvalue")
             }
+            $("#om_btn_predictcomb").html('Predict Combinations');
         }
 
-        await getadjPvaluesForObject(_identifiedTargets, "pvalue")
-
-        for (let target in _identifiedTargets) {
-            adddatatochart(_identifiedTargets[target]);
+        for (let target in targestsforTable) {
+            adddatatochart(targestsforTable[target], onlydirect, statistics == 0? true:false);
         }
 
-        $("#om_target_chart_canvas").height(400);
+        $("#om_target_chart_canvas").height(400);        
         $("#om_regulator_progress").hide();
         $("#om_btn_predicttarget").html('Predict Targets');
         $("#airomics_tab_content").removeClass("air_disabledbutton");
 
         globals.omics.om_targetchart.update();
 
+        var tbl = document.getElementById('om_target_chart_table');
+        var header = tbl.createTHead();
+        var headerrow = header.insertRow(0);
+
+        createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
+        createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
+        createCell(headerrow, 'th', 'adj p-value', 'col', 'col', 'center');
+        //createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
+        createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
+        createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
+        createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
+        //createCell(headerrow, 'th', 'Effect', 'col', 'col', 'left');
+
+
+        globals.omics.om_targettable = $('#om_target_chart_table').DataTable({
+            "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+            "buttons": [
+                {
+                    text: 'Copy',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        copyContent(getDTExportString(globals.omics.om_targettable));
+                    }
+                },
+                {
+                    text: 'CSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("Predicted_targets.csv", getDTExportString(globals.omics.om_targettable, seperator = ","))
+                    }
+                },
+                {
+                    text: 'TSV',
+                    className: 'air_dt_btn',
+                    action: function () {
+                        air_download("Predicted_targets.txt", getDTExportString(globals.omics.om_targettable))
+                    }
+                }
+            ],
+            "order": [[3, "desc"], [2, "asc"]],
+            "scrollX": true,
+            "autoWidth": true,
+            columns: [
+                null,
+                { "width": "15%" },
+                { "width": "15%" },
+                { "width": "15%" },
+                //{ "width": "15%" },
+                { "width": "10%" },
+                { "width": "10%" },
+            ],
+            columnDefs: [
+                {
+                    targets: 0,
+                    className: 'dt-right',
+                    'max-width': '25%',
+                },
+                {
+                    targets: 1,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 2,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 3,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 4,
+                    className: 'dt-center'
+                },
+                {
+                    targets: 5,
+                    className: 'dt-center'
+                },
+                // {
+                //     targets: 6,
+                //     className: 'dt-center'
+                // },
+            ]
+        }).columns.adjust();
     }
 
-    var tbl = document.getElementById('om_target_chart_table');
-    var header = tbl.createTHead();
-    var headerrow = header.insertRow(0);
 
-    createCell(headerrow, 'th', 'Element', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'Type', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'adj p-value', 'col', 'col', 'center');
-    //createCell(headerrow, 'th', 'p-value', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'Sensitivity', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'Specificity', 'col', 'col', 'center');
-    createCell(headerrow, 'th', 'FC', 'col', 'col', 'center');
-    //createCell(headerrow, 'th', 'Effect', 'col', 'col', 'left');
-
-
-    globals.omics.om_targettable = $('#om_target_chart_table').DataTable({
-        "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
-        "buttons": [
-            {
-                text: 'Copy',
-                className: 'air_dt_btn',
-                action: function () {
-                    copyContent(getDTExportString(globals.omics.om_targettable));
-                }
-            },
-            {
-                text: 'CSV',
-                className: 'air_dt_btn',
-                action: function () {
-                    air_download("Predicted_targets.csv", getDTExportString(globals.omics.om_targettable, seperator = ","))
-                }
-            },
-            {
-                text: 'TSV',
-                className: 'air_dt_btn',
-                action: function () {
-                    air_download("Predicted_targets.txt", getDTExportString(globals.omics.om_targettable))
-                }
-            }
-        ],
-        "order": [[3, "desc"], [2, "asc"]],
-        "scrollX": true,
-        "autoWidth": true,
-        columns: [
-            null,
-            { "width": "15%" },
-            { "width": "15%" },
-            { "width": "15%" },
-            //{ "width": "15%" },
-            { "width": "10%" },
-            { "width": "10%" },
-        ],
-        columnDefs: [
-            {
-                targets: 0,
-                className: 'dt-right',
-                'max-width': '25%',
-            },
-            {
-                targets: 1,
-                className: 'dt-center'
-            },
-            {
-                targets: 2,
-                className: 'dt-center'
-            },
-            {
-                targets: 3,
-                className: 'dt-center'
-            },
-            {
-                targets: 4,
-                className: 'dt-center'
-            },
-            {
-                targets: 5,
-                className: 'dt-center'
-            },
-            // {
-            //     targets: 6,
-            //     className: 'dt-center'
-            // },
-        ]
-    }).columns.adjust();
-
-    async function analyzetargets(targets) {
+    async function analyzetargets(targets, onlydirect) {
         let maxScore = 0;
         let maxregulators = null;
         let results = null;
+        let max_ES = 0;
+        let regulators, positiveSum, negativeSum, xysum, xxsum, xy
 
         for (let index of targetCombinations(targets.length)) {
-            let regulators = await getRegulatorsForTarget(targets, index)
-            let positiveSum = 0;
-            let negativeSum = 0;
+            regulators = await getRegulatorsForTarget(targets, index, onlydirect)
+            positiveSum = 0;
+            negativeSum = 0;
+
+            xysum = 0;
+            xxsum = 0
 
             for (let p in AIR.Molecules) {
                 let SP = regulators.hasOwnProperty(p) ? regulators[p] : 0;
-                if (elements_with_FC.hasOwnProperty(p)) {
-                    positiveSum += elements_with_FC[p] * SP;
+                let FC = elements_with_FC.hasOwnProperty(p)? elements_with_FC[p] : 0;
+
+                positiveSum += FC * SP;
+
+                if(SP == 0)
+                {
+                    xxsum += Math.abs(FC)
                 }
-                else {
+                else
+                {
+                    xy = SP * FC           
+                    xxsum += xy * xy
+                    xysum += xy * Math.abs(xy) 
+                }
+                
+                if(FC == 0) {
                     negativeSum += (1 - Math.abs(SP));
                 }
             }
+
+            var es = xysum/xxsum;
+
 
             let sensitivity = positiveSum / positiveCount;
             let specificity = negativeSum / negativeCount;
@@ -4067,22 +4232,26 @@ async function calculateTargets() {
             if (specificity > 0 && sensitivity != 0) {
                 let positive = sensitivity > 0 ? true : false;
                 let positiveValue = sensitivity > 0 ? 1 : -1;
-                sensitivity = Math.abs(sensitivity);
+                abssensitivity = Math.abs(sensitivity);
 
-                if (sensitivity <= maxScore)
+                if (abssensitivity < Math.abs(maxScore))
                     continue;
+
+                // if(Math.abs(es) < Math.abs(max_ES))
+                //     continue;
 
 
                 // let pvalue = await fishers(_TargetsInDeGs, _TargetsNotInDEGs, _nonTargetsInDEGs, _nonTargetsNotInDEGs)
                 maxregulators = regulators;
                 maxScore = sensitivity;
+                max_ES = es;
 
                 results =
                 {
                     "id": targets,
                     "fc": mean(targets.map(t => (elements_with_FC.hasOwnProperty(t) ? elements_with_FC[t] : 0))),
                     "index": index,
-                    "sensitivity": sensitivity,
+                    "sensitivity": abssensitivity,
                     "name": targets.map(t => AIR.Molecules[t].name + (index[targets.indexOf(t)] * positiveValue == -1 ? "\u2193" : "\u2191")).join(' & '),
                     "linkname": targets.map(t => getLinkIconHTML(AIR.Molecules[t].name) + (index[targets.indexOf(t)] * positiveValue == -1 ? "\u2193" : "\u2191")).join(' & '),
                     "specificity": specificity,
@@ -4095,33 +4264,48 @@ async function calculateTargets() {
             return false;
         }
         else {
-            let _sensitivity_scors = [];
+            let _escores = [];
+
+            let element, _sensitivity;
             for (let shuffled_elements of shuffled_arrays) {
-                let _sensitivity = 0.0;
-                for (let i in FC_values) {
-                    let element = shuffled_elements[i];
+                _sensitivity = 0.0;
+                xysum = 0;
+                xxsum = 2
+                for (let i in elements_with_FC_values) {
+                    element = shuffled_elements[i];
                     if (maxregulators.hasOwnProperty(element)) {
-                        _sensitivity += FC_values[i] * maxregulators[element];
+                        xy =  elements_with_FC_values[i] * maxregulators[element]   
+                        _sensitivity += xy;        
+                        xxsum += xy * xy
+                        xysum += xy * Math.abs(xy) 
+                    }
+                    else
+                    {
+                        xxsum += Math.abs(elements_with_FC_values[i])
                     }
                 }
-
-                _sensitivity_scors.push(_sensitivity / positiveCount);
+                switch (statistics) {
+                    case 1:
+                        _escores.push(_sensitivity / positiveCount);
+                        break;
+                    case 0:
+                        _escores.push(xysum/xxsum);
+                        break;
+                }
             }
 
-            let std = standarddeviation(_sensitivity_scors)
+            
+            var pvalueresults = GetpValueFromValues((statistics == 1? maxScore : max_ES), _escores)
 
-            let pvalue = 1
-            if (std && std != 0) {
-                let z_score = (results["sensitivity"] - mean(_sensitivity_scors)) / std;
-                pvalue = GetpValueFromZ(z_score);
-            }
 
-            results["pvalue"] = isNaN(pvalue) ? 1 : pvalue;
+            results["pvalue"] = pvalueresults.pvalue;
+            results["ES"] = max_ES;
+            results["CI"] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
             return results;
         }
     }
 
-    async function adddatatochart(targtetdata, colored = true) {
+    async function adddatatochart(targtetdata, onlydirect = false, distribution = false, colored = true) {
         return new Promise(
             async function (resolve, reject) {
 
@@ -4151,7 +4335,23 @@ async function calculateTargets() {
                 let result_row = tbl.insertRow(tbl.rows.length);
 
                 createCell(result_row, 'td', targtetdata.linkname, 'col-auto', 'col', 'center', true);
-                createPopupCell(result_row, 'td', targtetdata.positive == null ? "mixed" : (targtetdata.positive ? "positive" : "negative"), 'col-auto', 'center', om_createtargetpopup, { "sample": sample, "id": targtetdata.id, "index": targtetdata.index, "pvalue_threshold": pvalue_threshold, "fcthreshold": fc_threshold }),
+
+                var parameter = {
+                    "function": om_gettargetValues,
+                    "functionparam": {
+                        "sample": sample,
+                        "pvalue_threshold": pvalue_threshold,
+                        "fcthreshold": fc_threshold,
+                        "id": targtetdata.id,
+                        "index": targtetdata.index,
+                        "onlydirect": onlydirect,
+                    },
+                    "distribution": distribution,
+                    "slope": targtetdata.ES,
+                    "CI": targtetdata.CI,
+                    "title": "DCEs influenced by '" + targtetdata.id.map(t => AIR.Molecules[t].name).join(" & ") + "' in '" + globals.omics.samples[sample] + "'",
+                }
+                createPopupCell(result_row, 'td', targtetdata.positive == null ? "mixed" : (targtetdata.positive ? "positive" : "negative"), 'col-auto', 'center', air_createpopup, parameter),
                     createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
                 //createCell(result_row, 'td', expo(targtetdata.pvalue, 2, 2), 'col-auto', 'col', 'center', true);
                 createCell(result_row, 'td', expo(targtetdata.sensitivity, 3, 3), 'col-auto', 'col', 'center', true);
@@ -4187,19 +4387,17 @@ async function calculateTargets() {
     }
 }
 
-async function getRegulatorsForTarget(targets, index) {
+async function getRegulatorsForTarget(targets, index, onlydirect = false) {
     let regulators = {};
 
     for (let t in targets) {
-        let _data = await getInfluencesForElement(targets[t]);
-
-        for (let p in _data) {
-            if (_data[p] != 0)
-                if (!regulators.hasOwnProperty(p)) {
-                    regulators[p] = _data[p] * index[t];
+        for (let [e, _value] of Object.entries(await getInfluencesForElement(targets[t]))) {
+            if (_value != 0 && (onlydirect == false || Math.abs(_value) == 1))
+                if (!regulators.hasOwnProperty(e)) {
+                    regulators[e] = _value * index[t];
                 }
                 else {
-                    regulators[p] += _data[p] * index[t];
+                    regulators[e] += _value * index[t];
                 }
         }
     }
@@ -5087,660 +5285,264 @@ async function getEnrichr(elements, selectedenrichr) {
     });
 }
 
-function om_createpopup(button, parameter) {
+// async function om_createtargetpopup(button, parameter) {
 
-    var $target = $('#om_chart_popover');
-    var $btn = $(button);
+//     var $target = $('#om_target_chart_popover');
+//     var $btn = $(button);
 
-    let sample = parameter.sample
-    let phenotype = parameter.phenotype
+//     let sample = parameter.sample
+//     let phenotype = parameter.phenotype
 
-
-
-    if ($target) {
+//     if ($target) {
 
 
-        $('#om_clickedpopupcell').css('background-color', 'transparent');
-        $('#om_clickedpopupcell').removeAttr('id');
+//         $('#om_target_clickedpopupcell').css('background-color', 'transparent');
+//         $('#om_target_clickedpopupcell').removeAttr('id');
 
-        if ($target.siblings().is($btn)) {
-            $target.remove();
-            $("#om_resultstable").parents(".dataTables_scrollBody").css({
-                minHeight: "0px",
-            });
-            return;
-        }
-        $target.remove();
+//         if ($target.siblings().is($btn)) {
+//             $target.remove();
+//             $("#om_target_table").parents(".dataTables_scrollBody").css({
+//                 minHeight: "0px",
+//             });
+//             return;
+//         }
+//         $target.remove();
 
-    }
+//     }
 
-    $(button).attr('id', 'om_clickedpopupcell');
-    $(button).css('background-color', 'lightgray');
+//     $(button).attr('id', 'om_target_clickedpopupcell');
+//     $(button).css('background-color', 'lightgray');
 
-    $target = $(`<div id="om_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2; border: none;">
-                    <div class="arrow" style="left: 9.375%;"></div>
-                    <div id="om_chart_popover_content" class="popover-content">
-                        <button type="button" id="om_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                        <div class="cbcontainer mt-1 mb-2 ml-2">
-                            <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
-                            <label class="air_checkbox" for="om_popup_showregression">Show Confidence Intervall</label>
-                        </div>
-                        <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#C00000"></span>
-                                Activates Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#0070C0"></span>
-                                Represses Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#cccccc"></span>
-                                Not diff. expressed</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="triangle_small"></span>
-                                External Link</li>
-                        </div>
-                        <div style="height: 80%">
-                            <canvas class="popup_chart" id="om_popup_chart"></canvas>
-                        </div>
-                    </div>
-                </div>`);
-
-    $btn.after($target);
-
-    let close_btn = document.getElementById("om_popup_close");
-    // When the user clicks on <span> (x), close the modal
-    close_btn.onclick = function () {
-        $target.remove();
-        $("#om_resultstable").parents(".dataTables_scrollBody").css({
-            minHeight: "0px",
-        });
-    }
-
-    let targets = []
-    var dist_targets = [
-        {
-            label: "",
-            data: [{
-                x: 1,
-                y: 0,
-                r: 4
-            }],
-        },
-        {
-            label: "",
-            data: [{
-                x: -1,
-                y: 0,
-                r: 4
-            }],
-        }
-    ]
-    var maxx_dist = 0;
-    for (let element in parameter.FilteredRegulators[phenotype]) {
-
-        let SP = parameter.FilteredRegulators[phenotype][element];
-        let hex = "#cccccc";
-        let rad = 3;
-        let FC = 0
-
-        if (parameter.FilteredElements[sample].hasOwnProperty(element)) {
-            FC = parameter.FilteredElements[sample][element];
-            var aggr = SP * FC
-            rad = 6
-
-            if (aggr < 0) {
-                hex = "#0070C0";
-            }
-            else if (aggr > 0) {
-                hex = "#C00000"
-            }
-            if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
-            dist_targets.push(
-                {
-                    label: element,
-                    data: [{
-                        x: Math.abs(aggr) * Math.sign(FC),
-                        y: Math.abs(aggr) * Math.sign(SP),
-                        r: rad
-                    }],
-                    pointStyle: pstyle,
-                    backgroundColor: hex,
-                    hoverBackgroundColor: hex,
-                })
-        }
-
-        var pstyle = 'circle';
-        if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
-            pstyle = 'triangle'
-        }
-
-
-        targets.push(
-            {
-                label: element,
-                data: [{
-                    x: FC,
-                    y: SP,
-                    r: rad
-                }],
-                pointStyle: pstyle,
-                backgroundColor: hex,
-                hoverBackgroundColor: hex,
-            }
-        );
-    }
-
-    maxx_dist = maxx_dist < 1? 1 : maxx_dist;
-    
-    var m = AIR.Phenotypes[phenotype]["slope"][sample];
-    var [std1,std2] = AIR.Phenotypes[phenotype]["std"][sample];
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * m,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * m,
-                r: 0,
-            }],
-            type: 'line',
-            fill: false,
-            pointRadius: 0,
-            backgroundColor: m < 0 ? "#0070C0" : "#C00000",
-            borderColor: m < 0 ? "#0070C0" : "#C00000",
-            borderWidth: 2,
-        }
-    );
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * std2,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * std2,
-                r: 0,
-            }],
-            type: 'line',
-            fill: "+1",
-            pointRadius: 0,
-        }
-    );
-    dist_targets.push(
-        {
-            data: [{
-                x: -maxx_dist,
-                y: -maxx_dist * std1,
-                r: 0,
-            },
-            {
-                x: maxx_dist,
-                y: maxx_dist * std1,
-                r: 0,
-            }],
-            type: 'line',
-            fill: false,
-            pointRadius: 0,
-        }
-    );
-
-    var outputCanvas = document.getElementById('om_popup_chart');
-
-    var chartOptions = {
-        type: 'bubble',
-        data: {
-            datasets: targets,
-        },
-        options: {
-            plugins: {
-                plugins: {
-                    filler: {
-                        propagate: false
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                zoom: {
-                    // Container for pan options
-                    pan: {
-                        // Boolean to enable panning
-                        enabled: true,
-
-                        // Panning directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow panning in the y direction
-                        mode: 'xy',
-                        rangeMin: {
-                            // Format of min pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
-                        rangeMax: {
-                            // Format of max pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
-
-                        // On category scale, factor of pan velocity
-                        speed: 20,
-
-                        // Minimal pan distance required before actually applying pan
-                        threshold: 10,
-
-                    },
-
-                    // Container for zoom options
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'xy',
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            var element = context.label || '';
-
-                            if (element) {
-                                var is_dce = globals.omics.ExpressionValues.hasOwnProperty(element);
-                                return [
-                                    'Name: ' + AIR.Molecules[element].name,
-                                    'Influence: ' + expo(AIR.Phenotypes[phenotype].values[element], 4, 3),
-                                    'FC: ' + (is_dce ? expo(globals.omics.ExpressionValues[element].nonnormalized[sample], 4, 3) : "0"),
-                                    'p-value: ' + (is_dce ? (globals.omics.pvalue ? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A") : "N/A")
-                                ];
-                            }
-                            else
-                                return "";
-
-                        }
-                    }
-                }
-            },
-            responsive: true,
-            maintainAspectRatio: false,
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
-            onClick: (event, chartElement) => {
-                if (chartElement[0]) {
-                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            },
-            layout: {
-                padding: {
-                    top: 0
-                }
-            },
-            title: {
-                display: true,
-                text: "Regulators for '" + AIR.Phenotypes[phenotype].name + "' in '" + globals.omics.samples[sample] + "'",
-                fontFamily: 'Helvetica',
-            },
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Influence on Phenotype'
-                    },
-                    ticks: {
-                        //beginAtZero: true,
-                        max: 1,
-                        min: -1
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    }
-                },
-                x:
-                {
-                    title: {
-                        display: true,
-                        text: 'Fold Change in Data'
-                    },
-                    ticks: {
-                        //beginAtZero: false,
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    },
-                },
-            }
-        }
-
-    };
-
-    let popupchart = new Chart(outputCanvas, chartOptions);
-    $target.show();
-
-    var popupheight = $("#om_chart_popover").height() + 50;
-    $("#om_resultstable").parents(".dataTables_scrollBody").css({
-        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
-    });
-
-
-    $('#om_popup_showregression').on('click', function () {
-
-        if (document.getElementById("om_popup_showregression").checked === true) {
-            popupchart.data.datasets = dist_targets
-            $("#om_legend_target").replaceWith(`
-            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span style="font-weight:bold; font-size: 50; color:${m < 0 ? "#0070C0" : "#C00000"}">—</span>
-                    Normalized Regression</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#cccccc"></span>
-                    95% Confidence Intervall (unadjusted)</li>
-            </div>
-            `);
-        }
-        else {
-            popupchart.data.datasets = targets
-
-            $("#om_legend_target").replaceWith(`            
-            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#C00000"></span>
-                    Activates Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#0070C0"></span>
-                    Represses Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#cccccc"></span>
-                    Not diff. expressed</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="triangle_small"></span>
-                    External Link</li>
-            </div>`);
-        }
-
-        popupchart.update();
-    })
-};
-
-async function om_createtargetpopup(button, parameter) {
-
-    var $target = $('#om_target_chart_popover');
-    var $btn = $(button);
-
-    let sample = parameter.sample
-    let phenotype = parameter.phenotype
-
-    if ($target) {
-
-
-        $('#om_target_clickedpopupcell').css('background-color', 'transparent');
-        $('#om_target_clickedpopupcell').removeAttr('id');
-
-        if ($target.siblings().is($btn)) {
-            $target.remove();
-            $("#om_target_table").parents(".dataTables_scrollBody").css({
-                minHeight: "0px",
-            });
-            return;
-        }
-        $target.remove();
-
-    }
-
-    $(button).attr('id', 'om_target_clickedpopupcell');
-    $(button).css('background-color', 'lightgray');
-
-    $target = $(`<div id="om_target_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
-                    <div id="om_target_chart_popover_content" class="popover-content">
+//     $target = $(`<div id="om_target_chart_popover" class="popover bottom in" style="max-width: none; top: 55px; z-index: 2;">
+//                     <div id="om_target_chart_popover_content" class="popover-content">
                         
-                        <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#0070C0"></span>
-                                Congruent Relation</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#C00000"></span>
-                                Opposite Relation</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#cccccc"></span>
-                                Not diff. expressed</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="triangle_small"></span>
-                                External Link</li>
-                        </div>
-                        <div style="height: 80%">
-                            <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
-                        </div>
-                    </div>
-                </div>`);
+//                         <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
+//                             <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="legendspan_small" style="background-color:#0070C0"></span>
+//                                 Congruent Relation</li>
+//                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="legendspan_small" style="background-color:#C00000"></span>
+//                                 Opposite Relation</li>
+//                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="legendspan_small" style="background-color:#cccccc"></span>
+//                                 Not diff. expressed</li>
+//                             <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+//                                 <span class="triangle_small"></span>
+//                                 External Link</li>
+//                         </div>
+//                         <div style="height: 80%">
+//                             <canvas class="popup_chart" id="om_target_popup_chart"></canvas>
+//                         </div>
+//                     </div>
+//                 </div>`);
 
-    $btn.after($target);
+//     $btn.after($target);
 
-    let targets = []
+//     let targets = []
 
-    let regulators = await getRegulatorsForTarget(parameter.id, parameter.index)
+//     let regulators = await getRegulatorsForTarget(parameter.id, parameter.index)
 
-    for (let element in globals.omics.ExpressionValues) {
+//     for (let element in globals.omics.ExpressionValues) {
 
-        let FC = globals.omics.ExpressionValues[element].nonnormalized[sample]
-        let pValue = 1;
+//         let FC = globals.omics.ExpressionValues[element].nonnormalized[sample]
+//         let pValue = 1;
 
-        if (isNaN(FC) || FC == 0 || Math.abs(FC) < parameter.fcthreshold) {
-            continue;
-        }
-        if (globals.omics.pvalue) {
-            pValue = globals.omics.ExpressionValues[element].pvalues[sample];
-            if (isNaN(pValue))
-                pValue = 1;
+//         if (isNaN(FC) || FC == 0 || Math.abs(FC) < parameter.fcthreshold) {
+//             continue;
+//         }
+//         if (globals.omics.pvalue) {
+//             pValue = globals.omics.ExpressionValues[element].pvalues[sample];
+//             if (isNaN(pValue))
+//                 pValue = 1;
 
-            if (pValue > parameter.pvalue_threshold) {
-                continue;
-            }
-        }
+//             if (pValue > parameter.pvalue_threshold) {
+//                 continue;
+//             }
+//         }
 
-        let SP = regulators.hasOwnProperty(element) ? regulators[element] : 0;
+//         let SP = regulators.hasOwnProperty(element) ? regulators[element] : 0;
 
-        let hex = "#cccccc";
-        let rad = 6;
+//         let hex = "#cccccc";
+//         let rad = 6;
 
-        if ((SP * FC) < 0) {
-            hex = "#0070C0";
-        }
-        else if ((SP * FC) > 0) {
-            hex = "#C00000"
-        }
-
-
-        var pstyle = 'circle';
-        if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
-            pstyle = 'triangle'
-        }
+//         if ((SP * FC) < 0) {
+//             hex = "#0070C0";
+//         }
+//         else if ((SP * FC) > 0) {
+//             hex = "#C00000"
+//         }
 
 
-        targets.push(
-            {
-                label: element,
-                data: [{
-                    x: FC,
-                    y: SP,
-                    r: rad
-                }],
-                pointStyle: pstyle,
-                backgroundColor: hex,
-                hoverBackgroundColor: hex,
-            }
-        );
-    }
+//         var pstyle = 'circle';
+//         if (AIR.MapSpeciesLowerCase.includes(AIR.Molecules[element].name.toLowerCase()) === false) {
+//             pstyle = 'triangle'
+//         }
 
-    var outputCanvas = document.getElementById('om_target_popup_chart');
 
-    var chartOptions = {
-        type: 'bubble',
-        data: {
-            datasets: targets,
-        },
-        options: {
-            plugins: {
-                zoom: {
-                    // Container for pan options
-                    pan: {
-                        // Boolean to enable panning
-                        enabled: true,
+//         targets.push(
+//             {
+//                 label: element,
+//                 data: [{
+//                     x: FC,
+//                     y: SP,
+//                     r: rad
+//                 }],
+//                 pointStyle: pstyle,
+//                 backgroundColor: hex,
+//                 hoverBackgroundColor: hex,
+//             }
+//         );
+//     }
 
-                        // Panning directions. Remove the appropriate direction to disable 
-                        // Eg. 'y' would only allow panning in the y direction
-                        mode: 'xy',
-                        rangeMin: {
-                            // Format of min pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
-                        rangeMax: {
-                            // Format of max pan range depends on scale type
-                            x: null,
-                            y: null
-                        },
+//     var outputCanvas = document.getElementById('om_target_popup_chart');
 
-                        // On category scale, factor of pan velocity
-                        speed: 20,
+//     var chartOptions = {
+//         type: 'bubble',
+//         data: {
+//             datasets: targets,
+//         },
+//         options: {
+//             plugins: {
+//                 zoom: {
+//                     // Container for pan options
+//                     pan: {
+//                         // Boolean to enable panning
+//                         enabled: true,
 
-                        // Minimal pan distance required before actually applying pan
-                        threshold: 10,
+//                         // Panning directions. Remove the appropriate direction to disable 
+//                         // Eg. 'y' would only allow panning in the y direction
+//                         mode: 'xy',
+//                         rangeMin: {
+//                             // Format of min pan range depends on scale type
+//                             x: null,
+//                             y: null
+//                         },
+//                         rangeMax: {
+//                             // Format of max pan range depends on scale type
+//                             x: null,
+//                             y: null
+//                         },
 
-                    },
+//                         // On category scale, factor of pan velocity
+//                         speed: 20,
 
-                    // Container for zoom options
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'xy',
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            var element = context.label || '';
+//                         // Minimal pan distance required before actually applying pan
+//                         threshold: 10,
 
-                            if (element && globals.omics.ExpressionValues.hasOwnProperty(element)) {
-                                return [
-                                    'Name: ' + AIR.Molecules[element].name,
-                                    'Influence: ' + expo(regulators[element], 4, 3),
-                                    'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample], 4, 3),
-                                    'p-value: ' + (globals.omics.pvalue ? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
-                                ];
-                            }
-                            else
-                                return "";
+//                     },
 
-                        }
-                    }
-                }
-            },
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 0
-            },
-            responsiveAnimationDuration: 0,
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
-            onClick: (event, chartElement) => {
-                if (chartElement[0]) {
-                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
-                    selectElementonMap(name, true);
-                    xp_setSelectedElement(name);
-                }
-            },
-            layout: {
-                padding: {
-                    top: 0
-                }
-            },
-            title: {
-                display: true,
-                text: "DCEs influenced by '" + parameter.id.map(t => AIR.Molecules[t].name).join(" & ") + "' in '" + globals.omics.samples[sample] + "'",
-                fontFamily: 'Helvetica',
-            },
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Influence from Target'
-                    },
-                    ticks: {
-                        //beginAtZero: true,
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    }
-                },
-                x:
-                {
-                    title: {
-                        display: true,
-                        text: 'Fold Change in Data'
-                    },
-                    ticks: {
-                        //beginAtZero: false,
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: function (context) {
-                            if (context.tick.value == 0)
-                                return '#000000';
-                            else
-                                return "#D3D3D3";
-                        },
-                    },
-                },
-            }
-        }
+//                     // Container for zoom options
+//                     zoom: {
+//                         wheel: {
+//                             enabled: true,
+//                         },
+//                         pinch: {
+//                             enabled: true
+//                         },
+//                         mode: 'xy',
+//                     }
+//                 },
+//                 legend: {
+//                     display: false
+//                 },
+//                 tooltip: {
+//                     callbacks: {
+//                         label: function (context) {
+//                             var element = context.label || '';
 
-    };
+//                             if (element && globals.omics.ExpressionValues.hasOwnProperty(element)) {
+//                                 return [
+//                                     'Name: ' + AIR.Molecules[element].name,
+//                                     'Influence: ' + expo(regulators[element], 4, 3),
+//                                     'FC: ' + expo(globals.omics.ExpressionValues[element].nonnormalized[sample], 4, 3),
+//                                     'p-value: ' + (globals.omics.pvalue ? expo(globals.omics.ExpressionValues[element].pvalues[sample], 4, 3) : "N/A")
+//                                 ];
+//                             }
+//                             else
+//                                 return "";
 
-    let popupchart = new Chart(outputCanvas, chartOptions);
-    $target.show();
+//                         }
+//                     }
+//                 }
+//             },
+//             responsive: true,
+//             maintainAspectRatio: false,
+//             animation: {
+//                 duration: 0
+//             },
+//             responsiveAnimationDuration: 0,
+//             onHover: (event, chartElement) => {
+//                 event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+//             },
+//             onClick: (event, chartElement) => {
+//                 if (chartElement[0]) {
+//                     let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+//                     selectElementonMap(name, true);
+//                     xp_setSelectedElement(name);
+//                 }
+//             },
+//             layout: {
+//                 padding: {
+//                     top: 0
+//                 }
+//             },
+//             title: {
+//                 display: true,
+//                 text: "DCEs influenced by '" + parameter.id.map(t => AIR.Molecules[t].name).join(" & ") + "' in '" + globals.omics.samples[sample] + "'",
+//                 fontFamily: 'Helvetica',
+//             },
+//             scales: {
+//                 y: {
+//                     title: {
+//                         display: true,
+//                         text: 'Influence from Target'
+//                     },
+//                     ticks: {
+//                         //beginAtZero: true,
+//                     },
+//                     grid: {
+//                         drawBorder: false,
+//                         color: function (context) {
+//                             if (context.tick.value == 0)
+//                                 return '#000000';
+//                             else
+//                                 return "#D3D3D3";
+//                         },
+//                     }
+//                 },
+//                 x:
+//                 {
+//                     title: {
+//                         display: true,
+//                         text: 'Fold Change in Data'
+//                     },
+//                     ticks: {
+//                         //beginAtZero: false,
+//                     },
+//                     grid: {
+//                         drawBorder: false,
+//                         color: function (context) {
+//                             if (context.tick.value == 0)
+//                                 return '#000000';
+//                             else
+//                                 return "#D3D3D3";
+//                         },
+//                     },
+//                 },
+//             }
+//         }
 
-    var popupheight = $("#om_target_chart_popover").height() + 50;
-    $("#om_target_table").parents(".dataTables_scrollBody").css({
-        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
-    });
-    popupchart.update();
-};
+//     };
+
+//     let popupchart = new Chart(outputCanvas, chartOptions);
+//     $target.show();
+
+//     var popupheight = $("#om_target_chart_popover").height() + 50;
+//     $("#om_target_table").parents(".dataTables_scrollBody").css({
+//         minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
+//     });
+//     popupchart.update();
+// };
 
 function randomIDs(size, max, n) {
     let output = []
@@ -6252,4 +6054,86 @@ function updateRegulatorChart()
     document.getElementById("om_pregulatorchart_canvasContainer").style.height =((50 + 40 * results.length) < 250? 250 : (50 + 40 * results.length)).toString() + "px";
     globals.omics.pregulatorchartData = results
     globals.omics.pregulatorchart.update();
+}
+
+async function om_gettargetValues(param) 
+{
+    var DCEs = {}
+    var baseline = []
+
+    let regulators = await getRegulatorsForTarget(param.id, param.index, param.onlydirect)
+
+    for (let element in globals.omics.ExpressionValues) {
+
+        let FC = globals.omics.ExpressionValues[element].nonnormalized[param.sample]
+        let pValue = 1;
+
+        if (isNaN(FC) || FC == 0 || Math.abs(FC) < param.fcthreshold) {
+            continue;
+        }
+        if (globals.omics.pvalue) {
+            pValue = globals.omics.ExpressionValues[element].pvalues[param.sample];
+            if (isNaN(pValue))
+                pValue = 1;
+
+            if (pValue > param.pvalue_threshold) {
+                continue;
+            }
+        }
+
+        let SP = regulators.hasOwnProperty(element) ? regulators[element] : 0;
+
+        DCEs[element] = {
+            "SP": SP,
+            "FC": FC,
+            "pvalue": pValue
+        }
+
+        if(SP == 0)
+        {
+            baseline.push([FC,0])
+        }
+    }
+
+    return {
+        "DCEs": DCEs,
+        "Baseline": baseline,
+    };
+}
+
+async function om_getphenotypeValues(param) 
+{
+    var DCEs = {}
+
+    for(var [element, SP] of Object.entries(globals.correctSPs[param.phenotype]))
+    {
+        let FC = 0;
+        let pvalue = "N/A"
+        if(globals.elements_with_FC[param.sample].hasOwnProperty(element))
+        {
+            FC = globals.elements_with_FC[param.sample][element];
+            pvalue =  globals.omics.ExpressionValues[element].pvalues[param.sample]
+        }
+        DCEs[element] = {
+            "SP": SP,
+            "FC": FC,
+            "pvalue": pvalue,
+        }
+    }
+
+    return {
+        "DCEs": DCEs,
+        "Baseline": [[-1,0],[-1,0]],
+    };
+}
+
+function pvalueThreshold()
+{
+                    
+    let pvalue_threshold = parseFloat($("#om_highlight_pvalue_threshold").val().replace(',', '.'))
+    if (isNaN(pvalue_threshold)) {
+        pvalue_threshold = 1;
+    }
+
+    return pvalue_threshold
 }
