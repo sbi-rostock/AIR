@@ -1821,14 +1821,7 @@ async function om_createTable(param) {
                     <div class="col">
                         <input type="text" class="textfield" value="" id="om_overlay_suffix"/>
                     </div>
-                </div>
-
-                <div class="air_alert alert alert-danger mt-2">
-                    <span>Because of server issues, generating overlays can take several minutes.</span>
-                    <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>     
+                </div> 
 
                 <button type="button" id="om_addoverlaybtn"  class="air_btn_light btn btn-block mb-2 mt-2">Create Overlays</button>
 
