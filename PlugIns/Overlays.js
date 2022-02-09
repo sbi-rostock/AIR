@@ -155,11 +155,11 @@ function initMainPageStructure() {
     globals.user = user._login.toString().toLowerCase();
 
     if (globals.defaultusers.includes(globals.user) === true) {
-      alert('Waning: You can reate overlays only after sing-in');
+      alert('Warning: You can create overlays only after logging in.');
     }
 
     if (globals.guestuser.includes(globals.user) === true) {
-      alert("Warning: You're logged in through a public account. Overlays you create are visible to other users if not removed.");
+      alert("Warning: You are logged in using a public account. Overlays you create will be visible to other users if they are not removed.");
     }
 
     minervaProxy.project.data.getAllBioEntities().then(function (bioEntities) {
@@ -475,7 +475,7 @@ $(document).on('click', '.clickElementinTable', function () {
 function AddOverlays() {
   AddOverlaysPromise().then(r => {
     $("[name='refreshOverlays']").click();
-  }).catch(error => alert('Failed to Add Overlays'));
+  }).catch(error => alert('Failed to add Overlays'));
 }
 
 function AddOverlaysPromise() {
@@ -568,9 +568,9 @@ function readUserFile() {
                 }, 200);
               });
             }
-          }).catch(error => alert('Failed to create overlays.')).finally(r => enablebtn("ol_startbtn", text));
+          }).catch(error => alert('Failed to create Overlays.')).finally(r => enablebtn("ol_startbtn", text));
         }).catch(error => {
-          alert('Failed to remove old overlays.');
+          alert('Failed to remove old Overlays.');
           enablebtn("ol_startbtn", text);
         });
       }).catch(error => {
