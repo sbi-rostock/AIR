@@ -1544,9 +1544,8 @@ async function fishers(a, b, c, d) {
     return parseFloat(factorialize(a + b).times(factorialize(c + d)).times(factorialize(a + c)).times(factorialize(b + d)).dividedBy(factorialize(a).times(factorialize(b)).times(factorialize(c)).times(factorialize(d)).times(factorialize(a + b + c + d))).toExponential(40))
 }
 
-function GetpValueFromValues(value, rndvalues)
+function GetpValueFromValues(value, rndvalues, normalizeBins = false)
 {
-    
     var pos_random_scores = rndvalues.filter(x => x > 0)
     pos_random_scores = pos_random_scores.concat(pos_random_scores.map(x => -x))
 
@@ -1559,16 +1558,49 @@ function GetpValueFromValues(value, rndvalues)
     var neg_std = standarddeviation(neg_random_scores)
     var neg_mean = mean(neg_random_scores);
 
-    var z_score = value < 0? (pos_std != 0 ? (value - pos_mean) / pos_std : 0) : (neg_std != 0 ? (value - neg_mean) / neg_std : 0);
-    var pvalue = GetpValueFromZ(z_score);
+    var z_score = 0;
+    if(value > 0)
+    {
+        if(pos_std != 0)
+        {
+            z_score = (value - pos_mean) / pos_std
+        }
+        else
+        {
+            z_score = 14;
+        }
+    }
+    else if(value < 0)
+    {
+        if(neg_std != 0)
+        {
+            z_score = (value - neg_mean) / neg_std
+        }
+        else
+        {
+            z_score = 14;
+        }
+    }
 
+    let pvalue = (Math.abs(z_score) >= 14? parseFloat("1.5586968528014629e-44") : GetpValueFromZ(z_score))
     if (isNaN(pvalue))
         pvalue = 1;
 
+    bins = new Array(21).fill(0)
+    var rndmax = Math.max.apply(null, rndvalues.map(Math.abs))
+    for(let v of (normalizeBins? rndvalues.map(i => i/rndmax) : rndvalues))
+    {
+        bins[10+Math.round(v*10)] += 1
+    }
+    bins = bins.map(i => i/Math.max.apply(null, bins.map(Math.abs)))
+
     return {
         "pvalue": pvalue,
-        "posStd": pos_std,
-        "negStd": neg_std
+        "posStd": (normalizeBins? pos_std/rndmax : pos_std),
+        "negStd": (normalizeBins? neg_std/rndmax : neg_std),
+        "negMean": (normalizeBins? neg_mean/rndmax : neg_mean),
+        "posMean": (normalizeBins? pos_mean/rndmax : pos_mean),
+        "bins": bins,
     }
 }
 function GetpValueFromZ(_z, type = "twosided") {
@@ -1970,7 +2002,7 @@ function xp_searchListener(entites) {
 }
 
 
-async function air_createpopup(button, parameter, ylabel = "Influence Score", xlabel = "Fold Change in Data") {
+async function air_createpopup(button, parameter, ylabel = "Influence Score (I)", xlabel = "Fold Change in Data (FC)") {
 
     var $target = $('#om_chart_popover');
     var $btn = $(button);
@@ -2003,32 +2035,91 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
                     <div id="om_chart_popover_content" class="popover-content">
                         <button type="button" id="om_popup_close" class="air_close_tight close" data-dismiss="alert" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
-                        </button>` + (parameter.distribution? `
-                        <div class="cbcontainer mt-1 mb-2 ml-2">
-                            <input type="checkbox" class="air_checkbox" id="om_popup_showregression">
-                            <label class="air_checkbox" for="om_popup_showregression">Show Confidence Intervall</label>
-                        </div>` : ``) + `
-                        <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                            <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#C00000"></span>
-                                Activates Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#0070C0"></span>
-                                Represses Phenotype</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="legendspan_small" style="background-color:#cccccc"></span>
-                                Not diff. expressed</li>
-                            <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                                <span class="triangle_small"></span>
-                                External Link</li>
-                        </div>
-                        <div style="height: 80%">
-                            <canvas class="popup_chart" id="om_popup_chart"></canvas>
-                        </div>
+                        </button>
+                        <ul class="air_nav_tabs nav nav-tabs" id="xp_interaction_tab" role="tablist">
+                            <li class="air_nav_item nav-item" style="width: 33.3333%;">
+                                <a class="air_tab air_tab_sub air_popup_tabs active nav-link" id="air_popup_tab_dceplot" data-toggle="tab" href="#air_popup_tabcontent_dceplot" role="tab" aria-controls="air_popup_tabcontent_dceplot" aria-selected="true">DCE Plot</a>
+                            </li>
+                            <li class="air_nav_item nav-item" style="width: 33.3333%;">
+                                <a class="air_tab air_tab_sub air_popup_tabs nav-link" id="air_popup_tab_regression" data-toggle="tab" href="#air_popup_tabcontent_regression" role="tab" aria-controls="air_popup_tabcontent_regression" aria-selected="false">Regression Plot</a>
+                            </li>
+                            <li class="air_nav_item nav-item" style="width: 33.3333%;">
+                                <a class="air_tab air_tab_sub air_popup_tabs nav-link" id="air_popup_tab_histo" data-toggle="tab" href="#air_popup_tabcontent_histo" role="tab" aria-controls="air_popup_tabcontent_histo" aria-selected="false">Histogram</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content air_tab_content" style="height: 87%">
+                            <div class="tab-pane air_sub_tab_pane show active" style="height: 100%" id="air_popup_tabcontent_dceplot" role="tabpanel" aria-labelledby="air_popup_tab_dceplot">                        
+                                <div style="height: 80%">
+                                    <canvas class="popup_chart" id="air_popup_dceplot"></canvas>
+                                </div>
+                                <div class="d-flex justify-content-center ml-2 mr-2">
+                                    <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span class="legendspan_small" style="background-color:#C00000"></span>
+                                        Activates Phenotype</li>
+                                    <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span class="legendspan_small" style="background-color:#0070C0"></span>
+                                        Represses Phenotype</li>
+                                </div>
+                                <div class="d-flex justify-content-center ml-2 mr-2">
+                                    <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                        Not diff. expressed</li>
+                                    <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span class="triangle_small"></span>
+                                        External Link</li>
+                                </div>
+                            </div>  
+                            <div class="tab-pane air_sub_tab_pane" id="air_popup_tabcontent_regression" style="height: 100%" role="tabpanel" aria-labelledby="air_popup_tab_regression">                        
+                                <div style="height: 80%">
+                                    <canvas class="popup_chart" id="air_popup_regression"></canvas>
+                                </div>
+                                <div id="air_popoup_legen_regression" class="d-flex justify-content-center ml-2 mr-2">
+                                    <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span style="font-weight:bold; font-size: 50; color:#C00000">—</span>
+                                        Norm. Regression Line
+                                    </li>
+                                    <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
+                                        <span class="legendspan_small" style="background-color:#cccccc"></span>
+                                        Regression Confidence Intervall (95%; unadj.)
+                                    </li>
+                                </div>
+                            </div>
+                            <div class="tab-pane air_sub_tab_pane" style="height: 100%" id="air_popup_tabcontent_histo" role="tabpanel" aria-labelledby="air_popup_tab_histo">                        
+                                <select id="air_popup_histo_select" class="browser-default om_select custom-select mb-2">
+
+                                </select>
+                                <div style="height: 80%">
+                                    <canvas class="popup_chart" id="air_popup_histo"></canvas>
+                                </div>
+                            </div>
+                        <div>
                     </div>
                 </div>`);
 
     $btn.after($target);
+
+    select = document.getElementById('air_popup_histo_select');
+
+    for (let histodata in parameter.histo){
+        var opt = document.createElement('option');
+        opt.value = histodata;
+        opt.innerHTML = parameter.histo[histodata].title;
+        select.appendChild(opt);
+    }
+    $('#air_popup_histo_select').on('change', setHistoData);
+
+    $target.show();
+    var popupheight = $("#om_chart_popover").height() + 50;
+    $target.parents("table").parents(".dataTables_scrollBody").css({
+        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
+    });
+
+    $('.air_popup_tabs[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var popupheight = $("#om_chart_popover").height() + 50;
+        $target.parents("table").parents(".dataTables_scrollBody").css({
+            minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
+        });
+    });
 
     let close_btn = document.getElementById("om_popup_close");
     // When the user clicks on <span> (x), close the modal
@@ -2074,7 +2165,7 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
         }
         if (Math.abs(aggr) > maxx_dist) { maxx_dist = Math.abs(aggr) }
         
-        if(SP != 0)
+        if(aggr != 0)
             dist_targets.push(
                 {
                     label: element,
@@ -2113,7 +2204,8 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
     maxx_dist = maxx_dist < 1? 1 : maxx_dist;
     
     var m = parameter.slope;
-    var [std1,std2] = parameter.CI;
+    var std1 = 1.96 * parameter.std[0]
+    var std2 = -1.96 * parameter.std[1];
     dist_targets.push(
         {
             data: [{
@@ -2164,13 +2256,340 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
                 r: 0,
             }],
             type: 'line',
-            fill: false,
+            fill: "+1",
             pointRadius: 0,
         }
     );
 
-    var outputCanvas = document.getElementById('om_popup_chart');
 
+    outputCanvas = document.getElementById('air_popup_regression');
+    chartOptions = {
+        type: 'bubble',
+        data: {
+            datasets: dist_targets,
+        },
+        options: {
+            plugins: {
+                plugins: {
+                    filler: {
+                        propagate: false
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                zoom: {
+                    // Container for pan options
+                    pan: {
+                        // Boolean to enable panning
+                        enabled: true,
+
+                        // Panning directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow panning in the y direction
+                        mode: 'xy',
+                        rangeMin: {
+                            // Format of min pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+                        rangeMax: {
+                            // Format of max pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+
+                        // On category scale, factor of pan velocity
+                        speed: 20,
+
+                        // Minimal pan distance required before actually applying pan
+                        threshold: 10,
+
+                    },
+
+                    // Container for zoom options
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy',
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var element = context.label || '';
+
+                            if (element) {
+                                return [
+                                    'Name: ' + AIR.Molecules[element].name,
+                                    'Influence: ' + expo(DCE_values.DCEs[element].SP, 4, 3),
+                                    'FC: ' + expo(DCE_values.DCEs[element].FC, 4, 3),
+                                    'p-value: ' + (expo(DCE_values.DCEs[element].pvalue,4,3)),
+                                ];
+                            }
+                            else
+                                return "";
+
+                        }
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
+            onClick: (event, chartElement) => {
+                if (chartElement[0]) {
+                    let name = AIR.Molecules[regression_popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+                    selectElementonMap(name, true);
+                    xp_setSelectedElement(name);
+                }
+            },
+            layout: {
+                padding: {
+                    top: 0
+                }
+            },
+            title: {
+                display: true,
+                text: title,
+                fontFamily: 'Helvetica',
+            },
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: "I·|FC|",
+                    },
+                    ticks: {
+                        //beginAtZero: true,
+                        max: 1,
+                        min: -1
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    }
+                },
+                x:
+                {
+                    title: {
+                        display: true,
+                        text: "FC·|I|",
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    },
+                },
+            }
+        }
+
+    };
+    let regression_popupchart = new Chart(outputCanvas, chartOptions);
+
+    outputCanvas = document.getElementById('air_popup_histo');
+    chartOptions = {
+        type: 'bar',
+        data: {},
+        options: {
+            plugins: {
+                plugins: {
+                    filler: {
+                        propagate: false
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                zoom: {
+                    // Container for pan options
+                    pan: {
+                        // Boolean to enable panning
+                        enabled: true,
+
+                        // Panning directions. Remove the appropriate direction to disable 
+                        // Eg. 'y' would only allow panning in the y direction
+                        mode: 'xy',
+                        rangeMin: {
+                            // Format of min pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+                        rangeMax: {
+                            // Format of max pan range depends on scale type
+                            x: null,
+                            y: null
+                        },
+
+                        // On category scale, factor of pan velocity
+                        speed: 20,
+
+                        // Minimal pan distance required before actually applying pan
+                        threshold: 10,
+
+                    },
+
+                    // Container for zoom options
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy',
+                    }
+                },
+                // tooltip: {
+                //     callbacks: {
+                //         label: function (context) {
+                //             var element = context.label || '';
+
+                //             if (element) {
+                //                 return [
+                //                     'Name: ' + AIR.Molecules[element].name,
+                //                     'Influence: ' + expo(DCE_values.DCEs[element].SP, 4, 3),
+                //                     'FC: ' + expo(DCE_values.DCEs[element].FC, 4, 3),
+                //                     'p-value: ' + (expo(DCE_values.DCEs[element].pvalue,4,3)),
+                //                 ];
+                //             }
+                //             else
+                //                 return "";
+
+                //         }
+                //     }
+                // }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
+            // onClick: (event, chartElement) => {
+            //     if (chartElement[0]) {
+            //         let name = AIR.Molecules[histo_popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+            //         selectElementonMap(name, true);
+            //         xp_setSelectedElement(name);
+            //     }
+            // },
+            layout: {
+                padding: {
+                    top: 0
+                }
+            },
+            title: {
+                display: true,
+                text: title,
+                fontFamily: 'Helvetica',
+            },
+            scales: {
+                y: {
+                    stacked: false,
+                    title: {
+                        display: true,
+                        text: "Frequency",
+                    },
+                    ticks: {
+                        //beginAtZero: true,
+                        max: 1,
+                        min: 0
+                    },
+                    grid: {
+                        drawBorder: false,
+                        color: function (context) {
+                            if (context.tick.value == 0)
+                                return '#000000';
+                            else
+                                return "#D3D3D3";
+                        },
+                    }
+                },
+                x:
+                {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: "Score",
+                    },
+                    ticks: {
+                        //beginAtZero: false,
+                    },
+                    // grid: {
+                    //     drawBorder: false,
+                    //     color: function (context) {
+                    //         if (context.tick.value == 0)
+                    //             return '#000000';
+                    //         else
+                    //             return "#D3D3D3";
+                    //     },
+                    // },
+                },
+            }
+        }
+
+    };
+    let histo_popupchart = new Chart(outputCanvas, chartOptions);
+    setHistoData()
+
+    function setHistoData()
+    {    
+        let histodata = parameter.histo[$('#air_popup_histo_select').val()]
+        let mf = Math.floor(m*10)
+        let updateddata = {
+            datasets: [ 
+                {
+                    label: 'Enrichment Score',
+                    data: new Array(10+mf).fill(null).concat([1]).concat(new Array(10-mf).fill(null)),
+                    order: 0,
+                    backgroundColor: '#000000FF',
+                    barPercentage: 0.1
+                },
+                {
+                    label: 'ES Histogram',
+                    data: histodata.bins,
+                    order: 1,
+                    backgroundColor: '#c8c8c8',
+                    barPercentage: 1,
+                },
+                {
+                    label: 'Pos. Distribution',
+                    data: new Array(10).fill(null).concat(getNormalDistribution(0,1,10, histodata.mean[0], histodata.std[0])),
+                    type: 'line',
+                    order: 1,
+                    borderColor: "#FF0000"
+                }, {
+                    label: 'Neg. Distribution',
+                    data: getNormalDistribution(-1,0,10, histodata.mean[1], histodata.std[1]).concat(new Array(10).fill(null)),
+                    type: 'line',
+                    order: 1,
+                    borderColor: "#0000FF"
+                }
+            ],
+            labels: [...Array(21).keys()].map(v => Math.round((v)-10)/10)        
+        }
+        histo_popupchart.data = updateddata;
+        histo_popupchart.update();
+    }
+
+    var outputCanvas = document.getElementById('air_popup_dceplot');
     var chartOptions = {
         type: 'bubble',
         data: {
@@ -2252,7 +2671,7 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
             },
             onClick: (event, chartElement) => {
                 if (chartElement[0]) {
-                    let name = AIR.Molecules[popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
+                    let name = AIR.Molecules[dce_popupchart.data.datasets[chartElement[0].datasetIndex].label].name;
                     selectElementonMap(name, true);
                     xp_setSelectedElement(name);
                 }
@@ -2311,53 +2730,20 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score", xl
         }
 
     };
+    let dce_popupchart = new Chart(outputCanvas, chartOptions);
 
-    let popupchart = new Chart(outputCanvas, chartOptions);
-    $target.show();
-
-    var popupheight = $("#om_chart_popover").height() + 50;
-    $target.parents("table").parents(".dataTables_scrollBody").css({
-        minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
-    });
-
-
-    $('#om_popup_showregression').on('click', function () {
-
-        if (document.getElementById("om_popup_showregression").checked === true) {
-            popupchart.data.datasets = dist_targets
-            $("#om_legend_target").replaceWith(`
-            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span style="font-weight:bold; font-size: 50; color:#C00000">—</span>
-                    Norm. Regression Line
-                </li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#cccccc"></span>
-                    Regression Confidence Intervall (95%; unadj.)
-                </li>
-            </div>
-            `);
-        }
-        else {
-            popupchart.data.datasets = targets
-
-            $("#om_legend_target").replaceWith(`            
-            <div id="om_legend_target" class="d-flex justify-content-center ml-2 mr-2 mt-2 mb-2">
-                <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#C00000"></span>
-                    Activates Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#0070C0"></span>
-                    Represses Phenotype</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="legendspan_small" style="background-color:#cccccc"></span>
-                    Not diff. expressed</li>
-                <li class="legendli" style="margin-left:5px; color:#6d6d6d; font-size:100%; white-space: nowrap;">
-                    <span class="triangle_small"></span>
-                    External Link</li>
-            </div>`);
-        }
-
-        popupchart.update();
-    })
 };
+
+function getNormalDistribution(start, end, bins, _mean, _std)
+{
+	let output = [];
+	let mean = new Decimal(_mean);
+  let std = new Decimal(_std);
+  let two = new Decimal(2)
+  let pi = new Decimal("3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148086513282306647")
+  for(let i = start; i <= end; i += (end-start)/bins)
+  {
+  	output.push(parseFloat((new Decimal(-0.5)).times(new Decimal(i).minus(mean).dividedBy(std).pow(2)).exp().dividedBy(std.times(two.times(pi).sqrt()))))
+  }
+  return output.map(i => i/Math.max.apply(null, output.map(Math.abs)))
+}

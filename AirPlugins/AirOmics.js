@@ -465,7 +465,7 @@ async function createDifferentialAnalysisPanel() {
 
                 <h5>Statistics</h5>
 
-                <div id="om_pheno_randomsampleNumber-container" class="row mb-4">
+                <div id="om_pheno_randomsampleNumber-container" class="row mb-2">
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary ml-1"
@@ -480,6 +480,23 @@ async function createDifferentialAnalysisPanel() {
                     </div>
                     <div class="col">
                         <input type="text" class="textfield" value="1000" id="om_pheno_randomsampleNumber" onkeypress="" />
+                    </div>
+                </div>
+                <div class="row mt-1 mb-1">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="FC k adjustment"
+                                    data-content="If checked, the statistical threshold (parameter k) is adjusted to the highest FC in every permutated set. If checked, false negatives are reduced in cases where the permuted FC values are higher than the FC values of the original sets by preventing nonphysiological FC values from biasing the results. However, as a result of this adjustment, sets with DCEs that have per se high FC values lose statistical power.<br/>">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="om_checkbox_kadjustment" checked>
+                            <label class="air_checkbox" for="om_checkbox_kadjustment">Adjust for FC values?</label>
+                        </div>
                     </div>
                 </div>
 
@@ -1996,10 +2013,26 @@ async function om_createTable(param) {
                         "phenotype": phenotype,
                         "sample": sample,
                     },
-                    "distribution": true,
                     "title": "Regulators for '" + AIR.Phenotypes[phenotype].name + "' in '" + globals.omics.samples[sample] + "'",
                     "slope": AIR.Phenotypes[phenotype].slope[sample],
-                    "CI": AIR.Phenotypes[phenotype].std[sample],
+                    "std": AIR.Phenotypes[phenotype].std[sample],
+                    "size": globals.omics.numberOfRandomSamples,
+                    "histo": [
+                        {
+                            "title": "Distribution-based",
+                            "bins": AIR.Phenotypes[phenotype].bins[sample],
+                            "std": AIR.Phenotypes[phenotype].std[sample],
+                            "value": AIR.Phenotypes[phenotype].slope[sample],
+                            "mean": AIR.Phenotypes[phenotype].mean[sample],
+                        },
+                        {
+                            "title": "Level-based",
+                            "bins": AIR.Phenotypes[phenotype].en_bins[sample],
+                            "std": AIR.Phenotypes[phenotype].en_std[sample],
+                            "value": AIR.Phenotypes[phenotype].results[sample],
+                            "mean": AIR.Phenotypes[phenotype].en_mean[sample],
+                        }
+                    ]
                 }
                 let samplecell = createPopupCell(result_row, 'td', "<b>" + AIR.Phenotypes[phenotype].norm_results[sample] + '</b><br><span style="white-space:nowrap">(' + expo(pvalue, 2, 2) + ")", 'col-auto om_resultvalue', 'center', air_createpopup, parameter, order = pvalue);
                 samplecell.setAttribute('data', sample);
@@ -2673,6 +2706,8 @@ async function om_PhenotypeSP() {
     }
     fc_threshold = Math.abs(fc_threshold)
 
+    let kadjustment = $("#om_checkbox_kadjustment").prop("checked")
+
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if (isNaN(globals.omics.numberOfRandomSamples) || globals.omics.numberOfRandomSamples < 0) {
         alert("Only positive integer values numbers are allowed. n was set to 1000.")
@@ -2731,18 +2766,24 @@ async function om_PhenotypeSP() {
         AIR.Phenotypes[phenotype]["genenumbers"] = {};
         AIR.Phenotypes[phenotype]["slope"] = {};
         AIR.Phenotypes[phenotype]["std"] = {};
+        AIR.Phenotypes[phenotype]["bins"] = {};
+        AIR.Phenotypes[phenotype]["en_std"] = {};
+        AIR.Phenotypes[phenotype]["en_bins"] = {};
+        AIR.Phenotypes[phenotype]["mean"] = {};
+        AIR.Phenotypes[phenotype]["en_mean"] = {};
 
         correct_SPs[phenotype] = getFilteredRegulators(phenotype, i_threshold, document.getElementById("checkbox_submap").checked)
 
         var accuracyvalues = [];
-        var xysum, xxsum, xy
+        var xysum, xxsum, xy, maxxx
         for (let sample in globals.omics.samples) {
 
             let activity = 0.0;
             let abs_activity = 0.0;
             var accuracy = 0;
             xysum = 0;
-            xxsum = 2;
+            xxsum = 0;
+            maxxx = kadjustment? 0 : 2;
             AIR.Phenotypes[phenotype].includedelements[sample] = [];
             AIR.Phenotypes[phenotype].genenumbers[sample] = 0;
 
@@ -2768,7 +2809,10 @@ async function om_PhenotypeSP() {
                 if (isNaN(pvalue) || !pvalue) {
                     pvalue = 1;
                 }
-
+                if(kadjustment && Math.abs(FC)  > maxxx)
+                {
+                    maxxx = Math.abs(FC)
+                }
 
                 AIR.Phenotypes[phenotype].genenumbers[sample] += 1;
                 considered_elements.add(element);
@@ -2800,7 +2844,7 @@ async function om_PhenotypeSP() {
                 }
             }
 
-
+            xxsum += maxxx
             AIR.Phenotypes[phenotype].results[sample] = activity;
             AIR.Phenotypes[phenotype]["slope"][sample] = xysum/xxsum
 
@@ -2816,7 +2860,7 @@ async function om_PhenotypeSP() {
     let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
     let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
 
-    var FC_values, shuffled_arrays, shuffled_array, score, en_score, random_scores, random_en_scores, _en_score, shuffled_elements, element, pvalue
+    var FC_values, shuffled_arrays, shuffled_array, score, en_score, random_scores, random_en_scores, _en_score, shuffled_elements, element, maxxx
 
     for (let sample in globals.omics.samples) {
 
@@ -2842,6 +2886,7 @@ async function om_PhenotypeSP() {
                 _en_score = 0;
                 xysum = 0;
                 xxsum = 2;
+                maxxx = kadjustment? 0 : 2;
                 for (let i in FC_values) {
                     element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
@@ -2849,12 +2894,18 @@ async function om_PhenotypeSP() {
                         _en_score += xy;
                         xxsum += xy * xy
                         xysum += xy * Math.abs(xy) 
+
+                        if(kadjustment && Math.abs(FC_values[i]) > maxxx)
+                        {
+                            maxxx = Math.abs(FC_values[i]);
+                        }
                     }
                     // else
                     // {
                     //     xxsum += FC_values[i]
                     // }
                 }
+                xxsum += maxxx
 
                 random_scores.push(xysum/xxsum)
                 
@@ -2864,11 +2915,16 @@ async function om_PhenotypeSP() {
             var pvalueresults = GetpValueFromValues(score, random_scores)
 
             AIR.Phenotypes[phenotype].pvalue[sample] = pvalueresults.pvalue;
-            AIR.Phenotypes[phenotype].std[sample] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
+            AIR.Phenotypes[phenotype].std[sample] = [pvalueresults.posStd, pvalueresults.negStd];
+            AIR.Phenotypes[phenotype].bins[sample] = pvalueresults.bins;
+            AIR.Phenotypes[phenotype].mean[sample] = [pvalueresults.posMean, pvalueresults.negMean];
 
-            pvalueresults = GetpValueFromValues(en_score, random_en_scores)
+            pvalueresults = GetpValueFromValues(en_score, random_en_scores, true)
 
             AIR.Phenotypes[phenotype].en_pvalue[sample] = pvalueresults.pvalue;
+            AIR.Phenotypes[phenotype].en_std[sample] = [pvalueresults.posStd, pvalueresults.negStd];
+            AIR.Phenotypes[phenotype].en_bins[sample] = pvalueresults.bins;
+            AIR.Phenotypes[phenotype].en_mean[sample] = [pvalueresults.posMean, pvalueresults.negMean];
         }
     }
 
@@ -4263,7 +4319,7 @@ async function calculateTargets() {
             for (let shuffled_elements of shuffled_arrays) {
                 _sensitivity = 0.0;
                 xysum = 0;
-                xxsum = 2
+                xxsum = 0;
                 for (let i in elements_with_FC_values) {
                     element = shuffled_elements[i];
                     if (maxregulators.hasOwnProperty(element)) {
@@ -4293,7 +4349,9 @@ async function calculateTargets() {
 
             results["pvalue"] = pvalueresults.pvalue;
             results["ES"] = max_ES;
-            results["CI"] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
+            results["std"] = [pvalueresults.posStd, pvalueresults.negStd];
+            results["bins"] = pvalueresults.bins;;
+            results["mean"] = [pvalueresults.posMean, pvalueresults.negMean];
             return results;
         }
     }
@@ -4341,8 +4399,18 @@ async function calculateTargets() {
                     },
                     "distribution": distribution,
                     "slope": targtetdata.ES,
-                    "CI": targtetdata.CI,
+                    "std": targtetdata.std,
+                    "size": 500,
                     "title": "DCEs influenced by '" + targtetdata.id.map(t => AIR.Molecules[t].name).join(" & ") + "' in '" + globals.omics.samples[sample] + "'",
+                    "histo": [
+                        {
+                            "title": "Distrbution-based",
+                            "bins": targtetdata.bins,
+                            "std": targtetdata.std,
+                            "value": targtetdata.ES,
+                            "mean": targtetdata.mean,
+                        }
+                    ]
                 }
                 createPopupCell(result_row, 'td', targtetdata.positive == null ? "mixed" : (targtetdata.positive ? "positive" : "negative"), 'col-auto', 'center', air_createpopup, parameter),
                     createCell(result_row, 'td', expo(targtetdata.adj_pvalue, 2, 2), 'col-auto', 'col', 'center', true);
@@ -6116,7 +6184,7 @@ async function om_getphenotypeValues(param)
 
     return {
         "DCEs": DCEs,
-        "Baseline": [[-1,0],[-1,0]],
+        "Baseline": [[-1,0],[1,0]],
     };
 }
 

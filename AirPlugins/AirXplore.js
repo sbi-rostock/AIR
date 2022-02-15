@@ -503,8 +503,11 @@ function xp_EstimatePhenotypes() {
                 let max_influence = 0;
                 let influence = 0;
                 let level = 0;
+                let DCEs = {}
                 let count_elements = 0;
                 var regr_data = {}
+                xysum = 0;
+                xxsum = 2;
 
                 for (let e in phenotypeValues) {
                     let SP = parseFloat(phenotypeValues[e]);
@@ -514,21 +517,23 @@ function xp_EstimatePhenotypes() {
                         let FC = _data[e].value;
 
                         if (FC != 0) {
+                            DCEs[e] = [SP,FC]
                             influence += Math.abs(SP);
-                            level += SP * FC;
-                            count_elements++;
-                            regr_data[e] = [SP, FC];
+                            xy = SP * FC
+                            level += xy;
+                            xxsum += xy * xy
+                            xysum += xy * Math.abs(xy) 
                         }
                     }
                 }
-                var score = getEnrichmentScore(Object.values(regr_data))
+                var score = xysum/xxsum
                 let random_scores = [];
                 let random_en_scores = [];
 
-                xysum = 0;
-                xxsum = 2;
 
                 for (let shuffled_elements of shuffled_arrays) {
+                    xysum = 0;
+                    xxsum = 2;
 
                     for (let i in FC_values) {
                         let element = shuffled_elements[i];
@@ -554,12 +559,15 @@ function xp_EstimatePhenotypes() {
                 var pvalueresults = GetpValueFromValues(score, random_scores)
 
                 globals.xplore.pe_results[p]["pvalue"] = pvalueresults.pvalue;
-                globals.xplore.pe_results[p]["std"] = [1.96 * pvalueresults.posStd, - 1.96 * pvalueresults.negStd];
+                globals.xplore.pe_results[p]["std"] = [pvalueresults.posStd, pvalueresults.negStd]
                 globals.xplore.pe_results[p]["slope"] = score;
+                globals.xplore.pe_results[p]["dces"] = DCEs;
+                globals.xplore.pe_results[p]["bins"] = pvalueresults.bins;
+                globals.xplore.pe_results[p]["mean"] = [pvalueresults.posMean, pvalueresults.posMean]
 
-                pvalue = GetpValueFromValues(level, random_en_scores).pvalue
-                if (pvalue < globals.xplore.pe_results[p]["pvalue"])
-                    globals.xplore.pe_results[p]["pvalue"] =  pvalueresults
+                // pvalue = GetpValueFromValues(level, random_en_scores).pvalue
+                // if (pvalue < globals.xplore.pe_results[p]["pvalue"])
+                //     globals.xplore.pe_results[p]["pvalue"] =  pvalueresults
 
                 if (Math.abs(level) > max_level) {
                     max_level = Math.abs(level)
@@ -614,8 +622,19 @@ $(document).on('click', '.xp_pe_popup_btn', function () {
         },
         "distribution": true,
         "slope": globals.xplore.pe_results[phenotype]["slope"],
-        "CI": globals.xplore.pe_results[phenotype]["std"],
+        "std": globals.xplore.pe_results[phenotype]["std"],
+        "bins": globals.xplore.pe_results[phenotype]["bins"],
         "title": "Regulators for '" + AIR.Phenotypes[phenotype].name,
+        "size": 100,
+        "histo": [
+            {
+                "title": "Distrbution-based",
+                "bins": globals.xplore.pe_results[phenotype]["bins"],
+                "std": globals.xplore.pe_results[phenotype]["std"],
+                "value": globals.xplore.pe_results[phenotype]["slope"],
+                "mean": globals.xplore.pe_results[phenotype]["mean"],
+            }
+        ]
     }
 
     air_createpopup(this, parameter);
@@ -635,7 +654,7 @@ function xp_getphenotypeValues(param)
 
     return {
         "DCEs": DCEs,
-        "Baseline": [[-1,0],[-1,0]],
+        "Baseline": [[1,0],[-1,0]],
     };
 }
 

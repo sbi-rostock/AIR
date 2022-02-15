@@ -1,4 +1,6 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+let URL_PLUGINFILES = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
+let URL_DATAFILES = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/AirPlugins/";
 let $ = window.$;
 
 if ($ === undefined && minerva.$ !== undefined) {
@@ -19,9 +21,7 @@ let ttest = require('ttest');
 
 require('datatables.net-buttons')(window, $);
 
-let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/AirPlugins/";
 let local_datafile_URL = "http://localhost:3000/AirPlugIns/";
-let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
 let localURL = "http://localhost:3000/AirPlugIns/";
 const pluginName = 'AirPlugins';
 const pluginVersion = '0.9.0';
@@ -133,12 +133,12 @@ async function initMainPageStructure() {
       return;
     }
 
-    globalURL = query;
+    URL_PLUGINFILES = query;
   }
 
   let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
-  let filepath = filetesting ? localURL : globalURL;
+  let filepath = filetesting ? localURL : URL_PLUGINFILES;
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js"];
   var CssFiles = Array.from(css_files, x => filepath + x);
   var ScriptPaths = Array.from(js_files, x => filepath + x);
@@ -192,7 +192,7 @@ async function initMainPageStructure() {
   function GetDataFiles(filename, datatype = "text") {
     return new Promise((resolve, reject) => {
       $.ajax({
-        url: (filetesting ? local_datafile_URL : datafile_url) + filename,
+        url: (filetesting ? local_datafile_URL : URL_DATAFILES) + filename,
         dataType: datatype,
         success: function (data) {
           resolve(data);
