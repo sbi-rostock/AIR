@@ -52,7 +52,7 @@
     font-family: Helvetica Neue, Helvetica, Arial, sans-serif!important
 }
 
-.xp_select {
+.air_select {
     cursor: pointer
 }
 
@@ -97,11 +97,6 @@
     margin-bottom: 3px
 }
 
-.popup_chart {
-    width: 450px!important;
-    height: 250px!important
-}
-
 .legendspan {
     display: inline-block;
     height: 15px;
@@ -121,7 +116,7 @@
     margin-bottom: 3px
 }
 
-.xp_panel {
+.air_panel {
     border: none!important
 }
 
@@ -235,19 +230,19 @@
     background-color: white
 }
 
-.xp_panel_heading {
+.air_panel_heading {
     background-color: #ff8c8c;
     font-weight: bold;
     color: white
 }
 
-.xp_elementinput:focus {
+.air_elementinput:focus {
     box-shadow: none!important;
     outline: none!important;
     border-color: #ff8c8c
 }
 
-.xp_elementinput {
+.air_elementinput {
     border-color: #ff8c8c
 }
 
@@ -379,6 +374,15 @@
     max-width: 100px
 }
 
+.popover-content {
+    width: 400px !important;
+    height: 300px !important;
+    border-color: black;
+    border-width: 2px;
+    border-style: solid;
+    border-radius: 8px;
+  }
+  
 .air_checkbox {
     margin: 2px 0 0;
     text-align: center!important;
@@ -439,11 +443,11 @@ input[type=checkbox] .cbcontainer {
 .air_tab_pane {
     overflow-y: scroll;
     overflow-x: hidden;
-    height: calc(100vh - 185px);
+    height: calc(100vh - 90px);
     padding-right: 5px
 }
 
-.xp_molartContainer {
+.air_molartContainer {
     width: 100%;
     overflow-x: auto;
     position: relative
