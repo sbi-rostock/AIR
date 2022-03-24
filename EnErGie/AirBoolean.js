@@ -1,6 +1,14 @@
 let elementsingraph = [];
 let elementssources = [];
 let staedystates = []
+let knockedout = false
+
+let foodcolors = {
+    "undernourished": "#ff0000",
+    "overnourished": "#0000ff",
+    "nourished": "#00ff00",
+    "custom": "#000000"
+}
 
 async function AirBoolean() {
 
@@ -26,36 +34,46 @@ async function AirBoolean() {
         </div>
         <button id="air_step_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Next Step</button>
 
-        <button class="air_collapsible mt-4">Analyze Steady State</button>
-        <div id="air_bool_panel_ss" class="air_collapsible_content">
-            <button id="air_ss_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Find Steady State</button>
-            <div id="air_bool_ss_graph">
-            </div>
-        </div>
-        
-        <button class="air_collapsible mt-4">Analyze Correlations</button>
-        <div id="air_bool_panel_corr" class="air_collapsible_content">
+        <button class="air_collapsible mt-4 active">In silico Perturbation (Correlation analysis)</button>
+        <div id="air_bool_panel_corr" class="air_collapsible_content" style="max-height: 500px">
             <input type="text" list="air_bool_elementnames_source" style="width: 70%" class="textfield mb-2 mt-2" id="air_bool_element_source" value="cirrhosis (liver)"/>
             <datalist id="air_bool_elementnames_source" style="height:5.1em;overflow:hidden">
             </datalist>
             <div>
-                <span style="display: inline-block;width: 20%">
+                <span style="display: inline-block;width: 35%">
                         <input type="checkbox" class="air_checkbox" id="air_cb_source" checked>
-                        <label class="air_checkbox air_checkbox_label" for="air_cb_source">Source</label>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_source">Simulate Activation</label>
                 </span>
                 <span style="display: inline-block;width: 50%">
                         <input type="checkbox" class="air_checkbox" id="air_cb_target">
-                        <label class="air_checkbox air_checkbox_label" for="air_cb_target">Target</label>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_target">Simulate Inhibition</label>
                 </span>
             </div>
-            <div class="row mb-4">
+            <hr>
+            <h4>Nutrition States:</h4>
+            <div>
+                <span style="display: inline-block;width: 30%">
+                        <input type="checkbox" class="air_checkbox" id="air_cb_undernour" checked>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_source" title="Long fasting periods with complete glycogen depletion.">Undernourished</label>
+                </span>
+                <span style="display: inline-block;width: 30%">
+                        <input type="checkbox" class="air_checkbox" id="air_cb_wellnour" checked>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_target" title="Average food intake frequency - dependent on glycogen.">Well-nourished</label>
+                </span>
+                <span style="display: inline-block;width: 30%">
+                        <input type="checkbox" class="air_checkbox" id="air_cb_overnour" checked>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_target" title="High food intake frequency - independent of glycogen.">Overnourished</label>
+                </span>
+            </div>
+            <div class="row mt-2 mb-4">
                 <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Food Intake Frequence:</span>
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Custom Food Intake Frequence:</span>
                 </div>
                 <div class="col">
-                    <input type="text" class="textfield" value="1100" id="sp_bl_foodintake"/>
+                    <input type="text" class="textfield" value="" id="sp_bl_foodintake"/>
                 </div>
             </div>
+            <hr>
             <div class="row mb-4">
                 <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
                     <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Number of Steps:</span>
@@ -70,10 +88,10 @@ async function AirBoolean() {
                     <thead>
                         <tr>
                             <th style="vertical-align: middle;"></th>
-                            <th style="vertical-align: middle;">Perturbed</th>
                             <th style="vertical-align: middle;">Impact On</th>
-                            <th style="vertical-align: middle;">Correlation</th>
-                            <th style="vertical-align: middle;">Strongest Mediators</th>
+                            <th style="vertical-align: middle;">Compartment</th>
+                            <th style="vertical-align: middle;" title="Average correlation among all selected nutrition states.">avg. Corr.</th>
+                            <th style="vertical-align: middle;" title="Ten highest ranked mediators by their avarage correlation to both elements.">Strongest Mediators</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -81,6 +99,14 @@ async function AirBoolean() {
                 </table>
             </div>
         </div>
+        
+        <button class="air_collapsible mt-4">Analyze Steady State</button>
+        <div id="air_bool_panel_ss" class="air_collapsible_content">
+            <button id="air_ss_btn" type="button" class="air_btn btn btn-block mb-4 mt-4">Find Steady State</button>
+            <div id="air_bool_ss_graph">
+            </div>
+        </div>
+        
     `);
     await getBooleanPanel()
 }
@@ -277,6 +303,7 @@ async function setInitialState()
         AIR.Boolean[e].initial = globals.intitalElements.has(e)? true : false
         AIR.Boolean[e].locked = globals.intitalElements.has(e)? 1 : 0
         AIR.Boolean[e].sources = []
+        AIR.Boolean[e].storage = 0
     }
     $("#air_bool_steps").html("# Steps: 0")
     await setBooleanTable();
@@ -284,13 +311,27 @@ async function setInitialState()
 }
 async function environmentalSensitivity()
 {
-    let foodarray = $("#sp_bl_foodintake").val().split('').map(c => c == "1"? true : false)
+    let customfood = $("#sp_bl_foodintake").val().split('').map(c => c == "1"? true : false)
+    let foodarrays = {}
+
+    if($("#air_cb_undernour").prop("checked"))
+        foodarrays["undernourished"] = Array(5).fill(true).concat(Array(25).fill(false))
+    if($("#air_cb_overnour").prop("checked"))
+        foodarrays["overnourished"] = Array(5).fill(true).concat(Array(3).fill(false))
+    if($("#air_cb_wellnour").prop("checked"))
+        foodarrays["nourished"] = Array(5).fill(true).concat(Array(10).fill(false))
+
+    if(customfood.length > 0)
+    {
+        foodarrays["custom"] = customfood;
+    }
+
     let steps = parseFloat($("#sp_bl_steps").val())
-    var source = $("#air_cb_source").prop("checked");
+    var knockout = $("#air_cb_target").prop("checked");
     var _text = await disablebutton("air_bool_corr_btn", true);
-    let selement = $("#air_bool_element_source").val().split(',')[0].toLowerCase().trim()
-    if (AIR.ElementNames.fullname.hasOwnProperty(selement)) {
-        selement = AIR.ElementNames.fullname[selement]
+    let element = $("#air_bool_element_source").val().split(',')[0].toLowerCase().trim()
+    if (AIR.ElementNames.fullname.hasOwnProperty(element)) {
+        element = AIR.ElementNames.fullname[element]
     }
     else
     {
@@ -305,76 +346,91 @@ async function environmentalSensitivity()
 
     let initialstate = JSON.stringify(AIR.Boolean)
 
-
-    for(let element of (source? [selement] : AIR.MoleculeIDs))
+    let results = {}
+    for(let [diet, foodarray] of Object.entries(foodarrays))
     {
-        if(!source)
-            await updateProgress(count++, AIR.MoleculeIDs.length, "air_bool_corr_btn", " Iterating Attractor Activity...");
-
-        let results = {}
-
-        for (let index = 0; index <= 100; index+= 5) 
+        results[diet] = []
+        for (let index = 0; index <= 100; index += 5) 
         {
             AIR.Boolean = JSON.parse(initialstate)
-            if(source)
-                await updateProgress(index, 100, "air_bool_corr_btn", " Iterating Attractor Activity...");
 
-            let param = {}
-            param[element] = index
+            count += 5
+            
+            await updateProgress(count, 105 * Object.keys(foodarrays).length, "air_bool_corr_btn", " Iterating Attractor Activity...");
+
+            let activate = {}
+            let perturb = {}
+
             if (element != AIR.food)
             {
-                param[AIR.food] = foodarray
+                activate[AIR.food] = foodarray
+            }
+
+            if(knockout)              
+            {
+                perturb[element] = index
+            }  
+            else
+            {
+                activate[element] = index
             }
             
-            results[index] = await InterateSteps(param, steps)
+            results[diet][index] = await InterateSteps(activate, steps, perturb)
         }
-        count = 0;
+    }
+    count = 0;
 
-        for(let target of (source? AIR.MoleculeIDs : [selement]))
+    for(let target of AIR.MoleculeIDs)
+    {
+        count += 1;
+        if(count%100 == 0)
+            await updateProgress(count, AIR.MoleculeIDs.length, "air_bool_corr_btn", " Calculating Correlations...");
+            
+        let corrs = [] 
+        let mediators = Object.assign({}, ...AIR.MoleculeIDs.map((x) => ({[x]: []})))  
+        globals.corrResults[element + "_" + target] = {}
+
+        for(let diet in foodarrays)
         {
-            count += 1;
-            if(source && count%100 == 0)
-                await updateProgress(count, AIR.MoleculeIDs.length, "air_bool_corr_btn", " Calculating Correlations...");
-                
-            let corr = getCorrelation(element, target, results)
+            let corr = getCorrelation(element, target, results[diet])
+            corrs.push(corr)
 
-            if(Math.abs(corr.corr) > 0 && Math.abs(corr.corr) <= 1)
+            if(corr.corr != 0)
             { 
-                let mediators = {}  
-
                 for(let m of AIR.MoleculeIDs)
                 {
                     if(m == target || m == element)
                         continue; 
-                    let m_corr = getCorrelation(m, target, results)
-                    if(Math.abs(m_corr.corr) > Math.abs(corr.corr) && Math.abs(m_corr.corr) <= 1)
-                    { 
-                        mediators[m] = m_corr
-                    }
+                    let m_corr = getCorrelation(m, target, results[diet])
+                    mediators[m].push(m_corr.corr * m_corr.corr)
                 }
-                let highestmediators = Object.keys(mediators).sort((a, b) => (Math.abs(mediators[b].corr) - Math.abs(mediators[a].corr))).slice(0, 10);
-
-
-                globals.corrResults[element + "_" + target] = [corr.X, corr.Y]
-                let mediatorstring = '<span style="white-space:nowrap">'
-                for(let m of highestmediators)
-                {
-                    globals.corrResults[element + "_" + m + "_" + target] = [mediators[m].X, mediators[m].Y]
-                    mediatorstring += '<a href="#" class="air_bl_coor_mediator" style="color:' + (mediators[m].corr > 0? "#FF0000":"#0000FF")  + '" data="' + element + "_" + m + "_" + target + '">' + AIR.Molecules[m].ids.name + '</a>, '
-                }
-                mediatorstring = mediatorstring.slice(0, mediatorstring.length - 2)
-                mediatorstring += "</span>"
-                globals.air_ss_table.row.add([
-                    '<button type="button" class="air_bl_popup_btn air_invisiblebtn" data="' + element + "_" + target + '" style="cursor: pointer;"><a><span class="fa fa-external-link-alt"></span></a></button>',
-                    getLinkIconHTML(element),
-                    getLinkIconHTML(target),
-                    corr.corr,
-                    mediatorstring
-                ])
             }
-                
+
+            globals.corrResults[element + "_" + target][diet] = [corr.X, corr.Y]
         }
+
+        let highestmediators = Object.keys(mediators).sort((a, b) => (Math.abs(mean(mediators[b])) - Math.abs(mean(mediators[a])))).filter(m => Math.abs(mean(mediators[m])) > 0.8).slice(0, 10);
+
+        let mediatorstring = '<span style="white-space:nowrap">'
+        for(let m of highestmediators)
+        {
+            //globals.corrResults[element + "_" + m + "_" + target] = [mediators[m].X, mediators[m].Y]
+            mediatorstring += '<span style="color:' + (mean(mediators[m]) > 0? "#FF0000":"#0000FF")  + '">' + AIR.Molecules[m].ids.name + '</span>, '
+        }
+        mediatorstring = mediatorstring.slice(0, mediatorstring.length - 2)
+        mediatorstring += "</span>"
+        globals.air_ss_table.row.add([
+            '<button type="button" class="air_bl_popup_btn air_invisiblebtn" data="' + element + "_" + target + '" style="cursor: pointer;"><a><span class="fa fa-external-link-alt"></span></a></button>',
+            getLinkIconHTML(target),
+            AIR.Molecules[target].compartment,
+            expo(mean(corrs.map(corr => corr.corr))),
+            mediatorstring
+        ])
+        
+            
     }
+    
+    knockedout = knockout
     globals.air_ss_table.draw();
     AIR.Boolean = JSON.parse(initialstate)   
     await updateBooleanTable();
@@ -389,7 +445,7 @@ async function environmentalSensitivity()
 
         for(let [i, result] of Object.entries(results))
         {
-            arrX.push(result.elements[source]/result.size)
+            arrX.push(knockout? (parseFloat(i)/100) : (result.elements[source]/result.size))
 
             if(target == AIR.sarcopenia)
             {
@@ -418,19 +474,27 @@ async function environmentalSensitivity()
     }
 }
 
-async function InterateSteps(elementactivity, steps)
+async function InterateSteps(elementactivity, steps, perturbation = {})
 {
     let countelements = Object.assign({}, ...AIR.MoleculeIDs.map((x) => ({[x]: 0})))   
     let activityvalues = Object.assign({}, ...Object.entries(elementactivity).map(([k,v]) => ({[k]: (Array.isArray(v)? v : globals.activityvalues[v])})))   
+    let perturbationvalues = Object.assign({}, ...Object.entries(perturbation).map(([k,v]) => ({[k]: (Array.isArray(v)? v : globals.activityvalues[v])})))   
 
     for(let e in activityvalues)
         AIR.Boolean[e].locked = 2
 
     //while (states.includes(currentstate) == false) {
     for (let index = 0; index < steps; index++) {
+
+        for(let [e,vlist] of Object.entries(perturbationvalues))
+            if(vlist[index%vlist.length])
+                AIR.Boolean[e].active = false
+            else
+                AIR.Boolean[e].active = AIR.Boolean[e].keepstate? (AIR.Boolean[e].storage > 0? true : false) : AIR.Boolean[e].initial
+
         for(let [e,vlist] of Object.entries(activityvalues))
             AIR.Boolean[e].active = vlist[index%vlist.length]
-    
+
         let activeElements = await nextStep(false);
 
         for (let eindex = 0; eindex < activeElements.length; eindex++) {
@@ -476,6 +540,13 @@ async function nextStep(updateUI = true)
                     {
                         BooleanEntry.active = false
                         BooleanEntry.sources = [s] 
+                        if (BooleanEntry["keepstate"] && BooleanEntry["storage"] > 0)
+                        {
+                            BooleanEntry["storage"] -= 1
+                            // console.log("Lower Storage: " + BooleanEntry["storage"] + "  " + AIR.Molecules[AIR.MoleculeIDs[eindex]].name)
+                            if (BooleanEntry["storage"] > 0)
+                                BooleanEntry.active = true
+                        }
                         breakflag = true
                     }
             }
@@ -499,12 +570,17 @@ async function nextStep(updateUI = true)
                         BooleanEntry.active = true
                         breakflag = true
                         BooleanEntry.sources = rule
+                        if (BooleanEntry["keepstate"] && BooleanEntry["storage"] < 9)
+                        {
+                            BooleanEntry["storage"] += 1
+                            // console.log("Increase Storage: " + BooleanEntry["storage"] + "  " + AIR.Molecules[AIR.MoleculeIDs[eindex]].name)
+                        }
                     }
                 }                
             }
             if(!breakflag)
             {
-                BooleanEntry.active = false
+                BooleanEntry.active = BooleanEntry["storage"] > 0? true : false
                 BooleanEntry.sources = []
             }
         }
@@ -512,7 +588,7 @@ async function nextStep(updateUI = true)
         {
             for (index = 0; index < BooleanEntry["NOT"].length; index++) {
                 for(s of BooleanEntry["NOT"][index])
-                    if(AIR.diseases.includes(s) && oldstate[s].active)
+                    if(oldstate[s].active)
                     {
                         BooleanEntry.active = false
                         BooleanEntry.sources = [s] 
@@ -614,14 +690,14 @@ $(document).on('change', '.air_boolean_locked_cb', async function () {
 
 $(document).on('click', '.air_bl_coor_mediator', function () {
     var elements = $(this).attr("data")
-    air_create_corr_popup(this, globals.corrResults[elements], "Activity of " + AIR.Molecules[elements.split("_")[1]].name, "Activity of " + AIR.Molecules[elements.split("_")[2]].name );
+    air_create_corr_popup(this, globals.corrResults[elements],  "Activity of " + AIR.Molecules[elements.split("_")[1]].name, "Activity of " + AIR.Molecules[elements.split("_")[2]].name );
 });
 $(document).on('click', '.air_bl_popup_btn', function () {
     var elements = $(this).attr("data")
-    air_create_corr_popup(this, globals.corrResults[elements], "Activity of " + AIR.Molecules[elements.split("_")[0]].name, "Activity of " + AIR.Molecules[elements.split("_")[1]].name );
+    air_create_corr_popup(this, globals.corrResults[elements], (knockedout? "Inhibition " : "Activity ") + "of " + AIR.Molecules[elements.split("_")[0]].name, "Activity of " + AIR.Molecules[elements.split("_")[1]].name );
 });
 
-async function air_create_corr_popup(button, data, xlabel = "Activity", ylabel = "Activity") {
+async function air_create_corr_popup(button, corrdata, xlabel = "Activity", ylabel = "Activity") {
 
     var $target = $('#om_chart_popover');
     var $btn = $(button);
@@ -672,19 +748,27 @@ async function air_create_corr_popup(button, data, xlabel = "Activity", ylabel =
         adjustPanels()
 
     }
-    let targets = []
 
-    for (let index = 0; index < data[0].length; index++) {
-        
-        targets.push(
-            {
-                data: [{
+    let datasets = []
+
+    for(let [diet, data] of Object.entries(corrdata))
+    {
+        let dietdata = []
+        for (let index = 0; index < data[0].length; index++) {
+            
+            dietdata.push(
+                {
                     x: data[0][index],
                     y: data[1][index],
                     r: 3
-                }],
-            }
-        );
+                }
+            );
+        }
+        datasets.push({
+            data: dietdata,
+            label: diet,
+            backgroundColor: foodcolors[diet],
+        })
     }
 
     var outputCanvas = document.getElementById('om_popup_chart');
@@ -692,7 +776,7 @@ async function air_create_corr_popup(button, data, xlabel = "Activity", ylabel =
     var chartOptions = {
         type: 'bubble',
         data: {
-            datasets: targets,
+            datasets: datasets,
         },
         options: {
             plugins: {
@@ -702,7 +786,7 @@ async function air_create_corr_popup(button, data, xlabel = "Activity", ylabel =
                     }
                 },
                 legend: {
-                    display: false
+                    display: true
                 },
                 zoom: {
                     // Container for pan options
@@ -815,12 +899,13 @@ async function air_create_corr_popup(button, data, xlabel = "Activity", ylabel =
 
     let popupchart = new Chart(outputCanvas, chartOptions);
     $target.show();
-    adjustPanels()
 
     var popupheight = $("#om_chart_popover").height() + 50;
     $target.parents("table").parents(".dataTables_scrollBody").css({
         minHeight: (popupheight > 400 ? 400 : popupheight) + "px",
     });
+
+    adjustPanels()
 };
 
 async function findSteadyState()
@@ -914,7 +999,7 @@ async function findSteadyState()
     var ss_activityarray = []
     var ss_statearray = []
     var ss_sourcearray = []
-    var currentstate = AIR.MoleculeIDs.map(e => AIR.Boolean[e].active? "1" : "0").join("")
+    var currentstate = AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
     var index = 0
 
     ss_sourcearray.push(getCurrentSources())
@@ -928,7 +1013,7 @@ async function findSteadyState()
         ss_sourcearray.push(getCurrentSources())
         ss_statearray.push(JSON.stringify(AIR.Boolean))
 
-        currentstate = AIR.MoleculeIDs.map(e => AIR.Boolean[e].active? "1" : "0").join("")
+        currentstate = AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
     }
     ss_activityarray.push(currentstate)
 

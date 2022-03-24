@@ -180,18 +180,18 @@ async function initMainPageStructure() {
       `
 
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-                <li class="air_nav_item nav-item"  style="width: 40%;">
-                    <a class="air_tab active nav-link" id="airpaths_tab" data-toggle="tab" href="#airpaths_tab_content" role="tab" aria-controls="airpaths_tab_content" aria-selected="true">Paths</a>
-                </li>
                 <li class="air_nav_item nav-item" style="width: 40%;">
-                    <a class="air_tab nav-link" id="airboolean_tab" data-toggle="tab" href="#airboolean_tab_content" role="tab" aria-controls="airboolean_tab_content" aria-selected="false">Boolean</a>
+                    <a class="air_tab active nav-link" id="airboolean_tab" data-toggle="tab" href="#airboolean_tab_content" role="tab" aria-controls="airboolean_tab_content" aria-selected="false">Boolean</a>
+                </li>
+                <li class="air_nav_item nav-item"  style="width: 40%;">
+                    <a class="air_tab nav-link" id="airpaths_tab" data-toggle="tab" href="#airpaths_tab_content" role="tab" aria-controls="airpaths_tab_content" aria-selected="true">Paths</a>
                 </li>
                 <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
             </ul>
             <div class="tab-content" id="air_tab">
-                <div class="tab-pane show active" id="airpaths_tab_content" role="tabpanel" aria-labelledby="airpaths_tab">
+                <div class="tab-pane show active" id="airboolean_tab_content" role="tabpanel" aria-labelledby="airboolean_tab">
                 </div>
-                <div class="tab-pane" id="airboolean_tab_content" role="tabpanel" aria-labelledby="airboolean_tab">
+                <div class="tab-pane" id="airpaths_tab_content" role="tabpanel" aria-labelledby="airpaths_tab">
                 </div>
             </div>
         

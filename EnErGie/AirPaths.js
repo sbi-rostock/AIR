@@ -1716,8 +1716,8 @@ async function updatePathData() {
                 function coloredElement(typearray, text = true, seperator = "") {
                     return typearray.map(t =>
                     (t == -1 ?
-                        '<span style="color:blue">' + (text ? "negative" : "⊣") + '</span>' :
-                        '<span style="color:red">' + (text ? "positive" : "→") + '</span>')
+                        '<span style="color:red">' + (text ? "negative" : "⊣") + '</span>' :
+                        '<span style="color:black">' + (text ? "positive" : "→") + '</span>')
                     ).join(seperator)
                 }
 
@@ -1791,13 +1791,13 @@ async function updatePathData() {
                             {
                                 label: "Percentage of positive Paths",
                                 data: chartdata.map(p => expo(p[2] * 100 / elength)),
-                                backgroundColor: "#ff4d4d",
+                                backgroundColor: "#d8d8d8",
                                 barThickness: 30,
                             },
                             {
                                 label: "Percentage of negative Paths",
                                 data: chartdata.map(p => expo(p[3] * 100 / elength)),
-                                backgroundColor: "#4da3ff",
+                                backgroundColor: "#ff4d4d",
                                 barThickness: 30,
                             }
                         ]

@@ -100,11 +100,16 @@ const fixedelementNames = {
     "Anabolic Processes (muscle)": "anabolicprocesses",
     "Catabolic Processes (muscle)" : "catabolicprocesses",
     "sarcopenia (muscle)": "sarcopenia",
-    "sbs (enterocyte)": "sbs",
+    "intestinal dysfunction (enterocyte)": "sbs",
     "cirrhosis (liver)": "cirrhosis",
     "TMPRSS15 (enterocyte)": "protease",
-    "food intake (intestinallumen)": "food"
-
+    "food intake (intestinallumen)": "food",
+    "endothelial integrity (enterocyte)": "endothelia",
+    "portal hypertension (secreted)": "hypertension",
+    "sibo (intestinallumen)": "sibo",
+    "bacteria (intestinallumen)": "bacteria",
+    "probiotics (intestinallumen)": "probiotics",
+    "alcohol consumption (intestinallumen)": "alcohol"
 }
 
 function _evenDist(total, x, reverse = false)
@@ -133,8 +138,8 @@ function _evenDist(total, x, reverse = false)
 
     for (let i = 0; i < x; i++) {
         output.push(reverse? false : true)
-        for (let j = 0; j < t[i].length; j++) {
-            output = output.push(reverse? true : false)
+        for (let j = 0; j < t[i]; j++) {
+            output.push(reverse? true : false)
         }
     }
 
@@ -153,6 +158,7 @@ function evenDist(total, x)
         return output
     }
 }
+
 
 Object.filter = (obj, predicate) =>
     Object.keys(obj)
@@ -201,7 +207,17 @@ const pcorr = (x, y) => {
         sumY2 += yi * yi;
         }
     x.forEach(reduce);
-    return (minLength * sumXY - sumX * sumY) / Math.sqrt((minLength * sumX2 - sumX * sumX) * (minLength * sumY2 - sumY * sumY));
+
+    let corr = (minLength * sumXY - sumX * sumY) / Math.sqrt((minLength * sumX2 - sumX * sumX) * (minLength * sumY2 - sumY * sumY))
+    
+    switch (corr) {
+        case NaN:
+            return 0;
+        case Infinity:
+            return 0;
+        default:
+            return corr;
+    }
 };
 
 const centralities = ["Betweenness", "Closeness", "Degree", "Indegree", "Outdegree"];
@@ -311,40 +327,63 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _jszip, _filesa
                         if(AIR.Boolean.hasOwnProperty(e))
                         {
                             AIR["ElementsWithRules"].push(e)
-                            AIR.Boolean[e]["state"] = false
-                            AIR.Boolean[e]["initial"] = false
-                            AIR.Boolean[e]["locked"] = false
-                            AIR.Boolean[e]["sources"] = []
                         }
                         else
                         {
                             AIR.Boolean[e] = {
                                 "NOT": [],
                                 "DO": [],
-                                "state": false,
-                                "locked": false,
-                                "initial": false,
-                                "sources": []
                             }
                         }
+                        AIR.Boolean[e]["state"] = false
+                        AIR.Boolean[e]["initial"] = false
+                        AIR.Boolean[e]["locked"] = false
+                        AIR.Boolean[e]["keepstate"] = false
+                        AIR.Boolean[e]["storage"] = false
+                        AIR.Boolean[e]["sources"] = []
 
-                        if(AIR.Boolean[e]["DO"].length == 0 && AIR.Molecules[e].type != "FAMILY" && e != AIR.sbs && e != AIR.cirrhosis)
+                        if(AIR.Molecules[e].ids.name == "glycogen")
+                        {
+                            AIR.Boolean[e]["keepstate"] = true
+                        }
+
+                        if((AIR.Boolean[e]["DO"].length == 0 || AIR.Boolean[e]["DO"].every(s => s.length == 1 && (s[0]== AIR.sbs || s[0] == AIR.cirrhosis))) && AIR.Boolean[e]["NOT"].length > 0 && AIR.Molecules[e].type != "FAMILY" && e != AIR.sbs && e != AIR.cirrhosis)
                         {
                             globals.intitalElements.add(e)
                         }
                     }
+                    console.log("initialelements: " + globals.intitalElements.size)
 
                     // remove all intially active elements that have a positive impact
                     // howerer, not if they are enzymes, etc..
+                    for(let Booleanrule of Object.values(AIR.Boolean))
+                    {
+                        for(let rule of Booleanrule["DO"])
+                        {
+                            if(rule.length > 1)
+                            {
+                                for(let source of rule)
+                                {
+                                    if(AIR.Boolean[source]["DO"].length == 0 && AIR.Molecules[source].type != "FAMILY" && source != AIR.sbs && source != AIR.cirrhosis)
+                                    {
+                                        globals.intitalElements.add(source)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    console.log("initialelements: " + globals.intitalElements.size)
                     for(let [element,Booleanrule] of Object.entries(AIR.Boolean))
                     {
                         for(let rule of Booleanrule["DO"])
                         {
-                            if(rule.length == 1)
-                            {
-                                globals.intitalElements.delete(rule[0])
-                            }
-                            else
+                            // if(rule.length == 1)
+                            // {
+                            //     globals.intitalElements.delete(rule[0])
+                            // }
+                            // else
+                            // {
+                            if(rule.length > 1)
                             {
                                 for(let source of rule)
                                 {
@@ -352,12 +391,19 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _jszip, _filesa
                                         globals.intitalElements.delete(source)
                                 }
                             }
+                            // }
                         }
                     }
 
                     globals.intitalElements.add(AIR.protease)
                     globals.intitalElements.add(AIR.food)
-
+                    globals.intitalElements.add(AIR.endothelia)
+                    globals.intitalElements.delete(AIR.probiotics)
+                    globals.intitalElements.delete(AIR.hypertension)
+                    globals.intitalElements.delete(AIR.bacteria)
+                    globals.intitalElements.delete(AIR.sibo)
+                    globals.intitalElements.delete(AIR.alcohol)
+                    console.log("initialelements: " + globals.intitalElements.size)
                     resolve('');
                 });
             }
