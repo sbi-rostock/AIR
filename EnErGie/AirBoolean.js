@@ -68,7 +68,7 @@ async function AirBoolean() {
             </div>
             <div class="row mt-2 mb-4">
                 <div class="col-auto air_select_label" style="padding:0; width: 50%; text-align: right; ">
-                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Custom Food Intake Frequence:</span>
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;" placeholder="e.g. 111000" >Custom Food Intake Frequence:</span>
                 </div>
                 <div class="col">
                     <input type="text" class="textfield" value="" id="sp_bl_foodintake"/>
