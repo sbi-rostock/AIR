@@ -2727,22 +2727,23 @@ async function BFSfromTarget(element, ko_elements = [], allpaths = false, intera
                 }              
             }
             else {
-                if (!visited.hasOwnProperty(neighbour)) {
-                    if (count % 100 == 0)
-                        await updateProgress(count, maxlength, btn, " Finding Paths ...");
-                    count++;
+                if (!visited.includes(neighbour)) {
+
                     visited.push(neighbour)
 
                     neighbourpaths = paths[neighbour]
                     splitsign = neighbour + elements[e][neighbour].sign
                     type = elements[e][neighbour].type
                     neighbour_re = elementres[neighbour];
+        
+                    for (var [path, ptype] of Object.entries(paths[e])) {
+                        if (!neighbour_re.test(path)) {
+                            neighbourpaths[splitsign + path] = ptype * type
+                        }
+                    }    
 
                     queue.push(neighbour);
 
-                    for (var [path, ptype] of Object.entries(paths[e])) {
-                        neighbourpaths[splitsign + path] = ptype * type
-                    }
                 }
                 else if (dist[neighbour] == dist[e] + 1) {
 
@@ -2750,12 +2751,12 @@ async function BFSfromTarget(element, ko_elements = [], allpaths = false, intera
                     splitsign = neighbour + elements[e][neighbour].sign
                     type = elements[e][neighbour].type
                     neighbour_re = elementres[neighbour];
-
+        
                     for (var [path, ptype] of Object.entries(paths[e])) {
-                        if (!neighbour_re.test(path)){
+                        if (!neighbour_re.test(path)) {
                             neighbourpaths[splitsign + path] = ptype * type
                         }
-                    }
+                    }    
                 }
             }
         }
