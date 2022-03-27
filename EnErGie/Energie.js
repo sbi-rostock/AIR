@@ -13,7 +13,7 @@ let URL_PLUGINFILES = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/";
 let URL_DATAFILES = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/";
 let local_datafile_URL = "http://localhost:3000/Energie/";
 let localURL = "http://localhost:3000/Energie/";
-let filetesting = false;
+let filetesting = true;
 const pluginName = 'EnErGie';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
@@ -206,11 +206,11 @@ async function initMainPageStructure() {
       p.removeAttribute("hidden");
       $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
       setTimeout(() => {
-        $.getScript(ScriptPaths[1]).done(function () {
-          AirPaths();
-        });
         $.getScript(ScriptPaths[2]).done(function () {
           AirBoolean();
+        });
+        $.getScript(ScriptPaths[1]).done(function () {
+          AirPaths();
         });
       }, 0);
     });

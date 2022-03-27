@@ -36,6 +36,7 @@ async function AirBoolean() {
 
         <button class="air_collapsible mt-4 active">In silico Perturbation (Correlation analysis)</button>
         <div id="air_bool_panel_corr" class="air_collapsible_content" style="max-height: 500px">
+            <h4 class="mt-2">Element to perturb:</h4>
             <input type="text" list="air_bool_elementnames_source" style="width: 70%" class="textfield mb-2 mt-2" id="air_bool_element_source" value="cirrhosis (liver)"/>
             <datalist id="air_bool_elementnames_source" style="height:5.1em;overflow:hidden">
             </datalist>
@@ -54,15 +55,15 @@ async function AirBoolean() {
             <div>
                 <span style="display: inline-block;width: 30%">
                         <input type="checkbox" class="air_checkbox" id="air_cb_undernour" checked>
-                        <label class="air_checkbox air_checkbox_label" for="air_cb_source" title="Long fasting periods with complete glycogen depletion.">Undernourished</label>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_undernour" title="Long fasting periods with complete glycogen depletion.">Undernourished</label>
                 </span>
                 <span style="display: inline-block;width: 30%">
                         <input type="checkbox" class="air_checkbox" id="air_cb_wellnour" checked>
-                        <label class="air_checkbox air_checkbox_label" for="air_cb_target" title="Average food intake frequency - dependent on glycogen.">Well-nourished</label>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_wellnour" title="Average food intake frequency - dependent on glycogen.">Well-nourished</label>
                 </span>
                 <span style="display: inline-block;width: 30%">
                         <input type="checkbox" class="air_checkbox" id="air_cb_overnour" checked>
-                        <label class="air_checkbox air_checkbox_label" for="air_cb_target" title="High food intake frequency - independent of glycogen.">Overnourished</label>
+                        <label class="air_checkbox air_checkbox_label" for="air_cb_overnour" title="High food intake frequency - independent of glycogen.">Overnourished</label>
                 </span>
             </div>
             <div class="row mt-2 mb-4">
@@ -82,7 +83,7 @@ async function AirBoolean() {
                     <input type="text" class="textfield" value="100" id="sp_bl_steps"/>
                 </div>
             </div>
-            <button id="air_bool_corr_btn" type="button" class="air_btn btn btn-block mb-2 mt-2">Find Correlations</button>
+            <button id="air_bool_corr_btn" type="button" class="air_btn btn btn-block mb-2 mt-2">Start Simulation</button>
             <div class="air_table_background">
                 <table id="air_ss_table" cellspacing="0" class="air_table table table-sm" style="width:100%">
                     <thead>
