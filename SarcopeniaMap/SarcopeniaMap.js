@@ -9,12 +9,12 @@ let FileSaver = require('file-saver');
 
 require('datatables.net-buttons')(window, $);
 
-let URL_PLUGINFILES = "https://raw.githack.com/sbi-rostock/AIR/master/EnErGie/";
-let URL_DATAFILES = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/EnErGie/";
+let URL_PLUGINFILES = "https://raw.githack.com/sbi-rostock/AIR/master/SarcopeniaMap/";
+let URL_DATAFILES = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/SarcopeniaMap/";
 let local_datafile_URL = "http://localhost:3000/Energie/";
 let localURL = "http://localhost:3000/Energie/";
-let filetesting = false;
-const pluginName = 'EnErGie';
+let filetesting = true;
+const pluginName = 'Sarcopenia Map';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 var minervaProxy;
@@ -115,7 +115,7 @@ async function loadScript(script) {
 }
 
 async function initMainPageStructure() {
-  let js_files = ["fetchdata.js", "AirPaths.js", "AirBoolean.js"];
+  let js_files = ["fetchdata.js", "Paths.js", "Boolean.js"];
   let css_files = ["xp_style.css"];
   let filepath = filetesting ? localURL : URL_PLUGINFILES;
   let container = $('<div class="' + pluginName + '-container" id="sarco_plugincontainer"></div>').appendTo(pluginContainer);
