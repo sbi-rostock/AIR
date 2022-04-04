@@ -11,8 +11,8 @@ require('datatables.net-buttons')(window, $);
 
 let URL_PLUGINFILES = "https://raw.githack.com/sbi-rostock/AIR/master/SarcopeniaMap/";
 let URL_DATAFILES = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/SarcopeniaMap/";
-let local_datafile_URL = "http://localhost:3000/Energie/";
-let localURL = "http://localhost:3000/Energie/";
+let local_datafile_URL = "http://localhost:3000/SarcopeniaMap/";
+let localURL = "http://localhost:3000/SarcopeniaMap/";
 let filetesting = false;
 const pluginName = 'Sarcopenia Map';
 const pluginVersion = '0.9.0';

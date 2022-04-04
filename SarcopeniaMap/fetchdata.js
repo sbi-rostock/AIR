@@ -109,7 +109,8 @@ const fixedelementNames = {
     "sibo (intestinallumen)": "sibo",
     "bacteria (intestinallumen)": "bacteria",
     "probiotics (intestinallumen)": "probiotics",
-    "alcohol consumption (intestinallumen)": "alcohol"
+    "alcohol consumption (intestinallumen)": "alcohol",
+    "LEP (secreted)": "leptin"
 }
 
 function _evenDist(total, x, reverse = false)
@@ -337,12 +338,15 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _jszip, _filesa
                         }
                         AIR.Boolean[e]["state"] = false
                         AIR.Boolean[e]["initial"] = false
-                        AIR.Boolean[e]["locked"] = false
+                        AIR.Boolean[e]["locked"] = 0
                         AIR.Boolean[e]["keepstate"] = false
-                        AIR.Boolean[e]["storage"] = false
+                        AIR.Boolean[e]["storage"] = 0
                         AIR.Boolean[e]["sources"] = []
-
-                        if(AIR.Molecules[e].ids.name == "glycogen")
+                        AIR.Boolean[e]["perturbed"] = 0
+                        AIR.Boolean[e]["dNOT"] = []
+                        AIR.Boolean[e]["dDO"] = []
+                        
+                        if(AIR.Molecules[e].ids.name == "glycogen" || AIR.Molecules[e].name.toLowerCase() == "tag (liver)")
                         {
                             AIR.Boolean[e]["keepstate"] = true
                         }
@@ -393,16 +397,31 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _jszip, _filesa
                             }
                             // }
                         }
+                        for(let d of AIR.diseases)
+                        {
+                            for(let r of Booleanrule["NOT"].filter(r => r.includes(d)))
+                            {
+                                Booleanrule["NOT"].splice(Booleanrule["NOT"].indexOf(r), 1)
+                                Booleanrule["dNOT"].push(r)
+                            }
+                            for(let r of Booleanrule["DO"].filter(r => r.includes(d)))
+                            {
+                                Booleanrule["DO"].splice(Booleanrule["DO"].indexOf(r), 1)
+                                Booleanrule["dDO"].push(r)
+                            }
+                        }
                     }
 
+
                     globals.intitalElements.add(AIR.protease)
-                    globals.intitalElements.add(AIR.food)
                     globals.intitalElements.add(AIR.endothelia)
                     globals.intitalElements.delete(AIR.probiotics)
                     globals.intitalElements.delete(AIR.hypertension)
-                    globals.intitalElements.delete(AIR.bacteria)
+                    //globals.intitalElements.delete(AIR.bacteria)
                     globals.intitalElements.delete(AIR.sibo)
                     globals.intitalElements.delete(AIR.alcohol)
+                    globals.intitalElements.delete(AIR.leptin)
+                    globals.intitalElements.delete(AIR.food)
                     console.log("initialelements: " + globals.intitalElements.size)
                     resolve('');
                 });
