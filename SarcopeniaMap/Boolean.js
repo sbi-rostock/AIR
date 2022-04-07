@@ -217,6 +217,9 @@ async function getBooleanPanel() {
             },
         ]
     })
+    globals.air_ss_table.on( 'search.dt', function () {
+        adjustPanels()
+    } );
     $(globals.air_bool_table.table().container()).addClass('air_datatable');
     $(globals.air_ss_table.table().container()).addClass('air_datatable');
 
@@ -706,7 +709,7 @@ async function nextStep()
         {
             BooleanEntry["active"] = true
             BooleanEntry["sources"] = rule
-            if(BooleanEntry["keepstate"])
+            if(BooleanEntry["keepstate"] && BooleanEntry["storage"] < 9)
                 BooleanEntry["storage"] += 1
         }
         else
@@ -999,9 +1002,29 @@ async function air_create_corr_popup(button, corrdata, xlabel = "Activity", ylab
 
 async function findSteadyState()
 {
-
+    let ss_activityarray = []
+    let ss_statearray = []
+    let ss_sourcearray = []
+    let index = 0
     
     $("#air_bool_ss_graph").empty().append(`
+        <div class="row mt-2 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
+                            data-content="Because of the changeing food intake, nutrients inherently have an osicilating behavior. Their high number might impede the readibility of the graph.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col">
+                <div class="cbcontainer">
+                    <input type="checkbox" class="air_checkbox" id="sp_hidenutrients" checked>
+                    <label class="air_checkbox" for="sp_hidenutrients">Hide intestinal nutrients in graph</label>
+                </div>
+            </div>
+        </div> 
         <select id="air_bool_ssmode" class="browser-default air_select custom-select mb-2 mt-2">
             <option value="0" selected>During Steady State</option>
             <option value="1">Towards Steady State</option>
@@ -1075,36 +1098,68 @@ async function findSteadyState()
                     }
                 },
                 x: {
+                    title: {
+                        display: true,
+                        text: 'Number of steps'
+                    },
                     ticks: {
                         stepSize: 1,
                         autoSkip: false,
                         beginAtZero: true,
-                        callback: function(value) {if (value % 1 === 0) {return value;}}
+                        callback: function(value) {
+                            if (value % 1 === 0) 
+                            {
+                                if(parseFloat($("#air_bool_ssmode").val()) == 0)
+                                {
+                                    return value += index
+                                }
+                                else
+                                    return value;
+                            }
+                            else
+                            {
+
+                            }
+                        }
                     }
                 }
             }
         }
       });
-    var ss_activityarray = []
-    var ss_statearray = []
-    var ss_sourcearray = []
-    var currentstate = AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
-    var index = 0
+
+
+    let currentstep = parseFloat($("#air_bool_steps").html().split(": ")[1])
+    let foodarray = [true]
+
+    if($("#air_cb_undernour_step").prop("checked"))
+        foodarray = foodarrays["undernourished"] 
+    if($("#air_cb_overnour_step").prop("checked"))
+        foodarray = foodarrays["overnourished"] 
+    if($("#air_cb_wellnour_step").prop("checked"))
+        foodarray = foodarrays["well-nourished"] 
+    if($("#air_cb_customnour_step").prop("checked"))
+        foodarray = $("#sp_bl_foodintake_step").val().split('').map(c => c == "1"? true : false)
+    
 
     ss_sourcearray.push(getCurrentSources())
     ss_statearray.push(JSON.stringify(AIR.Boolean))
 
-    while((index = ss_activityarray.indexOf(currentstate)) == -1) {
+    var currentstate = (currentstep%foodarray.length) + "_" + AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
 
+    while((index = ss_activityarray.indexOf(currentstate)) == -1) {
+    
+        AIR.Boolean[AIR.food].active = foodarray[currentstep%foodarray.length]
         ss_activityarray.push(currentstate)
         await nextStep(false);
 
+        currentstep++;
         ss_sourcearray.push(getCurrentSources())
         ss_statearray.push(JSON.stringify(AIR.Boolean))
 
-        currentstate = AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
+        currentstate = (currentstep%foodarray.length) + "_" + AIR.MoleculeIDs.map(e => (AIR.Boolean[e]["keepstate"]? AIR.Boolean[e]["storage"] : (AIR.Boolean[e].active? "1" : "0"))).join("")
     }
     ss_activityarray.push(currentstate)
+    ss_activityarray = ss_activityarray.map(s => s.split("_")[1])
 
     $("#air_bool_steps").html("Current Step: " + ss_activityarray.length)
     var toward_activityarray = ss_activityarray.slice(0,index+1)
@@ -1145,11 +1200,15 @@ async function findSteadyState()
         var edata = []
         for (let i = 0; i < AIR.MoleculeIDs.length; i++) {
 
+            if($("#sp_hidenutrients").prop("checked") && (["enterocyte", "intestinallumen"].includes(AIR.Molecules[AIR.MoleculeIDs[i]].compartment)))
+            {
+                continue;
+            }
             let values = statearray.map(x => parseFloat(x[i]));
 
             if(!values.every( v => v === values[0] ))
             {
-                var _edata = [values.map(x => (x == 1? "a" : "b")).join(""),AIR.MoleculeIDs[i]]
+                var _edata = [values.map(x => (x == 0? "b" : "a")).join(""),AIR.MoleculeIDs[i]]
                 values = values.map(x => (x == 1? count : null))
                 count++;
                 let data = labels.map((label, index) => ({ x: label, y: values[index]}));

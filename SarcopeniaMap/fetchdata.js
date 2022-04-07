@@ -110,7 +110,8 @@ const fixedelementNames = {
     "bacteria (intestinallumen)": "bacteria",
     "probiotics (intestinallumen)": "probiotics",
     "alcohol consumption (intestinallumen)": "alcohol",
-    "LEP (secreted)": "leptin"
+    "LEP (secreted)": "leptin",
+    "GCG (secreted)": "glucagon"
 }
 
 function _evenDist(total, x, reverse = false)
@@ -422,6 +423,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _jszip, _filesa
                     globals.intitalElements.delete(AIR.alcohol)
                     globals.intitalElements.delete(AIR.leptin)
                     globals.intitalElements.delete(AIR.food)
+                    // globals.intitalElements.delete(AIR.glucagon)
                     console.log("initialelements: " + globals.intitalElements.size)
                     resolve('');
                 });
