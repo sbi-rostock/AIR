@@ -426,6 +426,15 @@ async function setInitialState(original = true)
 }
 async function environmentalSensitivity()
 {
+    let element = $("#air_bool_element_source").val().split(',')[0].toLowerCase().trim()
+    if (AIR.ElementNames.fullname.hasOwnProperty(element)) {
+        element = AIR.ElementNames.fullname[element]
+    }
+    else
+    {
+        return
+    }
+
     let customfood = $("#sp_bl_foodintake").val().split('').filter(c => c == "1" || c == "0").map(c => c == "1"? true : false)
     let selectedfoodarrays = {}
 
@@ -443,15 +452,8 @@ async function environmentalSensitivity()
 
     let steps = parseFloat($("#sp_bl_steps").val())
     var knockout = $("#air_cb_target").prop("checked");
+    
     var _text = await disablebutton("air_bool_corr_btn", true);
-    let element = $("#air_bool_element_source").val().split(',')[0].toLowerCase().trim()
-    if (AIR.ElementNames.fullname.hasOwnProperty(element)) {
-        element = AIR.ElementNames.fullname[element]
-    }
-    else
-    {
-        return
-    }
 
     //globals["activityvalues"] = Object.assign({}, ...[...Array(101).keys()].map((x) => ({[x]: evenDist(new Array(100-x).fill(false), new Array(x).fill(true))})))
     globals["activityvalues"] = Object.assign({}, ...[...Array(101).keys()].map((x) => ({[x]: evenDist(100, x)})))
