@@ -1831,7 +1831,7 @@ async function getPhenotypePanel() {
                 <div class="col-auto">
                     <div class="wrapper">
                         <button type="button" class="air_btn_info btn btn-secondary"
-                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalization"
                                 data-content="If checked, phenotype levels will be normalized by the max absolute values.">
                             ?
                         </button>
@@ -1859,6 +1859,7 @@ async function getPhenotypePanel() {
             </table>
         </div>`);
 
+        $('.air_btn_info[data-toggle="popover"]').popover();
         $("#air_pe_selectedelement_btn").tooltip();
         $("#air_pe_element_input").keyup(function (event) {
             if (event.keyCode === 13) {

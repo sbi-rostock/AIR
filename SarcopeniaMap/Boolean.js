@@ -21,7 +21,7 @@ async function AirBoolean() {
         <div class="mb-2 mt-2" style="overflow: hidden; width: 100%; white-space: nowrap;">
             <span id="air_bool_steps" class="col-md-2 control-label" style="vertical-align: sub;font-size: 15px;">Current Step: 0</span>
             <button id="air_reset_btn" style="float: right; width:20%" type="button" class="air_btn_light btn btn-block" title="Reset to original state (equal to page reload).">Full Reset</button>
-            <button id="air_reset_btn" style="float: right; width:20%" type="button" class="air_btn_light btn mr-1" title="Reset steps only and keep perturbed elements.">Reset Steps</button>            
+            <button id="air_reset_steps_btn" style="float: right; width:20%" type="button" class="air_btn_light btn mr-1" title="Reset steps only and keep perturbed elements.">Reset Steps</button>            
         </div>
         <div>
             <span style="display: inline-block;width: 30%">
@@ -322,8 +322,12 @@ async function getBooleanPanel() {
 
     return false;
     });
-
+    
     $('#air_reset_btn').on('click', setInitialState);
+
+    $('#air_reset_steps_btn').on('click', function() {
+        setInitialState(false)
+    });
 
     $('#air_bool_corr_btn').on('click', environmentalSensitivity);
 
@@ -424,6 +428,7 @@ async function setInitialState(original = true)
     await setBooleanTable();
     await colorState()
 }
+
 async function environmentalSensitivity()
 {
     let element = $("#air_bool_element_source").val().split(',')[0].toLowerCase().trim()
@@ -1014,8 +1019,8 @@ async function findSteadyState()
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary"
-                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Data Type"
-                            data-content="Because of the changeing food intake, nutrients inherently have an osicilating behavior. Their high number might impede the readibility of the graph.">
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Exclude Nutrients"
+                            data-content="Because of the changing food intake, nutrients inherently have an oscillating behavior. Their high number might impede the readibility of the graph.">
                         ?
                     </button>
                 </div>
@@ -1038,6 +1043,7 @@ async function findSteadyState()
         </div>   
     `)
     $("#air_bool_ssmode").on("change", ShowSSGraph)
+    $('.air_btn_info[data-toggle="popover"]').popover();
 
     var lineChart = new Chart(document.getElementById("air_bool_ss_chart").getContext('2d'), {
         type: "bubble",
