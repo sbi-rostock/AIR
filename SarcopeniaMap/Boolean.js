@@ -68,7 +68,7 @@ async function AirBoolean() {
         <button class="air_collapsible mt-4 active">In silico Perturbation (Correlation analysis)</button>
         <div id="air_bool_panel_corr" class="air_collapsible_content" style="max-height: 500px">
             <h4 class="mt-2">Element to perturb:</h4>
-            <input type="text" list="air_bool_elementnames_source" style="width: 70%" class="textfield mb-2 mt-2" id="air_bool_element_source" value="cirrhosis (liver)"/>
+            <input type="text" list="air_bool_elementnames_source" style="width: 70%" class="textfield mb-2 mt-2" id="air_bool_element_source" value="intestinal dysfunction (enterocyte)"/>
             <datalist id="air_bool_elementnames_source" style="height:5.1em;overflow:hidden">
             </datalist>
             <div>
