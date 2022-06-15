@@ -324,7 +324,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 
                                                     $("#stat_spinner").before(`
                                                         <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
-                                                            <span>The plugin mansucript has been published as a <a href="PrePrint" target="_blank">PrePrint</a>. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                            <span>The plugin mansucript describing the methodology has been published in <a href="https://www.nature.com/articles/s41540-022-00222-z" target="_blank">npj Systems Biology and Applications</a>. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
                                                             <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                                                                 <span aria-hidden="true">&times;</span>
                                                             </button>
