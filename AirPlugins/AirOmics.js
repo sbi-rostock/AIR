@@ -1,6 +1,7 @@
 async function AirOmics() {
     globals.omics = {
         enrichrtab: undefined,
+        crntab: undefined,
         phenotab: undefined,
         targettab: undefined,
         resultscontainer: undefined,
@@ -39,12 +40,12 @@ async function AirOmics() {
         saved_importdata: [{}],
         current_import_index: 0,
         import_data: {},
-
+        cy: undefined,
         seperator: "\t",
 
         SamplesWithCalculatedSP: [],
         sc_chart: undefined,
-
+        loops: {},
         abbreviations: {
             "b": "Betweenness",
             "c": "Closeness",
@@ -93,7 +94,7 @@ async function AirOmics() {
         </div>*/
     /*html*/`
     
-        <h4 class="mt-4 mb-4">1. Select Data</h4> 
+        <h4 class="mt-4 mb-4">1. Upload Data</h4> 
 
         <ul class="air_nav_tabs nav nav-tabs mt-4" role="tablist">
             <li class="air_nav_item nav-item" style="width: 50%;">
@@ -341,13 +342,16 @@ async function AirOmics() {
 async function createDifferentialAnalysisPanel() {
     $("#om_maintab").empty().append(`            
         <ul class="air_nav_tabs nav nav-tabs" role="tablist">
-            <li class="air_nav_item nav-item" style="width: 40%;">
+            <li class="air_nav_item nav-item" style="width: 35%;">
                 <a class="air_tab air_tab_sub active nav-link" id="om_regulation-tab" data-toggle="tab" href="#om_regulation" role="tab" aria-controls="om_regulation" aria-selected="true">Phenotype Inference</a>
             </li>
-            <li class="air_nav_item nav-item" style="width: 35%;">
+            <li class="air_nav_item nav-item" style="width: 30%;">
                 <a class="air_tab air_tab_sub nav-link" id="om_target-tab" data-toggle="tab" href="#om_target" role="tab" aria-controls="om_target" aria-selected="false">Target Inference</a>
             </li>
-            <li class="air_nav_item nav-item" style="width: 25%;">
+            <li class="air_nav_item nav-item" style="width: 15%;">
+                <a class="air_tab air_tab_sub nav-link" id="om_crn-tab" data-toggle="tab" href="#om_crn" role="tab" aria-controls="om_crn" aria-selected="false">CRNs</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 20%;">
                 <a class="air_tab air_tab_sub nav-link" id="om_enrichr-tab" data-toggle="tab" href="#om_enrichr" role="tab" aria-controls="om_enrichr" aria-selected="false">Enrichr</a>
             </li>
         </ul>
@@ -355,6 +359,87 @@ async function createDifferentialAnalysisPanel() {
 
         </div>`
     );
+    globals.omics.crntab = $(`
+    
+        <div class="tab-pane air_sub_tab_pane mb-2" id="om_crn" role="tabpanel" aria-labelledby="om_crn-tab">
+            <div class="row mt-2 mb-2">
+                <div class="col-auto">
+                    <div class="wrapper">
+                        <button type="button" class="air_btn_info btn btn-secondary"
+                                data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Influence value filtering"
+                                data-content="CRNs are subnetworks of the AIR MIM that represent regulatory gene interactions of a specific phenotype. They are creted by ranking feedbback loop motifs in the MIM by their fold changes in the selected sample and topology towards the phenotype. The methodology is based on the approach presented by Khan et al., 2017, Nature Communications.">
+                            ?
+                        </button>
+                    </div>
+                </div>
+                <div class="col">
+                    <h4 class="mb-2">Generate Core Regulatory Networks (CRNs):</h4>  
+                </div>
+            </div>
+            <div class="row mb-4 mt-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 15%; text-align: right;">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Sample:</span>
+                </div>
+                <div class="col">
+                    <select id="om_crn_sample_select" class="browser-default om_select custom-select"></select>
+                </div>
+            </div>
+            <div class="row mb-4 mt-4">
+                <div class="col-auto air_select_label" style="padding:0; width: 15%; text-align: right;">
+                    <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Phenotype:</span>
+                </div>
+                <div class="col">
+                    <select id="om_crn_phenotype_select" class="browser-default om_select custom-select"></select>
+                </div>
+            </div>
+            <div>
+                <label for="om_crn_ngenes" style="width: 40%; text-align: right;"># Phenotype Regulators:  </label>
+                <input type="number" id="om_crn_ngenes" name="n Regulators" value="10" min="1" max="50">
+            </div>
+            <div>
+                <label for="om_crn_nmotifs" style="width: 40%; text-align: right;"># Motifs per Regulator:</label>
+                <input type="number" id="om_crn_nmotifs" name="n Motifs" value="3" min="0" max="50">
+            </div>
+            <div>
+                <label for="om_crn_npaths" style="width: 40%; text-align: right;"># Paths to Phenotype:</label>
+                <input type="number" id="om_crn_npaths" name="n Motifs" value="1" min="0" max="50">
+            </div>
+            <button type="button" id="om_crn_analyzebtn" class="air_btn btn btn-block mt-2">Generate CRNs</button>
+            <div id="om_cytoscape" style="width: 100%; height: 350px"></div>
+            <div class="row mt-2 mb-2">
+                <div class="col-auto" style="width: 40%;">
+                    <div>
+                        <label for="om_crn_scale" style="width: 30%; text-align: right;">Scale:  </label>
+                        <input type="number" id="om_crn_scale" name="Scale" value="1000" min="0" max="10000" style="text-align: right;">
+                        <span>%</span>
+                    </div>
+                </div>
+                <div class="col">
+                    <button type="button" id="om_crn_exportbtn" class="air_btn_light btn btn-block"><i class="fa fa-download"></i> Export CRN as PNG</button>
+                </div>
+            </div>                      
+        </div>
+
+
+    `).appendTo('#om_tab');
+
+    for (let phenotype in AIR.Phenotypes) {
+        let pname = AIR.Phenotypes[phenotype].name;
+        $("#om_crn_phenotype_select").append($('<option>', {
+            value: phenotype,
+            text: pname
+        }));
+    }
+    for (let sample in globals.omics.samples) {
+        $("#om_crn_sample_select").append($('<option>', {
+            value: sample,
+            text: globals.omics.samples[sample]
+        }));
+    }
+
+    $('#om_crn_analyzebtn').on('click', generateCRN);
+    $('#om_crn_exportbtn').on('click', exportCRN);
+
     globals.omics.phenotab = $(`
     <div class="tab-pane air_sub_tab_pane show active mb-2" id="om_regulation" role="tabpanel" aria-labelledby="om_regulation-tab">
         <div id="om_pheno_startcontainer">
@@ -2096,6 +2181,7 @@ async function om_createTable(param) {
                 value: sample,
                 text: globals.omics.samples[sample]
             }));
+
             let headercell = createCustomLinkCell(headerrow, 'th', globals.omics.samples[sample], 'col-auto', 'col', 'center').parentElement;
             headercell.innerHTML += "<br>(p-value)"
 
@@ -6197,4 +6283,241 @@ function pvalueThreshold()
     }
 
     return pvalue_threshold
+}
+
+async function generateCRN()
+{
+    let text = await disablebutton("om_crn_analyzebtn")
+
+    let p = $("#om_crn_phenotype_select").val()
+    let sample = $("#om_crn_sample_select").val()
+    let nmotifs = $("#om_crn_nmotifs").val()
+    let npaths = $("#om_crn_npaths").val()
+    let ngenes = $("#om_crn_ngenes").val()
+
+    let loops = getTriplets([3], true)
+    let degs = getFilteredExpression(sample, 0, 0.05);    
+    let pgenes = getFilteredRegulators(p, 0, true)
+
+    let pdegs = Object.keys(pgenes).map(g => [g, Math.abs((degs.hasOwnProperty(g)? degs[g] : 0) * pgenes[g])]).sort(function(a, b){return b[1]-a[1]}).filter(x => x[1] != 0)
+    pdegs = pdegs.slice(0, (ngenes > pdegs.length? pdegs.length : ngenes)).map(x => x[0])
+
+    let finalmotifs = []
+    let genepaths = {}
+
+    for (let g of pdegs)
+    {
+        let ePaths = await BFSfromTarget(g)
+        let SPs = ePaths["SPs"]
+        ePaths = ePaths["Paths"]
+        genepaths[g] = ePaths
+
+        let weightedmotifs = []
+        for (let [i,loop] of loops.entries())
+        {            
+            let eset = Array.from(new Set(loop.map(x => x[0])))
+            let minSPelement, minsp;
+            if(eset.includes(g))
+            {
+                [minSPelement, minsp] = [g, 1]
+            }                
+            else
+            {
+                [minSPelement, minsp] = eset.filter(e => SPs.hasOwnProperty(e)).map(e => [e, SPs[e]]).sort(function(a, b){return a[1]-b[1]})[0] || ["", 0]
+            }
+
+            if (!minsp || minsp == 0)
+                continue
+                
+            weightedmotifs.push({
+                "loop": i,
+                "path": loop,
+                "minSPelement": minSPelement,
+                "elements": eset,
+                "gene": g,
+                "fcscore": eset.filter(e => degs.hasOwnProperty(e)).map(e => Math.abs(degs[e])).reduce((a, b) => a + b, 0) || 0,
+                "pscore": eset.filter(e => pgenes.hasOwnProperty(e)).map(e => Math.abs(pgenes[e])).reduce((a, b) => a + b, 0) || 0,
+                "spscore": minsp > 0? 1/Math.pow(minsp,2) : 0,
+                "tscore": 0, // sum([abs(targets[e]) if e in targets else 0 for e in eset]),
+            })
+        }
+
+        // let maxmotifs = []
+        let maxmotifs = weightedmotifs.map((x,k) =>
+            [
+                k, 
+                x["fcscore"] * x["spscore"]
+            ])
+        // if (weightedmotifs.length > 0)
+        // {
+        //     let fcmax = Math.max(...weightedmotifs.map(x => x["fcscore"]))
+        //     let pmax = Math.max(...weightedmotifs.map(x => x["pscore"]))
+        //     let spmax = Math.max(...weightedmotifs.map(x => x["spscore"]))
+        //     let tmax = Math.max(...weightedmotifs.map(x => x["tscore"]))
+
+        //     for (let w1 of [0/5, 1/5,2/5])
+        //     {
+        //         for (let w2 of [3/5, 4/5,5/5])
+        //         {
+        //             for (let w3 of [1/3, 2/3,3/3])
+        //             {
+        //                 if (w1 == w2 || w2 == w3 || w1 == w3)
+        //                     continue
+
+        //                 let sortedmotifs = weightedmotifs.map((x,k) =>
+        //                 [
+        //                     k, 
+        //                     (w1 * (fcmax != 0? x["fcscore"] / fcmax : 0)) + 
+        //                     (w2 * (spmax != 0? x["spscore"] / spmax : 0)) + 
+        //                     (w3 * (tmax != 0? x["tscore"] / tmax : 0))
+        //                 ]).sort(function(a, b){return b[1]-a[1]})
+
+        //                 if(maxmotifs.map(x => x[0]).includes(sortedmotifs[0][0]) == false && sortedmotifs[0][1] != 0)
+        //                 {
+        //                     maxmotifs.push(
+        //                         sortedmotifs[0]
+        //                     )
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        finalmotifs = finalmotifs.concat(maxmotifs.sort(function(a, b){return b[1]-a[1]}).slice(0, (nmotifs > maxmotifs.length? maxmotifs.length : nmotifs)).map(x => weightedmotifs[x[0]]))      
+    }
+
+    let edges = new Set();
+    let nodes = new Set();
+    let nodeswithpath = new Set();
+    nodes.add(p)
+
+    for (let motif of finalmotifs)
+    {
+        let path = motif["path"]
+        
+        for (let i = 0; i < path.length; i++) {
+            if(i == path.length - 1)
+            {
+                edges.add(path[i][0] + "_" + path[0][0])
+            }
+            else
+            {
+                edges.add(path[i][0] + "_" + path[i+1][0])
+            }
+        }
+
+        motif["elements"].forEach(item => nodes.add(item))
+
+        for(let [k,eSP] of Array.from(Object.keys(genepaths[motif["gene"]])).filter(p => p.startsWith(motif["minSPelement"] + "_")).map(p => p.split("_")).entries())
+        {
+            if(k > (npaths - 1))
+            {
+                break;
+            }
+            for (let i = 0; i < eSP.length-1; i++) 
+            {
+                edges.add(eSP[i] + "_" + eSP[i+1])
+                
+            } 
+            eSP.forEach(item => nodes.add(item))
+        }
+    }
+    
+    pdegs.forEach(item => nodes.add(item))
+
+    let SPs = Array.from(Object.keys(AIR.Phenotypes[p].paths))
+
+    for(let node of pdegs)
+    {
+        let eSPs = SPs.filter(p => p.startsWith(node + "_")).map(p => p.split("_"))
+        let minlength = Math.min(...eSPs.map(p => p.length)) || 0
+        eSPs = eSPs.filter(p => p.length == minlength)
+
+        for(let [k,eSP] of eSPs.entries())
+        {
+            if(k > (npaths - 1))
+            {
+                break;
+            }
+            for (let i = 0; i < eSP.length-1; i++) 
+            {
+                edges.add(eSP[i] + "_" + eSP[i+1])
+                
+            } 
+            eSP.forEach(item => nodes.add(item))
+        }
+    }
+    
+    nodes = Array.from(nodes)
+
+    let network = []
+    let fcmax = Math.max(...nodes.map(n => Math.abs(degs.hasOwnProperty(n)? degs[n] : 0))) || 1
+    for(let node of nodes)
+    {
+        network.push({
+            data: { 
+                id: node,
+                name: AIR.Molecules[node].name,
+                color: valueToHex(degs.hasOwnProperty(node)? degs[node]/fcmax : 0),
+                label: AIR.Molecules[node].name, 
+                shape: pdegs.includes(node)? "triangle" : "ellipse"
+            }, 
+            classes: 'center-center'
+        })
+    }
+
+    for(let edge of edges)
+    {
+        network.push(        {
+            data: {
+              id: edge,
+              source: edge.split("_")[0],
+              target: edge.split("_")[1]
+            }
+          })
+    }
+    
+    globals.omics.cy = cytoscape({
+        container: document.getElementById('om_cytoscape'),
+        elements: network,
+          style: [
+              {
+                  selector: 'node',
+                  style: {
+                      shape: 'circle',
+                      'background-color': 'data(color)',
+                      'label': 'data(name)',
+                      'shape': 'data(shape)'
+                  }
+              }]      
+      });
+    
+    let options = {
+        name: 'fcose',
+        animate: false, // whether to animate changes to the layout
+        animationDuration: 500, // duration of animation in ms, if enabled
+        animationEasing: undefined, // easing of animation, if enabled
+        animateFilter: function ( node, i ){ return true; }, // a function that determines whether the node should be animated.
+          // All nodes animated by default for `animate:true`.  Non-animated nodes are positioned immediately when the layout starts.
+        fit: true, // whether to fit the viewport to the graph
+        padding: 30, // padding to leave between graph and viewport
+        pan: undefined, // pan the graph to the provided position, given as { x, y }
+        ready: undefined, // callback for the layoutready event
+        stop: function(){
+            enablebtn("om_crn_analyzebtn", text)
+        }, // callback for the layoutstop event
+        spacingFactor: 1, // a positive value which adjusts spacing between nodes (>1 means greater than usual spacing)
+        zoom: undefined // zoom level as a positive number to set after animation
+      }
+
+    var layout = globals.omics.cy.elements().layout(options);
+    
+    layout.run();
+}
+
+function exportCRN() {
+    if(globals.omics.cy)
+    { 
+        saveAs(globals.omics.cy.png({scale:$("#om_crn_scale").val()/100}), "graph.png");
+    }
 }

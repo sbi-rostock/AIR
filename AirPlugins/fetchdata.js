@@ -8,6 +8,7 @@ let FileSaver;
 let VCF;
 let ttest;
 let Decimal;
+let cytoscape;
 var getFiles;
 
 Object.filter = (obj, predicate) =>
@@ -84,7 +85,7 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal) {
+function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal, _cytoscape) {
 
     return new Promise((resolve, reject) => {
 
@@ -95,6 +96,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
             var t0 = 0;
             var t1 = 0;
 
+            cytoscape = _cytoscape;
             Chart = _chart;
             VCF = _vcf;
             JSZip = _jszip;
@@ -286,6 +288,8 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                     t1 = performance.now()
                                     console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
                                     readMolecules(moleculecontent).then(s => {
+                                        t0 = performance.now();
+
                                         calculateShortestPaths([], false, true, "air_init_btn").then(r => {
                                             t1 = performance.now()
                                             console.log("Call to calculate SPs took " + (t1 - t0) + " milliseconds.");
@@ -296,8 +300,9 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                                 readPhenotypePaths(pathcontent).then(s => {
                                                     $("#air_init_btn").remove()
                                                     t1 = performance.now()
-                                                    console.log("Call to get Paths took " + (t1 - t0) + " milliseconds.")
+                                                    console.log("Call to get Paths took " + (t1 - t0) + " milliseconds.")                                                    
                                                     t0 = performance.now();
+
                                                     var height = 160;
                                                     if (globals.defaultusers.includes(globals.user) === true) {
 
@@ -324,7 +329,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 
                                                     $("#stat_spinner").before(`
                                                         <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
-                                                            <span>The plugin mansucript describing the methodology has been published in <a href="https://www.nature.com/articles/s41540-022-00222-z" target="_blank">npj Systems Biology and Applications</a>. For any further questions, please contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                            <span>For any further questions, please refer to our paper in <a href="https://www.nature.com/articles/s41540-022-00222-z" target="_blank">npj Systems Biology and Applications</a> or contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
                                                             <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                                                                 <span aria-hidden="true">&times;</span>
                                                             </button>
@@ -2746,4 +2751,206 @@ function getNormalDistribution(start, end, bins, _mean, _std)
   	output.push(parseFloat((new Decimal(-0.5)).times(new Decimal(i).minus(mean).dividedBy(std).pow(2)).exp().dividedBy(std.times(two.times(pi).sqrt()))))
   }
   return output.map(i => i/Math.max.apply(null, output.map(Math.abs)))
+}
+
+function getTriplets(length = [3], onlygenes = false)
+{
+    let loops = []
+    
+    for(let l of length)
+    {
+        if(globals.omics.loops.hasOwnProperty(l))
+        {
+            loops = loops.concat(globals.omics.loops[l])
+        }
+        else
+        {
+
+            loops = loops.concat.apply([], Object.values(getFeedbackLoop(length)))
+        }
+
+    }
+
+    for (let loop of loops)
+    {
+        loop.pop()
+        i = Array.from(loop.entries()).sort((a, b) => a[1][0].localeCompare(b[1][0]))[0][0]
+
+        for (let j = 0; j < i; j++) {
+            loop.push(loop.shift())
+        }
+    }
+    
+    loops = new Set(loops.map(l => l.map(x => x[0] + "_" + x[1]).join("$")))
+    loops = Array.from(loops).map(l => l.split("$").map(x => x.split("_")))
+    
+    if (onlygenes)
+    {
+        loops = loops.filter(l => l.every(x => ["HGNC" in AIR.Molecules[x[0]]["ids"]]))
+    }
+    
+    return loops
+
+    function getFeedbackLoopsFromElement(e, targets, l)
+    {
+        let elementpaths = []
+        if (l > 0 && targets.hasOwnProperty(e))
+        {
+            for (let [t,v] of Object.entries(targets[e]))
+            {
+                for (let path of getFeedbackLoopsFromElement(t, targets, l-1))
+                    if (path.slice(-1,1).every(x => e != x[0]))
+                    {
+                        elementpaths.push([[e,v], ...path]) 
+                    }
+            }
+
+            return elementpaths
+        }
+        else
+            return [[[e,1]]]
+    }
+
+    
+    function getFeedbackLoop(length = [2])
+    {
+        let _elements = Object.assign(...Object.keys(AIR.Molecules).map(e => ({[e]: {}}))) 
+        for (let inter of AIR.Interactions)
+            if (inter["type"] != 0)
+            {
+                _elements[inter["source"]][inter["target"]] = inter["type"]
+            }
+
+        _elements= Object.filter(_elements, e => Object.keys(_elements[e]).length > 0)
+        
+        let loopdict = {}
+        
+        for (let e in _elements) 
+        {
+            loopdict[e] = []
+            for (let l of length)
+            {
+                for (let p of getFeedbackLoopsFromElement(e, _elements, l))
+                {
+                    if (p.at(-1)[0] == e)
+                    {
+                        loopdict[e].push(p) 
+                    }
+                }
+            }              
+        }
+        return Object.filter(loopdict, e => loopdict[e].length > 0)
+    }
+
+
+}
+
+
+async function BFSfromTarget(element, interactiontype = false, sorted = false, btn = "") {
+
+
+    let paths = {};
+    let elements = {};
+    let elementids = Object.keys(AIR.Molecules)
+
+    await updateProgress(0, 1, btn, " Finding Paths ...");
+
+    var elementres = {}
+    var visitedpaths = {}
+
+    for (let e of elementids) {
+        elements[e] = {};
+        paths[e] = {}
+        elementres[e] = new RegExp(e + "([" + (interactiontype ? "+-" : "_") + "]|$)")
+    }
+
+    for (var inter of AIR.Interactions) {
+        if (inter.type == 0) {
+            continue;
+        }
+        elements[inter.target][inter.source] = {
+            type: inter.type,
+            sign: (interactiontype ? (inter.type == -1 ? "-" : "+") : "_")
+        }
+    }
+
+    var re = new RegExp(e + "([" + (interactiontype ? "+-" : "_") + "]|$)")
+
+    elements = Object.filter(elements, e => Object.keys(elements[e]).length > 0);
+
+    var neighbour, l, e, visited, queue, dist, spcount;
+
+    var queue = [element]
+    var dist = {};
+    var spcount = {};
+    var visited = [element]
+    visitedpaths[element] = []
+    dist[element] = 0;
+    spcount[element] = 0;
+
+    paths[element][element] = 1
+
+    var splitsign, type, neighbourpaths, neighbour_re, newpath;
+
+    while (queue.length > 0) {
+        e = queue.shift();
+        for (var neighbour in elements[e]) {            
+            if (!visited.includes(neighbour)) {
+
+                    visited.push(neighbour)
+
+                    neighbourpaths = paths[neighbour]
+                    splitsign = neighbour + elements[e][neighbour].sign
+                    type = elements[e][neighbour].type
+                    neighbour_re = elementres[neighbour];
+                    dist[neighbour] = dist[e] + 1;
+
+                    for (var [path, ptype] of Object.entries(paths[e])) {
+                        if (!neighbour_re.test(path)) {
+                            neighbourpaths[splitsign + path] = ptype * type
+                        }
+                    }    
+
+                    queue.push(neighbour);
+
+                }
+                else if (dist[neighbour] == dist[e] + 1) {
+
+                    neighbourpaths = paths[neighbour]
+                    splitsign = neighbour + elements[e][neighbour].sign
+                    type = elements[e][neighbour].type
+                    neighbour_re = elementres[neighbour];
+        
+                    for (var [path, ptype] of Object.entries(paths[e])) {
+                        if (!neighbour_re.test(path)) {
+                            neighbourpaths[splitsign + path] = ptype * type
+                        }
+                    }    
+            }
+            
+        }
+        
+    //  }
+    }
+
+    if (sorted) {
+        return {
+            "Paths": paths,
+            "SPs": dist
+        }
+    }
+    else {
+
+        var output = {};
+
+        for (const e of Object.values(paths)) {
+            for (const [path, ptype] of Object.entries(e)) {
+                output[path] = ptype
+            }
+        }
+        return {
+            "Paths": output,
+            "SPs": dist
+        }
+    }
 }
