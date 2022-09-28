@@ -3334,7 +3334,7 @@ async function om_loadfile(imported) {
                     if (AIR.ElementNames[globals.omics.selectedmapping].hasOwnProperty(probeid)) {
                         let molecule_id = AIR.ElementNames[globals.omics.selectedmapping][probeid];
 
-                        if (AIR.Molecules[molecule_id].type == "FAMILY" || AIR.Molecules[molecule_id].type == "COMPLEX")
+                        if (AIR.Molecules.hasOwnProperty(molecule_id) == false || AIR.Molecules[molecule_id].type == "FAMILY" || AIR.Molecules[molecule_id].type == "COMPLEX")
                             return;
 
 
