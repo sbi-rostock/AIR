@@ -530,10 +530,11 @@ async function environmentalSensitivity()
 
                     let m_corr = getCorrelation(element, m, results[diet])
                     let dist = 0
-                    for (let index = 0; index < m_corr.X.length; index++) {
-                        var a = m_corr.X[index] - corr.X[index];
-                        var b = m_corr.Y[index] - corr.Y[index];
-                        dist += Math.sqrt( a*a + b*b );
+                    for (let index = 1; index < m_corr.Y.length; index++) {
+                        // var a = m_corr.X[index] - corr.X[index];
+                        // var b = m_corr.Y[index] - corr.Y[index];
+                        // dist += Math.sqrt( a*a + b*b );
+                        dist += Math.abs((m_corr.Y[index]-m_corr.Y[index-1]) - (corr.Y[index]-corr.Y[index-1]))
                     }
 
                     mediators[m].push(dist)
