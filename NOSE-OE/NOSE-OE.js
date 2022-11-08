@@ -20,8 +20,8 @@ let ttest = require('ttest');
 require('datatables.net-buttons')(window, $);
 
 let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
-let local_datafile_URL = "http://localhost:3000/Smell/";
-let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/Smell/";
+let local_datafile_URL = "http://localhost:3000/NOSE-OE/";
+let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/NOSE-OE/";
 let localURL = "http://localhost:3000/AirPlugIns/";
 const pluginName = 'NOSE-OE';
 const pluginVersion = '0.9.0';
