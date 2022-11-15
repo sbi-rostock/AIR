@@ -1315,6 +1315,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
                     regulators.add(e)
             }
         }
+        regulators.delete(phenotype)
         regulators = Array.from(regulators);
 
         var influencevalues = {
@@ -1332,16 +1333,25 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
                 continue;
             }
 
-            var type = Math.min(...Object.values(Object.filter(paths, p => p.startsWith(e + "_") && p.split("_").length == minlength)));
-            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_"))))).size;
-            
             var includedpaths = patharray.filter(p => p.includes("_" + e + "_") || AIR.Molecules[e].parent.some(pe => p.includes("_" + pe + "_"))).length;
+
+            var isenzymeinsynthesis = false
 
             if(AIR.Modifiers.hasOwnProperty(e))
             {
-                var mod_paths = patharray.filter(p => AIR.Modifiers[e].some(m => p.includes(m + "_"))).length;
-                includedpaths += mod_paths;
+                var mod_path_length = patharray.filter(p => AIR.Modifiers[e].some(m => p.includes(m + "_"))).length;
+                if (mod_path_length > 0)
+                {
+                    isenzymeinsynthesis = true
+                }
+
+                includedpaths += mod_path_length;
             }
+
+            var type = isenzymeinsynthesis? 1 : Math.min(...Object.values(Object.filter(paths, p => p.startsWith(e + "_") && p.split("_").length == minlength)));
+            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_"))))).size;
+            
+
 
             influencevalues.SPs[e] = minlength * type;
             influencevalues.values[e] = type * (includedpaths / patharray.length + elementsonpaths / regulators.length)
@@ -2948,9 +2958,24 @@ async function BFSfromTarget(element, interactiontype = false, sorted = false, b
                 output[path] = ptype
             }
         }
-        return {
+        return  {
             "Paths": output,
             "SPs": dist
         }
     }
+}
+
+async function normalizeDictionary(dict)
+{    
+    if (Object.values(dict).length <= 1)
+        return dict
+
+    max_val = Math.max(...Object.values(dict))
+    new_dict = {}
+    for (let [key,val] in Object.entries(dict))
+    {
+        new_dict[key] = val/max_val
+    }
+
+    return new_dict
 }
