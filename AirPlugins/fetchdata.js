@@ -329,7 +329,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 
                                                     $("#stat_spinner").before(`
                                                         <div class="air_alert alert alert-info mt-2" id="air_welcome_alert">
-                                                            <span>For any further questions, please refer to our paper in <a href="https://www.nature.com/articles/s41540-022-00222-z" target="_blank">npj Systems Biology and Applications</a> or contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
+                                                            <span>For questions about the methodology of the tools, please refer to our paper in <a href="https://www.nature.com/articles/s41540-022-00222-z" target="_blank">npj Systems Biology and Applications</a> or contact the <a href="https://air.bio.informatik.uni-rostock.de/team" target="_blank">AIR team</a>.</span>
                                                             <button type="button" class="air_close close" data-dismiss="alert" aria-label="Close">
                                                                 <span aria-hidden="true">&times;</span>
                                                             </button>
