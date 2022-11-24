@@ -1334,24 +1334,22 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
             }
 
             var includedpaths = patharray.filter(p => p.includes("_" + e + "_") || AIR.Molecules[e].parent.some(pe => p.includes("_" + pe + "_"))).length;
-
-            var isenzymeinsynthesis = false
-
+            
+            var type = Math.min(...Object.values(Object.filter(paths, p => p.startsWith(e + "_") && p.split("_").length == minlength)))
+            
             if(AIR.Modifiers.hasOwnProperty(e))
             {
-                var mod_path_length = patharray.filter(p => AIR.Modifiers[e].some(m => p.includes(m + "_"))).length;
+                var catalyzedpaths = Object.filter(paths, p => AIR.Modifiers[e].some(m => p.includes(m + "_")))
+                var mod_path_length = Object.keys(catalyzedpaths).length;
                 if (mod_path_length > 0)
                 {
-                    isenzymeinsynthesis = true
+                    type = Math.min(...Object.values(catalyzedpaths))
                 }
 
                 includedpaths += mod_path_length;
             }
 
-            var type = isenzymeinsynthesis? 1 : Math.min(...Object.values(Object.filter(paths, p => p.startsWith(e + "_") && p.split("_").length == minlength)));
-            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_"))))).size;
-            
-
+            var elementsonpaths = (new Set([].concat.apply([], patharray.filter(p => p.startsWith(e + "_")).map(m => m.split("_"))))).size;        
 
             influencevalues.SPs[e] = minlength * type;
             influencevalues.values[e] = type * (includedpaths / patharray.length + elementsonpaths / regulators.length)
