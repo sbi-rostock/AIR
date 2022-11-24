@@ -1341,8 +1341,10 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
             {
                 var catalyzedpaths = Object.filter(paths, p => AIR.Modifiers[e].some(m => p.includes(m + "_")))
                 var mod_path_length = Object.keys(catalyzedpaths).length;
+                
                 if (mod_path_length > 0)
                 {
+                    catalyzedpaths = Object.filter(catalyzedpaths, p => AIR.Modifiers[e].some(m => p.startsWith(m + "_")))
                     type = Math.min(...Object.values(catalyzedpaths))
                 }
 
