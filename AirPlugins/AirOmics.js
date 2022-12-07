@@ -453,7 +453,7 @@ async function createDifferentialAnalysisPanel() {
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Use submaps only"
                                     data-content="If check, elements from submaps will be considered only. This will increase accuracy if many DCEs are available.">
                                 ?
                             </button>
@@ -1803,12 +1803,28 @@ async function om_createTable(param) {
                         </select>
                     </div>
                 </div>
-                    
                 <div class="row mb-2">
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalize Phenotypes"
+                                    data-content="Normalization of phenotypes with very low predicted values may lead to false positive results. However, if the input data contains low values per se, this option should be enabled.">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="om_cb_norm_low_pheno">
+                            <label class="air_checkbox" for="om_cb_norm_low_pheno">Normalize Phenotypes with low Activity?</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="FDR-Correction"
                                     data-content="If checked, FDR correction using Benjamini-Hochberg will be performed on the p-values.">
                                 ?
                             </button>
@@ -1854,7 +1870,7 @@ async function om_createTable(param) {
                     <div class="col-auto">
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary mb-4 ml-1"
-                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Include data in overlays"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Filter Phenotypes"
                                     data-content="Include only Phenotypes with an adj. p-value < 0.05">
                                 ?
                             </button>
@@ -3802,7 +3818,7 @@ function normalizeExpressionValues() {
 function om_normalizePhenotypeValues() {
     return new Promise((resolve, reject) => {
         let typevalue = $('#om_select_normalize').val();
-
+        let force_norm = (document.getElementById("om_cb_norm_low_pheno").checked === true)
         let allmax = 0.0;
         let alreadyincluded = [];
         let samplemaxvalues = [];
@@ -3839,13 +3855,13 @@ function om_normalizePhenotypeValues() {
             }
 
             for (let sample in globals.omics.samples) {
-                if (allmax <= 1) {
-                    AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / allmax) + Number.EPSILON) * 100) / 100;
-                }
+                // if (allmax <= 1) {
+                //     AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / allmax) + Number.EPSILON) * 100) / 100;
+                // }
                 if (typevalue == 2) {
                     max = samplemaxvalues[sample]
                 }
-                if (max > 1) {
+                if (max > 1 || force_norm) {
                     AIR.Phenotypes[phenotype].norm_results[sample] = Math.round(((AIR.Phenotypes[phenotype].results[sample] / max) + Number.EPSILON) * 100) / 100;
                 }
                 else {
