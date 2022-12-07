@@ -2026,6 +2026,12 @@ async function om_createTable(param) {
             });
         });
 
+        $("#om_cb_norm_low_pheno").on('click', function () {
+            om_normalizePhenotypeValues().then(async function (pv) {
+                updatepvalues();
+            });
+        });
+
         globals.omics.pickedcolors = [];
 
         var tbl = document.getElementById('om_resultstable');
