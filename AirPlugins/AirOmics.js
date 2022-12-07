@@ -3824,7 +3824,11 @@ function normalizeExpressionValues() {
 function om_normalizePhenotypeValues() {
     return new Promise((resolve, reject) => {
         let typevalue = $('#om_select_normalize').val();
-        let force_norm = (document.getElementById("om_cb_norm_low_pheno").checked === true)
+        let force_norm = false
+        if ($("#om_cb_norm_low_pheno").length)
+        {
+            force_norm = (document.getElementById("om_cb_norm_low_pheno").checked === true)
+        }
         let allmax = 0.0;
         let alreadyincluded = [];
         let samplemaxvalues = [];
