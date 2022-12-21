@@ -864,6 +864,11 @@ async function createDifferentialAnalysisPanel() {
         air_download("TargetPrediction.txt", getDTExportString(globals.omics.om_targettable))
     });
 
+    $(document).on('click', '.air_om_pheno_export_reg', function (event) {
+        let phenotype = $(this).attr("data");
+        air_download(AIR.Molecules[phenotype].name + "_PhenotypeRegulators.txt", geneExportstring([phenotype]))  
+    });
+
     var outputCanvas = document.getElementById('om_target_chart_canvas');
 
     var chartOptions = {
@@ -1849,7 +1854,8 @@ async function om_createTable(param) {
                 <div id="om_tablemodal_container" class="mb-2" style="width: 100%; margin: 0 auto"></div>
                 <div id="om_resultstable_container" class="mb-2">
                     <table class="hover air_table" id="om_resultstable" cellspacing=0></table>
-                    <button id="om_btn_download_pheno" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download results as .txt</button>           
+                    <button id="om_btn_download_pheno" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download Phenotype Results</button>           
+                    <button id="om_btn_download_pheno_reg" class="om_btn_download btn mt-4" style="width:100%"> <i class="fa fa-download"></i> Download Phenotype Regulator Scores</button>           
                 </div>
             </div>
 
@@ -2041,6 +2047,8 @@ async function om_createTable(param) {
             result_row.setAttribute('data', phenotype);
             let pname = AIR.Phenotypes[phenotype].name;
 
+            createCell(result_row, 'td', '<a href="#" class="air_om_pheno_export_reg" data="' + phenotype + '"><span class="fas fa-download"></span></a>', 'col-auto', 'col', 'center', true);
+
             let cbcell = checkBoxCell(result_row, 'th', pname, phenotype, 'center', "om_");
             cbcell.onclick = function () {
 
@@ -2181,6 +2189,7 @@ async function om_createTable(param) {
         let header = tbl.createTHead();
         var headerrow = header.insertRow(0);
 
+        createCell(headerrow, 'th', '', 'col', 'col', 'center');
         createCell(headerrow, 'th', 'Graph', 'col', 'col', 'center');
         createCell(headerrow, 'th', 'Phenotype', 'col', 'col', 'center');
 
@@ -2191,8 +2200,13 @@ async function om_createTable(param) {
         {
             targets: 1,
             className: 'dt-center',
+        },
+        {
+            targets: 2,
+            className: 'dt-center',
         }]
         let columns = [
+            { "width": "5px" },
             { "width": "8px" },
             { "width": "300px" }];
 
@@ -2234,7 +2248,7 @@ async function om_createTable(param) {
 
             columns.push({ "width": "30px" });
             columnsdefs.push({
-                targets: parseFloat(sample) + 2,
+                targets: parseFloat(sample) + 3,
                 className: 'dt-center',
             })
         }
@@ -2249,7 +2263,7 @@ async function om_createTable(param) {
         $pvalue_cell.tooltip();
 
         columnsdefs.push({
-            targets: globals.omics.samples.length + 2,
+            targets: globals.omics.samples.length + 3,
             className: 'dt-center',
         })
 
@@ -2259,7 +2273,7 @@ async function om_createTable(param) {
         $acc_cell.tooltip();
 
         columnsdefs.push({
-            targets: globals.omics.samples.length + 3,
+            targets: globals.omics.samples.length + 4,
             className: 'dt-center',
         })
 
@@ -2269,7 +2283,7 @@ async function om_createTable(param) {
         $reg_cell.tooltip();
 
         columnsdefs.push({
-            targets: globals.omics.samples.length + 4,
+            targets: globals.omics.samples.length + 5,
             className: 'dt-center',
         })
 
@@ -2433,6 +2447,11 @@ async function om_createTable(param) {
 
 
         $('.air_btn_info[data-toggle="popover"]').popover()
+        
+
+        $('#om_btn_download_pheno_reg').on('click', function () {
+            air_download("PhenotypeRegulators.txt", geneExportstring(Object.keys(AIR.Phenotypes)))  
+        });
         $('#om_btn_download_pheno').on('click', function () {
 
             let om_phenotype_downloadtext = "Phenotype";
@@ -2724,7 +2743,7 @@ async function om_createTable(param) {
             //     });
             // },
             "autoWidth": true,
-            "order": [globals.omics.samples.length == 1 ? [2, "asc"] : [globals.omics.samples.length + 2, "desc"]],
+            "order": [globals.omics.samples.length == 1 ? [3, "asc"] : [globals.omics.samples.length + 3, "desc"]],
             "scrollX": true,
             "columns": columns,
             "columnDefs": columnsdefs,
@@ -5967,7 +5986,7 @@ function getFilteredRegulators(phenotype, i_threshold, submapsonly) {
     return output;
 }
 
-function getFilteredExpression(sample, fc_threshold, pvalue_threshold) {
+function getFilteredExpression(sample, fc_threshold, pvalue_threshold, with_pvalue = false) {
     let output = {}
     for (let element in globals.omics.ExpressionValues) {
 
@@ -5988,7 +6007,7 @@ function getFilteredExpression(sample, fc_threshold, pvalue_threshold) {
             continue;
         }
 
-        output[element] = FC;
+        output[element] = with_pvalue? [FC,pvalue] : FC;
     }
     return output;
 }
@@ -6546,4 +6565,58 @@ function exportCRN() {
     { 
         saveAs(globals.omics.cy.png({scale:$("#om_crn_scale").val()/100}), "graph.png");
     }
+}
+
+    
+function geneExportstring(phenotypes)
+{
+    outputstring = "Gene\tType\t" 
+        + phenotypes.map(phenotype => "from " + AIR.Molecules[phenotype].name + " Submap\tInfluence Score on " + AIR.Molecules[phenotype].name).join("\t") + "\t"
+        + globals.omics.samples.map(sample => sample + (globals.omics.pvalue? ("\t" + sample + "_pvalue") : "")).join("\t")
+
+    output = {}
+    for(let [eid,element] of Object.entries(AIR.Molecules))
+    {
+        output[eid] = [element.name, element.type]
+    }
+    for(let phenotype of phenotypes)
+    {
+        regulators = getFilteredRegulators(phenotype, 0, false)
+        for(let eid in AIR.Molecules)
+        {
+            output[eid].push(AIR.Phenotypes[phenotype].SubmapElements.includes(eid)? "Yes":"No")
+            if(regulators.hasOwnProperty(eid))
+            {
+                output[eid].push(regulators[eid])
+            }
+            else
+            {
+                output[eid].push(0)
+            }
+        }
+    }
+    for (let sample in globals.omics.samples) {
+        elements_with_FC = getFilteredExpression(sample, 0, 1, with_pvalue = true);
+        for(let eid in AIR.Molecules)
+        {
+            if(elements_with_FC.hasOwnProperty(eid))
+            {
+                output[eid].push(elements_with_FC[eid][0])
+                if (globals.omics.pvalue)
+                {
+                    output[eid].push(elements_with_FC[eid][1])
+                }
+            }
+            else
+            {
+                output[eid].push(0)
+                if (globals.omics.pvalue)
+                {
+                    output[eid].push(1)
+                }
+            }
+        }
+    }
+
+    return outputstring + "\n" + Object.values(output).map(elist => elist.join("\t")).join("\n")
 }
