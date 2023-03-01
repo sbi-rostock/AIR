@@ -282,7 +282,7 @@ function getExportPanel() {
             if (selectedMap == "all") {
                 return [
                     AIR.Molecules,
-                    AIR.interactions
+                    AIR.Interactions
                 ]
             }
 
