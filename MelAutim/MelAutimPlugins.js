@@ -20,8 +20,8 @@ let ttest = require('ttest');
 require('datatables.net-buttons')(window, $);
 
 let globalURL = "https://raw.githack.com/sbi-rostock/AIR/master/AirPlugins/";
-let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/MelAutim2022/";
-let local_datafile_URL = "http://localhost:3000/MelAutim2022/";
+let datafile_url = "https://raw.githubusercontent.com/sbi-rostock/AIR/master/MelAutim/";
+let local_datafile_URL = "http://localhost:3000/MelAutim/";
 let localURL = "http://localhost:3000/AirPlugIns/";
 const pluginName = 'MelAutim 2022';
 const pluginVersion = '0.9.0';
