@@ -145,17 +145,6 @@ async function initMainPageStructure() {
     URL_PLUGINFILES = query;
   }
 
-  $.ajax({
-    type: 'POST',
-    contentType: 'application/json',
-    data: JSON.stringify(project_hash),
-    dataType: 'json',
-    url: SBI_SERVER + 'initialize_minerva',
-    success: function (data) {
-      project_hash = data.hash;
-      console.log(project_hash);
-    }
-  });
   let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js", "AirCopia.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : URL_PLUGINFILES;
@@ -209,6 +198,26 @@ async function initMainPageStructure() {
     return deferred.promise();
   }
 
+  function GetProjectHash() {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(project_hash),
+        dataType: 'json',
+        url: SBI_SERVER + 'initialize_minerva',
+        success: function (data) {
+          project_hash = data["hash"];
+          console.log(project_hash);
+          resolve('');
+        },
+        error: function (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
   function GetDataFiles(filename, datatype = "text") {
     return new Promise((resolve, reject) => {
       $.ajax({
@@ -224,71 +233,73 @@ async function initMainPageStructure() {
     });
   }
 
-  $.getScript(ScriptPaths[0]).done(function () {
-    readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape).then(async function (height) {
-      document.getElementById("stat_spinner").remove();
-      $("#air_plugincontainer").append(
-      /*html*/
-      `
+  GetProjectHash().then(function () {
+    $.getScript(ScriptPaths[0]).done(function () {
+      readDataFiles(minervaProxy, filetesting, GetDataFiles, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape).then(async function (height) {
+        document.getElementById("stat_spinner").remove();
+        $("#air_plugincontainer").append(
+        /*html*/
+        `
 
-            <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-                <li class="air_nav_item nav-item"  style="width: 17%;">
-                    <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">Xplore</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 17%;">
-                    <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 17%;">
-                    <a class="air_tab nav-link" id="aircopia_tab" data-toggle="tab" href="#aircopia_tab_content" role="tab" aria-controls="aircopia_tab_content" aria-selected="false">CoPIa</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 17%;">
-                    <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
-                </li>
-                <li class="air_nav_item nav-item" style="width: 17%;">
-                    <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">MassSpec</a>
-                </li>
-                <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
-            </ul>
-            <div class="tab-content" id="air_tab">
-                <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
+                <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
+                    <li class="air_nav_item nav-item"  style="width: 17%;">
+                        <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">Xplore</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: 17%;">
+                        <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: 17%;">
+                        <a class="air_tab nav-link" id="aircopia_tab" data-toggle="tab" href="#aircopia_tab_content" role="tab" aria-controls="aircopia_tab_content" aria-selected="false">CoPIa</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: 17%;">
+                        <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
+                    </li>
+                    <li class="air_nav_item nav-item" style="width: 17%;">
+                        <a class="air_tab nav-link" id="airmassspec_tab" data-toggle="tab" href="#airmassspec_tab_content" role="tab" aria-controls="airmassspec_tab_content" aria-selected="false">MassSpec</a>
+                    </li>
+                    <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
+                </ul>
+                <div class="tab-content" id="air_tab">
+                    <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
+                    </div>
+                    <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
+                    </div>
+                    <div class="tab-pane" id="aircopia_tab_content" role="tabpanel" aria-labelledby="aircopia_tab">
+                    </div>
+                    <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
+                    </div>
+                    <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
+                    </div>
                 </div>
-                <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
-                </div>
-                <div class="tab-pane" id="aircopia_tab_content" role="tabpanel" aria-labelledby="aircopia_tab">
-                </div>
-                <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
-                </div>
-                <div class="tab-pane" id="airmassspec_tab_content" role="tabpanel" aria-labelledby="airmassspec_tab">
-                </div>
-            </div>
-        
-            `);
+            
+                `);
 
-      for (let s of scripts) {
-        await loadScript(s);
-      }
+        for (let s of scripts) {
+          await loadScript(s);
+        }
 
-      $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
-      let p = document.getElementById('Air_Tab');
-      p.removeAttribute("hidden");
-      $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
-      setTimeout(() => {
-        $.getScript(ScriptPaths[1]).done(function () {
-          AirXplore();
-        });
-        $.getScript(ScriptPaths[2]).done(function () {
-          AirOmics();
-        });
-        $.getScript(ScriptPaths[3]).done(function () {
-          AirGenvar();
-        });
-        $.getScript(ScriptPaths[4]).done(function () {
-          AirMassSpec();
-        });
-        $.getScript(ScriptPaths[5]).done(function () {
-          AirCopia();
-        });
-      }, 0);
+        $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
+        let p = document.getElementById('Air_Tab');
+        p.removeAttribute("hidden");
+        $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
+        setTimeout(() => {
+          $.getScript(ScriptPaths[1]).done(function () {
+            AirXplore();
+          });
+          $.getScript(ScriptPaths[2]).done(function () {
+            AirOmics();
+          });
+          $.getScript(ScriptPaths[3]).done(function () {
+            AirGenvar();
+          });
+          $.getScript(ScriptPaths[4]).done(function () {
+            AirMassSpec();
+          });
+          $.getScript(ScriptPaths[5]).done(function () {
+            AirCopia();
+          });
+        }, 0);
+      });
     });
   });
 }
