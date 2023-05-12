@@ -58,6 +58,7 @@ const register = function (_minerva) {
   console.log('project id: ', minervaProxy.project.data.getProjectId());
   console.log('model id: ', minervaProxy.project.data.getModels()[0].modelId);
   project_hash = [window.location.origin, minerva.ServerConnector._sessionData._project._projectId, minerva.ServerConnector._sessionData._project._creationDate];
+  console.log(project_hash)
   return minerva.ServerConnector.getConfiguration().then(function (conf) {
     minervaVersion = parseFloat(conf.getVersion().split('.').slice(0, 2).join('.'));
     console.log('minerva version: ', minervaVersion);
