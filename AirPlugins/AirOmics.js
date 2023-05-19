@@ -5996,7 +5996,7 @@ function getFilteredExpression(sample, fc_threshold, pvalue_threshold, with_pval
         }
 
         let pvalue = globals.omics.ExpressionValues[element].pvalues[sample];
-        if (isNaN(pvalue) || !pvalue) {
+        if (isNaN(pvalue)) {
             pvalue = 1;
         }
         if (pvalue > pvalue_threshold) {
