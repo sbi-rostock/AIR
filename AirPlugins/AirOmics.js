@@ -6220,7 +6220,7 @@ function updateRegulatorChart()
         results.push([
             e,
             fc,
-            Object.values(values).reduce((sum, v) => sum + fc*Math.abs(v), 0),
+            Object.values(values).reduce((sum, v) => sum + Math.abs(fc)*Math.abs(v), 0),
             values,
             sample,
         ])
