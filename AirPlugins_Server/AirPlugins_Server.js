@@ -282,7 +282,7 @@ async function initMainPageStructure() {
             AirMassSpec();
           });
           $.getScript(ScriptPaths[5]).done(function () {
-            AirCopia();
+            AirBM();
           });
         }, 0);
       });
