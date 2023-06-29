@@ -30,7 +30,7 @@ require('datatables.net-buttons')(window, $);
 
 let local_datafile_URL = "http://localhost:3000/AirPlugins_Server/";
 let localURL = "http://localhost:3000/AirPlugins_Server/";
-const pluginName = 'AirPlugins';
+const pluginName = 'AirPlugins_Server';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = true;
@@ -146,7 +146,7 @@ async function initMainPageStructure() {
     URL_PLUGINFILES = query;
   }
 
-  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js", "AirCopia.js"];
+  let js_files = ["fetchdata.js", "AirXplore.js", "AirOmics.js", "AirGenvar.js", "AirMassSpec.js", "AirBM.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : URL_PLUGINFILES;
   let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"];
@@ -235,7 +235,7 @@ async function initMainPageStructure() {
                         <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
-                        <a class="air_tab nav-link" id="aircopia_tab" data-toggle="tab" href="#aircopia_tab_content" role="tab" aria-controls="aircopia_tab_content" aria-selected="false">CoPIa</a>
+                        <a class="air_tab nav-link" id="airbm_tab" data-toggle="tab" href="#airbm_tab_content" role="tab" aria-controls="airbm_tab_content" aria-selected="false">ABM</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
                         <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
@@ -249,8 +249,8 @@ async function initMainPageStructure() {
                     <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
                     </div>
                     <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
-                    </div>
-                    <div class="tab-pane" id="aircopia_tab_content" role="tabpanel" aria-labelledby="aircopia_tab">
+                    </div>                    
+                    <div class="tab-pane" id="airbm_tab_content" role="tabpanel" aria-labelledby="airbm_tab">
                     </div>
                     <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
                     </div>
