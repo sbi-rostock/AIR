@@ -204,6 +204,11 @@ async function initMainPageStructure() {
       $.ajax({
         type: 'POST',
         contentType: 'application/json',
+        cors: true,
+        secure: true,
+        headers: {
+          'Access-Control-Allow-Origin': '*'
+        },
         data: JSON.stringify(project_hash),
         dataType: 'json',
         url: SBI_SERVER + 'initialize_minerva',
