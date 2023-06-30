@@ -202,7 +202,7 @@ async function initMainPageStructure() {
   function GetProjectHash() {
     return new Promise((resolve, reject) => {
       $.ajax({
-        type: 'POST',
+        type: 'GET',
         contentType: 'application/json',
         data: JSON.stringify(project_hash),
         dataType: 'json',
