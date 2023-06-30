@@ -40,10 +40,7 @@ let minervaProxy;
 let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
-let project_hash = "";
-let project_id;
-let project_url;
-let project_date;
+let project_hash;
 
 const register = function (_minerva) {
   console.log('registering ' + pluginName + ' plugin');
@@ -60,9 +57,7 @@ const register = function (_minerva) {
   console.log('minerva object ', minervaProxy);
   console.log('project id: ', minervaProxy.project.data.getProjectId());
   console.log('model id: ', minervaProxy.project.data.getModels()[0].modelId);
-  project_url = window.location.origin;
-  project_id = minerva.ServerConnector._sessionData._project._projectId;
-  project_date = minerva.ServerConnector._sessionData._project._creationDate;
+  project_hash = [window.location.origin, minerva.ServerConnector._sessionData._project._projectId, minerva.ServerConnector._sessionData._project._creationDate];
   console.log(project_hash);
   return minerva.ServerConnector.getConfiguration().then(function (conf) {
     minervaVersion = parseFloat(conf.getVersion().split('.').slice(0, 2).join('.'));
@@ -207,14 +202,10 @@ async function initMainPageStructure() {
   function GetProjectHash() {
     return new Promise((resolve, reject) => {
       $.ajax({
-        type: 'GET',
-        // contentType: 'application/json',
-        data: {
-          "project_id": project_id,
-          "project_date": project_date,
-          "project_url": project_url
-        },
-        // dataType: 'json',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(project_hash),
+        dataType: 'json',
         url: SBI_SERVER + 'initialize_minerva',
         success: function (data) {
           project_hash = data["hash"];
