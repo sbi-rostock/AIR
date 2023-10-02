@@ -9,7 +9,7 @@ let VCF;
 let ttest;
 let Decimal;
 let cytoscape;
-let jspdf;
+// let jspdf;
 var project_hash;
 let SBI_SERVER = "";
 
@@ -187,7 +187,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
             project_hash = _project_hash;
             ttest = _ttest;
             Decimal = _decimal;
-            jspdf = _jspdf;
+            // jspdf = _jspdf;
             SBI_SERVER = _sbi_server;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
