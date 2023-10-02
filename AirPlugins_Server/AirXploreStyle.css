@@ -1,3 +1,9 @@
+.slider-column {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .waiting {
   cursor: progress !important;
   pointer-events: none;

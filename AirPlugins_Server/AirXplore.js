@@ -1324,11 +1324,17 @@ function getInteractionPanel() {
             </div>
         </div>
         <div id="xp_molartimg_modal"></div>
+        <select id="air_xp_node_select" class="browser-default xp_select custom-select mb-2 mt-2">
+        </select>
+
         `);
 
         $("#xp_elementinput").on('input', function (e) {
 
             getData();
+        });
+        $("#air_xp_node_select").on('change', function (e) {
+            getData(false, false, true);
         });
 
         globals.xplore.interactionpanel.append(/*html*/`
@@ -1361,7 +1367,7 @@ function getInteractionPanel() {
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_regulation" cellspacing="0">
                     <thead>
                         <tr>
-                            <th style="vertical-align: middle;">Regulator</th>
+                            <th style="vertical-align: middle;">Element</th>
                             <th style="vertical-align: middle;">Regulation</th>
                             <th style="vertical-align: middle;">Type</th>
                             <th style="vertical-align: middle;">Reference</th>
@@ -1373,7 +1379,7 @@ function getInteractionPanel() {
                 <table style="width:100%" class="air_table table nowrap table-sm" id="xp_table_inter_target" cellspacing="0">
                     <thead>
                         <tr>
-                            <th style="vertical-align: middle;">Target</th>
+                            <th style="vertical-align: middle;">Element</th>
                             <th style="vertical-align: middle;">Target Type</th>
                             <th style="vertical-align: middle;">Regulation</th>
                             <th style="vertical-align: middle;">Reference</th>
@@ -2261,9 +2267,9 @@ function getCentralityPanel() {
     });
 }
 
-function xp_setSelectedElement(name) {
+function xp_setSelectedElement(name, fullname = "") {
     $("#xp_elementinput").val(name);
-    getData(false);
+    getData(false, undefined, undefined, fullname = fullname.toLowerCase());
 }
 
 async function getUniprotID(element, pdb = false) {
@@ -2386,7 +2392,7 @@ async function getHPO(element) {
     });
 }
 
-async function getData(onlyRegulators = false, onlyHPO = false) {
+async function getData(onlyRegulators = false, onlyHPO = false, from_datalist = false, fullname = "") {
 
     let elementname = $("#xp_elementinput").val().toLowerCase();
 
@@ -2404,21 +2410,49 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
     }
 
     if (elementname.trim() != "") {
-        let elementid = null;
+        let elementids = [];
 
-        for (let element in AIR.Molecules) {
-            if (AIR.Molecules[element].name.toLowerCase() === elementname) {
-                elementid = element;
-                break;
+
+        let elementid = null
+        var nodeSelect = document.getElementById('air_xp_node_select');
+
+        if(from_datalist)
+        {
+            elementid = $("#air_xp_node_select").val();
+        }
+        else
+        {
+            $('#air_xp_node_select').empty();
+        
+            selected_element = null
+
+            for (let [elementid, element] of Object.entries(AIR.Molecules)) {
+                if (element.name.toLowerCase() === elementname) {
+
+                    elementids.push(elementid)    
+                    
+                    if (element.minerva_name == fullname)
+                    {
+                        selected_element = elementid
+                    }
+                    
+                    nodeSelect.options[nodeSelect.options.length] = new Option(element.fullname, elementid);
+                }
             }
-        }
-        if (elementid == null) {
-            globals.xplore.regulationtable.columns.adjust().draw();
-            globals.xplore.targettable.columns.adjust().draw();
 
-            adjustPanels(globals.xplore.container);
-            return
+            if (elementids.length == 0) {
+                globals.xplore.regulationtable.columns.adjust().draw();
+                globals.xplore.targettable.columns.adjust().draw();
+
+                adjustPanels(globals.xplore.container);
+                return
+            }
+
+            elementid = selected_element == null? elementids[0] : selected_element;
+
+            $("#air_xp_node_select").val(elementid)
         }
+
 
         let elementtype = getElementType(elementname)
         if (elementtype) {
@@ -2492,7 +2526,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
                     continue;
                 }
                 if (_target == elementid) {
-                    let { subtype: _sourcetype, name: _sourcename, ids: _sourceids } = AIR.Molecules[_source];
+                    let { subtype: _sourcetype, minerva_name: source_mapping, fullname: _sourcename, ids: _sourceids } = AIR.Molecules[_source];
                     let typevalue = $("#xp_select_interaction_type").val();
                     switch (typevalue) {
                         case "1":
@@ -2516,7 +2550,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                     var result_row = [];
 
-                    result_row.push(getLinkIconHTML(_sourcename));
+                    result_row.push(getLinkIconHTML(_sourcename, source_mapping));
 
                     var typehtml = '<font color="green">activation</font>';
                     if (_type == -1) {
@@ -2553,11 +2587,11 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 
                 if (_source == elementid && onlyRegulators === false) {
 
-                    let { type: _targettype, name: _targetname, ids: _targetids } = AIR.Molecules[_target];
+                    let { type: _targettype, minerva_name: target_mapping, fullname: _targetname, ids: _targetids } = AIR.Molecules[_target];
 
                     var result_row = [];
 
-                    result_row.push(getLinkIconHTML(_targetname));
+                    result_row.push(getLinkIconHTML(_targetname, target_mapping));
 
                     var typehtml = '<font color="green">activation</font>';
                     if (_type == -1) {
@@ -2747,7 +2781,7 @@ async function getData(onlyRegulators = false, onlyHPO = false) {
 }
 
 $(document).on('click', '.air_elementlink', function () {
-    selectElementonMap($(this).html(), false);
+    selectElementonMap($(this).html(), false, $(this).attr("data"));
 });
 $(document).on('click', '.air_phenotypepath', function (event) {
     
@@ -2812,8 +2846,8 @@ async function xp_updatePhenotypeTable() {
                 continue;
             }
             var result_row = AIR.Phenotypes[p].SubmapElements.includes(elementid)? ['<a href="#" class="air_phenotypepath" data="' + elementid + "_" + p + '"><span class="fas fa-eye"></span></a>'] : [""];
-            var pname = AIR.Molecules[p].name;
-
+            var pname = AIR.Molecules[p].fullname;
+            var pmapping = AIR.Molecules[p].minerva_name;
             var SP = globals.xplore.pe_influenceScores[p].SPs[elementid];
 
             if (SP === 0) {
@@ -2832,7 +2866,7 @@ async function xp_updatePhenotypeTable() {
 
             result_row.push(Math.abs(SP));
 
-            result_row.push(getLinkIconHTML(pname));
+            result_row.push(getLinkIconHTML(pname, pmapping));
             globals.xplore.phenotypetable.row.add(result_row)
         }
         globals.xplore.phenotypetable.columns.adjust().draw();

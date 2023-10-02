@@ -5340,8 +5340,8 @@ async function enrichr() {
 
     var enrichrresults_table = $('#om_enrichr_table').DataTable({
         "order": [[0, "asc"]],
-        "scrollX": true,
-        "autoWidth": true,
+        scrollX: true,
+        autoWidth: true,
         "columnDefs": [
             {
                 targets: 0,
@@ -6180,7 +6180,7 @@ function exportPhenotypeRegulators()
     }
     var maxvalue = Math.max(...results.map(r => r[2]))
 
-    results = results.filter(r => (r[2] * 100 / maxvalue) > 0.1).sort(function (a, b) {
+    results = results.filter(r => (r[2] * 100 / maxvalue) > 1).sort(function (a, b) {
         return b[2] - a[2];
     });
 

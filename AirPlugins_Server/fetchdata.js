@@ -9,7 +9,51 @@ let VCF;
 let ttest;
 let Decimal;
 let cytoscape;
-var getFiles;
+let jspdf;
+var project_hash;
+let SBI_SERVER = 'http://localhost:5001/';
+
+let sessionWarningTimeout;
+const sessionWarningDuration = 16 * 60 * 1000;  // 15 minutes
+const countdownDuration = 2 * 60 * 1000;  // 2 minutes
+
+function resetSessionWarningTimer() {
+    clearTimeout(sessionWarningTimeout);
+
+    sessionWarningTimeout = setTimeout(() => {
+        promptForExtension();
+    }, sessionWarningDuration);
+}
+
+async function promptForExtension() {
+    let expirationTimeout = setTimeout(() => {
+        alert('Your session has ended.');
+        location.reload();
+    }, countdownDuration);
+
+    let message = `Your session is about to expire in 2 Minutes. Do you want to extend the session?`;
+
+    if (window.confirm(message)) {
+        clearTimeout(expirationTimeout);
+
+        data = JSON.parse(await getDataFromServer("extend_session", type = "GET"))
+        
+        if (data.status === 'extended') {
+            resetSessionWarningTimer();
+        } else {
+            alert('Session already expired.');
+            location.reload();
+        }
+    }
+    else
+    {
+        alert('Your session has ended.');
+        location.reload();
+    }
+}
+
+// Start the initial timer
+resetSessionWarningTimer();
 
 Object.filter = (obj, predicate) =>
     Object.keys(obj)
@@ -44,6 +88,9 @@ const AIR = {
     Paths: {},
     InfluenceData: {},
     Modifiers: {},
+    Compartments: {},
+    Fullnames: {},
+    Aliases: {},
 }
 
 const globals = {
@@ -85,10 +132,47 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal, _cytoscape) {
+function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = 'application/json',) {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        type: type,
+        url: SBI_SERVER + project_hash + "/" + request,
+        contentType: contentType,
+        dataType: datatype,
+        data: data,
+        success: function (data) {
+          resolve(data);
+        },
+        error: function (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
+function getNameFromAlias(e) {
+    let name = e.name;
+    if (e._compartmentId) {
+        name += " (" + AIR.Compartments[e._compartmentId] + ")";
+    }
+    else {
+        name += " (Blood)";
+    }
+
+    return name;
+}
+
+function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal, _cytoscape, _jspdf) {
 
     return new Promise((resolve, reject) => {
 
+        // socket.on('progress', (data) => {
+        //     if (data.id === 'abm_progress') {
+        //         updateProgress(data.percent, 1, "om_pheno_analyzebtn", text = " Estimating phenotype levels.");
+        //     } else if (data.id === 'another_task') {
+        //         console.log('Progress from another_task:', data.percent);
+        //     }
+        // });
     
         minerva.ServerConnector.getLoggedUser().then(function (user) {
             globals.user = user._login.toString().toLowerCase();
@@ -103,9 +187,10 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
             FileSaver = _filesaver;
             TESTING = _filetesting;
             minervaProxy = _minerva;
-            getFiles = getfiles;
+            project_hash = _project_hash;
             ttest = _ttest;
             Decimal = _decimal;
+            jspdf = _jspdf;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -134,6 +219,9 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                             case "PhenotypeMap":
                                 globals.phenotypeImageMapID = model.getId();
                                 break;
+                            case "LiverMap":
+                                globals.liverMapID = model.getId();
+                                break;
                             case "Map":
                                 break;
                             default:
@@ -151,28 +239,46 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
 
                         AIR.allBioEntities = bioEntities;
                         for (let e of bioEntities) {
+
+                            if (e._type == "Compartment") {
+                                AIR.Compartments[e.id] = e.name //.trim().toLowerCase().replace(" ", "");
+                            }
+                        }
+                        for (let e of bioEntities) {
+ 
+                            if(e.getModelId() == globals.liverMapID)
+                            {
+                                continue
+                            }
+
                             if (e.constructor.name === 'Alias') {
-                                let name = e.getName();
+                                let name = getNameFromAlias(e);
                                 let namelower = name.toLowerCase();
                                 AIR.MapSpeciesLowerCase.push(namelower);
                                 AIR.MapSpecies.push(name);
 
-                                if (!AIR.MapElements.hasOwnProperty(namelower))
-                                    AIR.MapElements[namelower] = []
-
-                                AIR.MapElements[namelower].push(e);
+                                if (AIR.MapElements.hasOwnProperty(namelower))
+                                {
+                                    AIR.MapElements[namelower].push(e)
+                                }
+                                else
+                                {
+                                    AIR.MapElements[namelower]= [e];
+                                }
+            
+                                AIR.Fullnames[e.name.toLowerCase()] = (e.fullName? e.fullName : "")
+                                AIR.Aliases[e.name.toLowerCase()] = e._synonyms.join(", ")
                             }
                             if (e.constructor.name === 'Reaction') {
                                 AIR.MapReactions.push({
-                                    "reactants": e._reactants.map(r => r._alias.name.toLowerCase()),
-                                    "products": e._products.map(r => r._alias.name.toLowerCase()),
-                                    "modifiers": e._modifiers.map(r => r._alias.name.toLowerCase()),
+                                    "reactants": e._reactants.map(r => getNameFromAlias(r._alias).toLowerCase()),
+                                    "products": e._products.map(r => getNameFromAlias(r._alias).toLowerCase()),
+                                    "modifiers": e._modifiers.map(r => getNameFromAlias(r._alias).toLowerCase()),
                                     "id": e.id,
                                     "modelId": e.getModelId()
                                 })
-
+            
                             }
-
                         };
                         function readMolecules(content) {
                             return new Promise((resolve, reject) => {
@@ -254,21 +360,20 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                 let maxlength = Object.keys(AIR.Phenotypes).length
                                 await updateProgress(count++, maxlength, "air_init_btn", text = " Calculating Shortest Paths");
 
-                                let phenotypepaths;
-                                
-                                phenotypepaths = JSON.parse(content);
-
-                                let paths = phenotypepaths.paths;
-                                AIR.Modifiers = phenotypepaths.modifiers
+                                let paths = content.paths;
+                                let values = content.values;
+                                let SPs = content.SPs;
 
                                 for (let p in AIR.Phenotypes) {
-                                    if (paths.hasOwnProperty(p))
-                                        AIR.Phenotypes[p].paths = paths[p]
+                                    AIR.Phenotypes[p].paths = paths.hasOwnProperty(p)? paths[p] : {}
+                                    AIR.Phenotypes[p].values = values.hasOwnProperty(p)? values[p] : {}
+                                    AIR.Phenotypes[p].SPs = SPs.hasOwnProperty(p)? SPs[p] : {}
+                                    
+                                    AIR.Phenotypes[p].SubmapElements = Object.keys(AIR.Phenotypes[p].values);
 
-                                    let influence = await getPerturbedInfluences(p, [], true)
-                                    AIR.Phenotypes[p].values = influence.values;
-                                    AIR.Phenotypes[p].SPs = influence.SPs;
-                                    AIR.Phenotypes[p].SubmapElements = influence.SubmapElements;
+                                    // let influence = await getPerturbedInfluences(p, [], true)
+                                    // AIR.Phenotypes[p].SPs = influence.SPs;
+                                    // AIR.Phenotypes[p].SubmapElements = influence.SubmapElements;
                                     await updateProgress(count++, maxlength, "air_init_btn", text = " Calculating Shortest Paths");
                                 }
 
@@ -278,13 +383,13 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                         let typevalue = $('.selectdata').val();
                         //let urlstring = 'https://raw.githubusercontent.com/sbi-rostock/SBIMinervaPlugins/master/datafiles/Regulations.txt';
                         t0 = performance.now();
-                        getFiles('Interactions.json').then(content => {
+                        getDataFromServer('Interactions.json').then(content => {
                             readInteractions(content).then(r => {
                                 t1 = performance.now()
                                 console.log("Call to get Interactions took " + (t1 - t0) + " milliseconds.")
                                 t0 = performance.now();
                                 $('#air_loading_text').html('Fetching data ...')
-                                getFiles('Elements.json').then(moleculecontent => {
+                                getDataFromServer('Elements.json').then(moleculecontent => {
                                     t1 = performance.now()
                                     console.log("Call to get Molecules took " + (t1 - t0) + " milliseconds.")
                                     readMolecules(moleculecontent).then(s => {
@@ -293,7 +398,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
                                         calculateShortestPaths([], false, true, "air_init_btn").then(r => {
                                             t1 = performance.now()
                                             console.log("Call to calculate SPs took " + (t1 - t0) + " milliseconds.");
-                                            getFiles('PhenotypePaths.json').then(pathcontent => {
+                                            getDataFromServer('InfluenceScores', data = {}, type = "GET", datatype = "json").then(pathcontent => {
                                                 t1 = performance.now()
                                                 console.log("Call to read Moleculestook " + (t1 - t0) + " milliseconds.")
                                                 $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
@@ -559,15 +664,18 @@ function getElementType(name) {
     return type;
 }
 
-function selectElementonMap(element, external) {
-    let namelower = element.toLowerCase();
+function selectElementonMap(element, external, mapping = "") {
+    
+    if (mapping == "")
+        mapping = element.toLowerCase();
+
     globals.selected = [];
 
-    if (AIR.MapElements.hasOwnProperty(namelower)) {
+    if (AIR.MapElements.hasOwnProperty(mapping)) {
 
         var submapid = (new URLSearchParams(window.location.search)).get('submap')
 
-        for(let e of AIR.MapElements[namelower])
+        for(let e of AIR.MapElements[mapping])
         {
             if(e.getModelId() == submapid)
             {
@@ -578,7 +686,7 @@ function selectElementonMap(element, external) {
             }
         }
 
-        globals.selected.push(AIR.MapElements[namelower][0]);
+        globals.selected.push(AIR.MapElements[mapping][0]);
         focusOnSelected();
 
     }
@@ -611,12 +719,14 @@ function getLink(name) {
     return link;
 }
 
-function getLinkIconHTML(element) {
+function getLinkIconHTML(element, mapping = "") {
 
-    let namelower = element.toLowerCase();
+    if(mapping == "")
+        mapping = element.toLowerCase();
+
     let output = "";
-    if (AIR.MapElements.hasOwnProperty(namelower)) {
-        output += '<a href="#" class="air_elementlink">' + element + '</a>';
+    if (AIR.MapElements.hasOwnProperty(mapping)) {
+        output += '<a href="#" class="air_elementlink" data="' + mapping  + '">' + element + '</a>';
     }
     else {
         output += '<span>' + element + '</span>';
@@ -742,18 +852,22 @@ function checkBoxCell(row, type, text, data, align, prefix, _checked = false) {
     return button
 }
 
-function createSliderCell(row, type, data) {
+function createSliderCell(row, type, prefix = "") {
     var button = document.createElement('input'); // create text node
     button.setAttribute('type', 'range');
     button.setAttribute('value', '0');
     button.setAttribute('min', '-1');
     button.setAttribute('max', '1');
     button.setAttribute('step', '0.05');
-    button.setAttribute('class', 'slider air_slider');
+    button.setAttribute('class', prefix + 'slider air_slider');
+
+    var div = document.createElement("div");
+    div.setAttribute('style', 'display: flex; align-items: center;');     // append DIV to the table cell
+    div.appendChild(button);
 
     var cell = document.createElement(type);
     cell.setAttribute('style', 'text-align: center; vertical-align: middle;');     // create text node
-    cell.appendChild(button);     // append DIV to the table cell
+    cell.appendChild(div);     // append DIV to the table cell
     row.appendChild(cell);
 
 
@@ -987,12 +1101,22 @@ function getInterContent(interactions, seperator, extended = false) {
     return inter_content;
 }
 
-function isNumber(evt) {
+function isNumber(evt, int = false) {
     evt = (evt) ? evt : window.event;
     var charCode = (evt.which) ? evt.which : evt.keyCode;
-    if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 44 && charCode != 46) {
-        return false;
+    if(int)
+    {
+        if (charCode > 31 && (charCode < 48 || charCode > 57)) {
+            return false;
+        }
     }
+    else
+    {
+        if (charCode > 31 && (charCode < 48 || charCode > 57) && (charCode != 44 && charCode != 46)) {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -1057,7 +1181,7 @@ function rgbToHex(rgb) {
     return hex;
 };
 
-function valueToHex(_param) {
+function valueToHex(_param, transparency = "") {
     let _value = _param;
     if (_value > 1) {
         _value = 1;
@@ -1067,10 +1191,10 @@ function valueToHex(_param) {
     }
     var hex = rgbToHex((1 - Math.abs(_value)) * 255);
     if (_value > 0)
-        return '#ff' + hex + hex;
+        return '#' + transparency + 'ff' + hex + hex;
     else if (_value < 0)
-        return '#' + hex + hex + 'ff';
-    else return '#ffffff';
+        return '#' + transparency + hex + hex + 'ff';
+    else return '#' + transparency + 'ffffff';
 }
 
 function valueToRGB(_value) {
@@ -1180,7 +1304,7 @@ function union(setA, setB) {
 function findPhenotypePath(element, phenotype, perturbedElements = [], hideprevious = true) {
 
     let pathdata = AIR.Phenotypes[phenotype].paths;
-    let newpaths = Object.keys(pathdata).filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
+    let newpaths = pathdata.filter(path => perturbedElements.every(e => path.split("_").includes(e) == false));
 
     var pathsfromelement = newpaths.filter(p => p.startsWith(element + "_"));
     var re = new RegExp("_", "g")
@@ -1192,33 +1316,33 @@ function findPhenotypePath(element, phenotype, perturbedElements = [], hideprevi
         }, {});
 
         let shortestpath = pathsfromelement.reduce((a, b) => (a.match(re) || []).length <= (b.match(re) || []).length ? a : b);
-        highlightPath(shortestpath.split("_"), pathdata[shortestpath] == -1 ? "#ff0000" : "#0000ff", _additionalelements, hideprevious);
+        highlightPath(shortestpath.split("_"), "#0000ff", _additionalelements, hideprevious);
     }
 }
 
 function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hideprevious = true) {
 
     let _additionalelements = Object.fromEntries(
-        Object.entries(additionalelements).map(([k, v]) => [AIR.Molecules[k].name.toLowerCase(), v])
+        Object.entries(additionalelements).map(([k, v]) => [AIR.Molecules[k].minerva_name, v])
     );
     let elements = [];
     for (let i = 0; i < _elements.length - 1; i++) {
         let source = _elements[i];
         let target = _elements[i + 1];
         elements.push({
-            "source": AIR.Molecules[source].name.toLowerCase(),
-            "target": AIR.Molecules[target].name.toLowerCase()
+            "source": AIR.Molecules[source].minerva_name,
+            "target": AIR.Molecules[target].minerva_name
         })
         for (let parent of AIR.Molecules[source].family) {
             elements.push({
-                "source": AIR.Molecules[parent].name.toLowerCase(),
-                "target": AIR.Molecules[target].name.toLowerCase()
+                "source": AIR.Molecules[parent].minerva_name,
+                "target": AIR.Molecules[target].minerva_name
             })
         }
         for (let parent of AIR.Molecules[target].family) {
             elements.push({
-                "source": AIR.Molecules[source].name.toLowerCase(),
-                "target": AIR.Molecules[parent].name.toLowerCase()
+                "source": AIR.Molecules[source].minerva_name,
+                "target": AIR.Molecules[parent].minerva_name
             })
         }
     }
@@ -1259,35 +1383,41 @@ function highlightPath(_elements, color = "#0000ff", additionalelements = {}, hi
             if (Object.keys(modeids).length > 0) {
                 minervaProxy.project.map.openMap({ "id": parseFloat(Object.keys(modeids).reduce((a, b) => modeids[a] > modeids[b] ? a : b)) });
             }
-            AIR.allBioEntities.forEach(e => {
-                if (e.constructor.name === 'Alias') {
-
-                    if (e.getName().toLowerCase() == elements[0].source || e.getName().toLowerCase() == elements[elements.length - 1].target) {
-                        highlightDefs.push({
-                            element: {
-                                id: e.id,
-                                modelId: e.getModelId(),
-                                type: "ALIAS"
-                            },
-                            type: "ICON"
-                        });
-                    }
-                    else if (_additionalelements.hasOwnProperty(e.getName().toLowerCase())) {
-                        highlightDefs.push({
-                            element: {
-                                id: e.id,
-                                modelId: e.getModelId(),
-                                type: "ALIAS"
-                            },
-                            type: "SURFACE",
-                            options: {
-                                color: _additionalelements[e.getName().toLowerCase()]
-                            }
-
-                        });
-                    }
+            for(let mapping_name in [elements[0].source, elements[elements.length - 1].target])
+            {
+                if(AIR.MapElements.hasOwnProperty(mapping_name))
+                {
+                    e = AIR.MapElements[mapping_name]
+                    highlightDefs.push({
+                        element: {
+                            id: e.id,
+                            modelId: e.getModelId(),
+                            type: "ALIAS"
+                        },
+                        type: "ICON"
+                    });
                 }
-            });
+
+            }
+                        
+            for(let [mapping_name,color] of Object.entries(_additionalelements))
+            {
+                if(AIR.MapElements.hasOwnProperty(mapping_name))
+                {
+                    e = AIR.MapElements[mapping_name]
+                    highlightDefs.push({
+                        element: {
+                            id: e.id,
+                            modelId: e.getModelId(),
+                            type: "ALIAS"
+                        },
+                        type: "SURFACE",
+                        options: {
+                            color: color
+                        }
+                    })
+                }
+            }
 
             minervaProxy.project.map.showBioEntity(highlightDefs);
         });
@@ -2011,7 +2141,7 @@ function xp_searchListener(entites) {
             {
                 tag = "";
             }
-            xp_setSelectedElement(globals.xplore.selected[0].name+ (tag? ("_" + tag) : ""));
+            xp_setSelectedElement(globals.xplore.selected[0].name+ (tag? ("_" + tag) : ""), fullname = getNameFromAlias(globals.xplore.selected[0]));            
         }
     }
 }
@@ -2064,8 +2194,9 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score (I)"
                         </ul>
                         <div class="tab-content air_tab_content" style="height: 87%">
                             <div class="tab-pane air_sub_tab_pane show active" style="height: 100%" id="air_popup_tabcontent_dceplot" role="tabpanel" aria-labelledby="air_popup_tab_dceplot">                        
-                                <div style="height: 80%">
+                                <div style="height: 80%; display="none">
                                     <canvas class="popup_chart" id="air_popup_dceplot"></canvas>
+                                    <button type="button" id="om_deg_plot_exportbtn" class="air_btn_light btn btn-block"><i class="fa fa-download"></i>Export PDF</button>
                                 </div>
                                 <div class="d-flex justify-content-center ml-2 mr-2">
                                     <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
@@ -2112,6 +2243,20 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score (I)"
                 </div>`);
 
     $btn.after($target);
+    window.jsPDF = window.jspdf.jsPDF;
+    
+    $('#om_deg_plot_exportbtn').on('click', function (e) {
+
+        var reportPageHeight = $('#air_popup_dceplot').height() * 5;
+        var reportPageWidth = $('#air_popup_dceplot').width() * 5;
+
+        // create new pdf and add our new canvas as an image
+        var pdf = new jsPDF('l', 'px', [reportPageWidth, reportPageHeight]);
+        pdf.addImage($("#air_popup_dceplot")[0].toDataURL("image/jpeg", 1.0), 'JPG', 0, 0, reportPageWidth, reportPageHeight);
+        
+        // download the pdf
+        pdf.save('filename.pdf');
+    });
 
     select = document.getElementById('air_popup_histo_select');
 
@@ -2979,3 +3124,17 @@ async function normalizeDictionary(dict)
 
     return new_dict
 }
+
+var loadJS = function(url, implementationCode, location){
+    //url is URL of external file, implementationCode is the code
+    //to be called from the file, location is the location to 
+    //insert the <script> element
+
+    var scriptTag = document.createElement('script');
+    scriptTag.src = url;
+
+    scriptTag.onload = implementationCode;
+    scriptTag.onreadystatechange = implementationCode;
+
+    location.appendChild(scriptTag);
+};
