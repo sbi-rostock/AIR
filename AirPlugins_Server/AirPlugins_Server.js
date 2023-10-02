@@ -226,7 +226,7 @@ async function initMainPageStructure() {
 
   GetProjectHash().then(function () {
     $.getScript(ScriptPaths[0]).done(function () {
-      readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape).then(async function (height) {
+      readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape, SBI_SERVER).then(async function (height) {
         document.getElementById("stat_spinner").remove();
         $("#air_plugincontainer").append(
         /*html*/

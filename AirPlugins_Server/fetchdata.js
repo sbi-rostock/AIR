@@ -11,7 +11,7 @@ let Decimal;
 let cytoscape;
 let jspdf;
 var project_hash;
-let SBI_SERVER = 'http://localhost:5001/';
+let SBI_SERVER = "";
 
 let sessionWarningTimeout;
 const sessionWarningDuration = 16 * 60 * 1000;  // 15 minutes
@@ -51,9 +51,6 @@ async function promptForExtension() {
         location.reload();
     }
 }
-
-// Start the initial timer
-resetSessionWarningTimer();
 
 Object.filter = (obj, predicate) =>
     Object.keys(obj)
@@ -132,7 +129,7 @@ let pluginContainerId;
 let minervaVersion;
 
 
-function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = 'application/json',) {
+function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = 'application/json') {
     return new Promise((resolve, reject) => {
       $.ajax({
         type: type,
@@ -162,7 +159,7 @@ function getNameFromAlias(e) {
     return name;
 }
 
-function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal, _cytoscape, _jspdf) {
+function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _jszip, _filesaver, _vcf, _decimal, _cytoscape, _sbi_server) {
 
     return new Promise((resolve, reject) => {
 
@@ -191,10 +188,13 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
             ttest = _ttest;
             Decimal = _decimal;
             jspdf = _jspdf;
+            SBI_SERVER = _sbi_server;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
-
             
+            // Start the initial timer
+            resetSessionWarningTimer();
+
             minervaProxy.project.map.addListener({
                 dbOverlayName: "search",
                 type: "onSearch",
