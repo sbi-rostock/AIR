@@ -30,7 +30,7 @@ require('datatables.net-buttons')(window, $);
 
 let local_datafile_URL = "http://localhost:3000/AirPlugins_Server/";
 let localURL = "http://localhost:3000/AirPlugins_Server/";
-const pluginName = 'AirPlugins_Server';
+const pluginName = 'NAFLD Map';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = false;
