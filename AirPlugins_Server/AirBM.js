@@ -111,13 +111,13 @@ async function AirBM() {
             <div class="col-auto">
                 <div class="cbcontainer">
                     <input type="checkbox" class="air_checkbox" id="abm_single_analysis" checked>
-                    <label class="air_checkbox" for="abm_single_analysis">Single Simulation</label>
+                    <label class="air_checkbox" for="abm_single_analysis">Standalone</label>
                 </div>
             </div>
             <div class="col-auto">
                 <div class="cbcontainer">
                     <input type="checkbox" class="air_checkbox" id="abm_differential_analysis">
-                    <label class="air_checkbox" for="abm_differential_analysis">Comparitive Simulation</label>
+                    <label class="air_checkbox" for="abm_differential_analysis">Comparative</label>
                 </div>
             </div>
         </div>
@@ -126,8 +126,8 @@ async function AirBM() {
                 <thead>
                     <tr>
                         <th style="vertical-align: middle;">Element</th>
-                        <th style="vertical-align: middle;">Control\nSettings</th>
-                        <th style="vertical-align: middle;">Interference\nSettings</th>
+                        <th style="vertical-align: middle;">Control</th>
+                        <th style="vertical-align: middle;">Intervention</th>
                     </tr>
                 </thead>
                 <tbody>
