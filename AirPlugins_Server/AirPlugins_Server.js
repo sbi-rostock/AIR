@@ -234,13 +234,13 @@ async function initMainPageStructure() {
 
                 <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
                     <li class="air_nav_item nav-item"  style="width: 17%;">
-                        <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="false">Xplore</a>
+                        <a class="air_tab nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="false">Xplore</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
                         <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
-                        <a class="air_tab nav-link" id="airbm_tab" data-toggle="tab" href="#airbm_tab_content" role="tab" aria-controls="airbm_tab_content" aria-selected="true">ABM</a>
+                        <a class="air_tab active nav-link" id="airbm_tab" data-toggle="tab" href="#airbm_tab_content" role="tab" aria-controls="airbm_tab_content" aria-selected="true">ABM</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
                         <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
