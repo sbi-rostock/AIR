@@ -45,7 +45,7 @@ async function AirBM() {
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary ml-1"
                             data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Randomization Seed."
-                            data-content="Seeds allow for reproducability in probabilitic simulations. Models with the same seed will have exact same results, given that parameters stay the same.">
+                            data-content="Seeds allow for reproducability in probabilistic simulations. Models with the same seed will have exact same results, given that parameters stay the same.">
                         ?
                     </button>
                 </div>
