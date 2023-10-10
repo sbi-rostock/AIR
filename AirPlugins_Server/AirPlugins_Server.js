@@ -234,13 +234,13 @@ async function initMainPageStructure() {
 
                 <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
                     <li class="air_nav_item nav-item"  style="width: 17%;">
-                        <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="true">Xplore</a>
+                        <a class="air_tab active nav-link" id="airxplore_tab" data-toggle="tab" href="#airxplore_tab_content" role="tab" aria-controls="airxplore_tab_content" aria-selected="false">Xplore</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
                         <a class="air_tab nav-link" id="airomics_tab" data-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Omics</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
-                        <a class="air_tab nav-link" id="airbm_tab" data-toggle="tab" href="#airbm_tab_content" role="tab" aria-controls="airbm_tab_content" aria-selected="false">ABM</a>
+                        <a class="air_tab nav-link" id="airbm_tab" data-toggle="tab" href="#airbm_tab_content" role="tab" aria-controls="airbm_tab_content" aria-selected="true">ABM</a>
                     </li>
                     <li class="air_nav_item nav-item" style="width: 17%;">
                         <a class="air_tab nav-link" id="airgenvar_tab" data-toggle="tab" href="#airgenvar_tab_content" role="tab" aria-controls="airgenvar_tab_content" aria-selected="false">Variant</a>
@@ -251,11 +251,11 @@ async function initMainPageStructure() {
                     <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
                 </ul>
                 <div class="tab-content" id="air_tab">
-                    <div class="tab-pane show active" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
+                    <div class="tab-pane" id="airxplore_tab_content" role="tabpanel" aria-labelledby="airxplore_tab">
                     </div>
                     <div class="tab-pane" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
                     </div>                    
-                    <div class="tab-pane" id="airbm_tab_content" role="tabpanel" aria-labelledby="airbm_tab">
+                    <div class="tab-pane show active" id="airbm_tab_content" role="tabpanel" aria-labelledby="airbm_tab">
                     </div>
                     <div class="tab-pane" id="airgenvar_tab_content" role="tabpanel" aria-labelledby="airgenvar_tab">
                     </div>
