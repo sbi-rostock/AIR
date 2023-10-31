@@ -143,9 +143,7 @@ async function initMainPageStructure() {
   }
 
   let container = $('<div class="' + pluginName + '-container" id="bhs_plugincontainer"></div>').appendTo(pluginContainer);
-  $("#bhs_plugincontainer").parents(".tab-pane").css({
-    "overflow": "hidden"
-  });
+
   // $(`<div id="stat_spinner" class="mt-5">
   //       <div class="d-flex justify-content-center">
   //                   <div class="spinner-border" role="status">
