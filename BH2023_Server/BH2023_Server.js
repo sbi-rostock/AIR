@@ -195,7 +195,6 @@ async function initMainPageStructure() {
   }
 
   GetProjectHash().then(function () {
-    document.getElementById("stat_spinner").remove();
     $.getScript(ScriptPaths[0]).done(function () {
       readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape, SBI_SERVER).then(async function (height) {
 
