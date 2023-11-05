@@ -383,17 +383,17 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                     <th></th>
                                     <th></th>
                                     <th></th>
-                                    <th>Export</th>
-                                    <th># Nodes</th>
-                                    <th># HGNC</th>
-                                    <th># Edges</th>
-                                    <th>max. length</th>
-                                    <th># Disease genes</th>
-                                    <th># Expressed Genes</th>
-                                    <th># Drugs</th>
-                                    <th># Targeted genes</th>
-                                    <th># Targeted dis. genes</th>
-                                    <th># Targeted expr. genes</th>
+                                    <th title="Select the components which should be exported to Hipathia or SBML qual format.">Export</th>
+                                    <th title="Number of connected elements in the component excl. subunits."># Nodes</th>
+                                    <th title="Total number of HGNC annotated element incl. subunits."># HGNC</th>
+                                    <th title="Number of reactions connecting elements in the component"># Edges</th>
+                                    <th title="Length of the longest, traversable path in the component.">Longest Path</th>
+                                    <th title="Number of HGNC annotated and disease-related elements in the component."># Disease genes</th>
+                                    <th title="Number of HGNC annotated elements in the component with expression in the respective cell type."># Expressed Genes</th>
+                                    <th title="Number of drugs targeting HGNC annotated elements in the component."># Drugs</th>
+                                    <th title="Number of HGNC annotated elements in the component targeted by any drug."># Targeted genes</th>
+                                    <th title="Number of HGNC annotated and disease-related elements in the component targeted by any drug."># Targeted dis. genes</th>
+                                    <th title="Number of HGNC annotated elements in the component which are expressed in the respective cell type and are targeted by any drug."># Targeted expr. genes</th>
                                 </tr>
                             </thead>
                         </table>
@@ -404,7 +404,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 <button type="button" id="bhs_hipathia" class="air_btn btn mr-1">Hipathia</button>
                             </div>
                             <div class="btn-group">
-                                <button type="button" id="bhs_casq" class="air_btn btn ml-1"">Casq</button>
+                                <button type="button" id="bhs_casq" class="air_btn btn ml-1"">SBML qual</button>
                             </div>
                         </div>
                         <hr>
@@ -484,7 +484,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                             continue
                         }
 
-                        
+                        component.length--;
                         component["degs"] = []
                         component["drug_target_nodes"] = new Set()
                         component["drug_target_hgnc"] = new Set()
@@ -577,37 +577,64 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                             return
                         }
 
+                        var failedComponents = 0
+                        var successfulRequests = 0
+                        
                         for (let [i, component_id] of Object.entries(casq_files))
                         {
                             let unprocessed_data = {
                                 "model": components[component_id].model,
                                 "elements": components[component_id].nodes.map(node => nodes[node].minerva.id),
                             }  
-                            let qual_sbml_file = await getDataFromServer("casq", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json')
 
-                            if(casq_files.length == 1)
+                            try
                             {
-                                var blob = new Blob([qual_sbml_file], { type: 'text/plain' });
-                                var downloadLink = document.createElement("a");
-                                downloadLink.download = `hsa${components[component_id].model}c${component_id}.sbml`;
-                                downloadLink.href = window.URL.createObjectURL(blob);
-                                document.body.appendChild(downloadLink);
-                                downloadLink.click();
-                                document.body.removeChild(downloadLink);
-                            }
-                            else
-                            {
-                                zip.file(`hsa${components[component_id].model}c${component_id}.sbml`, qual_sbml_file);                        
-                            }
+                                let qual_sbml_file = await getDataFromServer("casq", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json')
 
-                            await updateProgress(i, casq_files.length, "bhs_casq");
+                                if(casq_files.length == 1)
+                                {
+                                    var blob = new Blob([qual_sbml_file], { type: 'text/plain' });
+                                    var downloadLink = document.createElement("a");
+                                    downloadLink.download = `hsa${components[component_id].model}c${component_id}.sbml`;
+                                    downloadLink.href = window.URL.createObjectURL(blob);
+                                    document.body.appendChild(downloadLink);
+                                    downloadLink.click();
+                                    document.body.removeChild(downloadLink);
+                                }
+                                else
+                                {
+                                    zip.file(`hsa${components[component_id].model}c${component_id}.sbml`, qual_sbml_file);                        
+                                }
+                                successfulRequests++; // Increment the counter for each successful request
+                            } catch (error) {
+                                if(casq_files.length == 1)
+                                {
+                                    alert("Files couldn't be processed, download canceled.");
+                                }
+                                console.log(error);
+                                // Add the failed component ID to the array
+                                failedComponents++;
+                            }
+                            await updateProgress(parseFloat(i) + 1, casq_files.length, "bhs_casq");
                         }
                         if(casq_files.length > 1)
                         {
-                            zip.generateAsync({ type: "blob" })
-                                .then(function (content) {
-                                    FileSaver.saveAs(content, "casq.zip");
-                                });
+                            if(successfulRequests > 0)
+                            {
+                                zip.generateAsync({ type: "blob" })
+                                    .then(function (content) {
+                                        FileSaver.saveAs(content, "casq.zip");
+                                    });
+                                                                // If there were any failed components, alert the user
+                                if (failedComponents > 0) 
+                                {
+                                    alert('Failed to process ' + failedComponents + ' components.');
+                                }
+                            } 
+                            else {
+                                // Alert the user that no files were processed successfully, download canceled
+                                alert('No files were processed successfully, download canceled.');
+                            }
                         }
                         enablebtn("bhs_casq", text)
                     })
@@ -635,6 +662,9 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                             return
                         }
 
+                        var failedComponents = 0
+                        var successfulRequests = 0
+
                         for (let [i, component_data] of Object.entries(hipathia_files))
                         {
                             let unprocessed_data = {
@@ -642,16 +672,37 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 "sif": component_data[2],
                                 "att": component_data[3],
                             }  
-                            let processed_data = JSON.parse(await getDataFromServer("hipathia", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json'))
-                            zip.file(`hsa${component_data[1]}c${component_data[0]}.sif`, processed_data[0]);
-                            zip.file(`hsa${component_data[1]}c${component_data[0]}.att`, processed_data[1]);
 
-                            await updateProgress(i, hipathia_files.length, "bhs_hipathia");
+                            try
+                            {
+                                let processed_data = JSON.parse(await getDataFromServer("hipathia", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json'))
+                                zip.file(`hsa${component_data[1]}c${component_data[0]}.sif`, processed_data[0]);
+                                zip.file(`hsa${component_data[1]}c${component_data[0]}.att`, processed_data[1]);
+                                successfulRequests++; // Increment the counter for each successful request
+                            } catch (error) {
+                                console.log(error);
+                                // Add the failed component ID to the array
+                                failedComponents++;
+                            }
+                            await updateProgress(parseFloat(i) + 1, hipathia_files.length, "bhs_hipathia");
                         }
-                        zip.generateAsync({ type: "blob" })
-                            .then(function (content) {
-                                FileSaver.saveAs(content, "hipathia.zip");
-                            });
+                    
+                        // Check if there were successful requests before proceeding to download
+                        if (successfulRequests > 0) 
+                        {
+                            zip.generateAsync({ type: "blob" })
+                                .then(function (content) {
+                                    FileSaver.saveAs(content, "hipathia.zip");
+                                });                                                
+                            // If there were any failed components, alert the user
+                            if (failedComponents > 0) {
+                                alert('Failed to process ' + failedComponents + ' components.');
+                            }
+                        } else {
+                            // Alert the user that no files were processed successfully, download canceled
+                            alert('No files were processed successfully, download canceled.');
+                        }
+
 
                         enablebtn("bhs_hipathia", text)
                     });
@@ -1112,6 +1163,8 @@ $(document).on('click', '#bhs_tbl_components .bhs_locate_component', function() 
             y2 = (y+h)
     }
 
+    
+    minervaProxy.project.map.openMap({ id: component.model });
     minervaProxy.project.map.fitBounds({
         modelId: component.model,
         x1: x1,
