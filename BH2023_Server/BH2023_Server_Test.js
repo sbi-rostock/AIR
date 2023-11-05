@@ -30,7 +30,7 @@ require('datatables.net-buttons')(window, $);
 
 let local_datafile_URL = "http://localhost:3000/BH2023_Server/";
 let localURL = "http://localhost:3000/BH2023_Server/";
-const pluginName = 'BH2023_Server';
+const pluginName = 'BH2023';
 const pluginVersion = '0.9.0';
 const minervaProxyServer = 'https://minerva-dev.lcsb.uni.lu/minerva-proxy/';
 let filetesting = true;
