@@ -340,6 +340,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                     // Start the initial timer
                     resetSessionWarningTimer();   
                     
+                    $('<h4 class="mt-4 mb-4">Filter Components</h4>').appendTo("#bhs_plugincontainer")
                     for(let config of ["expr", "deg", "drug", "len"])
                     {
                         let description = ""
@@ -372,11 +373,10 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                         `).appendTo("#bhs_plugincontainer")
                     }                    
                     
-                    $('<button type="button" id="bhs_reset_btn" class="air_btn_light btn btn-block mt-4 mb-6">Reset Filter</button>').appendTo("#bhs_plugincontainer")
-                    $('<hr>').appendTo("#bhs_plugincontainer")
-
-                    
                     $(`
+                        <button type="button" id="bhs_reset_btn" class="air_btn_light btn btn-block mt-4 mb-6">Reset Filter</button>
+                        <hr>
+                        <h4 class="mt-4 mb-4">Select Components</h4>
                         <table id="bhs_tbl_components"  class="hover air_table mb-2 bhs-main-tbl" style="width:100%">
                             <thead>
                                 <tr>
@@ -397,17 +397,20 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 </tr>
                             </thead>
                         </table>
-                    `).appendTo("#bhs_plugincontainer")
-                    // $('<select id="bhs_component_select" class="browser-default xp_select custom-select mt-2 mb-2"></select>').appendTo("#bhs_plugincontainer");
-                    $('<button type="button" id="bhs_hipathia" class="air_btn btn btn-block mt-4 mb-2">Export Hipathia</button>').appendTo("#bhs_plugincontainer")
-                    $('<button type="button" id="bhs_casq" class="air_btn btn btn-block mt-4 mb-2">Export Casq</button>').appendTo("#bhs_plugincontainer")
-                    $(`
                         <hr>
+                        <h4 class="mt-4 mb-4">Export Components</h4>
+                        <div class="btn-group btn-group-justified">
+                            <div class="btn-group">
+                                <button type="button" id="bhs_hipathia" class="air_btn btn mr-1">Hipathia</button>
+                            </div>
+                            <div class="btn-group">
+                                <button type="button" id="bhs_casq" class="air_btn btn ml-1"">Casq</button>
+                            </div>
+                        </div>
+                        <hr>
+                        <h4 class="mt-4 mb-4">Highlight Selected Component</h4>
                         <div class="container">
                             <div class="row mt-4 mb-2 justify-content-center">
-                                <div class="col-12 text-center mb-3">
-                                    <label class="air_checkbox">Highlight</label>
-                                </div>
                                 <div class="col-md-4 text-center">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input bhs_highlight_checkbox" id="bhs_highlight_elements" checked>
@@ -428,9 +431,8 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 </div>
                             </div>
                         </div>
-
+                        <div id="bhs_cytoscape" style="width: 100%; height: 350px"></div>
                     `).appendTo("#bhs_plugincontainer");
-                    $('<div id="bhs_cytoscape" style="width: 100%; height: 350px"></div>').appendTo("#bhs_plugincontainer");
 
                     $(".bhs_highlight_checkbox").on("change", function() {
                         highlight_component(highlighted_component)
@@ -780,163 +782,171 @@ function export_hipathia(id)
 
 function updateCytoscape(id) {
 
-    component = components[id]           
-    network = []
-
-    for (let [i,edge] of Object.entries(component.edges)) {
-
-        hipathia_sif_data.push({ from: edge[0], sign: edge[1] == -1? "inhibition" : "activation", to: edge[2] })
-
-        network.push({
-            data: {
-              id: i,
-              source: edge[0],
-              target: edge[2],
-              inhibition: edge[1] == -1? "true" : "false"
-            }
-          })
-    }
-    for (let node of component.nodes)
+    if(id)
     {
-        network.push({
-            data: { 
-                id: node,
-                name: nodes[node]["name"],
-                color: [...component.drug_target_nodes].includes(node)? "#FF0000" : "#29C6FA" ,
-                shape: nodes[node].expression? "circle": "triangle"
-            }
-        })
+        component = components[id]           
+        network = []
+
+        for (let [i,edge] of Object.entries(component.edges)) {
+
+            hipathia_sif_data.push({ from: edge[0], sign: edge[1] == -1? "inhibition" : "activation", to: edge[2] })
+
+            network.push({
+                data: {
+                id: i,
+                source: edge[0],
+                target: edge[2],
+                inhibition: edge[1] == -1? "true" : "false"
+                }
+            })
+        }
+        for (let node of component.nodes)
+        {
+            network.push({
+                data: { 
+                    id: node,
+                    name: nodes[node]["name"],
+                    color: [...component.drug_target_nodes].includes(node)? "#FF0000" : "#29C6FA" ,
+                    shape: nodes[node].expression? "circle": "triangle"
+                }
+            })
+        }
+
+        let cy = cytoscape({
+            container: document.getElementById('bhs_cytoscape'),
+            elements: network,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        shape: 'data(shape)',
+                        'background-color': 'data(color)',
+                        'label': 'data(name)',
+                        //   'shape': 'data(shape)'
+                    }
+                },
+                {
+                    selector: 'edge[inhibition="true"]',
+                    style: {
+                        'target-arrow-shape': 'tee',
+                        // 'line-color': '#ff0000',
+                        // 'target-arrow-color': '#ff0000'
+                    }
+                },
+                {
+                    selector: 'edge[inhibition="false"]',
+                    style: {
+                        'target-arrow-shape': 'triangle',
+                        // 'line-color': '#d8d8d8',
+                        // 'target-arrow-color': '#d8d8d8'
+                    }
+                }
+                ]      
+        });
+
+        let options = {
+            name: 'fcose',
+            animate: false, // whether to animate changes to the layout
+            animationDuration: 500, // duration of animation in ms, if enabled
+            animationEasing: undefined, // easing of animation, if enabled
+            animateFilter: function ( node, i ){ return true; }, // a function that determines whether the node should be animated.
+            // All nodes animated by default for `animate:true`.  Non-animated nodes are positioned immediately when the layout starts.
+            fit: true, // whether to fit the viewport to the graph
+            padding: 30, // padding to leave between graph and viewport
+            pan: undefined, // pan the graph to the provided position, given as { x, y }
+            ready: undefined, // callback for the layoutready event
+            stop: function(){
+                // enablebtn("om_crn_analyzebtn", text)
+            }, // callback for the layoutstop event
+            spacingFactor: 1, // a positive value which adjusts spacing between nodes (>1 means greater than usual spacing)
+            zoom: undefined // zoom level as a positive number to set after animation
+        }
+
+        var layout = cy.elements().layout(options);    
+
+        layout.run();
+
+        cy.on('tap', 'node', function(event){
+            var node = event.target;
+            var node_id = node.data('id');
+        
+            focus(nodes[node_id].minerva)
+            // Add more conditions based on other values of customAttribute as needed
+        }); 
+        
+        cy.on('tap', 'edge', function(event){
+            var edge = event.target;
+            var source = nodes[edge.data('source')].minerva
+            var target = nodes[edge.data('target')].minerva
+
+            focus(findreaction(source, target))
+            // Add more conditions based on other values of customAttribute as needed
+        });
+        highlight_component(component)
     }
-
-    let cy = cytoscape({
-        container: document.getElementById('bhs_cytoscape'),
-        elements: network,
-          style: [
-              {
-                  selector: 'node',
-                  style: {
-                      shape: 'data(shape)',
-                      'background-color': 'data(color)',
-                      'label': 'data(name)',
-                    //   'shape': 'data(shape)'
-                  }
-              },
-              {
-                selector: 'edge[inhibition="true"]',
-                style: {
-                    'target-arrow-shape': 'tee',
-                    // 'line-color': '#ff0000',
-                    // 'target-arrow-color': '#ff0000'
-                }
-            },
-            {
-                selector: 'edge[inhibition="false"]',
-                style: {
-                    'target-arrow-shape': 'triangle',
-                    // 'line-color': '#d8d8d8',
-                    // 'target-arrow-color': '#d8d8d8'
-                }
-            }
-            ]      
-      });
-
-      let options = {
-        name: 'fcose',
-        animate: false, // whether to animate changes to the layout
-        animationDuration: 500, // duration of animation in ms, if enabled
-        animationEasing: undefined, // easing of animation, if enabled
-        animateFilter: function ( node, i ){ return true; }, // a function that determines whether the node should be animated.
-          // All nodes animated by default for `animate:true`.  Non-animated nodes are positioned immediately when the layout starts.
-        fit: true, // whether to fit the viewport to the graph
-        padding: 30, // padding to leave between graph and viewport
-        pan: undefined, // pan the graph to the provided position, given as { x, y }
-        ready: undefined, // callback for the layoutready event
-        stop: function(){
-            // enablebtn("om_crn_analyzebtn", text)
-        }, // callback for the layoutstop event
-        spacingFactor: 1, // a positive value which adjusts spacing between nodes (>1 means greater than usual spacing)
-        zoom: undefined // zoom level as a positive number to set after animation
-      }
-
-    var layout = cy.elements().layout(options);    
-
-    layout.run();
-
-    cy.on('tap', 'node', function(event){
-        var node = event.target;
-        var node_id = node.data('id');
-    
-        focus(nodes[node_id].minerva)
-        // Add more conditions based on other values of customAttribute as needed
-    }); 
-    
-    cy.on('tap', 'edge', function(event){
-        var edge = event.target;
-        var source = nodes[edge.data('source')].minerva
-        var target = nodes[edge.data('target')].minerva
-
-        focus(findreaction(source, target))
-        // Add more conditions based on other values of customAttribute as needed
-    });
+    else
+    {
+        $("#bhs_cytoscape").empty()
+        highlight_component(null)
+    }
 
     highlighted_component = component
-    highlight_component(component)
 }
 
 function highlight_component(component) {
-
-    if(!component)
-        return
 
     let highlightDefs = []
     minervaProxy.project.map.getHighlightedBioEntities().then(highlighted => {
 
         minervaProxy.project.map.hideBioEntity(highlighted).then(r => {
+            
+            if(component)
+            {
+                if ($("#bhs_highlight_reactions").prop("checked"))
+                {
+                    for(let r of component.edges.map(edge => findreaction(nodes[edge[0]].minerva, nodes[edge[2]].minerva)).filter(r => r != null))
+                        highlightDefs.push({
+                            element: {
+                                id: r.id,
+                                modelId: r.getModelId(),
+                                type: "REACTION"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                lineColor: "#FF0000"
+                            }
+                        })
+                }
+                if ($("#bhs_highlight_elements").prop("checked"))
+                {
+                    for(let e of [... component.nodes].map(node => nodes[node].minerva))
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "SURFACE",
+                            options: {
+                                color: "#FF0000"
+                            }
+                        })
+                }
+                if ($("#bhs_highlight_targets").prop("checked"))
+                {
+                    for(let e of [... component.drug_target_nodes].map(node => nodes[node].minerva))
+                        highlightDefs.push({
+                            element: {
+                                id: e.id,
+                                modelId: e.getModelId(),
+                                type: "ALIAS"
+                            },
+                            type: "ICON"
+                        });
+                }
 
-            if ($("#bhs_highlight_reactions").prop("checked"))
-            {
-                for(let r of component.edges.map(edge => findreaction(nodes[edge[0]].minerva, nodes[edge[2]].minerva)).filter(r => r != null))
-                    highlightDefs.push({
-                        element: {
-                            id: r.id,
-                            modelId: r.getModelId(),
-                            type: "REACTION"
-                        },
-                        type: "SURFACE",
-                        options: {
-                            lineColor: "#FF0000"
-                        }
-                    })
+                minervaProxy.project.map.showBioEntity(highlightDefs);
             }
-            if ($("#bhs_highlight_elements").prop("checked"))
-            {
-                for(let e of [... component.nodes].map(node => nodes[node].minerva))
-                    highlightDefs.push({
-                        element: {
-                            id: e.id,
-                            modelId: e.getModelId(),
-                            type: "ALIAS"
-                        },
-                        type: "SURFACE",
-                        options: {
-                            color: "#FF0000"
-                        }
-                    })
-            }
-            if ($("#bhs_highlight_targets").prop("checked"))
-            {
-                for(let e of [... component.drug_target_nodes].map(node => nodes[node].minerva))
-                    highlightDefs.push({
-                        element: {
-                            id: e.id,
-                            modelId: e.getModelId(),
-                            type: "ALIAS"
-                        },
-                        type: "ICON"
-                    });
-            }
-
-            minervaProxy.project.map.showBioEntity(highlightDefs);
         });
     });
 }
@@ -1005,9 +1015,9 @@ function addRow(id, ...params) {
     let subtable = createSubtableContent(id)
 
     let rowData = [
-        subtable? '<span class="fas fa-caret-right toggle-details cursor-pointer"></span>' : "",
-        '<a href="#" class="bhs_locate_component"><span class="fas fa-map-marker"></span></a>',
-        '<a href="#" class="bhs_view_component"><span class="fas fa-eye"></span></a>',
+        subtable? '<span class="fas fa-caret-right toggle-details cursor-pointer" title="Show drugs and drug targets"></span>' : "",
+        '<a href="#" class="bhs_locate_component" title="Focus on component"><span class="fas fa-map-marker"></span></a>',
+        '<a href="#" class="bhs_view_component" title="View component"><span class="fas fa-eye"></span></a>',
         '<input type="checkbox">',
         ...params
     ];
@@ -1066,6 +1076,15 @@ $(document).on('change', '#bhs_tbl_components input[type="checkbox"]', function(
 
 $(document).on('click', '#bhs_tbl_components .bhs_view_component', function() {
     var rowId = $(this).closest('tr').data('id');
+
+    if ($(this).find('.fas').hasClass('fa-eye-slash')) {
+        rowId = null      
+        $(this).find('.fas').removeClass('fa-eye-slash').addClass('fa-eye');
+    } else {
+        $('.bhs_view_component .fas').removeClass('fa-eye-slash').addClass('fa-eye');
+        $(this).find('.fas').removeClass('fa-eye').addClass('fa-eye-slash');
+    }
+
     updateCytoscape(rowId) 
 });
 
