@@ -1,3 +1,21 @@
+.bhs-main-tbl .dataTables_wrapper  {
+  width: 0 !important;
+}
+
+.bhs_subtable {
+  width: auto !important;
+  table-layout: auto !important;
+}
+
+.bhs_subtable thead th, .bhs_subtable thead td,
+.bhs_subtable tbody th, .bhs_subtable tbody td {
+  white-space: nowrap;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
 .slider-column {
   white-space: nowrap;
   overflow: hidden;

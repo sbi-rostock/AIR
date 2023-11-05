@@ -113,7 +113,7 @@ function removeScripts() {
 }
 
 async function initMainPageStructure() {
-  if ($("#Air_Tab").length) {
+  if ($("#bhs_plugincontainer").length) {
     alert("Plugins have already been initialized.");
     return false;
   }
@@ -143,9 +143,17 @@ async function initMainPageStructure() {
   }
 
   let container = $('<div class="' + pluginName + '-container" id="bhs_plugincontainer"></div>').appendTo(pluginContainer);
-  $("#bhs_plugincontainer").parents(".tab-pane").css({
-    "overflow": "hidden"
-  });
+
+  $(`<div id="stat_spinner" class="mt-5">
+        <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only"></span>
+                    </div>
+        </div>
+        <div class="d-flex justify-content-center mt-2">
+            <span id="air_loading_text">LOADING ...</span>
+        </div>
+    </div>`).appendTo(container);
 
   function loadScripts(Scripts) {
     var deferred = $.Deferred();
@@ -189,11 +197,11 @@ async function initMainPageStructure() {
   GetProjectHash().then(function () {
     $.getScript(ScriptPaths[0]).done(function () {
       readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape, SBI_SERVER).then(async function (height) {
-        document.getElementById("stat_spinner").remove();
-        $("#air_plugincontainer").append(
-        /*html*/
-        `<div id="bhs_div">
-         </div>`);
+
+        // $("#bhs_plugincontainer").append(
+        // /*html*/
+        // `<div id="bhs_div">
+        //  </div>`);
 
       });
     });
