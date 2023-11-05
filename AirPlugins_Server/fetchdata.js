@@ -133,7 +133,7 @@ function getDataFromServer(request, data = {}, type = "GET", datatype = "text", 
     return new Promise((resolve, reject) => {
       $.ajax({
         type: type,
-        url: SBI_SERVER + project_hash + "/" + request,
+        url: SBI_SERVER + project_hash + "/bhs_" + request,
         contentType: contentType,
         dataType: datatype,
         data: data,
