@@ -1296,6 +1296,7 @@ async function disablebutton(id, progress = false) {
             }
             else {
                 $btn.empty().append(`<div class="air_progress position-relative mb-4">
+                    <span class="loadingspinner spinner-border spinner-border-sm"></span>
                     <div id= "${id}_progress" class="air_progress_value"></div>
                     <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
                 </div>`);
