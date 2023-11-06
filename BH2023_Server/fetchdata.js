@@ -404,7 +404,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 <button type="button" id="bhs_hipathia" class="air_btn btn mr-1">Hipathia</button>
                             </div>
                             <div class="btn-group">
-                                <button type="button" id="bhs_casq" class="air_btn btn ml-1"">SBML qual</button>
+                                <button type="button" id="bhs_casq" class="air_btn btn ml-1">SBML qual</button>
                             </div>
                         </div>
                         <hr>
@@ -1296,7 +1296,6 @@ async function disablebutton(id, progress = false) {
             }
             else {
                 $btn.empty().append(`<div class="air_progress position-relative mb-4">
-                    <span class="loadingspinner spinner-border spinner-border-sm"></span>
                     <div id= "${id}_progress" class="air_progress_value"></div>
                     <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
                 </div>`);
