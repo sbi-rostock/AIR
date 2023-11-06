@@ -439,14 +439,15 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                     })
 
                     component_table = $('#bhs_tbl_components').DataTable({
-                        "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
+                        "dom": '<"top"<"left-col"Bl><"right-col"f>>rtip',
                         "buttons": [
                             {
                                 text: 'All',
                                 className: 'air_dt_btn',
                                 action: function () {
-                                    $('#bhs_tbl_components tr').each(function() {
-                                        $(this).find('td input[type="checkbox"]').prop('checked', true);
+                                    // Select all checkboxes in rows that are not filtered out
+                                    component_table.rows({ search: 'applied' }).every(function () {
+                                        this.nodes().to$().find('td input[type="checkbox"]').prop('checked', true);
                                     });
                                 }
                             },
@@ -454,14 +455,14 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                 text: 'None',
                                 className: 'air_dt_btn',
                                 action: function () {
-                                    $('#bhs_tbl_components tr').each(function() {
-                                        $(this).find('td input[type="checkbox"]').prop('checked', false);
+                                    component_table.rows({ search: 'applied' }).every(function () {
+                                        this.nodes().to$().find('td input[type="checkbox"]').prop('checked', false);
                                     });
                                 }
                             },
                         ],
                         pageLength: 5,  // set the default to 15 rows per page
-                        lengthMenu: [[3, 5, 10, 15], [3, 5, 10, 15]],
+                        lengthMenu: [[3, 5, 7, 10], [3, 5, 7, 10]],
                         // "dom": '<"top"<"left-col"B><"right-col"f>>rtip',
                         "order": [[2, "desc"]],
                         "scrollX": true,
@@ -555,157 +556,10 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                     $("#bhs_slider_len").attr('max', max_size);
 
                     // New code to get all checked rows when the button is clicked
-                    $('#bhs_casq').click(async function() {
-                        
-                        var text = await disablebutton("bhs_casq", progress = true)
-
-                        await updateProgress(0, 1, "bhs_casq");
-
-                        var casq_files = [];
-                        $('#bhs_tbl_components tr').each(function() {
-                            var $firstCheckbox = $(this).find('td input[type="checkbox"]');
-                            if ($firstCheckbox.is(':checked')) {
-                                casq_files.push($(this).data('id'))
-                            }
-                        });
-                        
-                        var zip = new JSZip();
-
-                        if (casq_files.length == 0)
-                        {
-                            enablebtn("bhs_casq", text)
-                            return
-                        }
-
-                        var failedComponents = 0
-                        var successfulRequests = 0
-                        
-                        for (let [i, component_id] of Object.entries(casq_files))
-                        {
-                            let unprocessed_data = {
-                                "model": components[component_id].model,
-                                "elements": components[component_id].nodes.map(node => nodes[node].minerva.id),
-                            }  
-
-                            try
-                            {
-                                let qual_sbml_file = await getDataFromServer("casq", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json')
-
-                                if(casq_files.length == 1)
-                                {
-                                    var blob = new Blob([qual_sbml_file], { type: 'text/plain' });
-                                    var downloadLink = document.createElement("a");
-                                    downloadLink.download = `hsa${components[component_id].model}c${component_id}.sbml`;
-                                    downloadLink.href = window.URL.createObjectURL(blob);
-                                    document.body.appendChild(downloadLink);
-                                    downloadLink.click();
-                                    document.body.removeChild(downloadLink);
-                                }
-                                else
-                                {
-                                    zip.file(`hsa${components[component_id].model}c${component_id}.sbml`, qual_sbml_file);                        
-                                }
-                                successfulRequests++; // Increment the counter for each successful request
-                            } catch (error) {
-                                if(casq_files.length == 1)
-                                {
-                                    alert("Files couldn't be processed, download canceled.");
-                                }
-                                console.log(error);
-                                // Add the failed component ID to the array
-                                failedComponents++;
-                            }
-                            await updateProgress(parseFloat(i) + 1, casq_files.length, "bhs_casq");
-                        }
-                        if(casq_files.length > 1)
-                        {
-                            if(successfulRequests > 0)
-                            {
-                                zip.generateAsync({ type: "blob" })
-                                    .then(function (content) {
-                                        FileSaver.saveAs(content, "casq.zip");
-                                    });
-                                                                // If there were any failed components, alert the user
-                                if (failedComponents > 0) 
-                                {
-                                    alert('Failed to process ' + failedComponents + ' components.');
-                                }
-                            } 
-                            else {
-                                // Alert the user that no files were processed successfully, download canceled
-                                alert('No files were processed successfully, download canceled.');
-                            }
-                        }
-                        enablebtn("bhs_casq", text)
-                    })
+                    $('#bhs_casq').click(exportSBMLqual)
 
                     // New code to get all checked rows when the button is clicked
-                    $('#bhs_hipathia').click(async function() {
-                        
-                        var text = await disablebutton("bhs_hipathia", progress = true)
-
-                        await updateProgress(0, 1, "bhs_hipathia");
-
-                        var hipathia_files = [];
-                        $('#bhs_tbl_components tr').each(function() {
-                            var $firstCheckbox = $(this).find('td input[type="checkbox"]');
-                            if ($firstCheckbox.is(':checked')) {
-                                hipathia_files.push(export_hipathia($(this).data('id')))
-                            }
-                        });
-
-                        var zip = new JSZip();
-
-                        if (hipathia_files.length == 0)
-                        {
-                            enablebtn("bhs_hipathia", text)
-                            return
-                        }
-
-                        var failedComponents = 0
-                        var successfulRequests = 0
-
-                        for (let [i, component_data] of Object.entries(hipathia_files))
-                        {
-                            let unprocessed_data = {
-                                "id": component_data[1],
-                                "sif": component_data[2],
-                                "att": component_data[3],
-                            }  
-
-                            try
-                            {
-                                let processed_data = JSON.parse(await getDataFromServer("hipathia", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json'))
-                                zip.file(`hsa${component_data[1]}c${component_data[0]}.sif`, processed_data[0]);
-                                zip.file(`hsa${component_data[1]}c${component_data[0]}.att`, processed_data[1]);
-                                successfulRequests++; // Increment the counter for each successful request
-                            } catch (error) {
-                                console.log(error);
-                                // Add the failed component ID to the array
-                                failedComponents++;
-                            }
-                            await updateProgress(parseFloat(i) + 1, hipathia_files.length, "bhs_hipathia");
-                        }
-                    
-                        // Check if there were successful requests before proceeding to download
-                        if (successfulRequests > 0) 
-                        {
-                            zip.generateAsync({ type: "blob" })
-                                .then(function (content) {
-                                    FileSaver.saveAs(content, "hipathia.zip");
-                                });                                                
-                            // If there were any failed components, alert the user
-                            if (failedComponents > 0) {
-                                alert('Failed to process ' + failedComponents + ' components.');
-                            }
-                        } else {
-                            // Alert the user that no files were processed successfully, download canceled
-                            alert('No files were processed successfully, download canceled.');
-                        }
-
-
-                        enablebtn("bhs_hipathia", text)
-                    });
+                    $('#bhs_hipathia').click(exportHipathia);
 
                     $("#bhs_reset_btn").click(function() {
                         $(".bhs_slider").val(0)
@@ -726,6 +580,168 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
             });
         });
     });
+}
+
+async function exportSBMLqual() {
+                        
+    var text = await disablebutton("bhs_casq", progress = true)
+
+    await updateProgress(0, 1, "bhs_casq");
+
+    var casq_files = [];
+
+    
+    // Iterate through all rows, regardless of filtering and pagination
+    component_table.rows().every(function() {
+        var $row = this.nodes().to$(); // Convert the row to a jQuery object
+        // If the checkbox in this row is checked
+        if ($row.find('input[type="checkbox"]').prop('checked')) {
+            // Get the row ID from the row's data-id attribute
+            var rowId = $row.attr('data-id');
+            casq_files.push(rowId)
+        }
+    });
+    
+    var zip = new JSZip();
+
+    if (casq_files.length == 0)
+    {
+        enablebtn("bhs_casq", text)
+        return
+    }
+
+    var failedComponents = 0
+    var successfulRequests = 0
+    
+    for (let [i, component_id] of Object.entries(casq_files))
+    {
+        let unprocessed_data = {
+            "model": components[component_id].model,
+            "elements": components[component_id].nodes.map(node => nodes[node].minerva.id),
+        }  
+
+        try
+        {
+            let qual_sbml_file = await getDataFromServer("casq", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json')
+
+            if(casq_files.length == 1)
+            {
+                var blob = new Blob([qual_sbml_file], { type: 'text/plain' });
+                var downloadLink = document.createElement("a");
+                downloadLink.download = `hsa${components[component_id].model}c${component_id}.sbml`;
+                downloadLink.href = window.URL.createObjectURL(blob);
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }
+            else
+            {
+                zip.file(`hsa${components[component_id].model}c${component_id}.sbml`, qual_sbml_file);                        
+            }
+            successfulRequests++; // Increment the counter for each successful request
+        } catch (error) {
+            if(casq_files.length == 1)
+            {
+                alert("Files couldn't be processed, download canceled.");
+            }
+            console.log(error);
+            // Add the failed component ID to the array
+            failedComponents++;
+        }
+        await updateProgress(parseFloat(i) + 1, casq_files.length, "bhs_casq");
+    }
+    if(casq_files.length > 1)
+    {
+        if(successfulRequests > 0)
+        {
+            zip.generateAsync({ type: "blob" })
+                .then(function (content) {
+                    FileSaver.saveAs(content, "casq.zip");
+                });
+                                            // If there were any failed components, alert the user
+            if (failedComponents > 0) 
+            {
+                alert('Failed to process ' + failedComponents + ' components.');
+            }
+        } 
+        else {
+            // Alert the user that no files were processed successfully, download canceled
+            alert('No files were processed successfully, download canceled.');
+        }
+    }
+    enablebtn("bhs_casq", text)
+}
+
+async function exportHipathia() {
+                        
+    var text = await disablebutton("bhs_hipathia", progress = true)
+
+    await updateProgress(0, 1, "bhs_hipathia");
+
+    var hipathia_files = [];
+
+    // Iterate through all rows, regardless of filtering and pagination
+    component_table.rows().every(function() {
+        var $row = this.nodes().to$(); // Convert the row to a jQuery object
+        // If the checkbox in this row is checked
+        if ($row.find('input[type="checkbox"]').prop('checked')) {
+            // Get the row ID from the row's data-id attribute
+            var rowId = $row.attr('data-id');
+            hipathia_files.push(export_hipathia(rowId))
+        }
+    });
+
+    var zip = new JSZip();
+
+    if (hipathia_files.length == 0)
+    {
+        enablebtn("bhs_hipathia", text)
+        return
+    }
+
+    var failedComponents = 0
+    var successfulRequests = 0
+
+    for (let [i, component_data] of Object.entries(hipathia_files))
+    {
+        let unprocessed_data = {
+            "id": component_data[1],
+            "sif": component_data[2],
+            "att": component_data[3],
+        }  
+
+        try
+        {
+            let processed_data = JSON.parse(await getDataFromServer("hipathia", data = JSON.stringify(unprocessed_data), type = "POST", datatype = "text", contentType = 'application/json'))
+            zip.file(`hsa${component_data[1]}c${component_data[0]}.sif`, processed_data[0]);
+            zip.file(`hsa${component_data[1]}c${component_data[0]}.att`, processed_data[1]);
+            successfulRequests++; // Increment the counter for each successful request
+        } catch (error) {
+            console.log(error);
+            // Add the failed component ID to the array
+            failedComponents++;
+        }
+        await updateProgress(parseFloat(i) + 1, hipathia_files.length, "bhs_hipathia");
+    }
+
+    // Check if there were successful requests before proceeding to download
+    if (successfulRequests > 0) 
+    {
+        zip.generateAsync({ type: "blob" })
+            .then(function (content) {
+                FileSaver.saveAs(content, "hipathia.zip");
+            });                                                
+        // If there were any failed components, alert the user
+        if (failedComponents > 0) {
+            alert('Failed to process ' + failedComponents + ' components.');
+        }
+    } else {
+        // Alert the user that no files were processed successfully, download canceled
+        alert('No files were processed successfully, download canceled.');
+    }
+
+
+    enablebtn("bhs_hipathia", text)
 }
 
 function filterTable()
@@ -1292,12 +1308,15 @@ async function disablebutton(id, progress = false) {
             var $btn = $('#' + id);
             let text = $btn.html();
             if (progress == false) {
-                $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');
+                $btn.html('<span class="spinner-border spinner-border-sm"></span>');
             }
             else {
                 $btn.empty().append(`<div class="air_progress position-relative mb-4">
                     <div id= "${id}_progress" class="air_progress_value"></div>
-                    <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
+                    <span class="air_progress_label justify-content-center d-flex position-absolute w-100">
+                        <span style="margin-top: 3.2px;" class="spinner-border spinner-border-sm mr-1"></span>
+                        <span id="${id}_progress_label">0 %</span>
+                    </span>
                 </div>`);
             }
 
