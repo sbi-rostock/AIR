@@ -169,41 +169,14 @@ async function initMainPageStructure() {
     return deferred.promise();
   }
 
-  function GetProjectHash() {
-    return new Promise((resolve, reject) => {
-      $.ajax({
-        type: 'POST',
-        contentType: 'application/json',
-        cors: true,
-        secure: true,
-        headers: {
-          'Access-Control-Allow-Origin': '*'
-        },
-        data: JSON.stringify(project_hash),
-        dataType: 'json',
-        url: SBI_SERVER + 'bhs_initialize_minerva',
-        success: function (data) {
-          project_hash = data["hash"];
-          console.log(project_hash);
-          resolve('');
-        },
-        error: function (error) {
-          reject(error);
-        }
-      });
-    });
-  }
+  $.getScript(ScriptPaths[0]).done(function () {
+    readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape, SBI_SERVER).then(async function (height) {
 
-  GetProjectHash().then(function () {
-    $.getScript(ScriptPaths[0]).done(function () {
-      readDataFiles(minervaProxy, filetesting, project_hash, Chart, ttest, JSZip, FileSaver, VCF, Decimal, cytoscape, SBI_SERVER).then(async function (height) {
+      // $("#bhs_plugincontainer").append(
+      // /*html*/
+      // `<div id="bhs_div">
+      //  </div>`);
 
-        // $("#bhs_plugincontainer").append(
-        // /*html*/
-        // `<div id="bhs_div">
-        //  </div>`);
-
-      });
     });
   });
 }
