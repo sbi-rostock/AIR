@@ -177,6 +177,11 @@ async function initMainPageStructure() {
       // `<div id="bhs_div">
       //  </div>`);
 
+    }).catch(error => {
+      $(document).find('link[href^="' + filepath + '"]').remove();
+      $(document).find('script[src^="' + filepath + '"]').remove();
+      unregisterListeners()
+      return false
     });
   });
 }
