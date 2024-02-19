@@ -2194,9 +2194,8 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score (I)"
                         </ul>
                         <div class="tab-content air_tab_content" style="height: 87%">
                             <div class="tab-pane air_sub_tab_pane show active" style="height: 100%" id="air_popup_tabcontent_dceplot" role="tabpanel" aria-labelledby="air_popup_tab_dceplot">                        
-                                <div style="height: 80%; display="none">
+                                <div style="height: 80%">
                                     <canvas class="popup_chart" id="air_popup_dceplot"></canvas>
-                                    <button type="button" id="om_deg_plot_exportbtn" class="air_btn_light btn btn-block"><i class="fa fa-download"></i>Export PDF</button>
                                 </div>
                                 <div class="d-flex justify-content-center ml-2 mr-2">
                                     <li class="legendli" style="color:#6d6d6d; font-size:100%; white-space: nowrap;">
@@ -2243,20 +2242,6 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score (I)"
                 </div>`);
 
     $btn.after($target);
-    window.jsPDF = window.jspdf.jsPDF;
-    
-    $('#om_deg_plot_exportbtn').on('click', function (e) {
-
-        var reportPageHeight = $('#air_popup_dceplot').height() * 5;
-        var reportPageWidth = $('#air_popup_dceplot').width() * 5;
-
-        // create new pdf and add our new canvas as an image
-        var pdf = new jsPDF('l', 'px', [reportPageWidth, reportPageHeight]);
-        pdf.addImage($("#air_popup_dceplot")[0].toDataURL("image/jpeg", 1.0), 'JPG', 0, 0, reportPageWidth, reportPageHeight);
-        
-        // download the pdf
-        pdf.save('filename.pdf');
-    });
 
     select = document.getElementById('air_popup_histo_select');
 
@@ -3124,17 +3109,3 @@ async function normalizeDictionary(dict)
 
     return new_dict
 }
-
-var loadJS = function(url, implementationCode, location){
-    //url is URL of external file, implementationCode is the code
-    //to be called from the file, location is the location to 
-    //insert the <script> element
-
-    var scriptTag = document.createElement('script');
-    scriptTag.src = url;
-
-    scriptTag.onload = implementationCode;
-    scriptTag.onreadystatechange = implementationCode;
-
-    location.appendChild(scriptTag);
-};
