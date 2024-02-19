@@ -106,6 +106,7 @@ function readDataFiles(_minerva, _filetesting, getfiles, _chart, _ttest, _jszip,
             getFiles = getfiles;
             ttest = _ttest;
             Decimal = _decimal;
+            // jspdf = _jspdf;
             pluginContainer = $(minervaProxy.element);
             pluginContainerId = pluginContainer.attr('id');
 
@@ -1313,6 +1314,10 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
             for (let e of splitpath) {
                 if(e != phenotype)
                     regulators.add(e)
+                for (let e_subunit of AIR.Molecules[e].subunits) {
+                    if(e_subunit != phenotype)
+                        regulators.add(e_subunit)
+                }
             }
         }
         regulators.delete(phenotype)
