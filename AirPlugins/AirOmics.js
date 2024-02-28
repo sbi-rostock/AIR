@@ -1802,9 +1802,10 @@ async function om_createTable(param) {
                     </div>
                     <div class="col">
                         <select id="om_select_normalize" class="om_select browser-default custom-select mb-1 mt-1">
-                            <option value="0">No normalization</option>
+                            <option value="3">No normalization</option>
                             <option value="1" selected>Normalize each phenotype (recommended)</option>
                             <option value="2">Normalize each sample</option>
+                            <option value="0">Normalize all values</option>
                         </select>
                     </div>
                 </div>
@@ -3872,13 +3873,17 @@ function om_normalizePhenotypeValues() {
             AIR.Phenotypes[phenotype]["maxvalue"] = probemax;
         }
 
+        let max = 1;
+        if (typevalue == 0) {
+            max = allmax;
+        }
+
         for (let phenotype in AIR.Phenotypes) {
 
 
             if (alreadyincluded.includes(name) === true)
                 continue;
 
-            let max = allmax;
             if (typevalue == 1) {
                 max = AIR.Phenotypes[phenotype].maxvalue;
             }
@@ -6180,7 +6185,7 @@ function exportPhenotypeRegulators()
     }
     var maxvalue = Math.max(...results.map(r => r[2]))
 
-    results = results.filter(r => (r[2] * 100 / maxvalue) > 0.1).sort(function (a, b) {
+    results = results.filter(r => (r[2] * 100 / maxvalue) > 1).sort(function (a, b) {
         return b[2] - a[2];
     });
 
