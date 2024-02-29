@@ -7,6 +7,8 @@ async function AirBM() {
         prestored_colors: {},
         agents: [],
         current_step: 0,
+        chart: undefined,
+        chart_nodes: ["", "", "", ""]
     }
 
     AIR.allBioEntities.forEach(e => {
@@ -47,20 +49,20 @@ async function AirBM() {
                             data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Randomization Seed."
                             data-content="Seeds allow for reproducability in probabilistic simulations. Models with the same seed will have exact same results, given that parameters stay the same.">
                         ?
-                    </button>
+                    </button>   
                 </div>
             </div>
             <div class="col-auto air_select_label" style="padding:0; width: 10%; text-align: right; ">
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">Seed:</span>
             </div>
             <div class="col">
-                <input type="text" class="textfield" value="" id="abm_seed" onkeypress="return isNumber(event, int = true)" />
+                <input type="text" class="textfield" value="9157" id="abm_seed" onkeypress="return isNumber(event, int = true)" />
             </div>
         </div>
         <button type="button" id="abm_initializebtn" class="air_btn btn btn-block mt-2 mb-2">Initialize</button>
         
         <hr>
-        <h4 class="mt-4 mb-2">3. Configure Parameters</h4>
+        <h4 class="mt-4 mb-2">2. Configure Parameters</h4>
         <div id="abm_steps-container" class="row mt-4 mb-2">
             <div class="col-auto">
                 <div class="wrapper">
@@ -75,7 +77,7 @@ async function AirBM() {
                 <span style="margin: 0; display: inline-block; vertical-align: middle; line-height: normal;">#Steps:</span>
             </div>
             <div class="col">
-                <input type="number" id="abm_steps" min="1" value="200">
+                <input type="number" id="abm_steps" min="1" value="400">
             </div>
         </div>
         
@@ -90,7 +92,7 @@ async function AirBM() {
                 </div>
             </div>
             <div class="col-auto air_select_label" style="padding-left: 10px; width: 50%; text-align: left; ">
-                <h4>Food Intake Sequence</h4>
+                <h4>Diet Quantity</h4>
             </div>
         </div>
         <div id="abm_foodsequence_container">
@@ -107,6 +109,20 @@ async function AirBM() {
         </div>
         <button id="abm_addSequence" class="air_btn_light btn btn-block mb-4">Add Sequence Item</button>
 
+        <div class="row mt-4 mb-2">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Diet Quality."
+                            data-content="Relative quantities of nutrients. Represents the percentage of active states of the reprective nutrient during food intake.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col-auto air_select_label" style="padding-left: 10px; width: 50%; text-align: left; ">
+                <h4>Diet Quality</h4>
+            </div>
+        </div>
         <div class="row mt-2 mb-2" style="display: flex; align-items: center; justify-content: center;">
             <div class="col-auto">
                 <div class="cbcontainer">
@@ -141,22 +157,94 @@ async function AirBM() {
         <button type="button" id="abm_runbtn" class="air_btn btn btn-block mt-4 mb-2 air_disabledbutton">Run</button>
 
         <hr>
-        
+
         <h4 class="mt-4 mb-2">4. Visualize Results</h4> 
-        <div id="abm_showtab">            
         
-            <input type="text" value="TAG (Simple molecule, Hepatocyte)" list="air_abm_node_list" style="width: 70%" class="textfield mb-2 mt-2" id="air_abm_node_select"/>
-            <datalist id="air_abm_node_list" style="height:5.1em;overflow:hidden">
-            </datalist>
+        <ul class="air_nav_tabs nav nav-tabs mt-4" role="tablist">
+            <li class="air_nav_item nav-item" style="width: 33%;">
+                <a class="air_tab air_tab_sub active nav-link" id="abm_result_spatial-tab" data-toggle="tab" href="#abm_result_spatial" role="tab" aria-controls="abm_result_spatial" aria-selected="true">Spatial</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 33%;">
+                <a class="air_tab air_tab_sub nav-link" id="abm_result_temporal-tab" data-toggle="tab" href="#abm_result_temporal" role="tab" aria-controls="abm_result_temporal" aria-selected="false">Temporal</a>
+            </li>
+            <li class="air_nav_item nav-item" style="width: 33%;">
+                <a class="air_tab air_tab_sub nav-link" id="abm_result_mechanistic-tab" data-toggle="tab" href="#abm_result_mechanistic" role="tab" aria-controls="abm_result_mechanistic" aria-selected="false">Mechanistic</a>
+            </li>
+        </ul>
 
-            <button type="button" id="abm_show_abm_btn" class="air_btn btn btn-block mt-2 mb-2 air_disabledbutton" air_disabledbutton>Show</button>
+        <div id="abm_result_panel" class="air_disabledbutton">
+            <div class="tab-content air_tab_content">
+                <div class="tab-pane show active air_sub_tab_pane mb-2" id="abm_result_spatial" role="tabpanel" aria-labelledby="abm_result_spatial-tab">
+                    <input type="text" value="TAG (Simple molecule, Hepatocyte)" list="air_abm_node_list" style="width: 70%" class="textfield mb-2 mt-2" id="air_abm_node_select"/>
+                    <datalist id="air_abm_node_list" style="height:5.1em;overflow:hidden">
+                    </datalist>
 
-            <input type="range" style="width: 100%"  value="1" min="1" max="200" step="1" class="slider air_slider mt-2 mb-2 air_disabledbutton" data="m" id="abm_slider_step">
-            <div class="btn-group mt-2 mb-4" role="group">
-                <button id="abm_btn_play" class="air_btn btn mr-2 air_disabledbutton" style="width:100%">Start</button>
-                <button id="abm_btn_stop" class="air_btn btn air_disabledbutton" style="width:100%">Pause</button>
-            </div>
+                    <button type="button" id="abm_show_abm_btn" class="air_btn btn btn-block mt-2 mb-2" air_disabledbutton>Show</button>
+
+                    <input type="range" style="width: 100%"  value="1" min="1" max="200" step="1" class="slider air_slider mt-2 mb-2 air_disabledbutton" data="m" id="abm_slider_step">
+                    <div class="btn-group mt-2 mb-4" role="group">
+                        <button id="abm_btn_play" class="air_btn btn mr-2 air_disabledbutton" style="width:100%">Start</button>
+                        <button id="abm_btn_stop" class="air_btn btn air_disabledbutton" style="width:100%">Pause</button>
+                    </div>
+                </div>
+                
+                <div class="tab-pane air_sub_tab_pane mb-2" id="abm_result_temporal" role="tabpanel" aria-labelledby="abm_result_temporal-tab">  
+                    <p>Select up to 4 elements to be visualized.</p>          
+                    <input type="text" id="abm_cblist_search" placeholder="Search..." class="form-control">
+                    <div id="abm_graph_cblist" class="air_checkbox_list">
+                    </div>
+                    <div class="row mt-1 mb-1">
+                        <div class="col-auto">
+                            <p id="abm_cblist_txt">0 out of 4 elements selected.</p>
+                        </div>
+                        <div class="col d-flex justify-content-end">
+                            <button id="abm_show_selected" class="btn air_btn_light btn-block mb-2">Show Selected</button>
+                        </div>                   
+                    </div>
+                    <button id="abm_resetchart" class="air_btn_light btn btn-block mb-4">Reset</button>
+                    <div class="row mt-1 mb-1">
+                        <div class="col-auto">
+                            <div class="wrapper">
+                                <button type="button" class="air_btn_info btn btn-secondary"
+                                        data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Normalization"
+                                        data-content="If checked, activity values of all nodes are normalized from 0 to 1.<br/>">
+                                    ?
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="cbcontainer">
+                                <input type="checkbox" class="air_checkbox" id="abm_checkbox_normalize">
+                                <label class="air_checkbox air_checkbox_label" for="abm_checkbox_normalize">Normalize Values?</label>
+                            </div>
+                        </div>                   
+                    </div>
+                    <div class="row mt-1 mb-1">
+                        <div class="col-auto">
+                            <div class="wrapper">
+                                <button type="button" class="air_btn_info btn btn-secondary" data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="" data-content="If checked, elements with boolean states (i.e. either OFF/0 or ON/1) are converted into continuous activity values through moving window aggregation.<br></button>" data-original-title="Aggregation">
+                                    ?
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="cbcontainer">
+                                <input type="checkbox" class="air_checkbox" id="abm_checkbox_aggregate">
+                                <label class="air_checkbox air_checkbox_label" for="abm_checkbox_aggregate">Aggregate Values?</label>
+                            </div>
+                        </div>
+                        <div class="col-auto" style="display: table;">
+                            <span style="padding-right: 3px;display: table-cell;vertical-align:middle;" id="abm_slider_chart_window_text" class="slider-value">1</span>
+                            <input type="range" style="width: 80%;" value="1" min="1" max="200" step="1" class="slider air_slider mt-2 mb-2" data="m" id="abm_slider_chart_window" disabled>
+                        </div>                    
+                    </div>
+                    <canvas id="abm_chart" style="height: 250px;"></canvas>                  
+                </div>           
+                <div class="tab-pane air_sub_tab_pane mb-2" id="abm_result_mechanistic" role="tabpanel" aria-labelledby="abm_result_mechanistic-tab">                 
+                </div>          
+            </div>         
         </div>
+  
 
     `).appendTo(globals.abm.container);
     
@@ -179,8 +267,8 @@ async function AirBM() {
             </div>
         `
     }
-    $("#abm_foodsequence_container").append(generate_food_sequence_item(state = "ON", value = 25))
-    $("#abm_foodsequence_container").append(generate_food_sequence_item(state = "OFF", value = 75))
+    $("#abm_foodsequence_container").append(generate_food_sequence_item(state = "ON", value = 100))
+    $("#abm_foodsequence_container").append(generate_food_sequence_item(state = "OFF", value = 100))
 
     $('#abm_addSequence').click(function () {
         $("#abm_foodsequence_container").append(generate_food_sequence_item())
@@ -196,7 +284,7 @@ async function AirBM() {
         if ($(this).prop('checked') === false) {
             return false;
         }
-    });
+    });    
     $('#abm_single_analysis').change(function () {
         if ($(this).prop('checked') === true) {
             $('#abm_differential_analysis').prop('checked', false)
@@ -204,11 +292,38 @@ async function AirBM() {
             // globals.abm.condition_table.column(4).visible(false);
         }
     });
+    
+    $('#abm_checkbox_aggregate').change(async function () {
+        $("#abm_slider_chart_window").prop('disabled', !$(this).prop('checked'))
+        generateNodeChart()
+    });
+    $('#abm_checkbox_normalize').change(async function () {
+        generateNodeChart()
+    });
+    $('#abm_slider_chart_window').change(async function () {
+        $('#abm_slider_chart_window_text').html($(this).val())
+        generateNodeChart()
+    });
     $('#abm_single_analysis').click(function () {
         if ($(this).prop('checked') === false) {
             return false;
         }
     });
+    $('#abm_show_selected').click(function () {
+    
+        $("#abm_cblist_search").val("")
+        $('#abm_graph_cblist > div').each(function() {
+            // Using jQuery to find the checkbox and label within the current div
+            let $checkbox = $(this).find('input[type="checkbox"]');
+            // Show the div if the checkbox is checked and the label text includes the search term
+            if ($checkbox.is(':checked')) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+    
 
     globals.abm.condition_table = $('#abm_condition_table').DataTable({
         //"scrollX": true,
@@ -242,6 +357,27 @@ async function AirBM() {
         clearTimeout(timeoutId);
         timeoutId = NaN
     })
+
+    document.getElementById('abm_cblist_search').addEventListener('keyup', filterCheckboxList);
+    function filterCheckboxList() {
+        let searchTerm = document.getElementById('abm_cblist_search').value.toLowerCase();
+    
+        // Get all checkbox containers in the checkbox list
+        let checkboxes = document.querySelectorAll('#abm_graph_cblist > div');
+        
+        checkboxes.forEach(function(div) {
+            // Assuming the label text is the second child of the div
+            let label = div.querySelector('label');
+            let text = label.textContent.toLowerCase();
+            
+            // If the label text includes the search term, show the div, else hide it
+            if (text.includes(searchTerm)) {
+                div.style.display = "";
+            } else {
+                div.style.display = "none";
+            }
+        });
+    }
 }
 
 async function next_step() {
@@ -342,9 +478,37 @@ async function initialize_abm() {
         return 0;
       })) {
 
+        $('#abm_graph_cblist').append(`<div><input type="checkbox" class="abm_cblist_cb" data-value="${hash}" id="abm_cblist_cb${$('#abm_graph_cblist input').length + 1}"><label for="$abm_cblist_cb${$('#abm_graph_cblist input').length + 1}"> ${name}</label></div>`)
         $("#air_abm_node_list").append('<option data-value="' + hash + '" value="' + name + '"></option>')
     }
 
+    $('.abm_cblist_cb').on('click', function (e) {
+
+        if($(this).prop('checked') == true)
+        {
+            var free_index = globals.abm.chart_nodes.findIndex(node => node === "")
+            globals.abm.chart_nodes[free_index] = $(this).data('value')
+        }
+        else
+        {
+            var node_index = globals.abm.chart_nodes.findIndex(node => node == $(this).data('value'))
+            globals.abm.chart_nodes[node_index] = ""
+        }
+
+        var selected_checkboxes = $(`.abm_cblist_cb:checked`).length;
+        if (selected_checkboxes >= 4) {
+            $('.abm_cblist_cb:not(:checked)').prop('disabled', true); // Disable unchecked checkboxes
+        } else {
+            $('.abm_cblist_cb').prop('disabled', false); // Enable all checkboxes if max not reached
+        }
+        $("#abm_cblist_txt").html(selected_checkboxes + " out of 4 elements selected.")
+        generateNodeChart()
+    })
+    $('#abm_resetchart').on('click', async function (e) {
+        $('.abm_cblist_cb').prop('disabled', false);
+        $('.abm_cblist_cb').prop('checked', false);
+        generateNodeChart()
+    })
     enablebtn("abm_initializebtn", text);
     $('#abm_runbtn').removeClass("air_disabledbutton")
 }
@@ -374,13 +538,14 @@ async function run_abm() {
 
 
     var text = await disablebutton("abm_runbtn")
-    
+    var steps = parseInt($("#abm_steps").val())
+
     var run_parameters = {
         comparative: $('#abm_differential_analysis').prop('checked'),
         control_parameters: {},        
         interference_parameters: {},
         food_sequence: food_sequence,
-        steps: parseInt($("#abm_steps").val()),
+        steps: steps,
     }
 
     globals.abm.condition_table.rows().every(function () {
@@ -400,9 +565,104 @@ async function run_abm() {
 
     await getDataFromServer("ABM/run", data = JSON.stringify(run_parameters), type = "POST", datatype = "json")
 
+    
+    if(globals.abm.chart)
+    {
+        globals.abm.chart.destroy();
+    }
+
+    var chartData = {
+        labels: [...Array(steps).keys()],
+        datasets: [] 
+    };
+    
+    var chartOptions = {
+        responsive: true,
+        title: {
+            display: true,
+            text: 'Node States'
+        },
+        plugins: {
+          legend: {
+            display: true,
+            // this toggles on / off the confidence intervals
+            labels: {
+              filter: function(item, chart) {
+                return !item.text.includes('_lo') && !item.text.includes('_hi');
+              }
+            },
+           onClick: function(e, legendItem) { // need to hide index -1 and index +1
+              var index = legendItem.datasetIndex;
+              var ci = this.chart;
+              var alreadyHidden = (ci.getDatasetMeta(index).hidden === null) ? false : ci.getDatasetMeta(index).hidden;
+              var meta_lo = ci.getDatasetMeta(index - 1);
+              var meta = ci.getDatasetMeta(index);
+              var meta_hi = ci.getDatasetMeta(index + 1);
+              if (!alreadyHidden) {
+                meta_lo.hidden = true;
+                meta.hidden = true;
+                meta_hi.hidden = true;
+              } else {
+                meta_lo.hidden = null;
+                meta.hidden = null;
+                meta_hi.hidden = null;            
+              }
+    
+              ci.update();
+            },
+            position: "top",
+          },
+          zoom: {
+            // Container for pan options
+            pan: {
+                // Boolean to enable panning
+                enabled: true,
+
+                // Panning directions. Remove the appropriate direction to disable 
+                // Eg. 'y' would only allow panning in the y direction
+                mode: 'xy',
+                rangeMin: {
+                    // Format of min pan range depends on scale type
+                    x: null,
+                    y: null
+                },
+                rangeMax: {
+                    // Format of max pan range depends on scale type
+                    x: null,
+                    y: null
+                },
+
+                // On category scale, factor of pan velocity
+                speed: 20,
+
+                // Minimal pan distance required before actually applying pan
+                threshold: 10,
+
+            },
+
+            // Container for zoom options
+            zoom: {
+                wheel: {
+                    enabled: true,
+                },
+                pinch: {
+                    enabled: true
+                },
+                mode: 'xy',
+            }
+        }   
+        }
+    };
+    
+    globals.abm.chart = new Chart($('#abm_chart').get(0), {
+        type: 'line',
+        data: chartData,
+        options: chartOptions
+    });
+
 
     enablebtn("abm_runbtn", text);
-    $('#abm_show_abm_btn').removeClass("air_disabledbutton")
+    $('#abm_result_panel').removeClass("air_disabledbutton")
 }
 
 async function show_abm() {
@@ -524,4 +784,55 @@ async function highlightabm() {
     //         minervaProxy.project.map.showBioEntity(highlightDefs);
     //     });
     // });
+}
+
+async function generateNodeChart() {
+
+    var datasets = []
+    var steps = 100
+
+    var colors = ["2A7DB7", "FF6D00", "0B910B", "D00506"]
+
+    if(globals.abm.chart_nodes.findIndex(node => node != "") != -1)
+    {
+            
+        results = JSON.parse(await getDataFromServer("ABM/node_pis", data = {
+            "nodes":`${globals.abm.chart_nodes.filter(node => node != "").join(',')}`, 
+            "window_size": $("#abm_checkbox_aggregate").prop("checked")? $("#abm_slider_chart_window").val() : -1, 
+            "normalize": $("#abm_checkbox_normalize").prop("checked")? "1":"0" 
+        }))
+
+        steps = results["steps"]
+        
+        for(var [j,node] of Object.entries(globals.abm.chart_nodes))
+        {
+            if(node)
+            {
+                for (let i = 0; i < 3; i++) {
+                    dataset = {
+                        label: globals.abm.nodes[node] + (i == 0? "_lo" : (i == 2? "_hi" : "")),
+                        backgroundColor: "#" + colors[j] + (i == 1? 'FF' : '88'),
+                        data: results["activities"][node].map(val => val[i]),
+                        borderWidth: 0.1,
+                        fill: i == 2? '-2' : false,
+                        pointRadius: 0.0,
+                    }
+
+                    if(i==1)
+                    {
+                        dataset["borderColor"] = "#00F"
+                    }
+                    else
+                    {
+                        dataset["borderWidth"] = 0.1
+                    }
+
+                    datasets.push(dataset)
+                }
+            }
+        }
+    }
+    
+    globals.abm.chart.data.datasets = datasets
+    globals.abm.chart.update();
 }

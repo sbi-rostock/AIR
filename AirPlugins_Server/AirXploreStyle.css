@@ -127,6 +127,15 @@
   margin-bottom: 3px;
 }
 
+.air_checkbox_list {
+  max-height: 150px; /* Adjust as needed */
+  overflow-y: auto;
+  border: 1px solid #ccc; /* Just for visibility */
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+
 .xp_panel {
   border: none !important; }
 

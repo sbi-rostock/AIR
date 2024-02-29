@@ -295,8 +295,8 @@ function getExportPanel() {
                 selectedMap = parseFloat(selectedMap)
                 for (var e in AIR.Molecules) {
                     var lowername = AIR.Molecules[e].name.toLowerCase();
-                    if (AIR.MapElements.hasOwnProperty(lowername)) {
-                        for (let mapelement of AIR.MapElements[lowername])
+                    if (AIR.name_minerva_mapping.hasOwnProperty(lowername)) {
+                        for (let mapelement of AIR.name_minerva_mapping[lowername])
                             if (selectedMap == mapelement._modelId) {
                                 filteredElementIds.push(e)
                             }
@@ -697,7 +697,7 @@ async function setPeTable() {
         for (let e in globals.xplore.pe_data[globals.xplore.pe_data_index]) {
             var row = tbl.insertRow(tbl.rows.length);
 
-            createCell(row, 'td', getLinkIconHTML(AIR.Molecules[e].name), 'col', '', 'right');
+            createCell(row, 'td', getLinkIconHTML(AIR.Molecules[e].fullname), 'col', '', 'right');
             let cbcell = checkBoxCell(row, 'td', "", e, 'center', "xp_pe_", _checked = globals.xplore.pe_data[globals.xplore.pe_data_index][e].perturbed);
             if (AIR.Molecules[e].submap == false) {
                 cbcell.classList.add("air_disabledbutton");
@@ -1195,18 +1195,14 @@ async function getPhenotypePanel() {
                     globals.xplore.pe_data = globals.xplore.pe_data.slice(0, globals.xplore.pe_data_index + 1);
 
                     let _data = JSON.parse(JSON.stringify(globals.xplore.pe_data[globals.xplore.pe_data_index]));
-                    var tag = globals.xplore.selected[0]._other.structuralState;
-                    if(tag && tag.toLowerCase() == "family")
-                    {
-                        tag = "";
-                    }
-                    let element = globals.xplore.selected[0].name+ (tag? ("_" + tag) : "")
-                    
-                    if (AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim())) {
-                        var m = AIR.ElementNames.name[element.toLowerCase().trim()];
 
-                        if (!_data.hasOwnProperty(m))
-                            _data[m] = {
+                    let minerva_element = globals.xplore.selected[0]
+                    if (AIR.minerva_kg_mapping.hasOwnProperty(minerva_element.id)) {
+                        // var kg_nodes = AIR.minerva_kg_mapping[minerva_element];
+
+                        var node = AIR.minerva_kg_mapping[minerva_element.id]//for(let node of kg_nodes)
+                        if (!_data.hasOwnProperty(node))
+                            _data[node] = {
                                 "value": 0,
                                 "perturbed": false
                             };
@@ -1238,13 +1234,17 @@ async function getPhenotypePanel() {
 
             for (let element of $("#xp_pe_element_input").val().split(',')) {
                 if (AIR.ElementNames.name.hasOwnProperty(element.toLowerCase().trim())) {
-                    var m = AIR.ElementNames.name[element.toLowerCase().trim()];
+                    var kg_nodes = AIR.ElementNames.name[element.toLowerCase().trim()];
 
-                    if (!_data.hasOwnProperty(m))
-                        _data[m] = {
+                    for(let node of kg_nodes)
+                    {
+                        if (!_data.hasOwnProperty(node))
+                        _data[node] = {
                             "value": 0,
                             "perturbed": false
                         };
+                    }
+
                 }
             }
 
