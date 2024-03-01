@@ -2211,7 +2211,7 @@ async function air_createpopup(button, parameter, ylabel = "Influence Score (I)"
                         </ul>
                         <div class="tab-content air_tab_content" style="height: 87%">
                             <div class="tab-pane air_sub_tab_pane show active" style="height: 100%" id="air_popup_tabcontent_dceplot" role="tabpanel" aria-labelledby="air_popup_tab_dceplot">                        
-                                <div style="height: 80%>
+                                <div style="height: 80%">
                                     <canvas class="popup_chart" id="air_popup_dceplot"></canvas>
                                 </div>
                                 <div class="d-flex justify-content-center ml-2 mr-2">
