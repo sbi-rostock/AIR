@@ -237,6 +237,8 @@ function readPhenotypePaths(content) {
         await disablebutton("air_init_btn", progress = true);
         let count = 0
         let maxlength = Object.keys(AIR.Phenotypes).length
+        content = JSON.parse(content)
+
         await updateProgress(count++, maxlength, "air_init_btn", text = " Calculating Shortest Paths");
 
         let paths = content.paths;
@@ -413,7 +415,7 @@ function readDataFiles(_minerva, _filetesting, _project_hash, _chart, _ttest, _j
                                         calculateShortestPaths([], false, true, "air_init_btn").then(r => {
                                             t1 = performance.now()
                                             console.log("Call to calculate SPs took " + (t1 - t0) + " milliseconds.");
-                                            getDataFromServer('InfluenceScores', data = {}, type = "GET", datatype = "json").then(pathcontent => {
+                                            getDataFromServer('PhenotypePaths.json').then(pathcontent => {
                                                 t1 = performance.now()
                                                 console.log("Call to read Moleculestook " + (t1 - t0) + " milliseconds.")
                                                 $("#air_loading_text").parent().after('<button type="button" id="air_init_btn" class="air_btn btn btn-block mt-2"></button>');
