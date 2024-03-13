@@ -42,7 +42,7 @@ async function AirOmics() {
         import_data: {},
         cy: undefined,
         seperator: "\t",
-        absolute,
+        absolute: false,
 
         SamplesWithCalculatedSP: [],
         sc_chart: undefined,
