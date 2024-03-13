@@ -3788,7 +3788,7 @@ function readExpressionValues() {
 
 function normalizeExpressionValues() {
     return new Promise((resolve, reject) => {
-        let typevalue = $('#om_select_normalize').val();
+        let typevalue = 2 // $('#om_select_normalize').val();
 
         let allmax = 0.0;
         let samplemaxvalues = [];

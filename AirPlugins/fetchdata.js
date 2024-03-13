@@ -1362,7 +1362,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
             influencevalues.values[e] = type * (includedpaths / patharray.length + elementsonpaths / regulators.length)
         };
 
-        let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).map(Math.abs));
+        let maxvalue = Math.max.apply(null, Object.values(influencevalues.values).filter(value => Number.isFinite(value)).map(Math.abs));
         Object.keys(influencevalues.values).map(function (key, index) {
             influencevalues.values[key] /= maxvalue;
         });
