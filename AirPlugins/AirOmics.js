@@ -42,6 +42,7 @@ async function AirOmics() {
         import_data: {},
         cy: undefined,
         seperator: "\t",
+        absolute,
 
         SamplesWithCalculatedSP: [],
         sc_chart: undefined,
@@ -2836,6 +2837,8 @@ async function om_PhenotypeSP() {
 
     let kadjustment = $("#om_checkbox_kadjustment").prop("checked")
 
+    globals.omics.absolute = $("#om_checkbox_absolute").prop("checked")
+
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if (isNaN(globals.omics.numberOfRandomSamples) || globals.omics.numberOfRandomSamples < 0) {
         alert("Only positive integer values numbers are allowed. n was set to 1000.")
@@ -2927,6 +2930,11 @@ async function om_PhenotypeSP() {
                 AIR.Phenotypes[phenotype].includedelements[sample].push(element);
                 let SP = correct_SPs[phenotype][element];
 
+                if(globals.omics.absolute)
+                {
+                    SP = Math.abs(SP)
+                    FC = Math.abs(SP)
+                }
 
                 xy = SP * FC;
                 
@@ -3019,6 +3027,10 @@ async function om_PhenotypeSP() {
                     element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
                         xy = correct_SPs[phenotype][element] * FC_values[i]
+                        if(globals.omics.absolute)
+                        {
+                            xy = Math.abs(xy)
+                        }
                         _en_score += xy;
                         xxsum += xy * xy
                         xysum += xy * Math.abs(xy) 
@@ -3844,6 +3856,10 @@ function normalizeExpressionValues() {
 function om_normalizePhenotypeValues() {
     return new Promise((resolve, reject) => {
         let typevalue = $('#om_select_normalize').val();
+        if(!typevalue)
+        {
+            typevalue = 1
+        }
         let force_norm = false
         if ($("#om_cb_norm_low_pheno").length)
         {
@@ -6312,8 +6328,8 @@ async function om_getphenotypeValues(param)
             pvalue =  globals.omics.ExpressionValues[element].pvalues[param.sample]
         }
         DCEs[element] = {
-            "SP": SP,
-            "FC": FC,
+            "SP": globals.omics.absolute? Math.abs(SP) : SP,
+            "FC": globals.omics.absolute? Math.abs(FC) : FC,
             "pvalue": pvalue,
         }
     }
