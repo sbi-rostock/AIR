@@ -516,7 +516,7 @@ async function createDifferentialAnalysisPanel() {
                         <div class="wrapper">
                             <button type="button" class="air_btn_info btn btn-secondary"
                                     data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Absolute values"
-                                    data-content="If checked, the absolute value of fold change will be considered for the phenotype assessement.<br/>">
+                                    data-content="If checked, the absolute values of fold changes and topology scores will be considered for the phenotype assessement.<br/>">
                                 ?
                             </button>
                         </div>
@@ -525,6 +525,24 @@ async function createDifferentialAnalysisPanel() {
                         <div class="cbcontainer">
                             <input type="checkbox" class="air_checkbox" id="om_checkbox_absolute">
                             <label class="air_checkbox" for="om_checkbox_absolute">Absolute effect?</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-1 mb-1">
+                    <div class="col-auto">
+                        <div class="wrapper">
+                            <button type="button" class="air_btn_info btn btn-secondary"
+                                    data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Absolute values"
+                                    data-content="If checked, the absolute values of topology scores will be considered for the phenotype assessement.<br/>">
+                                ?
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="cbcontainer">
+                            <input type="checkbox" class="air_checkbox" id="om_checkbox_undirected">
+                            <label class="air_checkbox" for="om_checkbox_undirected">Undirected effect?</label>
                         </div>
                     </div>
                 </div>
@@ -635,6 +653,16 @@ async function createDifferentialAnalysisPanel() {
                 alert("Settings could not be adjusted to achieve optimal results. Your data may have to few signifcant elements or the elements are not included in the AIR. However, you can still perform the analysis. Please check the settings manually beforehand.");
             enablebtn("om_pheno_optimize", text)
         });
+    });
+    $('#om_checkbox_undirected').on('input', function (e) {
+        if ($(this).prop('checked') == true) {
+            $('#om_checkbox_absolute').prop('checked', false);
+        }
+    });
+    $('#om_checkbox_absolute').on('input', function (e) {
+        if ($(this).prop('checked') == true) {
+            $('#om_checkbox_undirected').prop('checked', false);
+        }
     });
 
     $('#om_ithreshold_slider').on('input', function (e) {
@@ -2837,7 +2865,7 @@ async function om_PhenotypeSP() {
 
     let kadjustment = $("#om_checkbox_kadjustment").prop("checked")
 
-    globals.omics.absolute = $("#om_checkbox_absolute").prop("checked")
+    globals.omics.absolute = $("#om_checkbox_absolute").prop("checked")? "absolute" : ($("#om_checkbox_undirected").prop("checked")? "undirected" : false)
 
     globals.omics.numberOfRandomSamples = parseFloat($("#om_pheno_randomsampleNumber").val().replace(',', '.'))
     if (isNaN(globals.omics.numberOfRandomSamples) || globals.omics.numberOfRandomSamples < 0) {
@@ -2933,7 +2961,11 @@ async function om_PhenotypeSP() {
                 if(globals.omics.absolute)
                 {
                     SP = Math.abs(SP)
-                    FC = Math.abs(SP)
+
+                    if(globals.omics.absolute == "undirected")
+                    {
+                        FC = Math.abs(FC)
+                    }
                 }
 
                 xy = SP * FC;
@@ -3026,11 +3058,21 @@ async function om_PhenotypeSP() {
                 for (let i in FC_values) {
                     element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
-                        xy = correct_SPs[phenotype][element] * FC_values[i]
-                        if(globals.omics.absolute)
+
+                        if(globals.omics.absolute == "undirected")
                         {
-                            xy = Math.abs(xy)
+                            xy = Math.abs(correct_SPs[phenotype][element]) * FC_values[i]
                         }
+                        else
+                        {
+                            if(globals.omics.absolute == "absolute")
+                            {
+                                xy = Math.abs(xy)
+                            }
+                        }
+
+
+
                         _en_score += xy;
                         xxsum += xy * xy
                         xysum += xy * Math.abs(xy) 
@@ -6329,7 +6371,7 @@ async function om_getphenotypeValues(param)
         }
         DCEs[element] = {
             "SP": globals.omics.absolute? Math.abs(SP) : SP,
-            "FC": globals.omics.absolute? Math.abs(FC) : FC,
+            "FC": globals.omics.absolute == "absolute"? Math.abs(FC) : FC,
             "pvalue": pvalue,
         }
     }
