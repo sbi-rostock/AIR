@@ -2962,7 +2962,7 @@ async function om_PhenotypeSP() {
                 {
                     SP = Math.abs(SP)
 
-                    if(globals.omics.absolute == "undirected")
+                    if(globals.omics.absolute == "absolute")
                     {
                         FC = Math.abs(FC)
                     }
@@ -3028,7 +3028,7 @@ async function om_PhenotypeSP() {
     let elementarray_proteins = Object.keys(AIR.Molecules).filter(m => ["PROTEIN", "RNA"].includes(AIR.Molecules[m].type))
     let elementarray_metabolite = Object.keys(AIR.Molecules).filter(m => AIR.Molecules[m].type == "SIMPLE_MOLECULE")
 
-    var FC_values, shuffled_arrays, shuffled_array, score, en_score, random_scores, random_en_scores, _en_score, shuffled_elements, element, maxxx
+    var FC_values, shuffled_arrays, shuffled_array, score, en_score, random_scores, random_en_scores, _en_score, shuffled_elements, element, maxxx, SP, FC
 
     for (let sample in globals.omics.samples) {
 
@@ -3059,19 +3059,20 @@ async function om_PhenotypeSP() {
                     element = shuffled_elements[i];
                     if (correct_SPs[phenotype].hasOwnProperty(element)) {
 
-                        if(globals.omics.absolute == "undirected")
+                        SP = correct_SPs[phenotype][element];
+                        FC = FC_values[i]
+
+                        if(globals.omics.absolute)
                         {
-                            xy = Math.abs(correct_SPs[phenotype][element]) * FC_values[i]
-                        }
-                        else
-                        {
+                            SP = Math.abs(SP)
+        
                             if(globals.omics.absolute == "absolute")
                             {
-                                xy = Math.abs(xy)
+                                FC = Math.abs(FC)
                             }
                         }
-
-
+        
+                        xy = SP * FC;
 
                         _en_score += xy;
                         xxsum += xy * xy
