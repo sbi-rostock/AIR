@@ -97,7 +97,9 @@ async function AirGenvar(){
         <table class="stripe" style="width:100%" id="gv_table" cellspacing=0>
         </table>
 
-        <button type="button" id="gv_selectmapelements" class="air_btn btn btn-block mt-4 mb-2">Select all map elements</button>
+        <button id="gv_btn_download_data" class="om_btn_download btn mt-4 mb-2" style="width:100%"> <i class="fa fa-download"></i> Download Mapped Data</button>
+
+        <button type="button" id="gv_selectmapelements" class="air_btn btn btn-block mt-2 mb-2">Select all map elements</button>
 
         <button type="button" id="gv_reset" class="air_btn btn btn-block mt-2 mb-4">Reset</button>
 
@@ -199,6 +201,61 @@ async function AirGenvar(){
         }
 
         air_download("AirVariant_Results.txt", resultsFull_text)
+
+    });
+
+    $('#gv_btn_download_data').on('click', function() {
+        
+        var zip = new JSZip();
+
+        for(var sample in globals.variant.samples)
+        {
+            var resultsFull_text = [
+                "gene", 
+                "in submap",
+                "chromosome",
+                "start",
+                "end",
+                "reference",
+                "type",
+                "position",
+                "ref",
+                "alt"
+            ].join("\t");
+
+            for(var m in globals.variant.gv_results[sample])
+            {
+
+                for(var t in globals.variant.gv_results[sample][m])
+                {
+                    var transcript = globals.variant.transcripts[t]
+                    for(var v in globals.variant.gv_results[sample][m][t])
+                    {
+                        var variant = globals.variant.variants[v]
+
+                        resultsFull_text += "\n" + [
+                            AIR.Molecules[m].name,
+                            AIR.Molecules[m].submap,
+                            transcript.c,
+                            transcript.s,
+                            transcript.e,
+                            transcript.r,
+                            transcript.t,
+                            variant["POS"],
+                            variant["REF"],
+                            variant["ALT"],
+                        ].join("\t")
+                    }
+                }
+            }
+            
+            zip.file(globals.variant.samples[sample] + ".txt", resultsFull_text);
+        }
+        
+        zip.generateAsync({ type: "blob" })
+            .then(function (content) {
+                FileSaver.saveAs(content, "Mapped_Variants.zip");
+            });
 
     });
 
