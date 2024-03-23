@@ -376,7 +376,7 @@ async function AirGenvar(){
                 _text = _text.substr(0, _text.lastIndexOf("\n"));
             }
             offset += _text.length; // callback for handling read chunk
-            _text.split('\n').forEach(async function(line) {
+            for(var line of _text.split('\n')) {
 
                 if(line == "")
                 {
@@ -395,7 +395,7 @@ async function AirGenvar(){
                     
                     await readvcfline(line);
                 }
-            })
+            }
             
             if (offset >= fileSize) {
                 console.log("Done reading file");
@@ -458,10 +458,10 @@ async function AirGenvar(){
                 else
                 {
                     globals.variant.variants.push(variant);
-                    variantid = globals.variant.variants.indexOf(variant);
+                    variantid = globals.variant.variants.length - 1;
                     globals.variant.variants_temp[variantstring] = variantid
                 }
-                results.forEach(function(transcriptid) {
+                for(var transcriptid of results) {
                     if(transcriptid == null)
                         return;
                     
@@ -483,7 +483,7 @@ async function AirGenvar(){
 
                     globals.variant.gv_results[number][molecule][transcriptid].push(variantid);
 
-                });
+                };
             }
         }     
         
@@ -1199,16 +1199,16 @@ async function getTranscripts(chr, position)
         
         ].forEach(current_dicts =>
             {
-                current_dicts.forEach(current_dict => 
+                for(var current_dict of current_dicts)
                 {
-                    Object.keys(current_dict).map(Number).filter(function(start) { return start <= position; }).forEach(s_pos =>
+                    for(var s_pos of Object.keys(current_dict).map(Number).filter(function(start) { return start <= position; }))
                     {
-                        Object.keys(current_dict[s_pos]).map(Number).filter(function(end) { return end >= position; }).forEach(e_pos =>
+                        for(var e_pos of Object.keys(current_dict[s_pos]).map(Number).filter(function(end) { return end >= position; }))
                         {
                             current_dict[s_pos][e_pos].forEach(_id => results.add(_id))
-                        });
-                    });
-                });
+                        };
+                    };
+                };
             });
 
         resolve(Array.from(results))
