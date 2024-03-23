@@ -482,17 +482,23 @@ async function initialize_abm() {
         $("#air_abm_node_list").append('<option data-value="' + hash + '" value="' + name + '"></option>')
     }
 
-    $('.abm_cblist_cb').on('click', function (e) {
+    $('.abm_cblist_cb').on('change', function (e) {
 
         if($(this).prop('checked') == true)
         {
             var free_index = globals.abm.chart_nodes.findIndex(node => node === "")
-            globals.abm.chart_nodes[free_index] = $(this).data('value')
+            if(free_index != -1)
+            {
+                globals.abm.chart_nodes[free_index] = $(this).data('value')
+            }
         }
         else
         {
             var node_index = globals.abm.chart_nodes.findIndex(node => node == $(this).data('value'))
-            globals.abm.chart_nodes[node_index] = ""
+            if(node_index != -1)
+            {
+                globals.abm.chart_nodes[node_index] = ""
+            }
         }
 
         var selected_checkboxes = $(`.abm_cblist_cb:checked`).length;
