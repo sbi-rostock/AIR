@@ -482,7 +482,9 @@ async function initialize_abm() {
         $("#air_abm_node_list").append('<option data-value="' + hash + '" value="' + name + '"></option>')
     }
 
-    $('.abm_cblist_cb').on('change', function (e) {
+    $('.abm_cblist_cb').on('change', async function (e) {
+        
+        $('#abm_result_panel').addClass("air_disabledbutton")
 
         if($(this).prop('checked') == true)
         {
@@ -508,13 +510,21 @@ async function initialize_abm() {
             $('.abm_cblist_cb').prop('disabled', false); // Enable all checkboxes if max not reached
         }
         $("#abm_cblist_txt").html(selected_checkboxes + " out of 4 elements selected.")
-        generateNodeChart()
+        
+        await generateNodeChart()
+        
+        $('#abm_result_panel').removeClass("air_disabledbutton")
     })
+
     $('#abm_resetchart').on('click', async function (e) {
+        $('#abm_result_panel').addClass("air_disabledbutton")
         $('.abm_cblist_cb').prop('disabled', false);
         $('.abm_cblist_cb').prop('checked', false);
-        generateNodeChart()
+        globals.abm.chart_nodes = globals.abm.chart_nodes.map(() => "");
+        await generateNodeChart()
+        $('#abm_result_panel').removeClass("air_disabledbutton")
     })
+
     enablebtn("abm_initializebtn", text);
     $('#abm_runbtn').removeClass("air_disabledbutton")
 }
