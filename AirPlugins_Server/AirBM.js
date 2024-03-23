@@ -521,6 +521,7 @@ async function initialize_abm() {
         $('.abm_cblist_cb').prop('disabled', false);
         $('.abm_cblist_cb').prop('checked', false);
         globals.abm.chart_nodes = globals.abm.chart_nodes.map(() => "");
+        $("#abm_cblist_txt").html("0 out of 4 elements selected.")
         await generateNodeChart()
         $('#abm_result_panel').removeClass("air_disabledbutton")
     })
@@ -597,6 +598,17 @@ async function run_abm() {
         title: {
             display: true,
             text: 'Node States'
+        },
+        scales: {
+            x: {
+                // Assuming 'x' is your scale identifier; could be different based on your chart configuration
+                type: 'linear', // or 'time' if your x-axis is date/time based
+                // Ensure automatic scaling by not setting fixed min and max
+            },
+            y: {
+                // Similar setup for the y-axis
+                type: 'linear', // Adjust based on your data type
+            }
         },
         plugins: {
           legend: {
