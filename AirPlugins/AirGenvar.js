@@ -63,8 +63,8 @@ async function AirGenvar(){
             </div>
             <div class="col">
                 <select id="gv_genomeselect" class="browser-default om_select custom-select">
-                    <option value="hg19" selected>hg19</option>
-                    <option value="hg38">hg38</option>
+                    <option value="hg19">hg19</option>
+                    <option value="hg38" selected>hg38</option>
                 </select>
             </div>
         </div>
@@ -229,7 +229,7 @@ async function AirGenvar(){
                 for(var t in globals.variant.gv_results[sample][m])
                 {
                     var transcript = globals.variant.transcripts[t]
-                    for(var v in globals.variant.gv_results[sample][m][t])
+                    for(var v of globals.variant.gv_results[sample][m][t])
                     {
                         var variant = globals.variant.variants[v]
 
@@ -380,7 +380,7 @@ async function AirGenvar(){
 
                 if(line == "")
                 {
-                    return;
+                    continue;
                 }
                 if(line.startsWith("#"))
                 {
@@ -482,7 +482,6 @@ async function AirGenvar(){
                     }
 
                     globals.variant.gv_results[number][molecule][transcriptid].push(variantid);
-
                 };
             }
         }     
@@ -1187,29 +1186,28 @@ async function getTranscripts(chr, position)
         if(!globals.variant.index_db.hasOwnProperty(chr))
             resolve([]);
 
-
         var results = new Set();
 
-        [
+        for(var current_dicts of [
             getRangeDictionaries(globals.variant.index_db[chr].largest, 1),
             getRangeDictionaries(globals.variant.index_db[chr].large, 2),
             getRangeDictionaries(globals.variant.index_db[chr].long, 3),
             getRangeDictionaries(globals.variant.index_db[chr].middle, 4),
             getRangeDictionaries(globals.variant.index_db[chr].short, 5)
         
-        ].forEach(current_dicts =>
+        ])
+        {
+            for(var current_dict of current_dicts)
             {
-                for(var current_dict of current_dicts)
+                for(var s_pos of Object.keys(current_dict).map(Number).filter(function(start) { return start <= position; }))
                 {
-                    for(var s_pos of Object.keys(current_dict).map(Number).filter(function(start) { return start <= position; }))
+                    for(var e_pos of Object.keys(current_dict[s_pos]).map(Number).filter(function(end) { return end >= position; }))
                     {
-                        for(var e_pos of Object.keys(current_dict[s_pos]).map(Number).filter(function(end) { return end >= position; }))
-                        {
-                            current_dict[s_pos][e_pos].forEach(_id => results.add(_id))
-                        };
+                        current_dict[s_pos][e_pos].forEach(_id => results.add(_id))
                     };
                 };
-            });
+            };
+        };
 
         resolve(Array.from(results))
 
@@ -1220,7 +1218,7 @@ async function getTranscripts(chr, position)
             var _array = undefined;    
             for (var i = 1; i <= iterations; i++) {
                 var new_dicts = []
-                current_dicts.forEach(current_dict => 
+                for(var current_dict of current_dicts) 
                 {
                     _array = Object.keys(current_dict).map(Number).filter(function(x) { return x <= position; }).sort(function(a, b){return a-b});
                     if(_array.length > 0)
@@ -1233,7 +1231,7 @@ async function getTranscripts(chr, position)
                         if(_array.length >= 2 && (laststep + Math.pow(10, 8 - iterations) > position))
                             new_dicts.push(current_dict[_array[_array.length - 2]])
                     } 
-                });
+                };
                 current_dicts = new_dicts;
             }
             if(breakflag)
@@ -1303,7 +1301,7 @@ function gv_create_table_popup(button, parameters) {
 
             var vstring = []
             {
-                for(var v in globals.variant.gv_results[sample][m][t])
+                for(var v of globals.variant.gv_results[sample][m][t])
                 {    
                     var variant = globals.variant.variants[v];
                     vstring.push('<li class="list-group-item d-flex justify-content-between align-items-center">' + variant["POS"] + ": " + variant["REF"] + ' <i class="fas fa-arrow-right"></i> ' + variant["ALT"] + "</li>");
