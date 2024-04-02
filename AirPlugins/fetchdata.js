@@ -1350,7 +1350,18 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
                 if (mod_path_length > 0)
                 {
                     catalyzedpaths = Object.filter(catalyzedpaths, p => AIR.Modifiers[e].some(m => p.startsWith(m + "_")))
-                    type = Math.min(...Object.values(catalyzedpaths))
+
+                    var mod_minlength = Math.min(...Object.keys(catalyzedpaths).map(p => p.split("_").length));
+
+                    if(mod_minlength <= minlength)
+                    {
+                        var modtype = Math.min(...Object.values(Object.filter(catalyzedpaths, p => p.split("_").length == mod_minlength)))
+
+                        if(type == -1 && modtype == 1)
+                        {
+                            type = modtype
+                        }
+                    }
                 }
 
                 includedpaths += mod_path_length;
