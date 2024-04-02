@@ -1357,10 +1357,7 @@ async function getPerturbedInfluences(phenotype, perturbedElements, force = fals
                     {
                         var modtype = Math.min(...Object.values(Object.filter(catalyzedpaths, p => p.split("_").length == mod_minlength)))
 
-                        if(type == -1 && modtype == 1)
-                        {
-                            type = modtype
-                        }
+                        type = modtype
                     }
                 }
 
