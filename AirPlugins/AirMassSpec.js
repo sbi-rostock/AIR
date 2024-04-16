@@ -53,18 +53,21 @@ async function AirMassSpec() {
             <img src="https://www.sbi.uni-rostock.de/files/Projects/AIR/AIR3D_croped.png" class="img-fluid" width="100%">
         </div>*/
         /*html*/`                            
+
+
+
         <div class="row mb-2 mt-4">
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary ml-1"
-                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="File Specifications"
-                            data-content="CSV mass spec data file.">
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Reference Peak File"
+                            data-content="File containing reference peak data in a tab-separated tabular format. An example file can be found <a href="https://github.com/sbi-rostock/AIR/blob/master/AirPlugins/Metabolite_meta.txt" target="_blank">here</a>">
                         ?
                     </button>
                 </div>
             </div>
             <div class="col">
-                <input id="ms_inputId" type="file" class="ms_inputfile inputfile" />
+                <input id="ms_input_meta" type="file" class="ms_inputfile inputfile" />
             </div>
         </div>
         <div id="ms_mzSelect-container" class="row mb-2 mt-2">
@@ -482,7 +485,7 @@ async function AirMassSpec() {
         globals.massspec.data_chart.update();
     });
 
-    $('.air_btn_info[data-toggle="popover"]').popover()
+    $('.air_btn_info[data-toggle="popover"]').popover({html:true})
     $('a[data-toggle="popover"]').popover()
 
     $('#ms_checkbox_zaxis').on('change', async function () {
@@ -864,6 +867,11 @@ async function ms_loadfile() {
         }
 
         var fileReader = new FileReader();
+        try {
+            fileReader.readAsText(fileToLoad, "UTF-8");
+        } catch (error) {
+            resolve(false)
+        }
         fileReader.onload = function (fileLoadedEvent) {
 
             var textFromFileLoaded = fileLoadedEvent.target.result;
@@ -1526,7 +1534,34 @@ async function updateMetaboliteTable() {
 
 async function initializeData() {
     return new Promise((resolve, reject) => {
-        getFiles('Metabolite_meta.txt').then(async function (output) {
+        
+        if (_result == false) {
+            reject("Could not fetch metadata. Please try again or contact the admin.")
+        }
+
+        globals.massspec.raw_values = [];
+
+        var resolvemessage = "";
+        var fileToLoad = document.getElementById("ms_input_meta").files[0];
+
+        if (!fileToLoad) {
+            reject('No file selected.');
+        }
+
+        var fileReader = new FileReader();
+        try {
+            fileReader.readAsText(fileToLoad, "UTF-8");
+        } catch (error) {
+            resolve(false)
+        }
+        fileReader.onload = function (fileLoadedEvent) {
+
+            var output = fileLoadedEvent.target.result;
+            if (output.trim() == "") {
+                reject('The file appears to be empty.');
+            }
+            var firstline = true;
+
             globals.massspec.metadata = {}
             let lines = output.split('\n');
             for (let line of lines) {
@@ -1570,8 +1605,7 @@ async function initializeData() {
             }
 
             resolve(true)
-
-        });
+        };
     });
 }
 
