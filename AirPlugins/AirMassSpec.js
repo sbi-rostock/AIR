@@ -59,7 +59,7 @@ async function AirMassSpec() {
         <div class="row mb-2 mt-4">
             <div class="col-auto">
                 <div class="wrapper">
-                    <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                    <button type="button" id="air_btn_info_html" class="air_btn_info btn btn-secondary ml-1"
                             data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Reference Peak File"
                             data-content="File containing reference peak data in a tab-separated tabular format. An example file can be found <a href='https://github.com/sbi-rostock/AIR/blob/master/AirPlugins/Metabolite_meta.txt' target='_blank'>here</a>">
                         ?
@@ -68,6 +68,20 @@ async function AirMassSpec() {
             </div>
             <div class="col">
                 <input id="ms_input_meta" type="file" class="ms_inputfile inputfile" />
+            </div>
+        </div>
+        <div class="row mb-2 mt-4">
+            <div class="col-auto">
+                <div class="wrapper">
+                    <button type="button" class="air_btn_info btn btn-secondary ml-1"
+                            data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="File Specifications"
+                            data-content="CSV mass spec data file.">
+                        ?
+                    </button>
+                </div>
+            </div>
+            <div class="col">
+                <input id="ms_inputId" type="file" class="ms_inputfile inputfile" />
             </div>
         </div>
         <div id="ms_mzSelect-container" class="row mb-2 mt-2">
@@ -486,6 +500,13 @@ async function AirMassSpec() {
     });
 
     $('.air_btn_info[data-toggle="popover"]').popover({html:true})
+
+    $('#air_btn_info_html[data-toggle="popover"]').popover({
+        html:true,
+        container: "#air_btn_info_html"
+    })
+
+
     $('a[data-toggle="popover"]').popover()
 
     $('#ms_checkbox_zaxis').on('change', async function () {
