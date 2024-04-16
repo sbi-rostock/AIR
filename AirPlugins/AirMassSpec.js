@@ -56,7 +56,8 @@ async function AirMassSpec() {
 
 
 
-        <div class="row mb-2 mt-4">
+        <h5 class="mt-4">Reference File:</h5>
+        <div class="row mb-4 mt-1">
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" id="air_btn_info_html" class="air_btn_info btn btn-secondary ml-1"
@@ -70,7 +71,9 @@ async function AirMassSpec() {
                 <input id="ms_input_meta" type="file" class="ms_inputfile inputfile" />
             </div>
         </div>
-        <div class="row mb-2 mt-4">
+
+        <h5 class="mt-4">Data File:</h5>
+        <div class="row mb-4 mt-1">
             <div class="col-auto">
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary ml-1"
