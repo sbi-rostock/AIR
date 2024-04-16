@@ -877,7 +877,7 @@ async function ms_loadfile() {
     return new Promise((resolve, reject) => {
 
         if (_result == false) {
-            reject("Could not fetch metadata. Please try again or contact the admin.")
+            reject("Could not read the reference data. Please check the file and try again.")
         }
 
         globals.massspec.raw_values = [];
@@ -1557,10 +1557,6 @@ async function updateMetaboliteTable() {
 
 async function initializeData() {
     return new Promise((resolve, reject) => {
-        
-        if (_result == false) {
-            reject("Could not fetch metadata. Please try again or contact the admin.")
-        }
 
         globals.massspec.raw_values = [];
 
@@ -1568,7 +1564,7 @@ async function initializeData() {
         var fileToLoad = document.getElementById("ms_input_meta").files[0];
 
         if (!fileToLoad) {
-            reject('No file selected.');
+            reject(false);
         }
 
         var fileReader = new FileReader();
