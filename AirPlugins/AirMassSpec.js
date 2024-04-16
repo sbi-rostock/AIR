@@ -739,8 +739,6 @@ async function AirMassSpec() {
     async function ms_detectFile(force_seperator) {
         return new Promise((resolve, reject) => {
 
-            FileReader.close()
-
             if (document.getElementById("ms_inputId").files.length == 0) {
                 $("#ms_ccsSelect").addClass("air_disabledbutton");
                 $("#ms_retentionSelect").addClass("air_disabledbutton");
@@ -878,8 +876,6 @@ async function ms_loadfile() {
     }
     return new Promise((resolve, reject) => {
 
-        FileReader.close()
-
         if (_result == false) {
             reject("Could not read the reference data. Please check the file and try again.")
         }
@@ -890,6 +886,7 @@ async function ms_loadfile() {
         var fileToLoad = document.getElementById("ms_inputId").files[0];
 
         if (!fileToLoad) {
+
             reject('No file selected.');
         }
 
@@ -1016,7 +1013,6 @@ async function ms_loadfile() {
         };
 
         // fileReader.readAsText(fileToLoad, "UTF-8");
-
 
     });
 
@@ -1561,8 +1557,6 @@ async function updateMetaboliteTable() {
 
 async function initializeData() {
     return new Promise((resolve, reject) => {
-
-        FileReader.close()
 
         globals.massspec.raw_values = [];
 
