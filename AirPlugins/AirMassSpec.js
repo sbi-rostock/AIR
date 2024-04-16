@@ -61,7 +61,7 @@ async function AirMassSpec() {
                 <div class="wrapper">
                     <button type="button" class="air_btn_info btn btn-secondary ml-1"
                             data-html="true" data-trigger="hover" data-toggle="popover" data-placement="top" title="Reference Peak File"
-                            data-content="File containing reference peak data in a tab-separated tabular format. An example file can be found <a href="https://github.com/sbi-rostock/AIR/blob/master/AirPlugins/Metabolite_meta.txt" target="_blank">here</a>">
+                            data-content="File containing reference peak data in a tab-separated tabular format. An example file can be found <a href='https://github.com/sbi-rostock/AIR/blob/master/AirPlugins/Metabolite_meta.txt' target='_blank'>here</a>">
                         ?
                     </button>
                 </div>
