@@ -499,13 +499,12 @@ async function AirMassSpec() {
         globals.massspec.data_chart.update();
     });
 
-    $('.air_btn_info[data-toggle="popover"]').popover({html:true})
-
     $('#air_btn_info_html[data-toggle="popover"]').popover({
         html:true,
         container: "#air_btn_info_html"
     })
 
+    $('.air_btn_info[data-toggle="popover"]').popover({html:true})
 
     $('a[data-toggle="popover"]').popover()
 
