@@ -45,6 +45,7 @@ let pluginContainer;
 let pluginContainerId;
 let minervaVersion;
 let session_token;
+let project_hash;
 
 const register = function (_minerva) {
   console.log('registering ' + pluginName + ' plugin');
