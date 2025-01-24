@@ -216,7 +216,7 @@ async function initMainPageStructure() {
         },
         data: JSON.stringify(project_hash),
         dataType: 'json',
-        url: SBI_SERVER + 'initialize_minerva',
+        url: SBI_SERVER + 'initialize_session',
         success: function (data) {
           session_token = data["hash"];
           console.log(session_token);
