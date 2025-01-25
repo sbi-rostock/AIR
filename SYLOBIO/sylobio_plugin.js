@@ -156,7 +156,7 @@ async function initMainPageStructure() {
   let js_files = ["server_handler.js", "fairdom_ui.js"];
   let css_files = ["AirOmicsStyle.css", "AirXploreStyle.css"];
   let filepath = filetesting ? localURL : URL_PLUGINFILES;
-  let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css"];
+  let scripts = ["https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"];
   var CssFiles = Array.from(css_files, x => filepath + x);
   var ScriptPaths = Array.from(js_files, x => filepath + x);
   CssFiles.forEach(s => {
@@ -167,6 +167,15 @@ async function initMainPageStructure() {
     }).appendTo("head");
   });
 
+  try {
+    $("<link/>", {
+      rel: "stylesheet",
+      type: "text/css",
+      href: "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css"
+    }).appendTo("head");
+  } catch (err) {
+    console.log(error);
+  }
   try {
     $("<link/>", {
       rel: "stylesheet",
