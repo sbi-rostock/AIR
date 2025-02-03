@@ -163,7 +163,8 @@ async function initMainPageStructure() {
     $("<link/>", {
       rel: "stylesheet",
       type: "text/css",
-      href: s
+      // Append a timestamp as a cache-busting parameter
+      href: s + "?v=" + new Date().getTime()
     }).appendTo("head");
   });
 
