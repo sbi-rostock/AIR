@@ -2,7 +2,6 @@
 var css = "/*# sourceMappingURL=styles.css.map */\n"; (require("browserify-css").createStyle(css, { "href": "SYLOBIO\\__tmp_minerva_plugin\\css\\styles.css" }, { "insertAt": "bottom" })); module.exports = css;
 },{"browserify-css":5}],2:[function(require,module,exports){
 require('../css/styles.css');
-const $ = require('jquery');
 const PARAMS = new URLSearchParams(window.location.search);
 const TESTING = PARAMS.has('testing') ? PARAMS.get('testing') === '1' || PARAMS.get('testing').toLowerCase() === 'true' : false;
 const JS_FILE_NAMES = ["server_handler.js", "fairdom_ui.js"];
@@ -22,9 +21,11 @@ window.air_plugin = {
   ttest: require('ttest'),
   cytoscape: require('cytoscape'),
   fcose: require('cytoscape-fcose'),
-  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/'
+  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/',
+  $: require('jquery')
 };
 window.air_plugin.cytoscape.use(window.air_plugin.fcose);
+const $ = window.air_plugin.$;
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
 const createStructure = () => {
   let container = $('<div id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
