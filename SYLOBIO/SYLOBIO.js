@@ -22,7 +22,7 @@ window.air_plugin = {
   ttest: require('ttest'),
   cytoscape: require('cytoscape'),
   fcose: require('cytoscape-fcose'),
-  SBI_SERVER: filetesting ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/'
+  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/'
 };
 window.air_plugin.cytoscape.use(window.MyAppLibs.fcose);
 const project_hash = [window.location.origin, window.minerva.ServerConnector._sessionData._project._projectId, window.minerva.ServerConnector._sessionData._project._creationDate];
@@ -51,7 +51,7 @@ function initPlugin() {
       removeAllListeners
     }
   } = minerva.plugins.registerPlugin({
-    pluginName: filetesting ? 'SYLOBIO Test' : 'SYLOBIO',
+    pluginName: TESTING ? 'SYLOBIO Test' : 'SYLOBIO',
     pluginVersion: '1.0.0',
     pluginUrl: 'https://example.com/plugins/plugin.js'
   });
