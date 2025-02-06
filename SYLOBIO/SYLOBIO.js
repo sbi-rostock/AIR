@@ -27,7 +27,7 @@ window.air_plugin = {
 window.air_plugin.cytoscape.use(window.air_plugin.fcose);
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId(), window.minerva.project.data.getVersion()];
 const createStructure = () => {
-  let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
+  let container = $('<div id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
   $("#air_plugincontainer").parents(".tab-pane").css({
     "overflow": "hidden"
   });
