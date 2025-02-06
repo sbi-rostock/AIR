@@ -4,7 +4,7 @@ var css = "/*# sourceMappingURL=styles.css.map */\n"; (require("browserify-css")
 require('../css/styles.css');
 const $ = require('jquery');
 const PARAMS = new URLSearchParams(window.location.search);
-const TESTING = params.has('testing') ? params.get('testing') === '1' || params.get('testing').toLowerCase() === 'true' : false;
+const TESTING = PARAMS.has('testing') ? PARAMS.get('testing') === '1' || PARAMS.get('testing').toLowerCase() === 'true' : false;
 const JS_FILE_NAMES = ["server_handler.js", "fairdom_ui.js"];
 const CSS_FILE_NAMES = ["AirOmicsStyle.css", "AirXploreStyle.css"];
 const JS_FOLDER_PATH = TESTING ? "http://localhost:3000/SYLOBIO/" : "https://raw.githack.com/sbi-rostock/AIR/master/SYLOBIO/";
