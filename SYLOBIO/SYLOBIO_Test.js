@@ -54,7 +54,7 @@ function initPlugin() {
   } = minerva.plugins.registerPlugin({
     pluginName: TESTING ? 'SYLOBIO Test' : 'SYLOBIO',
     pluginVersion: '1.0.0',
-    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO.js'
+    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO_Test.js'
   });
   window.air_plugin.pluginContainer = element;
   createStructure();
