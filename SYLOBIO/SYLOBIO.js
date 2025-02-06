@@ -25,7 +25,7 @@ window.air_plugin = {
   SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/'
 };
 window.air_plugin.cytoscape.use(window.air_plugin.fcose);
-const project_hash = [window.location.origin, window.minerva.ServerConnector._sessionData._project._projectId, window.minerva.ServerConnector._sessionData._project._creationDate];
+const project_hash = [window.location.origin, window.minerva.project.data.getProjectId(), window.minerva.project.data.getVersion()];
 const createStructure = () => {
   let container = $('<div class="' + pluginName + '-container" id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
   $("#air_plugincontainer").parents(".tab-pane").css({
