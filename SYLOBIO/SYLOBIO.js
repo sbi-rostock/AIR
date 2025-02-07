@@ -38,8 +38,6 @@ window.air_plugin.cytoscape.use(window.air_plugin.fcose);
 const $ = window.air_plugin.$;
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
 const createStructure = () => {
-  window.air_plugin.pluginContainer = element;
-
   // Attach a shadow root to isolate your plugin
   const shadowRoot = window.air_plugin.pluginContainer.attachShadow({
     mode: 'open'
@@ -80,6 +78,7 @@ function initPlugin() {
     pluginVersion: '1.0.0',
     pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO.js'
   });
+  window.air_plugin.pluginContainer = element;
   createStructure();
   const callbackShowOverlay = data => {
     console.log('onShowOverlay', data);
