@@ -20,6 +20,15 @@ CSS_FILE_PATHS.push(...[
   // "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css",
   // "https://ebi-uniprot.github.io/CDN/protvista/css/main.css",
 ]);
+document.addEventListener("DOMContentLoaded", function () {
+  CSS_FILE_PATHS.forEach(s => {
+    $("<link/>", {
+      rel: "stylesheet",
+      type: "text/css",
+      href: s + "?v=" + new Date().getTime()
+    }).appendTo("head");
+  });
+});
 const EXTERN_JS_FILE_PATHS = [
   // "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
   // "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
@@ -87,14 +96,6 @@ function initPlugin() {
   });
   $('#remove-listeners').on('click', function () {
     removeAllListeners();
-  });
-  CSS_FILE_PATHS.forEach(s => {
-    $("<link/>", {
-      rel: "stylesheet",
-      type: "text/css",
-      // Append a timestamp as a cache-busting parameter
-      href: s + "?v=" + new Date().getTime()
-    }).appendTo("head");
   });
   GetProjectHash().then(function (session_token) {
     window.air_plugin.session_token = session_token;
