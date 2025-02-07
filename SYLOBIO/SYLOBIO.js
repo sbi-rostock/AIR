@@ -39,7 +39,7 @@ const $ = window.air_plugin.$;
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
 const createStructure = () => {
   // Attach a shadow root to isolate your plugin
-  const shadowRoot = window.air_plugin.pluginContainer.attachShadow({
+  const shadowRoot = window.air_plugin.container.attachShadow({
     mode: 'open'
   });
   CSS_FILE_PATHS.forEach(s => {
@@ -59,7 +59,9 @@ const createStructure = () => {
   // $("#air_plugincontainer").parents(".tab-pane").css({
   //   "overflow": "hidden"
   // });
-  $("#air_plugincontainer").append(`<div id="stat_spinner" class="mt-5">
+
+  window.air_plugin.container = $(shadowRoot.querySelector("#air_plugincontainer"));
+  window.air_plugin.container.append(`<div id="stat_spinner" class="mt-5">
           <div class="d-flex justify-content-center">
                       <div class="spinner-border" role="status">
                           <span class="sr-only"></span>
@@ -83,7 +85,7 @@ function initPlugin() {
     pluginVersion: '1.0.0',
     pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO.js'
   });
-  window.air_plugin.pluginContainer = element;
+  window.air_plugin.container = element;
   createStructure();
   const callbackShowOverlay = data => {
     console.log('onShowOverlay', data);
@@ -103,29 +105,25 @@ function initPlugin() {
     window.air_plugin.session_token = session_token;
     $.getScript(JS_FILE_PATHS[0]).done(function () {
       initialize_server().then(async function (height) {
-        document.getElementById("stat_spinner").remove();
-        $("#air_plugincontainer").append(/*html*/
-        `
-    
-                    <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-                        <li class="air_nav_item nav-item"  style="width: 80%;">
-                            <a class="air_tab active nav-link" id="fairdom_tab" data-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">Xplore</a>
-                        </li>
-                        <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
-                    </ul>
-                    <div class="tab-content" id="air_tab">
-                        <div class="tab-pane show active" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
-                        </div>
+        window.air_plugin.container.find("#stat_spinner").remove();
+        window.air_plugin.container.append(`
+                <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
+                    <li class="air_nav_item nav-item" style="width: 80%;">
+                        <a class="air_tab active nav-link" id="fairdom_tab" data-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">Xplore</a>
+                    </li>
+                    <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
+                </ul>
+                <div class="tab-content" id="air_tab">
+                    <div class="tab-pane show active" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
                     </div>
-                
-            `);
+                </div>
+                `);
         for (let script of EXTERN_JS_FILE_PATHS) {
           await loadScript(script);
         }
-        $("#air_tab").children(".tab-pane").addClass("air_tab_pane");
-        let p = document.getElementById('Air_Tab');
-        p.removeAttribute("hidden");
-        $(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
+        window.air_plugin.container.find("#air_tab").children(".tab-pane").addClass("air_tab_pane");
+        window.air_plugin.container.find("#Air_Tab").removeAttr("hidden");
+        window.air_plugin.container.find(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
         setTimeout(() => {
           $.getScript(JS_FILE_PATHS[1]).done(function () {
             Fairdom();
