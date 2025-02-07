@@ -44,14 +44,12 @@ window.air_plugin.cytoscape.use(window.air_plugin.fcose);
 const $ = window.air_plugin.$;
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
 const createStructure = () => {
-  document.addEventListener("DOMContentLoaded", function () {
-    CSS_FILE_PATHS.forEach(s => {
-      $("<link/>", {
-        rel: "stylesheet",
-        type: "text/css",
-        href: s + "?v=" + new Date().getTime()
-      }).appendTo("head");
-    });
+  CSS_FILE_PATHS.forEach(s => {
+    $("<link/>", {
+      rel: "stylesheet",
+      type: "text/css",
+      href: s + "?v=" + new Date().getTime()
+    }).appendTo("head");
   });
   let container = $('<div class="air_bs" id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
   $("#air_plugincontainer").parents(".tab-pane").css({
