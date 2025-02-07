@@ -72,6 +72,15 @@ function initPlugin() {
     pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO.js'
   });
   window.air_plugin.pluginContainer = element;
+  const shadowRoot = window.air_plugin.pluginContainer.attachShadow({
+    mode: 'open'
+  });
+
+  // Create a <link> element to include your CSS (if you prefer the CDN or external file)
+  const linkElem = document.createElement('link');
+  linkElem.rel = 'stylesheet';
+  linkElem.href = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css'; // or your Bootstrap CDN URL
+  shadowRoot.appendChild(linkElem);
   createStructure();
   const callbackShowOverlay = data => {
     console.log('onShowOverlay', data);
