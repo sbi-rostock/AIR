@@ -20,15 +20,6 @@ CSS_FILE_PATHS.push(...[
   // "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css",
   // "https://ebi-uniprot.github.io/CDN/protvista/css/main.css",
 ]);
-document.addEventListener("DOMContentLoaded", function () {
-  CSS_FILE_PATHS.forEach(s => {
-    $("<link/>", {
-      rel: "stylesheet",
-      type: "text/css",
-      href: s + "?v=" + new Date().getTime()
-    }).appendTo("head");
-  });
-});
 const EXTERN_JS_FILE_PATHS = [
   // "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
   // "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
@@ -53,6 +44,15 @@ window.air_plugin.cytoscape.use(window.air_plugin.fcose);
 const $ = window.air_plugin.$;
 const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
 const createStructure = () => {
+  document.addEventListener("DOMContentLoaded", function () {
+    CSS_FILE_PATHS.forEach(s => {
+      $("<link/>", {
+        rel: "stylesheet",
+        type: "text/css",
+        href: s + "?v=" + new Date().getTime()
+      }).appendTo("head");
+    });
+  });
   let container = $('<div class="air_bs" id="air_plugincontainer"></div>').appendTo(window.air_plugin.pluginContainer);
   $("#air_plugincontainer").parents(".tab-pane").css({
     "overflow": "hidden"
@@ -133,7 +133,9 @@ function initPlugin() {
     });
   });
 }
-initPlugin();
+setTimeout(function () {
+  initPlugin();
+}, 500);
 function GetProjectHash() {
   return new Promise((resolve, reject) => {
     $.ajax({
