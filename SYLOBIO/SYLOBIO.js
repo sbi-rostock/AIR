@@ -11,7 +11,7 @@ require('../css/bootstrap.namespaced.css');
 const PARAMS = new URLSearchParams(window.location.search);
 const TESTING = PARAMS.has('testing') ? PARAMS.get('testing') === '1' || PARAMS.get('testing').toLowerCase() === 'true' : false;
 const JS_FILE_NAMES = ["server_handler.js", "fairdom_ui.js"];
-const CSS_FILE_NAMES = ["AirOmicsStyle.css", "AirXploreStyle.css"];
+const CSS_FILE_NAMES = ["AirStyle.css"];
 const JS_FOLDER_PATH = TESTING ? "http://localhost:3000/SYLOBIO/" : "https://raw.githack.com/sbi-rostock/AIR/master/SYLOBIO/";
 ;
 const JS_FILE_PATHS = JS_FILE_NAMES.map(file => JS_FOLDER_PATH + file);
