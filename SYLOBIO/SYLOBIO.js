@@ -49,7 +49,12 @@ const createStructure = () => {
       href: s + "?v=" + new Date().getTime()
     }).appendTo(shadowRoot);
   });
-  shadowRoot.appendChild('<div class="air_bs" id="air_plugincontainer"></div>');
+
+  // Create the element with jQuery
+  const $containerDiv = $('<div class="air_bs" id="air_plugincontainer"></div>');
+
+  // Append the underlying DOM node to the shadow root
+  shadowRoot.appendChild($containerDiv.get(0));
 
   // $("#air_plugincontainer").parents(".tab-pane").css({
   //   "overflow": "hidden"
