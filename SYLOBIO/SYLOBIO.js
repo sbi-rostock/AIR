@@ -54,7 +54,7 @@ const createStructure = () => {
 
   // Prepare script tags for each custom JS file
   const customJsScripts = JS_FILE_PATHS.map(js => {
-    return `<script src="${js}"></script>`;
+    return `<script src="${js}?v=${new Date().getTime()}"></script>`;
   }).join('\n');
 
   // Build the complete HTML content for the iframe
