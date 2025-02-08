@@ -42,6 +42,16 @@ const createStructure = () => {
   const shadowRoot = window.air_plugin.container.attachShadow({
     mode: 'open'
   });
+
+  // Add a style reset to remove inherited properties.
+  const resetStyle = document.createElement('style');
+  resetStyle.textContent = `
+    :host, :host * {
+        all: unset;
+        box-sizing: border-box;
+    }
+    `;
+  shadowRoot.appendChild(resetStyle);
   CSS_FILE_PATHS.forEach(s => {
     $("<link/>", {
       rel: "stylesheet",
