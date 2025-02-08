@@ -40,6 +40,7 @@ const createStructure = () => {
   const iframe = document.createElement('iframe');
   // Style the iframe to use the full available width and remove any border
   iframe.style.width = '100%';
+  iframe.style.height = '100%';
   iframe.style.border = 'none';
   // Append the iframe to your plugin container (assumed to be a jQuery element)
   window.air_data.container.append(iframe);
@@ -58,15 +59,15 @@ const createStructure = () => {
   }).join('\n');
 
   // Build the complete HTML content for the iframe
-  const iframeHTML = `
+  const iframeHTML = `    
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="en" style="height: 100%;overflow: hidden;">
         <head>
             <title>Plugin</title>
             ${customCssLinks}
         </head>
-        <body>
-            <div class="air_bs" id="air_plugincontainer"></div>
+        <body style="height: 100%;overflow: hidden;">
+            <div class="air_bs" id="air_plugincontainer" style="height: 100%;overflow: hidden;"></div>
             <script src=></script>
             ${customJsScripts}
         </body>
