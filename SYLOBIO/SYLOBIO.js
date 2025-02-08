@@ -42,7 +42,7 @@ const createStructure = () => {
   const shadowRoot = window.air_plugin.container.attachShadow({
     mode: 'open'
   });
-  this.shadowRoot.innerHTML = `
+  shadowRoot.innerHTML = `
     <style>
         :host {
             all : initial;
