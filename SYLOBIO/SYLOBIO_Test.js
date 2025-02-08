@@ -6,22 +6,9 @@ require('../css/styles.css');
 // require('../css/bootstrap.namespaced.css');
 
 const PARAMS = new URLSearchParams(window.location.search);
-const TESTING = true
-const JS_FILE_NAMES = ["server_handler.js", "fairdom_ui.js"];
-const CSS_FILE_NAMES = ["AirStyle.css"];
-const JS_FOLDER_PATH = TESTING ? "http://localhost:3000/SYLOBIO/" : "https://raw.githack.com/sbi-rostock/AIR/master/SYLOBIO/";
-;
-const JS_FILE_PATHS = JS_FILE_NAMES.map(file => JS_FOLDER_PATH + file);
-const CSS_FILE_PATHS = ["https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
-CSS_FILE_PATHS.push(...CSS_FILE_NAMES.map(file => JS_FOLDER_PATH + file));
-const EXTERN_JS_FILE_PATHS = [
-  // "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
-  // "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
-  // "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", 
-  // "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", 
-  // "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js",
-];
-window.air_plugin = {
+const TESTING = true;
+window.air_data = {
+  JS_FOLDER_PATH: TESTING ? "http://localhost:3000/SYLOBIO/" : "https://raw.githack.com/sbi-rostock/AIR/master/SYLOBIO/",
   Chart: require('chart.js'),
   Decimal: require('decimal.js'),
   JSZip: require("jszip"),
@@ -34,50 +21,84 @@ window.air_plugin = {
   $: require('jquery'),
   jstree: require('jstree')
 };
-window.air_plugin.cytoscape.use(window.air_plugin.fcose);
-const $ = window.air_plugin.$;
-const project_hash = [window.location.origin, window.minerva.project.data.getProjectId()];
+window.air_data.cytoscape.use(window.air_data.fcose);
+const $ = window.air_data.$;
+const JS_FILE_NAMES = ["server_handler.js"];
+const CSS_FILE_NAMES = ["AirStyle.css"];
+const CSS_FILE_PATHS = ["https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
+CSS_FILE_PATHS.push(...CSS_FILE_NAMES.map(file => window.air_data.JS_FOLDER_PATH + file));
+const JS_FILE_PATHS = [
+// "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
+// "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
+// "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", 
+// "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", 
+// "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js",
+"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"];
+JS_FILE_PATHS.push(...JS_FILE_NAMES.map(file => window.air_data.JS_FOLDER_PATH + file));
 const createStructure = () => {
-  // Attach a shadow root to isolate your plugin
-  const shadowRoot = window.air_plugin.container.attachShadow({
-    mode: 'open'
-  });
-  shadowRoot.innerHTML = `
-    <style>
-        :host {
-                all: unset;
-        box-sizing: border-box;
-        }
-    </style>`;
-  CSS_FILE_PATHS.forEach(s => {
-    $("<link/>", {
-      rel: "stylesheet",
-      type: "text/css",
-      href: s + "?v=" + new Date().getTime()
-    }).appendTo(shadowRoot);
-  });
+  // Create an iframe element
+  const iframe = document.createElement('iframe');
+  // Style the iframe to use the full available width and remove any border
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  // Append the iframe to your plugin container (assumed to be a jQuery element)
+  window.air_data.container.append(iframe);
 
-  // Create the element with jQuery
-  const $containerDiv = $('<div class="air_bs" id="air_plugincontainer"></div>');
+  // Get the iframe's document object
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
 
-  // Append the underlying DOM node to the shadow root
-  shadowRoot.appendChild($containerDiv.get(0));
+  // Prepare link tags for each custom CSS file
+  const customCssLinks = CSS_FILE_PATHS.map(s => {
+    return `<link rel="stylesheet" type="text/css" href="${s}?v=${new Date().getTime()}">`;
+  }).join('\n');
 
-  // $("#air_plugincontainer").parents(".tab-pane").css({
-  //   "overflow": "hidden"
-  // });
+  // Prepare script tags for each custom JS file
+  const customJsScripts = JS_FILE_PATHS.map(js => {
+    return `<script src="${js}?v=${new Date().getTime()}"></script>`;
+  }).join('\n');
 
-  window.air_plugin.container = $(shadowRoot.querySelector("#air_plugincontainer"));
-  window.air_plugin.container.append(`<div id="stat_spinner" class="mt-5">
-          <div class="d-flex justify-content-center">
-                      <div class="spinner-border" role="status">
-                          <span class="sr-only"></span>
-                      </div>
-          </div>
-          <div class="d-flex justify-content-center mt-2">
-              <span id="air_loading_text">LOADING ...</span>
-          </div>
-      </div>`);
+  // Build the complete HTML content for the iframe
+  const iframeHTML = `    
+        <!DOCTYPE html>
+        <html lang="en" style="height: 100%;overflow: hidden;">
+        <head>
+            <title>Plugin</title>
+            ${customCssLinks}
+        </head>
+        <body style="height: 100%;overflow: hidden;">
+            <div class="air_bs" id="air_plugincontainer" style="height: 100%;overflow: hidden;"></div>
+            <script src=></script>
+            ${customJsScripts}
+        </body>
+        </html>
+    `;
+
+  // Write the HTML into the iframe's document
+  iframeDoc.open();
+  iframeDoc.write(iframeHTML);
+  iframeDoc.close();
+
+  // When the iframe is fully loaded, append your additional plugin markup (spinner, etc.)
+  iframe.onload = function () {
+    const containerDiv = iframeDoc.getElementById('air_plugincontainer');
+    containerDiv.innerHTML += `
+        <div id="stat_spinner" class="mt-5">
+            <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="sr-only"></span>
+            </div>
+            </div>
+            <div class="d-flex justify-content-center mt-2">
+            <span id="air_loading_text">LOADING ...</span>
+            </div>
+        </div>
+        `;
+
+    // Optionally update the plugin container reference to the container inside the iframe.
+    window.air_data.container = $(containerDiv);
+    iframe.contentWindow.initialize_server();
+  };
 };
 function initPlugin() {
   const {
@@ -92,91 +113,10 @@ function initPlugin() {
     pluginVersion: '1.0.0',
     pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO_Test.js'
   });
-  window.air_plugin.container = element;
+  window.air_data.container = element;
   createStructure();
-  const callbackShowOverlay = data => {
-    console.log('onShowOverlay', data);
-  };
-  const callbackRemoveDataOverlay = data => {
-    console.log('onRemoveDataOverlay', data);
-  };
-  addListener('onShowOverlay', callbackShowOverlay);
-  addListener('onRemoveDataOverlay', callbackRemoveDataOverlay);
-  $('#remove-listener').on('click', function () {
-    removeListener('onShowOverlay', callbackShowOverlay);
-  });
-  $('#remove-listeners').on('click', function () {
-    removeAllListeners();
-  });
-  GetProjectHash().then(function (session_token) {
-    window.air_plugin.session_token = session_token;
-    $.getScript(JS_FILE_PATHS[0]).done(function () {
-      initialize_server().then(async function (height) {
-        window.air_plugin.container.find("#stat_spinner").remove();
-        window.air_plugin.container.append(`
-                <ul class="air_nav_tabs nav nav-tabs mt-2" id="Air_Tab" role="tablist" hidden>
-                    <li class="air_nav_item nav-item" style="width: 80%;">
-                        <a class="air_tab active nav-link" id="fairdom_tab" data-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">FAIRDOM</a>
-                    </li>
-                    <button id="air_btn_clear" style="height:70%; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
-                </ul>
-                <div class="tab-content" id="air_tab">
-                    <div class="tab-pane show active" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
-                    </div>
-                </div>
-                `);
-        for (let script of EXTERN_JS_FILE_PATHS) {
-          await loadScript(script);
-        }
-        window.air_plugin.container.find("#air_tab").children(".tab-pane").addClass("air_tab_pane");
-        window.air_plugin.container.find("#Air_Tab").removeAttr("hidden");
-        window.air_plugin.container.find(".air_tab_pane").css("height", "calc(100vh - " + height + "px)");
-        setTimeout(() => {
-          $.getScript(JS_FILE_PATHS[1]).done(function () {
-            Fairdom();
-          });
-        }, 0);
-      });
-    });
-  });
 }
-setTimeout(function () {
-  initPlugin();
-}, 500);
-function GetProjectHash() {
-  return new Promise((resolve, reject) => {
-    $.ajax({
-      type: 'POST',
-      contentType: 'application/json',
-      cors: true,
-      secure: true,
-      headers: {
-        'Access-Control-Allow-Origin': '*'
-      },
-      data: JSON.stringify(project_hash),
-      dataType: 'json',
-      url: window.air_plugin.SBI_SERVER + 'initialize_session',
-      success: function (data) {
-        console.log(data["hash"]);
-        resolve(data["hash"]);
-      },
-      error: function (error) {
-        reject(error);
-      }
-    });
-  });
-}
-async function loadScript(script) {
-  return new Promise((resolve, reject) => {
-    try {
-      $.getScript(script).done(function () {
-        resolve();
-      });
-    } catch (err) {
-      resolve();
-    }
-  });
-}
+initPlugin();
 },{"../css/styles.css":1,"chart.js":12,"cytoscape":16,"cytoscape-fcose":15,"decimal.js":17,"file-saver":23,"jquery":25,"jstree":26,"jszip":27,"ttest":32}],3:[function(require,module,exports){
 /*!
  * @kurkle/color v0.3.4
