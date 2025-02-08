@@ -118,7 +118,7 @@ function initPlugin() {
                     <li class="air_nav_item nav-item" style="width: 80%;">
                         <a class="air_tab active nav-link" id="fairdom_tab" data-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">FAIRDOM</a>
                     </li>
-                    <button id="air_btn_clear" style="height:70%; width:8%; vertical-align: middle; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
+                    <button id="air_btn_clear" style="height:70%; margin-top: 10px; margin-left: 15px; color: darkgray;" type="button" class="air_btn_light btn btn-block">Clear</button>
                 </ul>
                 <div class="tab-content" id="air_tab">
                     <div class="tab-pane show active" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
