@@ -45,7 +45,8 @@ const createStructure = () => {
   shadowRoot.innerHTML = `
     <style>
         :host {
-            all : initial;
+                all: unset;
+        box-sizing: border-box;
         }
     </style>`;
   CSS_FILE_PATHS.forEach(s => {
