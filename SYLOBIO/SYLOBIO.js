@@ -12,8 +12,8 @@ const CSS_FILE_NAMES = ["AirStyle.css"];
 const JS_FOLDER_PATH = TESTING ? "http://localhost:3000/SYLOBIO/" : "https://raw.githack.com/sbi-rostock/AIR/master/SYLOBIO/";
 ;
 const JS_FILE_PATHS = JS_FILE_NAMES.map(file => JS_FOLDER_PATH + file);
-const CSS_FILE_PATHS = CSS_FILE_NAMES.map(file => JS_FOLDER_PATH + file);
-CSS_FILE_PATHS.push(...["https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"]);
+const CSS_FILE_PATHS = ["https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
+CSS_FILE_PATHS.push(...CSS_FILE_NAMES.map(file => JS_FOLDER_PATH + file));
 const EXTERN_JS_FILE_PATHS = [
   // "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
   // "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
