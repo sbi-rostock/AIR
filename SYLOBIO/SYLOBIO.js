@@ -18,6 +18,7 @@ window.air_data = {
   cytoscape: require('cytoscape'),
   fcose: require('cytoscape-fcose'),
   SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air-mattihoch.pythonanywhere.com/',
+  //'https://air.bio.informatik.uni-rostock.de/air-plugin/',
   $: require('jquery'),
   jstree: require('jstree'),
   DataTables: require('datatables.net-dt')
@@ -26,7 +27,7 @@ window.air_data.cytoscape.use(window.air_data.fcose);
 const $ = window.air_data.$;
 const JS_FILE_NAMES = ["server_handler.js"];
 const CSS_FILE_NAMES = ["AirStyle.css"];
-const CSS_FILE_PATHS = ["https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
+const CSS_FILE_PATHS = ["https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.css", "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
 CSS_FILE_PATHS.push(...CSS_FILE_NAMES.map(file => window.air_data.JS_FOLDER_PATH + file));
 const JS_FILE_PATHS = [
 // "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
