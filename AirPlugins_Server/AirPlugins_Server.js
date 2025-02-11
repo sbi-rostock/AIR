@@ -211,7 +211,7 @@ async function initMainPageStructure() {
         },
         data: JSON.stringify(project_hash),
         dataType: 'json',
-        url: SBI_SERVER + 'initialize_minerva',
+        url: SBI_SERVER + 'abm_initialize_minerva',
         success: function (data) {
           project_hash = data["hash"];
           console.log(project_hash);
