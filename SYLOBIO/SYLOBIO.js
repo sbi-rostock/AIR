@@ -17,7 +17,7 @@ window.air_data = {
   ttest: require('ttest'),
   cytoscape: require('cytoscape'),
   fcose: require('cytoscape-fcose'),
-  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air-mattihoch.pythonanywhere.com/',
+  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://mattihoch.pythonanywhere.com/',
   //'https://air.bio.informatik.uni-rostock.de/air-plugin/',
   $: require('jquery'),
   jstree: require('jstree'),
