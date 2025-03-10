@@ -184,6 +184,10 @@ async function initialize_server() {
         buildPLuginNavigator();
         loadAndExecuteScripts(["omics.js", "fairdom.js"]);
         resetSessionWarningTimer();
+        
+        air_data.minerva_events.addListener("onBioEntityClick", showModulatorsOnClick);
+
+
     } catch (error) {
         console.error("Error while initializing:", error);
     }
@@ -451,4 +455,50 @@ function setupNodeMapLinks() {
             y2: minerva_id[5] + minerva_id[2]
         });
     });
+}
+
+const showModulatorsOnClick = async data => {
+
+    if(data.type == "ALIAS") {
+        const response = await getDataFromServer(
+            'get_modulators', {
+            id: data.id,
+            modelId: data.modelId
+        }, "POST", "json");
+
+        if(response.ok && response.data.length > 0) {
+            highlightValues(response.data, true);
+        }
+    }
+};
+
+function highlightValues(data, remove = true) {
+
+    // Clear existing markers
+    if(remove) {
+        for(var marker_id of air_omics.added_markers) {
+            minerva.data.bioEntities.removeSingleMarker(marker_id);
+        }
+        air_omics.added_markers.length = 0; 
+    }
+
+    var new_markers = data.map(function(entity) {
+        var marker_id = "marker_" + entity.id;
+        air_omics.added_markers.push(marker_id);
+        return {
+            type: 'surface',
+            opacity: 0.67,
+            x: entity.x,
+            y: entity.y,
+            width: entity.width,
+            height: entity.height,
+            modelId: entity.modelId,
+            id: marker_id,
+            color: valueToHex(entity.value)
+        };
+    });
+
+    for(var marker of new_markers) {
+        minerva.data.bioEntities.addSingleMarker(marker);
+    }
 }
