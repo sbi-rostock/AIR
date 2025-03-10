@@ -25,7 +25,7 @@ function resetSessionWarningTimer() {
 async function promptForExtension() {
     let expirationTimeout = setTimeout(() => {
         alert('Your session has ended.');
-        location.reload();
+        window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
     }, countdownDuration);
 
     let message = `Your session is about to expire in 2 Minutes. Do you want to extend the session?`;
@@ -39,13 +39,13 @@ async function promptForExtension() {
             resetSessionWarningTimer();
         } else {
             alert('Session already expired.');
-            location.reload();
+            window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
         }
     }
     else
     {
         alert('Your session has ended.');
-        location.reload();
+        window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
     }
 }
 
@@ -66,64 +66,127 @@ const globals = {
 
 
 function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = 'application/json') {
-    data.session = air_data.session_token;
-    return new Promise((resolve, reject) => {
-      $.ajax({
+    // Only add session token if it exists and the request is not for initialization
+    if (air_data.session_token && !request.includes('initialize_session')) {
+        if (data instanceof FormData) {
+            if (!data.has('session')) {
+                data.append('session', air_data.session_token);
+            }
+        } else {
+            data.session = air_data.session_token;
+        }
+    }
+
+    // Prepare the AJAX options
+    const ajaxOptions = {
         type: type,
         url: air_data.SBI_SERVER + request,
-        contentType: contentType,
         dataType: datatype,
-        data: JSON.stringify(data),
         success: function (data) {
-          resolve(data);
+            return data;
         },
-        error: function (error) {
-          reject(error);
-        }
-      });
-    });
-  }
-
-
-function GetProjectHash(project_data) {
-    return new Promise((resolve, reject) => {
-        $.ajax({
-            type: 'POST',
-            contentType: 'application/json',
-            cors: true,
-            secure: true,
-            headers: {
-                'Access-Control-Allow-Origin': '*'
-            },
-            data: JSON.stringify(project_data),
-            dataType: 'json',
-            url: air_data.SBI_SERVER + 'initialize_session',
-            success: function (data) {
-                console.log(data["hash"]);
-                resolve(data["hash"]);
-            },
-            error: function (error) {
-                reject(error);
+        error: function (xhr, status, error) {
+            // Log detailed error information
+            console.error("Server request failed:", {
+                endpoint: request,
+                status: xhr.status,
+                statusText: xhr.statusText,
+                responseText: xhr.responseText,
+                error: error
+            });
+            
+            // If there's a JSON response with error details, throw that
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                throw new Error(xhr.responseJSON.error);
             }
-        });
+            // Otherwise throw the general error
+            throw new Error(error || xhr.statusText);
+        }
+    };
+
+    // Handle FormData vs JSON data
+    if (data instanceof FormData) {
+        ajaxOptions.processData = false;
+        ajaxOptions.contentType = false;
+        ajaxOptions.data = data;
+    } else {
+        ajaxOptions.contentType = contentType;
+        ajaxOptions.data = type === "GET" ? data : JSON.stringify(data);
+    }
+
+    return new Promise((resolve, reject) => {
+        $.ajax(ajaxOptions)
+            .done(resolve)
+            .fail(reject);
     });
 }
 
-function initialize_server() {
 
-    minerva = window.parent.minerva;
-    GetProjectHash([
-        window.parent.location.origin,
-        minerva.project.data.getProjectId(),
-    ]).then(function (session_token) {
+async function GetProjectHash(project_data) {
+    const loadingText = air_data.container.find("#air_loading_text");
+    
+    try {
+        if (loadingText.length) {
+            loadingText.text("Checking model status...");
+        }
+        
+        let sessionData;
+        try {
+            sessionData = await getDataFromServer('initialize_session', project_data, "POST", "json");
+        } catch (error) {
+            if (!error.status || error.status === 0) {
+                throw new Error("Could not contact the server. Please check your internet connection and try again.");
+            } else if (error.responseJSON && error.responseJSON.error) {
+                throw new Error(`Server error: ${error.responseJSON.error}`);
+            } else {
+                throw new Error(`Failed to initialize session: ${error.message || 'Unknown error'}`);
+            }
+        }
+
+        air_data.session_token = sessionData.hash;
+        
+        // needs_model_init only exists to display a message to the user that it may take a few moments to initialize the model
+        // intiialize_model is requested anyway
+        if (sessionData.needs_model_init) {
+            if (loadingText.length) {
+                loadingText.text("This is the first time the project is loaded since the last server restart... This may take a moment.");
+            }
+        }
+            
+        await getDataFromServer('initialize_model', {
+            session: sessionData.hash,
+            project_hash: sessionData.project_hash
+        }, "POST", "json");
+        
+        if (loadingText.length) {
+            loadingText.text("LOADING ...");
+        }
+        
+        return sessionData.hash;
+        
+    } catch (error) {
+        if (loadingText.length) {
+            loadingText.text("Error: " + error.message);
+        }
+        throw error;
+    }
+}
+
+async function initialize_server() {
+    try {
+        minerva = window.parent.minerva;
+        const session_token = await GetProjectHash([
+            window.parent.location.origin,
+            minerva.project.data.getProjectId(),
+        ]);
+        
         air_data.session_token = session_token;
         buildPLuginNavigator();
-        loadAndExecuteScripts(["fairdom.js"])
+        loadAndExecuteScripts(["fairdom.js", "omics.js"]);
         resetSessionWarningTimer();
-    }).catch(function (error) {
-        console.error("Error while logging in:", error);
-    });
-
+    } catch (error) {
+        console.error("Error while initializing:", error);
+    }
 }
 
 buildPLuginNavigator = () => {
@@ -183,9 +246,9 @@ function loadAndExecuteScripts(urls) {
       };
       document.head.appendChild(script);
     });
-  }
+}
 
-  async function disablebutton(id, progress = false) {
+async function disablebutton(id, progress = false) {
     var promise = new Promise(function (resolve, reject) {
         setTimeout(() => {
             var $btn = $(id);
@@ -250,4 +313,142 @@ function valueToHex(val, max=1) {
     else if (val < 0)
         return '#' + hex + hex + 'ff';
     else return '#ffffff';
+}
+
+// Common utility functions
+function createDataTable(containerId, data, columns, options = {}) {
+    const defaultOptions = {
+        dom: "<'top'<'dt-length'l><'dt-search'f>>" +
+             "<'clear'>" +
+             "rt" +
+             "<'bottom'ip><'clear'>",
+        scrollY: '50vh',
+        scrollX: true,
+        paging: true,
+        searching: true,
+        destroy: true
+    };
+
+    const tableOptions = {
+        ...defaultOptions,
+        ...options,
+        data: data,
+        columns: columns.map(col => typeof col === 'string' ? {
+            title: col,
+            data: col
+        } : col)
+    };
+
+    return $(containerId).DataTable(tableOptions);
+}
+
+function processDataForTable(data, includeLinks = false) {
+    if (!data || !data.columns || !data.data) {
+        console.error("Invalid data format");
+        return null;
+    }
+
+    const columns = data.columns.map((col, index) => {
+        if (includeLinks && col === "index") {
+            return {
+                data: index,
+                title: col,
+                render: (data, type, row) => {
+                    return row[row.length - 1] ? 
+                        `<a href="#" class="node_map_link" data-id="${row[row.length - 1]}">${data}</a>` : 
+                        data;
+                }
+            };
+        }
+        return {
+            data: index,
+            title: col
+        };
+    });
+
+    return {
+        columns: columns.slice(0, -1), // Remove last column (usually metadata)
+        data: data.data
+    };
+}
+
+function setupColumnSelector(selectId, columns, excludeColumns = ["index"]) {
+    const $select = $(selectId);
+    $select.empty();
+    $select.append($("<option selected>").attr("value", -1).text("None"));
+    
+    columns.forEach((col, index) => {
+        if (!excludeColumns.includes(col)) {
+            $select.append($("<option>").attr("value", index).text(col));
+        }
+    });
+}
+
+// Generalized highlighting function
+function highlightColumn(options) {
+    const {
+        selectedColumn,
+        data,
+        markerArray,
+        includeNonMapped,
+        markerPrefix = "marker_"
+    } = options;
+
+    // Clear existing markers
+    for(var marker_id of markerArray) {
+        minerva.data.bioEntities.removeSingleMarker(marker_id);
+    }
+    markerArray.length = 0;  // Clear the array while maintaining the reference
+
+    if (selectedColumn == -1) {
+        return;
+    }
+
+    var max = includeNonMapped ? data.max : data.minerva_max;
+    var id_col = data.columns.length - 1;
+    
+    var new_markers = data.data
+        .filter(row => row[selectedColumn] != 0 && row[id_col])
+        .map(function(row) {
+            var val = row[selectedColumn];
+            var id = JSON.parse(row[id_col]);
+            var marker_id = markerPrefix + id[1];
+            markerArray.push(marker_id);
+            return {
+                type: 'surface',
+                opacity: 0.67,
+                x: id[4],
+                y: id[5],
+                width: id[3],
+                height: id[2],
+                modelId: id[0],
+                id: marker_id,
+                color: data.columns[selectedColumn].toLowerCase().endsWith('_pvalue') ? 
+                    valueToHex(-Math.log10(Math.abs(val)), 5) : 
+                    valueToHex(val, max)
+            };
+        });
+
+    for(var marker of new_markers) {
+        minerva.data.bioEntities.addSingleMarker(marker);
+    }
+}
+
+// Generalized node map link handler
+function setupNodeMapLinks() {
+    $(document).on('click', '.node_map_link', function(e) {
+        e.preventDefault();
+        var minerva_id = $(this).data('id');
+
+        minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
+        
+        minerva.map.openMap({ id: minerva_id[0] });
+
+        minerva.map.fitBounds({
+            x1: minerva_id[4],
+            y1: minerva_id[5],
+            x2: minerva_id[4] + minerva_id[3],
+            y2: minerva_id[5] + minerva_id[2]
+        });
+    });
 }

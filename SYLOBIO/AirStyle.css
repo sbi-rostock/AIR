@@ -280,8 +280,8 @@
 .air_btn {
   background-color: #FF8C8C;
   border-color: #FF8C8C;
-  font-weight: bold;
-  font-size: 17px;
+  font-weight: 700;
+  font-size: 14px;
   color: white; 
   padding: 0;
   height: 32.5px;
@@ -354,18 +354,22 @@
   width: 20px;
   height: 20px;
   font-size: 0.8em;
-  position: absolute;
   top: 15%;
   text-align: center !important;
   padding: 0;
-  background-color: dimgrey; 
+  background-color: #ededed;
   margin-left: 3px;
   z-index: 2;
-}
-
-.air_btn_info:focus {
+  border: 0px solid;
+  font-weight: bold;
   box-shadow: none !important;
   outline: none !important; 
+}
+
+.air_btn_info:focus, .air_btn_info:hover {
+  box-shadow: none !important;
+  outline: none !important; 
+  background-color: #bababa;
 }
   .air_close {
     position: absolute;
@@ -662,3 +666,13 @@ input[type=checkbox] .cbcontainer {
   justify-content: space-between;
   align-items: center;
 }
+
+#air_loading_text {
+  width: 60%;
+  text-align: center;
+}
+
+.collapse .card {
+  border: 0px solid white;
+}
+

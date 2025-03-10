@@ -1,25 +1,29 @@
-var loaded_data = null;
-var selected_item = "";
-var added_markers = []
-let air_fairdom_container = null;
+air_data.fairdom = {
+    loaded_data: null,
+    selected_item: "",
+    added_markers: [],
+    container: null,
+    current_data: null
+  }
+
+var air_fairdom = air_data.fairdom
+
 
 const ICONS = {
-    "investigation": "https://fairdomhub.org/assets/avatars/avatar-investigation-35a43ae47ff29f40a337f4df217b9e406b3d0e959465e5b5e37d1334e56f627f.png",
-    "study":         "https://fairdomhub.org/assets/avatars/avatar-study-cf2295264451598f1ffcf0379368bdb8dd86a5f58879d5cc1649ce92767121fb.png",
-    "assay":         "https://fairdomhub.org/assets/avatars/avatar-assay-459bd53f15bd3793a7e8b874c77a457012593bdba8f99f10be2a51f4639f6f9a.png",
-    "data":          "https://fairdomhub.org/assets/file_icons/small/txt-6dfb7dfdd4042a4fc251a5bee07972dd61df47e8d979cce525a54d8989300218.png",
-    // you can replace these with your own icons
-  };
+  "investigation": "https://fairdomhub.org/assets/avatars/avatar-investigation-35a43ae47ff29f40a337f4df217b9e406b3d0e959465e5b5e37d1334e56f627f.png",
+  "study": "https://fairdomhub.org/assets/avatars/avatar-study-cf2295264451598f1ffcf0379368bdb8dd86a5f58879d5cc1649ce92767121fb.png",
+  "assay": "https://fairdomhub.org/assets/avatars/avatar-assay-459bd53f15bd3793a7e8b874c77a457012593bdba8f99f10be2a51f4639f6f9a.png",
+  "data": "https://fairdomhub.org/assets/file_icons/small/txt-6dfb7dfdd4042a4fc251a5bee07972dd61df47e8d979cce525a54d8989300218.png",
+  // you can replace these with your own icons
+};
 
 async function fairdom() {
+  air_fairdom.container = air_data.container.find('#fairdom_tab_content');
 
-  air_fairdom_container = air_data.container.find('#fairdom_tab_content')
-
-    $(
-      `
-
-      <button class="btn air_collapsible mt-2" id="fd_collapse_1_btn" type="button" data-bs-toggle="collapse"data-bs-target="#fd_collapse_1" aria-expanded="false" aria-controls="fd_collapse_1">
-        1. Log in to your FAIRDOMHub account
+  $(
+    `
+      <button class="btn air_collapsible mt-2 collapsed" id="fd_collapse_1_btn" type="button" data-bs-toggle="collapse" data-bs-target="#fd_collapse_1" aria-expanded="false" aria-controls="fd_collapse_1">
+        1. Login to FAIRDOMHub
       </button>
       <div class="collapse show" id="fd_collapse_1">
         <div class="card card-body">
@@ -48,7 +52,12 @@ async function fairdom() {
           </div>
 
           <div style="text-align: center;">
-            <button type="button" id="fd_btn_loaddata" class="air_btn btn btn-block air_disabledbutton mt-4 mb-2">Load Data File</button>
+            <button type="button" id="fd_btn_loaddata" class="air_btn btn air_disabledbutton mt-4 mb-2 mr-2">
+              Load Data File
+            </button>
+            <button type="button" id="fd_btn_refresh" class="air_btn btn mt-4 mb-2">
+              ↻ Refresh
+            </button>
           </div>
         </div>
       </div>
@@ -73,190 +82,200 @@ async function fairdom() {
 
 
       `
-  ).appendTo(air_fairdom_container);
+  ).appendTo(air_fairdom.container);
 
-  $("#fd_cb_nonmapped").on('change', highlightcolumn);
-  $("#fd_select_column").on('change', highlightcolumn);
+  $("#fd_cb_nonmapped").on('change', highlightFairdomColumn);
+  $("#fd_select_column").on('change', highlightFairdomColumn);
 
   // Handle the login form submission
-  air_fairdom_container.on('submit', '#fd_loginForm', async (e) => {
+  air_fairdom.container.on('submit', '#fd_loginForm', async (e) => {
       e.preventDefault(); // Prevent the form from submitting the normal way
 
       const username = $("#fd_username").val();
       const password = $("#fd_password").val();
 
       try {
-        
           var btn_text = await disablebutton("#fd_btn_submit")
       
-          loaded_data = await getDataFromServer("sylobio/login", data = {"username":username, "password":password}, type = "POST")
-          loaded_data = JSON.parse(loaded_data)
+          var project_data = await getDataFromServer("sylobio/login", data = {"username":username, "password":password}, type = "POST")
+          project_data = JSON.parse(project_data)
 
-          if(Object.keys(loaded_data).length == 0)
-          {
-            alert("No Data Found.")
-            return
-          }
-          console.log(loaded_data);
-
-          var element = document.querySelector('#fd_collapse_1');
-          bootstrap.Collapse.getOrCreateInstance(element).hide();
-          
-          var element = document.querySelector('#fd_collapse_2');
-          bootstrap.Collapse.getOrCreateInstance(element).show();
-
-          $("#fd_collapse_2_btn").removeClass("air_disabledbutton");
-          
-          const treeData = buildJsTreeNodes(loaded_data.investigations, "investigation");
-
-          $('#fd_data_treeview').jstree({
-              "core": {
-              "multiple": false,
-              "data": treeData,
-              "themes": {
-                  "dots": true,      // show dots between nodes
-                  "icons": true      // show icons
-              }
-              },
-              "plugins": ["wholerow"]  // you can add more plugins if needed
-          });
-
-          $('#fd_data_treeview').on('select_node.jstree', function (e, data) {
-            const node = data.node; 
-            // e.g. node.id = "assay-2541"
-            const parts = node.id.split("-");
-            const itemType = parts[0];  
-            const itemId   = parts.slice(1).join("-");
-          
-            if (itemType === "data") {
-              $("#fd_btn_loaddata").removeClass("air_disabledbutton");
-              selected_item = itemId
-            }
-            else
-            {
-              $("#fd_btn_loaddata").addClass("air_disabledbutton");
-              selected_item = ""
-            }
-          });
+          build_project_tree(project_data)
 
           enablebutton("#fd_btn_submit", btn_text)
           
       } catch (err) {
-          console.error("Error while logging in:", err);
-          alert("An error occurred. See console for details.");
+          console.error("Error during FAIRDOM login:", err);
+          alert(`Login failed: ${err.message}`);
+          enablebutton("#fd_btn_submit", btn_text)
       }
   });
+
+  $('#fd_btn_refresh').on('click', async function () {
+    try {
+        var btn_text = await disablebutton("#fd_btn_refresh")
+    
+        var project_data = await getDataFromServer("sylobio/refresh", data = {}, type = "POST")
+        project_data = JSON.parse(project_data)
+        
+        var treeData = buildJsTreeNodes(project_data.investigations, "investigation");
+
+        $('#fd_data_treeview').jstree(true).settings.core.data = treeData;
+        $('#fd_data_treeview').jstree(true).refresh();
+        
+        enablebutton("#fd_btn_refresh", btn_text)
+    } catch (err) {
+        console.error("Error refreshing FAIRDOM data:", err);
+        alert(`Failed to refresh data: ${err.message}`);
+        enablebutton("#fd_btn_refresh", btn_text)
+    }
+  })
 
   $('#fd_btn_loaddata').on('click', async function () {
     try {
 
-      var btn_text = await disablebutton("#fd_btn_loaddata")
-      
-      loaded_data = await getDataFromServer("sylobio/load_data", data = {"id": selected_item}, type = "POST")
-      loaded_data = JSON.parse(loaded_data)
+        if(air_fairdom.selected_item.length == 0)
+          return
 
-      var data = loaded_data["data"]
-      var columns = [];
-
-      $("#fd_select_column").empty();              
-      $("#fd_select_column").append(
-        $("<option selected>").attr("value", -1).text("None")
-      );
-
-      $.each(loaded_data["columns"], function(index, key) {
-        if (index < loaded_data["columns"].length - 1)
+        for(var selected_item of air_fairdom.selected_items)
         {
-          columns.push({
-            data: index,
-            title: key,
-            render: function(data, type, row, meta) {
-              // Create an anchor element with a data attribute containing the id
-              return key == "index" && row[row.length - 1]? `<a href="#" class="node_map_link" data-id="${row[row.length - 1]}">${data}</a>` : data;
-            }
-          });
-          if(index > 0)
-            $("#fd_select_column").append(
-              $("<option>").attr("value", index).text(key)
-            );
-        }
+          var btn_text = await disablebutton("#fd_btn_loaddata")
           
-      });
-      
-      // Initialize DataTables
-      $('#fd_datatable').DataTable({
-          dom:
-            "<'top'<'dt-length'l><'dt-search'f>>" +
-            "<'clear'>" +
-            "rt" +
-            "<'bottom'ip><'clear'>",
-          destroy: true,
-          data: data,
-          columns: columns,
-          scrollY: '50vh',  // Optional: vertical scroll
-          scrollX: true,    // Optional: horizontal scroll
-          paging: true,
-          searching: true
-      });
-      
-      bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
-      bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
-      bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_3')).show();
-      
-      $("#fd_collapse_3_btn").removeClass("air_disabledbutton");
+          const rawData = await getDataFromServer(
+            "sylobio/load_data", 
+            {"id": selected_item[1], "name": selected_item[0]},
+            "POST",
+            "json",
+          )
 
-      enablebutton("#fd_btn_loaddata", btn_text)
+          // const rawData = JSON.parse(response);
+          
+          addDataToTree('fairdom', selected_item[0], rawData);
+
+          if(air_fairdom.selected_items.length == 1)
+          {
+            // Store the data ID
+            air_fairdom.current_data = rawData;
+
+            // Setup the data table
+            const processedData = processDataForTable(rawData, true);
+            createDataTable('#fd_datatable', processedData.data, processedData.columns, {});
+
+            // Setup column selector
+            setupColumnSelector('#fd_select_column', rawData.columns);
+            
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_3')).show();
+            
+            $("#fd_collapse_3_btn").removeClass("air_disabledbutton");
+          }
+        }
+
+
+        enablebutton("#fd_btn_loaddata", btn_text)
     } 
     catch (err) {
-      console.error("Error while logging in:", err);
-      alert("An error occurred. See console for details.");
+        console.error("Error loading FAIRDOM data:", err);
+        alert(`Failed to load data: ${err.message}`);
+        enablebutton("#fd_btn_loaddata", btn_text)
     }
   })
 
+  // Setup node map link handling
+  setupNodeMapLinks();
 }
 
-function highlightcolumn() {
-  var selected_col = $("#fd_select_column").val();
+function build_project_tree(project_data) {
+  
+  if(Object.keys(project_data).length == 0)
+    {
+      alert("No Data Found.")
+      return
+    }
+    console.log(project_data);
 
-  for(var marker_id of added_markers)
-  {
-    minerva.data.bioEntities.removeSingleMarker(marker_id);
-  }
-  added_markers = []
-  if (selected_col == -1)
-  {
-    return
-  }
+    var element = document.querySelector('#fd_collapse_1');
+    bootstrap.Collapse.getOrCreateInstance(element).hide();
+    
+    var element = document.querySelector('#fd_collapse_2');
+    bootstrap.Collapse.getOrCreateInstance(element).show();
 
-  var max = $("#fd_cb_nonmapped").prop('checked')? loaded_data["max"] : loaded_data["minerva_max"]
-  var id_col = loaded_data["columns"].length - 1
-  var new_markers = loaded_data["data"].filter((row) => row[selected_col] != 0 && row[id_col]).map(function (row) {
-    var val = row[selected_col];
-    var id = JSON.parse(row[id_col]);
-    var marker_id = "fd_marker_" + id[1]
-    added_markers.push(marker_id)
-    return {
-      type: 'surface',
-      opacity: 0.67,
-      x: id[4],
-      y: id[5],
-      width: id[3],
-      height: id[2],
-      modelId: id[0],
-      id: marker_id,
-      color: selected_col.endsWith('_pvalue')? valueToHex(-Math.log10(Math.abs(val)), 5) : valueToHex(val, max) 
-    };
-  })
-  for(var marker of new_markers)
-  {
-    minerva.data.bioEntities.addSingleMarker(marker);
-  }
+    $("#fd_collapse_2_btn").removeClass("air_disabledbutton");
+    
+    const treeData = buildJsTreeNodes(project_data.investigations, "investigation");
+
+    if($('#fd_data_treeview').jstree(true))
+    {
+      $('#fd_data_treeview').jstree(true).settings.core.data = treeData;
+      $('#fd_data_treeview').jstree(true).refresh();
+    }
+    else
+    {
+      $('#fd_data_treeview').jstree({
+        "core": {
+        "multiple": false,
+        "data": treeData,
+        "themes": {
+            "dots": true,      // show dots between nodes
+            "icons": true      // show icons
+        }
+        },
+        "plugins": ["wholerow"]  // you can add more plugins if needed
+      });
+      $('#fd_data_treeview').on('select_node.jstree deselect_node.jstree', function (e, data) {
+
+
+        air_fairdom.selected_items = []
+      
+        const selectedNodes = $('#fd_data_treeview').jstree('get_selected', true);
+        selectedNodes.forEach(function(selectedNode) {
+            const parts = selectedNode.id.split("-");
+            const itemType = parts[0];  
+            const itemId   = parts.slice(1).join("-");
+            if (itemType === "data") {
+              air_fairdom.selected_items.push([node.text, itemId])
+            }
+            else
+            {
+              air_fairdom.selected_items = []
+            }
+        });
+
+        if(air_fairdom.selected_items.length > 0)
+          $("#fd_btn_loaddata").removeClass("air_disabledbutton");
+        else
+          $("#fd_btn_loaddata").addClass("air_disabledbutton");
+
+
+      });
+    }
+}
+
+function highlightFairdomColumn() {
+    highlightColumn({
+        selectedColumn: $("#fd_select_column").val(),
+        data: air_fairdom.current_data,
+        markerArray: air_fairdom.added_markers,
+        includeNonMapped: $("#fd_cb_nonmapped").prop('checked'),
+        markerPrefix: "fairdom_marker_"
+    });
 }
 
 $(document).on('click', '.node_map_link', function(e) {
     e.preventDefault();
-    var id = $(this).data('id');
+    var minerva_id = $(this).data('id')
+
+    minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
     
-    minerva.map.triggerSearch({ query: $(this).text()});
+    minerva.map.openMap({ id: minerva_id[0] });
+
+    minerva.map.fitBounds({
+      x1: minerva_id[4],
+      y1: minerva_id[5],
+      x2: minerva_id[4] + minerva_id[3],
+      y2: minerva_id[5] + minerva_id[2]
+    });
 });
 
 function buildJsTreeNodes(obj, typeHint = "", dictKey = "") {
