@@ -116,6 +116,12 @@ function initPlugin() {
     pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/SYLOBIO/SYLOBIO.js'
   });
   window.air_data.container = element;
+
+  window.air_data.minerva_events = {
+      "addListener": addListener,
+      "removeListener": removeListener,
+      "removeAllListeners": removeAllListeners,
+  };
   createStructure();
 }
 initPlugin();
