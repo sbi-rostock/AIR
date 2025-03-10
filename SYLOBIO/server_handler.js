@@ -182,7 +182,7 @@ async function initialize_server() {
         
         air_data.session_token = session_token;
         buildPLuginNavigator();
-        loadAndExecuteScripts(["fairdom.js", "omics.js"]);
+        loadAndExecuteScripts(["omics.js", "fairdom.js"]);
         resetSessionWarningTimer();
     } catch (error) {
         console.error("Error while initializing:", error);
@@ -195,16 +195,16 @@ buildPLuginNavigator = () => {
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
                 <li class="air_nav_item nav-item" style="width: 50%;">
-                    <a class="air_tab active nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">FAIRDOM</a>
-                </li>
+                    <a class="air_tab active nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">Omics</a>
+                </li>   
                 <li class="air_nav_item nav-item" style="width: 50%;">
-                    <a class="air_tab nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">AirOmics</a>
-                </li>                
+                    <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="true">FAIRDOM</a>
+                </li>             
             </ul>
             <div class="tab-content air_tab_content" id="air_tabs" style="height:calc(100% - 45px);background-color: white;">
-                <div class="tab-pane show active" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
+                <div class="tab-pane show active" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
                 </div>
-                <div class="tab-pane show" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
+                <div class="tab-pane show" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
                 </div>
             </div>
     `);
