@@ -102,7 +102,7 @@ async function omics() {
             <div class="card card-body">
                 <form id="omics_queryform" class="d-flex mb-2">
                     <input type="text" id="omics_query_input" class="form-control me-2" style="flex: 1;" aria-label="Text input with segmented dropdown button">
-                    <button type="button" type="submit" id="omics_btn_query" class="btn btn-outline-secondary">Submit</button>
+                    <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
                 </form>
                 <div id="analysis-content" style="width: 100%; height: 400px; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 10px;">
 
@@ -196,6 +196,7 @@ async function omics() {
         } catch (err) {
             console.error("Error processing omics file:", err);
             alert(`Failed to process file: ${err.message}`);
+        } finally {
             enablebutton("#omics_btn_submit", btn_text);
         }
     });
@@ -265,6 +266,7 @@ async function omics() {
         } catch (err) {
             console.error("Error loading data:", err);
             alert(`Failed to load data: ${err.message}`);
+        } finally {
             enablebutton("#omics_btn_viewdata", btn_text);
         }
     });
@@ -288,8 +290,10 @@ async function omics() {
         } catch (err) {
             console.error("Error deleting data:", err);
             alert(`Failed to delete data: ${err.message}`);
+        } finally {
             enablebutton("#omics_btn_deletedata", btn_text);
         }
+
     });
 
     // Handle analysis button click
@@ -313,6 +317,8 @@ async function omics() {
         } catch (err) {
             console.error("Error during analysis:", err);
             alert(`Analysis failed: ${err.message}`);
+        }
+        finally {
             enablebutton("#omics_btn_analyze", btn_text);
         }
     });
@@ -331,54 +337,158 @@ async function omics() {
 
             console.log(response);
             
-            // Handle different response types
-            if (response.response_type === "html") {
-                // For HTML responses, just insert the content as before
-                $("#analysis-content").html(response.content);
-            } else if (response.response_type === "image") {
-                // For image responses, create an image element with the byte string
-                const imgHtml = `
-                    <div class="text-center">
-                        <img src="data:image/png;base64,${response.content}" 
-                             class="img-fluid analysis-image" 
-                             style="width: 100%; cursor: pointer;" 
-                             alt="Analysis Result">
-                        <p class="mt-2 text-muted small">Click on the image to expand</p>
-                    </div>
-                `;
-                $("#analysis-content").html(imgHtml);
+            // Clear existing content first
+            $("#analysis-content").empty();
+            
+            // Convert response to array if not already
+            const responses = Array.isArray(response) ? response : [response];
+            
+            // Handle each response
+            for (const response of responses) {
+                if (response.response_type === "html") {
+                    // For HTML responses
+                    $("#analysis-content").append(response.content);
+                }
                 
-                $(".analysis-image").on('click', function() {
-                    // Construct the modal HTML with inline styles to ensure full-page coverage
-                    const modalHTML = `
-                      <div id="air_Modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                           background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
-                        <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
-                             max-width: 90%; max-height: 90%; overflow: auto;">
-                          <button id="air_closeModal" style="position: absolute; top: 10px; right: 10px;
-                               background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-                          <img src="data:image/png;base64,${response.content}" style="max-width: 100%; max-height: 100%;" alt="Analysis Result">
+                if (response.response_type === "image") {
+                    // For image responses
+                    const imgContainer = $(`
+                        <div class="text-center">
+                            <img src="data:image/png;base64,${response.content}" 
+                                 class="img-fluid analysis-image" 
+                                 style="width: 100%; cursor: pointer;" 
+                                 alt="Analysis Result">
+                            <p class="mt-2 text-muted small">Click on the image to expand</p>
                         </div>
-                      </div>
-                    `;
-                  
-                    // Append the modal to the parent window's body
-                    $(window.parent.document.body).append(modalHTML);
-                  
-                    // Add an event listener on the parent to remove the modal when the close button is clicked
-                    $(window.parent.document).on('click', '#air_closeModal', function() {
-                      $('#air_Modal', window.parent.document).remove();
+                    `);
+                    $("#analysis-content").append(imgContainer);
+                    
+                    $(".analysis-image").on('click', function() {
+                        const modalHTML = `
+                          <div id="air_Modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                               background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
+                            <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
+                                 max-width: 90%; max-height: 90%; overflow: auto;">
+                              <button id="air_closeModal" style="position: absolute; top: 10px; right: 10px;
+                                   background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                              <img src="data:image/png;base64,${response.content}" style="max-width: 100%; max-height: 100%;" alt="Analysis Result">
+                            </div>
+                          </div>
+                        `;
+                      
+                        $(window.parent.document.body).append(modalHTML);
+                      
+                        $(window.parent.document).on('click', '#air_closeModal', function() {
+                          $('#air_Modal', window.parent.document).remove();
+                        });
                     });
-                  });
-            } else {
-                // For any other type, display as text
-                $("#analysis-content").html(`<pre>${response.response}</pre>`);
+                }
+
+                if (response.response_type === "highlight") {
+
+                    var markers = response.content.map(minerva_id => ({
+                        id: minerva_id[0],
+                        x: minerva_id[1], 
+                        y: minerva_id[2],
+                        width: minerva_id[3],
+                        height: minerva_id[4],
+                        modelId: minerva_id[5],
+                        value: minerva_id[6]
+                    }))
+                    highlightValues(markers);
+                }
+
+                if (response.response_type === "table") {
+                    // For table responses
+                    const tableContent = response.content;
+                    
+                    // Create a container for the table
+                    const tableHtml = `
+                        <div class="mt-3">
+                            <div id="query-table-container" style="width: 100%; overflow-x: auto; font-size: 12px;">
+                                <table id="query_result_table" class="display" width="100%"></table>
+                            </div>
+                        </div>
+                    `;
+                    
+                    $("#analysis-content").html(tableHtml);
+                    
+                    const columns = tableContent.columns.map((col, index) => {
+                        if (col === "index") {
+                            return {
+                                data: index,
+                                title: col,
+                                render: (data, type, row) => {
+                                    return row[row.length - 1] ? 
+                                        `<a href="#" class="node_map_link" data-id="${row[row.length - 1]}">${data}</a>` : 
+                                        data;
+                                }
+                            };
+                        }
+                        return {
+                            data: index,
+                            title: col
+                        };
+                    });
+
+                    // Initialize DataTable
+                    const table = $('#query_result_table').DataTable({
+                        data: tableContent.data,
+                        columns: columns.slice(0, -1),
+                        dom: "<'top'<'dt-length'l><'dt-search'f>>" +
+                        "<'clear'>" +
+                        "rt" +
+                        "<'bottom'ip><'clear'>",
+                        scrollY: '50vh',
+                        scrollX: true,
+                        paging: true,
+                        searching: true,
+                        destroy: true,
+                        "buttons": [
+                            {
+                                text: 'Copy',
+                                className: 'air_dt_btn',
+                                action: function () {
+                                    copyContent(getDTExportString(table));
+                                }
+                            },
+                            {
+                                text: 'CSV',
+                                className: 'air_dt_btn',
+                                action: function () {
+                                    download_data("Enrichment_results.csv", getDTExportString(table, seperator = ","))
+                                }
+                            },
+                            {
+                                text: 'TSV',
+                                className: 'air_dt_btn',
+                                action: function () {
+                                    download_data("Enrichment_results.txt", getDTExportString(table))
+                                }
+                            }
+                        ],
+                    });
+                    
+                    // Setup click handler for minerva links
+                    $('#query_result_table').on('click', '.minerva-link', function(e) {
+                        e.preventDefault();
+                        const entityId = $(this).data('id');
+                        
+                        // Use the setupNodeMapLinks functionality
+                        if (window.minerva && entityId) {
+                            minerva.data.bioEntities.highlightBioEntity(entityId);
+                            minerva.data.bioEntities.scrollToBioEntity(entityId);
+                        }
+                    });
+                }
+                    
             }
             
             enablebutton("#omics_btn_query", btn_text);  
         } catch (err) {
-            console.error("Error processing omics file:", err);
-            alert(`Failed to process file: ${err.message}`);
+            console.error("Error processing query:", err);
+            alert(`Failed to process query: ${err.message}`);
+        } finally {
             enablebutton("#omics_btn_query", btn_text);
         }
     });

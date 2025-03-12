@@ -234,11 +234,7 @@ function build_project_tree(project_data) {
             const itemType = parts[0];  
             const itemId   = parts.slice(1).join("-");
             if (itemType === "data") {
-              air_fairdom.selected_items.push([node.text, itemId])
-            }
-            else
-            {
-              air_fairdom.selected_items = []
+              air_fairdom.selected_items.push([selectedNode.text, itemId])
             }
         });
 

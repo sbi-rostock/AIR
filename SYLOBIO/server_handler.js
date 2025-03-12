@@ -371,7 +371,7 @@ function processDataForTable(data, includeLinks = false) {
     });
 
     return {
-        columns: columns.slice(0, -1), // Remove last column (usually metadata)
+        columns: columns.slice(0, -1),
         data: data.data
     };
 }
@@ -483,22 +483,94 @@ function highlightValues(data, remove = true) {
     }
 
     var new_markers = data.map(function(entity) {
-        var marker_id = "marker_" + entity.id;
-        air_omics.added_markers.push(marker_id);
-        return {
-            type: 'surface',
-            opacity: 0.67,
-            x: entity.x,
-            y: entity.y,
-            width: entity.width,
-            height: entity.height,
-            modelId: entity.modelId,
-            id: marker_id,
-            color: valueToHex(entity.value)
-        };
-    });
+        // Convert single value to array if needed
+        const values = Array.isArray(entity.value) ? entity.value : [entity.value];
+        
+        // Calculate width of each slice
+        const sliceWidth = entity.width / values.length;
+        
+        // Create markers for each value
+        return values.map((value, index) => {
+            const marker_id = "marker_" + entity.id + "_" + index;
+            air_omics.added_markers.push(marker_id);
+            return {
+                type: 'surface',
+                opacity: 0.67,
+                x: entity.x + (index * sliceWidth), // Offset x by slice position
+                y: entity.y,
+                width: sliceWidth,
+                height: entity.height,
+                modelId: entity.modelId,
+                id: marker_id,
+                color: valueToHex(value)
+            };
+        });
+    }).flat(); // Flatten array of arrays into single array
 
     for(var marker of new_markers) {
         minerva.data.bioEntities.addSingleMarker(marker);
     }
+}
+
+
+function getDTExportString(dt, seperator = "\t") {
+    let output = [];
+
+
+    dt.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        output.push(this.data().map(function (cell) {
+            return extractContent(cell);
+        }));
+    });
+
+    let columnstodelete = [];
+
+    if (output.length > 1) {
+        let index_hasValue = {}
+        for (let i in output[0]) {
+            index_hasValue[i] = false;
+        }
+        for (let row of output) {
+            for (let i in row) {
+                if (row[i] != "") {
+                    index_hasValue[i] = true;
+                }
+            }
+        }
+
+        columnstodelete = Object.keys(index_hasValue).filter(key => index_hasValue[key] === false)
+    }
+
+
+    output.unshift([]);
+    dt.columns().every(function () {
+        output[0].push(this.header().textContent)
+    })
+
+    output = output.map(row => {
+
+        let newarray = []
+        for (let i in row) {
+            if (!columnstodelete.includes(i)) {
+                newarray.push(row[i]);
+            }
+        }
+        return newarray
+    });
+
+    return output.map(e => e.join(seperator)).join("\n");
+}
+
+function download_data(filename, data) {
+
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data));
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
 }
