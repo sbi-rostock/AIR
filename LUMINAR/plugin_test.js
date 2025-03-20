@@ -112,7 +112,7 @@ function initPlugin() {
   } = minerva.plugins.registerPlugin({
     pluginName: TESTING ? 'LUMINAR Test' : 'LUMINAR',
     pluginVersion: '1.0.0',
-    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/plugin.js'
+    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/plugin_test.js'
   });
   window.air_data.container = element;
   window.air_data.minerva_events = {
