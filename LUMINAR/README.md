@@ -1,3 +1,5 @@
+![Luminar](https://github.com/user-attachments/assets/b1e202fc-aa40-4b59-b655-6cc59ce8719b)
+
 # Overview
 
 This resource presents JavaScript and Python files for LUMINAR tool, which is a MINERVA plugin.
