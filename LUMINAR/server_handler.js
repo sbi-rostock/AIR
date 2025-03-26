@@ -84,27 +84,7 @@ function getDataFromServer(request, data = {}, type = "GET", datatype = "text", 
     const ajaxOptions = {
         type: type,
         url: air_data.SBI_SERVER + request,
-        dataType: datatype,
-        success: function (data) {
-            return data;
-        },
-        error: function (xhr, status, error) {
-            // Log detailed error information
-            console.error("Server request failed:", {
-                endpoint: request,
-                status: xhr.status,
-                statusText: xhr.statusText,
-                responseText: xhr.responseText,
-                error: error
-            });
-            
-            // If there's a JSON response with error details, throw that
-            if (xhr.responseJSON && xhr.responseJSON.error) {
-                throw new Error(xhr.responseJSON.error);
-            }
-            // Otherwise throw the general error
-            throw new Error(error || xhr.statusText);
-        }
+        dataType: datatype
     };
 
     // Handle FormData vs JSON data
@@ -119,8 +99,41 @@ function getDataFromServer(request, data = {}, type = "GET", datatype = "text", 
 
     return new Promise((resolve, reject) => {
         $.ajax(ajaxOptions)
-            .done(resolve)
-            .fail(reject);
+            .done((data) => {
+                try {
+                    if (datatype === "json" && typeof data === "string") {
+                        data = JSON.parse(data);
+                    }
+                    resolve(data);
+                } catch (e) {
+                    reject(e); // Properly reject the promise if parsing fails
+                }
+            })
+            .fail((xhr, status, error) => {
+                // Log detailed error information
+                console.error("Server request failed:", {
+                    endpoint: request,
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText,
+                    error: error
+                });
+                
+                // Create an error object to reject with
+                let errorObj;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorObj = new Error(xhr.responseJSON.error);
+                } else {
+                    errorObj = new Error(error || xhr.statusText || "Unknown error");
+                }
+                
+                // Add xhr properties to the error object for more context
+                errorObj.status = xhr.status;
+                errorObj.responseText = xhr.responseText;
+                
+                // Reject the promise with the error
+                reject(errorObj);
+            });
     });
 }
 
@@ -273,9 +286,11 @@ async function disablebutton(id, progress = false) {
                 $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');
             }
             else {
+                // Remove padding when showing progress bar to prevent cutoff
+                $btn.css('padding', '0');
                 $btn.empty().append(`<div class="air_progress position-relative">
                     <div id= "${id}_progress" class="air_progress_value"></div>
-                    <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100"><span class="loadingspinner spinner-border spinner-border-sm me-1" style="margin-top: 5px;"></span> 0% </span>
+                    <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100"><span class="loadingspinner spinner-border spinner-border-sm me-2 mt-1"></span> 0% </span>
                 </div>`);
             }
 
@@ -297,6 +312,8 @@ async function enablebutton(id, text) {
                 $(this).removeClass("air_temp_disabledbutton");
             });
             var $btn = $('#' + id);
+            // Restore default padding
+            $btn.css('padding', '');
             $btn.html(text);
             resolve('');
         }, 0);
@@ -309,7 +326,7 @@ async function updateProgress(value, max, progressbar, text = "") {
         let percentage = (max == 0 ? 0 : Math.ceil(value * 100 / max));
         setTimeout(function () {
             $("#" + progressbar + "_progress").width(percentage + "%");
-            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-1"></span> ' + percentage + "% " + text);
+            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-2 mt-1"></span> ' + percentage + "% " + text);
             resolve('');
         }, 0);
     });
