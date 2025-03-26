@@ -1,8 +1,8 @@
+![Luminar](https://github.com/user-attachments/assets/b1e202fc-aa40-4b59-b655-6cc59ce8719b)
+
 # Overview
 
-This resource presents JavaScript and Python files for LUMINAR tool, which is a MINERVA plugin.
-
-The tool has been developed in the Disease Map projects at the Department of Systems Biology and Bioinformatics at the University of Rostock and were developed by Matti van Welezen.
+This resource presents JavaScript and Python files for LUMINAR tool, a MINERVA plugin for the exploration and data analysis on Disease Maps developed by Matti van Welzen at the Department of Systems Biology and Bioinformatics, University of Rostock, Germany.
 
 The Javascript files generate the UI in MINERVA while the PYthon scipts allow, independently from MINERVA, the processing and analysis of Knowledge Graphs from SBML files.
 
