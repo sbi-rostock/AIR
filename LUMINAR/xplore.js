@@ -37,7 +37,7 @@ async function xplore() {
 
     // Handle query button click
     $("#xplore_btn_query").on('click', async function() {
-        var btn_text = await disablebutton("#xplore_btn_query");
+        var btn_text = await disablebutton("xplore_btn_query");
         
         try {
             const response = await getDataFromServer(
@@ -56,7 +56,7 @@ async function xplore() {
             console.error("Error processing query:", err);
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "xplore", $("#xplore_query_input").val(), "Xplore");
         } finally {
-            enablebutton("#xplore_btn_query", btn_text);
+            enablebutton("xplore_btn_query", btn_text);
         }
     });
 } 

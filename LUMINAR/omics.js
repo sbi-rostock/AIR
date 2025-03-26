@@ -26,7 +26,7 @@ async function omics() {
             <div class="card card-body">
                 <form id="omics_fileForm">
                     <div class="mb-2">
-                        <input type="file" class="form-control" id="omics_file" accept=".csv,.txt,.tsv">
+                        <input type="file" class="form-control" id="omics_file" accept=".csv,.txt,.tsv" multiple>
                     </div>
                     <div class="form-check mb-2" style="display: flex; align-items: center; gap: 5px;">
                         <div>
@@ -91,7 +91,7 @@ async function omics() {
         <div class="collapse" id="omics_collapse_3">
             <div class="card card-body">
                 <div style="text-align: center;">
-                    <button id="omics_btn_analyze" class="air_btn btn air_disabledbutton">Run Analysis</button>
+                    <button type="button" id="omics_btn_analyze" style="width: 100%;" class="air_btn btn btn-block air_disabledbutton">Run Analysis</button>
                 </div>
             </div>
         </div>
@@ -133,10 +133,12 @@ async function omics() {
 
     // Add file input change handler for p-value detection
     $("#omics_file").on('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
         try {
+            // Check first file to detect p-values
+            const file = files[0];
             const content = await file.text();
             const lines = content.split('\n');
             if (lines.length < 2) return;  // Need at least header and one data row
@@ -158,46 +160,49 @@ async function omics() {
         e.preventDefault();
 
         const fileInput = $("#omics_file")[0];
-        const file = fileInput.files[0];
+        const files = fileInput.files;
 
-        if (!file) {
-            alert('Please select a file first');
+        if (!files || files.length === 0) {
+            alert('Please select at least one file first');
             return;
         }
 
         try {
-            var btn_text = await disablebutton("#omics_btn_submit");
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('has_pvalues', $("#omics_cb_pvalues").prop('checked'));
-            formData.append('session', air_data.session_token);
+            var btn_text = await disablebutton("omics_btn_submit");
             
-            const response = await getDataFromServer(
-                "sylobio/process_omics", 
-                formData, 
-                "POST",
-                "json",
-            );
+            // Process each file
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('has_pvalues', $("#omics_cb_pvalues").prop('checked'));
+                formData.append('session', air_data.session_token);
+                
+                const response = await getDataFromServer(
+                    "sylobio/process_omics", 
+                    formData, 
+                    "POST",
+                    "json",
+                );
 
-            // Add data to the tree
-            addDataToTree('user', file.name, response.data_id);
-            
-            // Enable and show next section
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_1')).hide();
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_2')).show();
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).show();
+                // Add data to the tree
+                addDataToTree('user', file.name, response.data_id);
+            }
 
             $("#omics_collapse_2_btn").removeClass("air_disabledbutton");
             $("#omics_collapse_3_btn").removeClass("air_disabledbutton");
 
-            enablebutton("#omics_btn_submit", btn_text);
+            enablebutton("omics_btn_submit", btn_text);            
+            // Enable and show next section
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_1')).hide();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_2')).show();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).show();
             
         } catch (err) {
             console.error("Error processing omics file:", err);
             alert(`Failed to process file: ${err.message}`);
         } finally {
-            enablebutton("#omics_btn_submit", btn_text);
+            enablebutton("omics_btn_submit", btn_text);
         }
     });
 
@@ -207,10 +212,8 @@ async function omics() {
         // Get all selected nodes
         const selectedNodes = $('#omics_data_treeview').jstree('get_selected', true);
         
-        // Reset and rebuild the selected_data_ids list
+        // Reset selected data ids and add all currently selected nodes
         air_omics.selected_data_ids = [];
-        
-        // Add data_id of each selected node to the list if it exists
         selectedNodes.forEach(function(selectedNode) {
             if (selectedNode.original.data_id) {
                 air_omics.selected_data_ids.push(selectedNode.original.data_id);
@@ -239,7 +242,7 @@ async function omics() {
         if (air_omics.selected_data_ids.length != 1) return;
 
         try {
-            var btn_text = await disablebutton("#omics_btn_viewdata");
+            var btn_text = await disablebutton("omics_btn_viewdata");
 
             // Get the data from the tree
             const data = await getDataFromTree(air_omics.selected_data_ids[0]);
@@ -262,19 +265,19 @@ async function omics() {
             $("#omics_collapse_3_btn").removeClass("air_disabledbutton");
             $("#omics_collapse_viewdata_btn").removeClass("air_disabledbutton");
 
-            enablebutton("#omics_btn_viewdata", btn_text);
+            enablebutton("omics_btn_viewdata", btn_text);
         } catch (err) {
             console.error("Error loading data:", err);
             alert(`Failed to load data: ${err.message}`);
         } finally {
-            enablebutton("#omics_btn_viewdata", btn_text);
+            enablebutton("omics_btn_viewdata", btn_text);
         }
     });
     $('#omics_btn_deletedata').on('click', async function() {
         if (air_omics.selected_data_ids.length == 0) return;
 
         try {
-            var btn_text = await disablebutton("#omics_btn_deletedata");
+            var btn_text = await disablebutton("omics_btn_deletedata");
 
             const response = await getDataFromServer(
                 "sylobio/delete_omics",
@@ -286,12 +289,12 @@ async function omics() {
             // Remove the data from the tree
             removeDataFromTree(air_omics.selected_data_ids);
 
-            enablebutton("#omics_btn_deletedata", btn_text);
+            enablebutton("omics_btn_deletedata", btn_text);
         } catch (err) {
             console.error("Error deleting data:", err);
             alert(`Failed to delete data: ${err.message}`);
         } finally {
-            enablebutton("#omics_btn_deletedata", btn_text);
+            enablebutton("omics_btn_deletedata", btn_text);
         }
 
     });
@@ -299,34 +302,62 @@ async function omics() {
     // Handle analysis button click
     $("#omics_btn_analyze").on('click', async function() {
         try {
-            var btn_text = await disablebutton("#omics_btn_analyze");
+            var btn_text = await disablebutton("omics_btn_analyze", progress = true);
+            
+            const total = air_omics.selected_data_ids.length;
 
-            // Request analysis from server
-            const response = await getDataFromServer(
-                "sylobio/analyze_omics",
+            await updateProgress(0, total, "omics_btn_analyze", text = `Initialising...`);
+
+            await getDataFromServer(
+                "sylobio/prepare_LLM",
                 { data_ids: air_omics.selected_data_ids },
                 "POST",
                 "json"
             );
+            
+            // Process each dataset separately
+            for (let i = 0; i < total; i++) {
 
+                // Update progress bar with current file information
+                await updateProgress(i, total, "omics_btn_analyze", text = `Processing dataset ${i+1}/${total} ...`);
+
+                // Request analysis for the current dataset from server
+                await getDataFromServer(
+                    "sylobio/analyze_data",
+                    { data_id: i},
+                    "POST",
+                    "json"
+                );
+            }
+            
+            // Final progress update
+            await updateProgress(total, total, "omics_btn_analyze", text = "Initialising LLM...");
+
+            await getDataFromServer(
+                "sylobio/initialize_LLM",
+                {},
+                "POST",
+                "json"
+            );
+            
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).hide();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_4')).show();
             $("#omics_collapse_4_btn").removeClass("air_disabledbutton");
 
-            enablebutton("#omics_btn_analyze", btn_text);
+            enablebutton("omics_btn_analyze", btn_text);
         } catch (err) {
             console.error("Error during analysis:", err);
             alert(`Analysis failed: ${err.message}`);
         }
         finally {
-            enablebutton("#omics_btn_analyze", btn_text);
+            enablebutton("omics_btn_analyze", btn_text);
         }
     });
 
     // Handle file upload form submission
     $("#omics_btn_query").on('click', async function() {
         try {
-            var btn_text = await disablebutton("#omics_btn_query");
+            var btn_text = await disablebutton("omics_btn_query");
             
             const response = await getDataFromServer(
                 "sylobio/query_llm",
@@ -340,13 +371,13 @@ async function omics() {
             // Use the generalized function to process responses
             processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");
             
-            enablebutton("#omics_btn_query", btn_text);  
+            enablebutton("omics_btn_query", btn_text);  
         } catch (err) {
             console.error("Error processing query:", err);
             
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", $("#omics_query_input").val(), "analysis");
         } finally {
-            enablebutton("#omics_btn_query", btn_text);
+            enablebutton("omics_btn_query", btn_text);
         }
     });
     
@@ -446,7 +477,7 @@ function removeDataFromTree(dataIds) {
 async function getDataFromTree(dataId) {
     // Search for the data in all sources
     try {
-        var btn_text = await disablebutton("#omics_btn_viewdata");
+        var btn_text = await disablebutton("omics_btn_viewdata");
 
         const response = await getDataFromServer(
             "sylobio/get_omics_data",
@@ -455,12 +486,12 @@ async function getDataFromTree(dataId) {
             "json"
         );
 
-        enablebutton("#omics_btn_viewdata", btn_text);
+        enablebutton("omics_btn_viewdata", btn_text);
 
         return response;
     } catch (err) {
         console.error("Error getting data from tree:", err);
-        enablebutton("#omics_btn_viewdata", btn_text);
+        enablebutton("omics_btn_viewdata", btn_text);
         return null;
     }
 }

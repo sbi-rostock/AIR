@@ -513,6 +513,7 @@ input[type=checkbox] .cbcontainer {
 .air_progress_value {
   background-color: #ff5959;
   height: 100%;
+  width: 0%;
 }
 
 .air_progress_label {

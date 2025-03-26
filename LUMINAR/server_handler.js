@@ -152,7 +152,7 @@ async function GetProjectHash(project_data) {
         // intiialize_model is requested anyway
         if (sessionData.needs_model_init) {
             if (loadingText.length) {
-                loadingText.text("This is the first time the project is loaded since the last server restart... This may take a moment.");
+                loadingText.text("This is the first time this project has been loaded since the last server restart... This may take a moment.");
             }
         }
             
@@ -265,45 +265,56 @@ function loadAndExecuteScripts(urls) {
 async function disablebutton(id, progress = false) {
     var promise = new Promise(function (resolve, reject) {
         setTimeout(() => {
-            var $btn = $(id);
+            var $btn = $('#' + id);
             var btnWidth = $btn.outerWidth();
             $btn.css('width', btnWidth + 'px');
-
-            let originalContent = $btn.html();
-            
-            if (!progress) {
+            let text = $btn.html();
+            if (progress == false) {
                 $btn.html('<span class="loadingspinner spinner-border spinner-border-sm"></span>');
-            } else {
-                $btn.empty().append(`
-                    <div class="air_progress position-relative mb-4">
-                        <div id="${id}_progress" class="air_progress_value"></div>
-                        <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100">0 %</span>
-                    </div>
-                `);
+            }
+            else {
+                $btn.empty().append(`<div class="air_progress position-relative">
+                    <div id= "${id}_progress" class="air_progress_value"></div>
+                    <span id="${id}_progress_label" class="air_progress_label justify-content-center d-flex position-absolute w-100"><span class="loadingspinner spinner-border spinner-border-sm me-1" style="margin-top: 5px;"></span> 0% </span>
+                </div>`);
             }
 
-            $(".air_btn").each(function () {
-                $(this).addClass("air_temp_disabledbutton");
+            $(".air_btn").each(function (pindex) {
+                var airbtn = $(this)
+                airbtn.addClass("air_temp_disabledbutton");
             });
-            resolve(originalContent);
+            resolve(text)
         }, 0);
     });
     return promise;
 }
 
-async function enablebutton(id, originalContent) {
+async function enablebutton(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
-            $(".air_btn").each(function () {
+
+            $(".air_btn").each(function (pindex) {
                 $(this).removeClass("air_temp_disabledbutton");
             });
-            var $btn = $(id);
-            $btn.html(originalContent);
-            $btn.css('width', '');
+            var $btn = $('#' + id);
+            $btn.html(text);
             resolve('');
         }, 0);
     });
 }
+
+
+async function updateProgress(value, max, progressbar, text = "") {
+    return new Promise(resolve => {
+        let percentage = (max == 0 ? 0 : Math.ceil(value * 100 / max));
+        setTimeout(function () {
+            $("#" + progressbar + "_progress").width(percentage + "%");
+            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-1"></span> ' + percentage + "% " + text);
+            resolve('');
+        }, 0);
+    });
+}
+
 
 function rgbToHex(rgb) {
     var hex = Number(Math.round(rgb)).toString(16);
@@ -714,10 +725,36 @@ function now() {
 function processServerResponses(response, origin, queryText = "", filePrefix = "Export") {
     var containerId = "#" + origin + "_analysis_content";
     
+    // Check if we need to initialize the container
+    if ($(containerId).find('.responses-wrapper').length === 0) {
+        // First time - create the scrollable container
+        $(containerId).html(`
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <button id="${origin}_clear_btn" class="btn btn-sm btn-outline-danger">Clear History</button>
+                </div>
+            </div>
+            <div class="responses-wrapper" style="height:500px; overflow-y:scroll, border: 1px solid #dee2e6; border-radius: 4px;"></div>
+        `);
+        
+        // Add clear history button handler
+        $(`#${origin}_clear_btn`).on('click', function() {
+            $(containerId).find('.responses-wrapper').empty();
+        });
+    }
+
+    // Get the responses wrapper after ensuring it exists
+    const responsesWrapper = $(containerId).find('.responses-wrapper');
+    
     // Create a container for the current response with timestamp
     const timestamp = new Date().toLocaleTimeString();
+    
+    // Create the response container
     const responseContainer = $(`<div class="response-container mt-3 p-3 border-bottom"></div>`);
     
+    // Append the new response to the container (newest at bottom)
+    responsesWrapper.append(responseContainer);
+
     // Add query text if provided
     if (queryText) {
         const queryHeader = $(`
@@ -904,25 +941,30 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             const tableContent = response.content;
             const tableId = `${origin}_table_${Date.now()}`; // Unique ID for each table
             
+            // Debug logging
+            console.log('Table Content:', tableContent);
+            
             // Create a container for the table
             const tableHtml = $(`
                 <div class="mt-3">
-                    <div class="table-container" style="width: 100%; overflow-x: auto; font-size: 12px;">
-                        <table id="${tableId}" class="display" width="100%"></table>
+                    <div class="table-container" style="width: 100%; overflow-x: auto; font-size: 12px; background-color: white; padding: 10px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <table id="${tableId}" class="display" width="100%" style="margin-bottom: 0;"></table>
                     </div>
                 </div>
             `);
             
             responseContainer.append(tableHtml);
             
+            // Define columns before DataTable initialization
             const columns = tableContent.columns.map((col, index) => {
                 if (col === "index") {
                     return {
                         data: index,
                         title: col,
                         render: (data, type, row) => {
-                            return row[row.length - 1] ? 
-                                `<a href="#" class="node_map_link" data-id="${row[row.length - 1]}">${data}</a>` : 
+                            const minervaId = row[row.length - 1];
+                            return minervaId ? 
+                                `<a href="#" class="node_map_link" data-id="${minervaId}">${data}</a>` : 
                                 data;
                         }
                     };
@@ -933,94 +975,83 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 };
             });
 
-            // Initialize DataTable
-            const table = $(`#${tableId}`).DataTable({
-                data: tableContent.data,
-                columns: columns.slice(0, -1),
-                dom: "<'top'<'dt-length'l><'dt-search'f>>" +
-                "<'clear'>" +
-                "rt" +
-                "<'bottom'ip><'clear'>",
-                scrollY: '30vh',
-                scrollX: true,
-                paging: true,
-                searching: true,
-                destroy: true,
-                "buttons": [
-                    {
-                        text: 'Copy',
-                        className: 'air_dt_btn',
-                        action: function () {
-                            copyContent(getDTExportString(table));
-                        }
+            // Initialize DataTable with the defined columns
+            try {
+                const table = $(`#${tableId}`).DataTable({
+                    data: tableContent.data,
+                    columns: columns.slice(0, -1),
+                    dom: "<'top'<'dt-length'l><'dt-search'f>>" +
+                    "<'clear'>" +
+                    "rt" +
+                    "<'bottom'ip><'clear'>",
+                    scrollY: '50vh',
+                    scrollX: true,
+                    paging: true,
+                    searching: true,
+                    destroy: false,
+                    initComplete: function(settings, json) {
+                        console.log('DataTable initialized:', {
+                            tableId: tableId,
+                            rowCount: this.api().rows().count(),
+                            columnCount: this.api().columns().count()
+                        });
                     },
-                    {
-                        text: 'CSV',
-                        className: 'air_dt_btn',
-                        action: function () {
-                            download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","))
+                    "buttons": [
+                        {
+                            text: 'Copy',
+                            className: 'air_dt_btn',
+                            action: function () {
+                                copyContent(getDTExportString(table));
+                            }
+                        },
+                        {
+                            text: 'CSV',
+                            className: 'air_dt_btn',
+                            action: function () {
+                                download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","))
+                            }
+                        },
+                        {
+                            text: 'TSV',
+                            className: 'air_dt_btn',
+                            action: function () {
+                                download_data(`${filePrefix}_results.txt`, getDTExportString(table))
+                            }
                         }
-                    },
-                    {
-                        text: 'TSV',
-                        className: 'air_dt_btn',
-                        action: function () {
-                            download_data(`${filePrefix}_results.txt`, getDTExportString(table))
-                        }
-                    }
-                ],
-            });
-            
-            // Add export buttons
-            const exportButtons = $(`
-                <div class="mt-2 mb-2">
-                    <button class="btn btn-sm btn-outline-secondary copy-btn mr-2">Copy</button>
-                    <button class="btn btn-sm btn-outline-secondary csv-btn mr-2">CSV</button>
-                    <button class="btn btn-sm btn-outline-secondary tsv-btn">TSV</button>
-                </div>
-            `);
-            
-            tableHtml.append(exportButtons);
-            
-            exportButtons.find('.copy-btn').on('click', function() {
-                copyContent(getDTExportString(table));
-            });
-            
-            exportButtons.find('.csv-btn').on('click', function() {
-                download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","));
-            });
-            
-            exportButtons.find('.tsv-btn').on('click', function() {
-                download_data(`${filePrefix}_results.txt`, getDTExportString(table));
-            });
+                    ],
+                });
+                
+                // Add export buttons
+                const exportButtons = $(`
+                    <div class="mt-2 mb-2">
+                        <button class="btn btn-sm btn-outline-secondary copy-btn mr-2">Copy</button>
+                        <button class="btn btn-sm btn-outline-secondary csv-btn mr-2">CSV</button>
+                        <button class="btn btn-sm btn-outline-secondary tsv-btn">TSV</button>
+                    </div>
+                `);
+                
+                tableHtml.append(exportButtons);
+                
+                exportButtons.find('.copy-btn').on('click', function() {
+                    copyContent(getDTExportString(table));
+                });
+                
+                exportButtons.find('.csv-btn').on('click', function() {
+                    download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","));
+                });
+                
+                exportButtons.find('.tsv-btn').on('click', function() {
+                    download_data(`${filePrefix}_results.txt`, getDTExportString(table));
+                });
+            } catch (error) {
+                console.error('Error initializing DataTable:', error);
+            }
         }
         else {
             // For any other type, display as text
             responseContainer.append(`<pre>${response.content || response.response}</pre>`);
         }
     }
-    
-    // Check if we need to initialize the container
-    if ($(containerId).find('.responses-wrapper').length === 0) {
-        // First time - create the scrollable container
-        $(containerId).html(`
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <button id="${origin}_clear_btn" class="btn btn-sm btn-outline-danger">Clear History</button>
-                </div>
-            </div>
-            <div class="responses-wrapper" style="height:500px; overflow-y:scroll, border: 1px solid #dee2e6; border-radius: 4px;"></div>
-        `);
-        
-        // Add clear history button handler
-        $(`#${origin}_clear_btn`).on('click', function() {
-            $(containerId).find('.responses-wrapper').empty();
-        });
-    }
-    
-    // Append the new response to the container (newest at bottom)
-    const responsesWrapper = $(containerId).find('.responses-wrapper');
-    responsesWrapper.append(responseContainer);
     
     // Scroll to the bottom to show the new response
     responsesWrapper.scrollTop(responsesWrapper[0].scrollHeight);

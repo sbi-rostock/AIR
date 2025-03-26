@@ -1,6 +1,6 @@
 air_data.fairdom = {
     loaded_data: null,
-    selected_item: "",
+    selected_items: "",
     added_markers: [],
     container: null,
     current_data: null
@@ -95,25 +95,25 @@ async function fairdom() {
       const password = $("#fd_password").val();
 
       try {
-          var btn_text = await disablebutton("#fd_btn_submit")
+          var btn_text = await disablebutton("fd_btn_submit")
       
           var project_data = await getDataFromServer("sylobio/login", data = {"username":username, "password":password}, type = "POST")
           project_data = JSON.parse(project_data)
 
           build_project_tree(project_data)
 
-          enablebutton("#fd_btn_submit", btn_text)
+          enablebutton("fd_btn_submit", btn_text)
           
       } catch (err) {
           console.error("Error during FAIRDOM login:", err);
           alert(`Login failed: ${err.message}`);
-          enablebutton("#fd_btn_submit", btn_text)
+          enablebutton("fd_btn_submit", btn_text)
       }
   });
 
   $('#fd_btn_refresh').on('click', async function () {
     try {
-        var btn_text = await disablebutton("#fd_btn_refresh")
+        var btn_text = await disablebutton("fd_btn_refresh")
     
         var project_data = await getDataFromServer("sylobio/refresh", data = {}, type = "POST")
         project_data = JSON.parse(project_data)
@@ -123,46 +123,53 @@ async function fairdom() {
         $('#fd_data_treeview').jstree(true).settings.core.data = treeData;
         $('#fd_data_treeview').jstree(true).refresh();
         
-        enablebutton("#fd_btn_refresh", btn_text)
+        enablebutton("fd_btn_refresh", btn_text)
     } catch (err) {
         console.error("Error refreshing FAIRDOM data:", err);
         alert(`Failed to refresh data: ${err.message}`);
-        enablebutton("#fd_btn_refresh", btn_text)
+        enablebutton("fd_btn_refresh", btn_text)
     }
   })
 
   $('#fd_btn_loaddata').on('click', async function () {
     try {
 
-        if(air_fairdom.selected_item.length == 0)
+        if(air_fairdom.selected_items.length == 0)
           return
 
-        for(var selected_item of air_fairdom.selected_items)
+        for(var i = 0; i < air_fairdom.selected_items.length; i++)
         {
-          var btn_text = await disablebutton("#fd_btn_loaddata")
+          var btn_text = await disablebutton("fd_btn_loaddata")
           
           const rawData = await getDataFromServer(
             "sylobio/load_data", 
-            {"id": selected_item[1], "name": selected_item[0]},
+            {"id": air_fairdom.selected_items[i][1], "name": air_fairdom.selected_items[i][0]},
             "POST",
             "json",
           )
 
           // const rawData = JSON.parse(response);
           
-          addDataToTree('fairdom', selected_item[0], rawData);
+          addDataToTree('fairdom', air_fairdom.selected_items[i][0], rawData.data_id);
 
-          if(air_fairdom.selected_items.length == 1)
+          if(i == 0)
           {
+
+            const response = await getDataFromServer(
+              "sylobio/get_omics_data",
+              { data_id: rawData.data_id },
+              "POST",
+              "json"
+            );
             // Store the data ID
-            air_fairdom.current_data = rawData;
+            air_fairdom.current_data = response;
 
             // Setup the data table
-            const processedData = processDataForTable(rawData, true);
+            const processedData = processDataForTable(response, true);
             createDataTable('#fd_datatable', processedData.data, processedData.columns, {});
 
             // Setup column selector
-            setupColumnSelector('#fd_select_column', rawData.columns);
+            setupColumnSelector('#fd_select_column', response.columns);
             
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
@@ -173,12 +180,12 @@ async function fairdom() {
         }
 
 
-        enablebutton("#fd_btn_loaddata", btn_text)
+        enablebutton("fd_btn_loaddata", btn_text)
     } 
     catch (err) {
         console.error("Error loading FAIRDOM data:", err);
         alert(`Failed to load data: ${err.message}`);
-        enablebutton("#fd_btn_loaddata", btn_text)
+        enablebutton("fd_btn_loaddata", btn_text)
     }
   })
 
