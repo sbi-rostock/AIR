@@ -391,7 +391,7 @@ function processDataForTable(data, includeLinks = false) {
     }
 
     const columns = data.columns.map((col, index) => {
-        if (includeLinks && col === "index") {
+        if (includeLinks && index === 0) {
             return {
                 data: index,
                 title: col,
@@ -414,13 +414,13 @@ function processDataForTable(data, includeLinks = false) {
     };
 }
 
-function setupColumnSelector(selectId, columns, excludeColumns = ["index"]) {
+function setupColumnSelector(selectId, columns, excludeColumns = [0]) {
     const $select = $(selectId);
     $select.empty();
     $select.append($("<option selected>").attr("value", -1).text("None"));
     
     columns.forEach((col, index) => {
-        if (!excludeColumns.includes(col)) {
+        if (!excludeColumns.includes(index)) {
             $select.append($("<option>").attr("value", index).text(col));
         }
     });

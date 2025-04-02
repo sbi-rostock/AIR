@@ -51,11 +51,25 @@ async function fairdom() {
 
           </div>
 
+          <div class="form-check mt-4 mb-2" style="display: flex; align-items: center; gap: 5px;">
+            <div>
+              <input class="form-check-input" type="checkbox" id="fd_cb_pvalues">
+              <label class="form-check-label" for="fd_cb_pvalues">
+                Data includes p-values
+              </label>
+            </div>
+            <button type="button" class="air_btn_info btn btn-info btn-sm" 
+                    data-bs-toggle="tooltip" data-bs-placement="right"
+                    title="P-values should be in every second column (ignoring index column). Column names should contain 'pvalue' or 'p-value' (case insensitive).">
+              ?
+            </button>
+          </div>
+
           <div style="text-align: center;">
-            <button type="button" id="fd_btn_loaddata" class="air_btn btn air_disabledbutton mt-4 mb-2 mr-2">
+            <button type="button" id="fd_btn_loaddata" class="air_btn btn air_disabledbutton mr-2">
               Load Data File
             </button>
-            <button type="button" id="fd_btn_refresh" class="air_btn btn mt-4 mb-2">
+            <button type="button" id="fd_btn_refresh" class="air_btn btn">
               ↻ Refresh
             </button>
           </div>
@@ -141,41 +155,47 @@ async function fairdom() {
         {
           var btn_text = await disablebutton("fd_btn_loaddata")
           
-          const rawData = await getDataFromServer(
+          const rawDatasets = await getDataFromServer(
             "sylobio/load_data", 
-            {"id": air_fairdom.selected_items[i][1], "name": air_fairdom.selected_items[i][0]},
+            {
+              "id": air_fairdom.selected_items[i][1], 
+              "name": air_fairdom.selected_items[i][0],
+              "has_pvalues": $("#fd_cb_pvalues").prop('checked')
+            },
             "POST",
             "json",
           )
 
           // const rawData = JSON.parse(response);
-          
-          addDataToTree('fairdom', air_fairdom.selected_items[i][0], rawData.data_id);
-
-          if(i == 0)
+          for(var rawData of rawDatasets)
           {
+            addDataToTree('fairdom', rawData.name, rawData.data_id);
 
-            const response = await getDataFromServer(
-              "sylobio/get_omics_data",
-              { data_id: rawData.data_id },
-              "POST",
-              "json"
-            );
-            // Store the data ID
-            air_fairdom.current_data = response;
+            if(i == 0)
+            {
 
-            // Setup the data table
-            const processedData = processDataForTable(response, true);
-            createDataTable('#fd_datatable', processedData.data, processedData.columns, {});
+              const response = await getDataFromServer(
+                "sylobio/get_omics_data",
+                { data_id: rawData.data_id },
+                "POST",
+                "json"
+              );
+              // Store the data ID
+              air_fairdom.current_data = response;
 
-            // Setup column selector
-            setupColumnSelector('#fd_select_column', response.columns);
-            
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
-            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_3')).show();
-            
-            $("#fd_collapse_3_btn").removeClass("air_disabledbutton");
+              // Setup the data table
+              const processedData = processDataForTable(response, true);
+              createDataTable('#fd_datatable', processedData.data, processedData.columns);
+
+              // Setup column selector
+              setupColumnSelector('#fd_select_column', response.columns);
+              
+              bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
+              bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
+              bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_3')).show();
+              
+              $("#fd_collapse_3_btn").removeClass("air_disabledbutton");
+            }
           }
         }
 

@@ -185,8 +185,11 @@ async function omics() {
                     "json",
                 );
 
-                // Add data to the tree
-                addDataToTree('user', file.name, response.data_id);
+                for(var dataset of response)
+                {
+                    // Add data to the tree
+                    addDataToTree('user', dataset.name, dataset.data_id);
+                }
             }
 
             $("#omics_collapse_2_btn").removeClass("air_disabledbutton");
