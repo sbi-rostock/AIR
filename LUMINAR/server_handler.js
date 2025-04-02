@@ -397,7 +397,7 @@ function processDataForTable(data, includeLinks = false) {
                 title: col,
                 render: (data, type, row) => {
                     return row[row.length - 1] ? 
-                        `<a href="#" class="node_map_link" data-id="${row[row.length - 1]}">${data}</a>` : 
+                        `<a href="#" class="node_map_link" data-type="${col}" data-id="${row[row.length - 1]}">${data}</a>` : 
                         data;
                 }
             };
@@ -481,12 +481,12 @@ function setupNodeMapLinks() {
     $(document).on('click', '.node_map_link', function(e) {
         e.preventDefault();
         var minerva_id = $(this).data('id');
-
+        var type = $(this).data('type');
         if (typeof minerva_id === 'string') {
             minerva_id = JSON.parse(minerva_id);
         }
 
-        minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
+        minerva.map.triggerSearch({ query: (type == "name"? "" : (type + ":")) + $(this).text(), perfectSearch: true});
         
         minerva.map.openMap({ id: minerva_id[0] });
 
@@ -974,14 +974,14 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             
             // Define columns before DataTable initialization
             const columns = tableContent.columns.map((col, index) => {
-                if (col === "index") {
+                if (index === 0) {
                     return {
                         data: index,
                         title: col,
                         render: (data, type, row) => {
                             const minervaId = row[row.length - 1];
                             return minervaId ? 
-                                `<a href="#" class="node_map_link" data-id="${minervaId}">${data}</a>` : 
+                                `<a href="#" class="node_map_link" data-type="name" data-id="${minervaId}">${data}</a>` : 
                                 data;
                         }
                     };

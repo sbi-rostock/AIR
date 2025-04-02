@@ -26,7 +26,7 @@ async function omics() {
             <div class="card card-body">
                 <form id="omics_fileForm">
                     <div class="mb-2">
-                        <input type="file" class="form-control" id="omics_file" accept=".csv,.txt,.tsv" multiple>
+                        <input type="file" class="form-control" id="omics_file" multiple>
                     </div>
                     <div class="form-check mb-2" style="display: flex; align-items: center; gap: 5px;">
                         <div>
@@ -284,7 +284,7 @@ async function omics() {
 
             const response = await getDataFromServer(
                 "sylobio/delete_omics",
-                { data_id: air_omics.selected_data_ids},
+                { data_ids: air_omics.selected_data_ids},
                 "POST",
                 "json"
             );
@@ -411,7 +411,12 @@ function buildTreeData() {
             text: sourceData.title,
             icon: getSourceIcon(source),
             state: { opened: true },
-            children: []
+            children: [],
+            a_attr: {
+                'data-bs-toggle': 'tooltip',
+                'data-bs-placement': 'right',
+                title: sourceData.title
+            }
         };
 
         // Add data entries as children
@@ -420,7 +425,12 @@ function buildTreeData() {
                 id: `data-${dataId}`,
                 text: dataInfo.title,
                 icon: getDataIcon(dataInfo.type),
-                data_id: dataId
+                data_id: dataId,
+                a_attr: {
+                    'data-bs-toggle': 'tooltip',
+                    'data-bs-placement': 'right',
+                    title: dataInfo.title
+                }
             });
         }
 
@@ -447,7 +457,6 @@ function getDataIcon(type) {
 }
 
 function addDataToTree(source, title, data_id) {
-
     $("#omics_collapse_2_btn").removeClass("air_disabledbutton");
 
     // Add data to the tree structure
@@ -460,6 +469,12 @@ function addDataToTree(source, title, data_id) {
     if ($('#omics_data_treeview').jstree(true)) {
         $('#omics_data_treeview').jstree(true).settings.core.data = buildTreeData();
         $('#omics_data_treeview').jstree(true).refresh();
+        
+        // Reinitialize tooltips after tree refresh
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('#omics_data_treeview [data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
     }
 
     bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).show();
