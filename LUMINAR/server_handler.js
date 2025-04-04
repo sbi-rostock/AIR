@@ -198,6 +198,12 @@ async function initialize_server() {
             minerva.project.data.getProjectId(),
         ]);
         
+        // Add Font Awesome
+        const fontAwesomeLink = document.createElement('link');
+        fontAwesomeLink.rel = 'stylesheet';
+        fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css';
+        document.head.appendChild(fontAwesomeLink);
+        
         air_data.session_token = session_token;
         buildPLuginNavigator();
         loadAndExecuteScripts(["omics.js", "fairdom.js", "xplore.js"]);
@@ -326,7 +332,7 @@ async function updateProgress(value, max, progressbar, text = "") {
         let percentage = (max == 0 ? 0 : Math.ceil(value * 100 / max));
         setTimeout(function () {
             $("#" + progressbar + "_progress").width(percentage + "%");
-            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-2 mt-1"></span> ' + percentage + "% " + text);
+            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-1 mt-1"></span> ' + percentage + "% " + text);
             resolve('');
         }, 0);
     });
@@ -384,10 +390,16 @@ function createDataTable(containerId, data, columns, options = {}) {
     return $(containerId).DataTable(tableOptions);
 }
 
-function processDataForTable(data, includeLinks = false) {
+function processDataForTable(data, includeLinks = false, showMappedOnly = false) {
     if (!data || !data.columns || !data.data) {
         console.error("Invalid data format");
         return null;
+    }
+
+    // Filter data if showMappedOnly is true
+    let filteredData = data.data;
+    if (showMappedOnly) {
+        filteredData = data.data.filter(row => row[row.length - 1]);
     }
 
     const columns = data.columns.map((col, index) => {
@@ -410,7 +422,7 @@ function processDataForTable(data, includeLinks = false) {
 
     return {
         columns: columns.slice(0, -1),
-        data: data.data
+        data: filteredData
     };
 }
 

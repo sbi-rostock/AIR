@@ -9,6 +9,14 @@ air_data.omics = {
     data_tree: {
         fairdom: { title: "FAIRDOMHub", data: {} },
         user: { title: "User Uploads", data: {} }
+    },
+    data_types: {
+        "transcriptomics": "Transcriptomics",
+        "proteomics": "Proteomics",
+        "metabolomics": "Metabolomics",
+        "genomics": "Genomics",
+        "epigenomics": "Epigenomics",
+        "other": "Other"
     }
 }
 
@@ -43,6 +51,12 @@ async function omics() {
                     </div>
                     <div style="text-align: center;">
                         <button id="omics_btn_submit" type="submit" class="air_btn btn mb-2 mt-2">Upload and Process</button>
+                        <div style="font-size: 0.8em;">
+                            <a href="#" id="omics_example_data" class="air_link">Use example data</a>
+                            <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE131032" target="_blank" class="air_link" style="margin-left: 5px;">
+                                <i class="fas fa-info-circle"></i>
+                            </a>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -74,7 +88,13 @@ async function omics() {
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" value="" id="omics_cb_nonmapped">
                             <label class="form-check-label" for="omics_cb_nonmapped">
-                                Include non-mapped entries
+                                Normalize by total max in data
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" value="" id="omics_cb_mapped_only">
+                            <label class="form-check-label" for="omics_cb_mapped_only">
+                                Show only mapped entries
                             </label>
                         </div>
                         <div id="table-container" style="width: 100%; max-width: 800px; overflow-x: auto; font-size: 10px;">
@@ -90,6 +110,20 @@ async function omics() {
         </button>
         <div class="collapse" id="omics_collapse_3">
             <div class="card card-body">
+                <div class="d-flex gap-3 mb-2 justify-content-center">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="" id="omics_cb_downstream" checked>
+                        <label class="form-check-label" for="omics_cb_downstream">
+                            Downstream
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="" id="omics_cb_upstream">
+                        <label class="form-check-label" for="omics_cb_upstream">
+                            Upstream
+                        </label>
+                    </div>
+                </div>
                 <div style="text-align: center;">
                     <button type="button" id="omics_btn_analyze" style="width: 100%;" class="air_btn btn btn-block air_disabledbutton">Run Analysis</button>
                 </div>
@@ -130,6 +164,12 @@ async function omics() {
 
     $("#omics_cb_nonmapped").on('change', highlightOmicsColumn);
     $("#omics_select_column").on('change', highlightOmicsColumn);
+    $("#omics_cb_mapped_only").on('change', function() {
+        if (air_omics.loaded_data) {
+            const processedData = processDataForTable(air_omics.loaded_data, true, $(this).prop('checked'));
+            createDataTable('#omics_datatable', processedData.data, processedData.columns);
+        }
+    });
 
     // Add file input change handler for p-value detection
     $("#omics_file").on('change', async function(e) {
@@ -177,6 +217,7 @@ async function omics() {
                 formData.append('file', file);
                 formData.append('has_pvalues', $("#omics_cb_pvalues").prop('checked'));
                 formData.append('session', air_data.session_token);
+                formData.append('name', file.name);
                 
                 const response = await getDataFromServer(
                     "sylobio/process_omics", 
@@ -185,6 +226,12 @@ async function omics() {
                     "json",
                 );
 
+
+                if(response[0].hasOwnProperty('error'))
+                {
+                    alert("Could not process file: " + file.name + ". " + response[0].error);
+                    continue;
+                }
                 for(var dataset of response)
                 {
                     // Add data to the tree
@@ -206,6 +253,62 @@ async function omics() {
             alert(`Failed to process file: ${err.message}`);
         } finally {
             enablebutton("omics_btn_submit", btn_text);
+        }
+    });
+
+    // Handle example data click
+    $("#omics_example_data").on('click', async function(e) {
+        e.preventDefault();
+        try {
+            var btn_text = await disablebutton("omics_example_data");
+            
+            // Fetch example data from GitHub
+            const response = await fetch('https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/example%20data/GSE131032_Czarnewski_2019.txt');
+            if (!response.ok) {
+                throw new Error('Failed to fetch example data');
+            }
+            
+            const text = await response.text();
+            const blob = new Blob([text], { type: 'text/plain' });
+            const file = new File([blob], 'GSE131032_Czarnewski_2019.txt', { type: 'text/plain' });
+            
+            // Create a FormData object and append the file
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('has_pvalues', true);
+            formData.append('session', air_data.session_token);
+            formData.append('name', file.name);
+            
+            const processResponse = await getDataFromServer(
+                "sylobio/process_omics", 
+                formData, 
+                "POST",
+                "json",
+            );
+
+            if(processResponse[0].hasOwnProperty('error')) {
+                alert("Could not process example data: " + processResponse[0].error);
+                return;
+            }
+
+            for(var dataset of processResponse) {
+                // Add data to the tree
+                addDataToTree('user', dataset.name, dataset.data_id);
+            }
+
+            $("#omics_collapse_2_btn").removeClass("air_disabledbutton");
+            $("#omics_collapse_3_btn").removeClass("air_disabledbutton");
+
+            // Enable and show next section
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_1')).hide();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_2')).show();
+            bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).show();
+            
+        } catch (err) {
+            console.error("Error processing example data:", err);
+            alert(`Failed to process example data: ${err.message}`);
+        } finally {
+            enablebutton("omics_example_data", btn_text);
         }
     });
 
@@ -257,7 +360,7 @@ async function omics() {
             air_omics.loaded_data = data;
 
             // Setup the data table
-            const processedData = processDataForTable(data, true);
+            const processedData = processDataForTable(data, true, $("#omics_cb_mapped_only").prop('checked'));
             createDataTable('#omics_datatable', processedData.data, processedData.columns);
 
             // Setup column selector
@@ -307,30 +410,58 @@ async function omics() {
         try {
             var btn_text = await disablebutton("omics_btn_analyze", progress = true);
             
-            const total = air_omics.selected_data_ids.length;
+            var analysis_types = []
+            if($("#omics_cb_upstream").prop('checked')) analysis_types.push("upstream");
+            if($("#omics_cb_downstream").prop('checked')) analysis_types.push("downstream");
+
+            if(analysis_types.length == 0)
+            {
+                alert("Please select at least one analysis type");
+                return;
+            }
+
+            const n_datasets = air_omics.selected_data_ids.length;
+            const total = n_datasets * analysis_types.length;
 
             await updateProgress(0, total, "omics_btn_analyze", text = `Initialising...`);
 
+            // Get data types for selected datasets
+            const dataTypes = air_omics.selected_data_ids.map(dataId => {
+                for (const source of Object.values(air_omics.data_tree)) {
+                    if (source.data[dataId]) {
+                        return source.data[dataId].data_type || 'transcriptomics';
+                    }
+                }
+                return 'transcriptomics';
+            });
+
             await getDataFromServer(
                 "sylobio/prepare_LLM",
-                { data_ids: air_omics.selected_data_ids },
+                { 
+                    data_ids: air_omics.selected_data_ids,
+                    data_types: dataTypes
+                },
                 "POST",
                 "json"
             );
             
             // Process each dataset separately
-            for (let i = 0; i < total; i++) {
+            for (let i = 0; i < n_datasets; i++) {
+                for(let j = 0; j < analysis_types.length; j++)
+                {
+                    await updateProgress(i * analysis_types.length + j, total, "omics_btn_analyze", text = `${analysis_types[j]} analysis - dataset ${i+1}/${n_datasets} ...`);
 
-                // Update progress bar with current file information
-                await updateProgress(i, total, "omics_btn_analyze", text = `Processing dataset ${i+1}/${total} ...`);
-
-                // Request analysis for the current dataset from server
-                await getDataFromServer(
-                    "sylobio/analyze_data",
-                    { data_id: i},
-                    "POST",
-                    "json"
-                );
+                    await getDataFromServer(
+                        "sylobio/analyze_data",
+                        { 
+                            data_id: i, 
+                            analysis_type: analysis_types[j],
+                            data_type: dataTypes[i]
+                        },
+                        "POST",
+                        "json"
+                    );
+                }
             }
             
             // Final progress update
@@ -399,6 +530,52 @@ function initializeDataTree() {
         },
         'plugins': ['wholerow']
     });
+    
+    // Add handler after jstree is initialized to prevent select interaction issues
+    $('#omics_data_treeview').on('ready.jstree', function() {
+        // Find all select elements in the tree
+        $('#omics_data_treeview .data-type-selector').each(function() {
+            const $select = $(this);
+            
+            // Remove and reinsert the select to break the DOM parent-child relationship for events
+            const $parent = $select.parent();
+            const selectHtml = $select.prop('outerHTML');
+            const selectPosition = $select.index();
+            
+            $select.remove();
+            
+            // Insert a wrapper div to capture events instead
+            $parent.append('<span class="select-container"></span>');
+            const $container = $parent.find('.select-container');
+            $container.html(selectHtml);
+            
+            // Add specific event handlers to stop propagation
+            $container.on('mousedown click', function(e) {
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+            });
+            
+            // Add change handler for the select
+            $container.find('.data-type-selector').on('change', function(e) {
+                e.stopPropagation();
+                
+                const select = $(this);
+                const value = select.val();
+                const nodeId = select.closest('.jstree-node').attr('id');
+                const dataId = nodeId.split('-')[1];
+                
+                // Update the data type in the tree structure
+                for (const source of Object.values(air_omics.data_tree)) {
+                    if (source.data[dataId]) {
+                        source.data[dataId].data_type = value;
+                        break;
+                    }
+                }
+            });
+        });
+    });
 }
 
 function buildTreeData() {
@@ -421,9 +598,15 @@ function buildTreeData() {
 
         // Add data entries as children
         for (const [dataId, dataInfo] of Object.entries(sourceData.data)) {
+            const currentType = dataInfo.data_type || 'transcriptomics';
+            const currentLabel = air_omics.data_types[currentType];
             sourceNode.children.push({
                 id: `data-${dataId}`,
-                text: dataInfo.title,
+                text: `${dataInfo.title} <select class="form-select form-select-sm data-type-selector" style="display: inline-block; width: auto; margin-left: 10px; font-size: 0.8em; padding: 0.1rem 0.4rem; z-index: 1000;">
+                    ${Object.entries(air_omics.data_types).map(([value, label]) => 
+                        `<option value="${value}" ${value === currentType ? 'selected' : ''}>${label}</option>`
+                    ).join('')}
+                </select>`,
                 icon: getDataIcon(dataInfo.type),
                 data_id: dataId,
                 a_attr: {
@@ -558,3 +741,4 @@ $(document).on('click', '.node_map_link', function(e) {
         y2: minerva_id[5] + minerva_id[2]
     });
 });
+

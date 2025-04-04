@@ -29,6 +29,10 @@ async function fairdom() {
         <div class="card card-body">
           <form id="fd_loginForm">
             <div class="mb-2">
+              <label for="fd_project_id" class="form-label">Project ID</label>
+              <input type="text" class="form-control" id="fd_project_id">
+            </div>
+            <div class="mb-2">
               <label for="fd_username" class="form-label">User Name</label>
               <input type="text" class="form-control" id="fd_username">
             </div>
@@ -85,7 +89,13 @@ async function fairdom() {
           <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" value="" id="fd_cb_nonmapped">
             <label class="form-check-label" for="fd_cb_nonmapped">
-              Include non-mapped entries
+              Normalize by total max in data
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" value="" id="fd_cb_mapped_only">
+            <label class="form-check-label" for="fd_cb_mapped_only">
+              Show only mapped entries
             </label>
           </div>
           <div id="table-container" style="width: 100%; max-width: 800px; overflow-x: auto; font-size: 10px;">
@@ -100,6 +110,12 @@ async function fairdom() {
 
   $("#fd_cb_nonmapped").on('change', highlightFairdomColumn);
   $("#fd_select_column").on('change', highlightFairdomColumn);
+  $("#fd_cb_mapped_only").on('change', function() {
+      if (air_fairdom.current_data) {
+          const processedData = processDataForTable(air_fairdom.current_data, true, $(this).prop('checked'));
+          createDataTable('#fd_datatable', processedData.data, processedData.columns);
+      }
+  });
 
   // Handle the login form submission
   air_fairdom.container.on('submit', '#fd_loginForm', async (e) => {
@@ -107,11 +123,16 @@ async function fairdom() {
 
       const username = $("#fd_username").val();
       const password = $("#fd_password").val();
+      const project_id = $("#fd_project_id").val();
 
       try {
           var btn_text = await disablebutton("fd_btn_submit")
       
-          var project_data = await getDataFromServer("sylobio/login", data = {"username":username, "password":password}, type = "POST")
+          var project_data = await getDataFromServer("sylobio/login", data = {
+              "username": username, 
+              "password": password,
+              "project_id": project_id
+          }, type = "POST")
           project_data = JSON.parse(project_data)
 
           build_project_tree(project_data)
@@ -184,7 +205,7 @@ async function fairdom() {
               air_fairdom.current_data = response;
 
               // Setup the data table
-              const processedData = processDataForTable(response, true);
+              const processedData = processDataForTable(response, true, $("#fd_cb_mapped_only").prop('checked'));
               createDataTable('#fd_datatable', processedData.data, processedData.columns);
 
               // Setup column selector
