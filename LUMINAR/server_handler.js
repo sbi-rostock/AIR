@@ -332,7 +332,7 @@ async function updateProgress(value, max, progressbar, text = "") {
         let percentage = (max == 0 ? 0 : Math.ceil(value * 100 / max));
         setTimeout(function () {
             $("#" + progressbar + "_progress").width(percentage + "%");
-            $("#" + progressbar + "_progress_label").html('<span class="loadingspinner spinner-border spinner-border-sm me-1 mt-1"></span> ' + percentage + "% " + text);
+            $("#" + progressbar + "_progress_label").html('<span style="margin-top: 2px;" class="loadingspinner spinner-border spinner-border-sm me-1"></span> ' + percentage + "% " + text);
             resolve('');
         }, 0);
     });

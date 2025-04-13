@@ -595,18 +595,18 @@ function buildTreeData() {
                 title: sourceData.title
             }
         };
-
         // Add data entries as children
         for (const [dataId, dataInfo] of Object.entries(sourceData.data)) {
             const currentType = dataInfo.data_type || 'transcriptomics';
             const currentLabel = air_omics.data_types[currentType];
             sourceNode.children.push({
                 id: `data-${dataId}`,
-                text: `${dataInfo.title} <select class="form-select form-select-sm data-type-selector" style="display: inline-block; width: auto; margin-left: 10px; font-size: 0.8em; padding: 0.1rem 0.4rem; z-index: 1000;">
-                    ${Object.entries(air_omics.data_types).map(([value, label]) => 
-                        `<option value="${value}" ${value === currentType ? 'selected' : ''}>${label}</option>`
-                    ).join('')}
-                </select>`,
+                text: `${dataInfo.title}`,
+                // text: `${dataInfo.title} <div style="display: inline-block; height: 100%; width: auto; align-items: center;"><select class="form-select form-select-sm data-type-selector" style="margin: 2px; height: 80%; width: 100%; padding-bottom: 1px !important; margin-left: 10px; font-size: 0.8em; padding: 0px 0px 0px 5px; z-index: 1000; transform: translateY(-1px);">
+                //     ${Object.entries(air_omics.data_types).map(([value, label]) => 
+                //         `<option value="${value}" ${value === currentType ? 'selected' : ''}>${label}</option>`
+                //     ).join('')}
+                // </select></div>`,
                 icon: getDataIcon(dataInfo.type),
                 data_id: dataId,
                 a_attr: {
