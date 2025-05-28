@@ -209,7 +209,7 @@ async function fairdom() {
               createDataTable('#fd_datatable', processedData.data, processedData.columns);
 
               // Setup column selector
-              setupColumnSelector('#fd_select_column', response.columns);
+              setupColumnSelector('#fd_select_column', response.columns, [response.columns[0]].concat(response.pvalue_columns));
               
               bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_1')).hide();
               bootstrap.Collapse.getOrCreateInstance(document.querySelector('#fd_collapse_2')).hide();
@@ -306,21 +306,21 @@ function highlightFairdomColumn() {
     });
 }
 
-$(document).on('click', '.node_map_link', function(e) {
-    e.preventDefault();
-    var minerva_id = $(this).data('id')
+// $(document).on('click', '.node_map_link', function(e) {
+//     e.preventDefault();
+//     var minerva_id = $(this).data('id')
 
-    minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
+//     minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
     
-    minerva.map.openMap({ id: minerva_id[0] });
+//     minerva.map.openMap({ id: minerva_id[0] });
 
-    minerva.map.fitBounds({
-      x1: minerva_id[4],
-      y1: minerva_id[5],
-      x2: minerva_id[4] + minerva_id[3],
-      y2: minerva_id[5] + minerva_id[2]
-    });
-});
+//     minerva.map.fitBounds({
+//       x1: minerva_id[4],
+//       y1: minerva_id[5],
+//       x2: minerva_id[4] + minerva_id[3],
+//       y2: minerva_id[5] + minerva_id[2]
+//     });
+// });
 
 function buildJsTreeNodes(obj, typeHint = "", dictKey = "") {
   // Guard: if not an object, return no nodes

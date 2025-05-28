@@ -370,7 +370,7 @@ function createDataTable(containerId, data, columns, options = {}) {
              "<'clear'>" +
              "rt" +
              "<'bottom'ip><'clear'>",
-        scrollY: '50vh',
+        scrollY: '65vh',
         scrollX: true,
         paging: true,
         searching: true,
@@ -399,7 +399,7 @@ function processDataForTable(data, includeLinks = false, showMappedOnly = false)
     // Filter data if showMappedOnly is true
     let filteredData = data.data;
     if (showMappedOnly) {
-        filteredData = data.data.filter(row => row[row.length - 1]);
+        filteredData = data.data.filter(row => row[row.length - 1].length > 0);
     }
 
     const columns = data.columns.map((col, index) => {
@@ -408,8 +408,9 @@ function processDataForTable(data, includeLinks = false, showMappedOnly = false)
                 data: index,
                 title: col,
                 render: (data, type, row) => {
-                    return row[row.length - 1] ? 
-                        `<a href="#" class="node_map_link" data-type="${col}" data-id="${row[row.length - 1]}">${data}</a>` : 
+                    var minerva_ids = row[row.length - 1]; 
+                    return minerva_ids.length > 0 ? 
+                        `<a href="#" class="node_map_link" data-type="${col}" data-id="${JSON.stringify(minerva_ids)}">${data}</a>` : 
                         data;
                 }
             };
@@ -426,13 +427,14 @@ function processDataForTable(data, includeLinks = false, showMappedOnly = false)
     };
 }
 
-function setupColumnSelector(selectId, columns, excludeColumns = [0]) {
+function setupColumnSelector(selectId, columns, excludeColumns = []) {
     const $select = $(selectId);
     $select.empty();
-    $select.append($("<option selected>").attr("value", -1).text("None"));
+    $select.append($("<option selected disabled>").attr("value", -2).text("Select a column to visualize"));
+    $select.append($("<option>").attr("value", -1).text("None"));
     
     columns.forEach((col, index) => {
-        if (!excludeColumns.includes(index)) {
+        if (!excludeColumns.includes(col)) {
             $select.append($("<option>").attr("value", index).text(col));
         }
     });
@@ -440,74 +442,99 @@ function setupColumnSelector(selectId, columns, excludeColumns = [0]) {
 
 // Generalized highlighting function
 function highlightColumn(options) {
-    const {
-        selectedColumn,
-        data,
-        markerArray,
-        includeNonMapped,
-        markerPrefix = "marker_"
-    } = options;
+    // Set waiting cursor
+    window.parent.document.body.style.cursor = 'wait';
 
-    // Clear existing markers
-    for(var marker_id of markerArray) {
-        minerva.data.bioEntities.removeSingleMarker(marker_id);
-    }
-    markerArray.length = 0;  // Clear the array while maintaining the reference
+    // Defer heavy processing so cursor has time to update
+    setTimeout(() => {
+        try {
+            const {
+                selectedColumn,
+                data,
+                markerArray,
+                includeNonMapped,
+                markerPrefix = "marker_",
+                pvalueThreshold = null
+            } = options;
 
-    if (selectedColumn == -1) {
-        return;
-    }
+            const selectedColumnInt = parseInt(selectedColumn);
+            if (isNaN(selectedColumnInt)) {
+                return;
+            }
 
-    var max = includeNonMapped ? data.max : data.minerva_max;
-    var id_col = data.columns.length - 1;
-    
-    var new_markers = data.data
-        .filter(row => row[selectedColumn] != 0 && row[id_col])
-        .map(function(row) {
-            var val = row[selectedColumn];
-            var id = JSON.parse(row[id_col]);
-            var marker_id = markerPrefix + id[1];
-            markerArray.push(marker_id);
-            return {
-                type: 'surface',
-                opacity: 0.67,
-                x: id[4],
-                y: id[5],
-                width: id[3],
-                height: id[2],
-                modelId: id[0],
-                id: marker_id,
-                color: data.columns[selectedColumn].toLowerCase().endsWith('_pvalue') ? 
-                    valueToHex(-Math.log10(Math.abs(val)), 5) : 
-                    valueToHex(val, max)
-            };
-        });
+            // Clear existing markers
+            for (var marker_id of markerArray) {
+                minerva.data.bioEntities.removeSingleMarker(marker_id);
+            }
+            markerArray.length = 0;
 
-    for(var marker of new_markers) {
-        minerva.data.bioEntities.addSingleMarker(marker);
-    }
+            if (selectedColumn < 0) {
+                return;
+            }
+
+            var max = includeNonMapped ? data.minerva_max : data.max;
+            var id_col = data.columns.length - 1;
+
+            var new_markers = data.data
+                .filter(row => row[selectedColumnInt] != 0 && row[id_col])
+                .flatMap(function (row) {
+                    var val = row[selectedColumnInt];
+                    if (val == 0 || (pvalueThreshold && row[selectedColumnInt + 1] > pvalueThreshold)) {
+                        return [];
+                    }
+                    var minerva_ids = row[id_col];
+                    return minerva_ids.map(minerva_id => {
+                        var marker_id = markerPrefix + minerva_id[1];
+                        markerArray.push(marker_id);
+                        return {
+                            type: 'surface',
+                            opacity: 0.67,
+                            x: minerva_id[4],
+                            y: minerva_id[5],
+                            width: minerva_id[3],
+                            height: minerva_id[2],
+                            modelId: minerva_id[0],
+                            id: marker_id,
+                            color: data.columns[selectedColumnInt].toLowerCase().endsWith('_pvalue') ?
+                                valueToHex(-Math.log10(Math.abs(val)), 5) :
+                                valueToHex(val, max)
+                        };
+                    });
+                });
+
+            for (var marker of new_markers) {
+                minerva.data.bioEntities.addSingleMarker(marker);
+            }
+        } finally {
+            // Reset cursor back to default
+            window.parent.document.body.style.cursor = 'default';
+        }
+    }, 0); // Delay just enough for the browser to repaint
 }
+
 
 // Generalized node map link handler
 function setupNodeMapLinks() {
     $(document).on('click', '.node_map_link', function(e) {
         e.preventDefault();
-        var minerva_id = $(this).data('id');
+        var minerva_ids = $(this).data('id');
         var type = $(this).data('type');
-        if (typeof minerva_id === 'string') {
-            minerva_id = JSON.parse(minerva_id);
+        if (typeof minerva_ids === 'string') {
+            minerva_ids = JSON.parse(minerva_ids);
         }
 
         minerva.map.triggerSearch({ query: (type == "name"? "" : (type + ":")) + $(this).text(), perfectSearch: true});
         
-        minerva.map.openMap({ id: minerva_id[0] });
+        if(minerva_ids.length > 0) {
+            minerva.map.openMap({ id: minerva_ids[0][0] });
 
-        minerva.map.fitBounds({
-            x1: minerva_id[4],
-            y1: minerva_id[5],
-            x2: minerva_id[4] + minerva_id[3],
-            y2: minerva_id[5] + minerva_id[2]
-        });
+            minerva.map.fitBounds({
+                x1: minerva_ids[0][4],
+                y1: minerva_ids[0][5],
+                x2: minerva_ids[0][4] + minerva_ids[0][3],
+                y2: minerva_ids[0][5] + minerva_ids[0][2]
+            });
+        }
     });
     $(document).on('click', '.edge_map_link', function(e) {
         e.preventDefault();
@@ -876,11 +903,10 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             `);
             responseContainer.append(imgContainer);
             
-            responseContainer.find(".analysis-image").on('click', function(e) {
+            imgContainer.find(".analysis-image").on('click', function(e) {
                 // Prevent event from bubbling up to parent document
                 e.preventDefault();
                 e.stopPropagation();
-                
                 // Remove any existing modals
                 $("#air_Modal", window.parent.document).remove();
                 
@@ -991,9 +1017,9 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                         data: index,
                         title: col,
                         render: (data, type, row) => {
-                            const minervaId = row[row.length - 1];
-                            return minervaId ? 
-                                `<a href="#" class="node_map_link" data-type="name" data-id="${minervaId}">${data}</a>` : 
+                            const minervaIds = row[row.length - 1];
+                            return minervaIds.length > 0 ? 
+                                `<a href="#" class="node_map_link" data-type="name" data-id="${JSON.stringify(minervaIds)}">${data}</a>` : 
                                 data;
                         }
                     };

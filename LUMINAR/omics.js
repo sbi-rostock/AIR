@@ -83,18 +83,24 @@ async function omics() {
                 </button>
                 <div class="collapse" id="omics_collapse_viewdata">
                     <div class="card card-body">
-                        <select class="form-select mb-1 mt-2" id="omics_select_column">
-                        </select>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" value="" id="omics_cb_nonmapped">
-                            <label class="form-check-label" for="omics_cb_nonmapped">
-                                Normalize by total max in data
+                        <div class="d-flex gap-2 mb-1 mt-2">
+                            <select class="form-select" id="omics_select_column" data-bs-toggle="tooltip" data-bs-placement="right" title="Select a data column to visualize on the Disease Map">
+                            </select>
+                            <input type="text" style="width: 80px;" class="form-control form-control-sm" id="omics_select_column_filter" placeholder="p-value" data-bs-toggle="tooltip" data-bs-placement="right" title="Only show values with p-values below this threshold">
+                            <button type="button" class="btn btn-outline-secondary" id="omics_select_column_refresh">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" value="" id="omics_cb_onlymapped_norm" checked>
+                            <label class="form-check-label" for="omics_cb_onlymapped_norm" style="font-size: 11pt;">
+                                Normalize only values mapped to the network.
                             </label>
                         </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" value="" id="omics_cb_mapped_only">
-                            <label class="form-check-label" for="omics_cb_mapped_only">
-                                Show only mapped entries
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" value="" id="omics_cb_mapped_only" checked>
+                            <label class="form-check-label" for="omics_cb_mapped_only" style="font-size: 11pt;">
+                                Show only values mapped to the network.
                             </label>
                         </div>
                         <div id="table-container" style="width: 100%; max-width: 800px; overflow-x: auto; font-size: 10px;">
@@ -118,8 +124,8 @@ async function omics() {
                         </label>
                     </div>
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="" id="omics_cb_upstream">
-                        <label class="form-check-label" for="omics_cb_upstream">
+                        <input class="form-check-input" type="checkbox" value="" id="omics_cb_upstream" disabled>
+                        <label class="form-check-label" for="omics_cb_upstream" disabled>
                             Upstream
                         </label>
                     </div>
@@ -133,14 +139,14 @@ async function omics() {
             4. Submit your Query
         </button>
         <div class="collapse" id="omics_collapse_4">
-            <div class="card card-body">
-                <form id="omics_queryform" class="d-flex mb-2">
-                    <input type="text" id="omics_query_input" class="form-control me-2" style="flex: 1;" aria-label="Text input with segmented dropdown button">
-                    <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
-                </form>
+            <div class="card card-body">            
                 <div id="omics_analysis_content" style="width: 100%; height: 100%; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 10px;">
 
                 </div>
+                <form id="omics_queryform" class="d-flex mb-2">
+                    <input type="text" placeholder="Ask a question about the data analysis." id="omics_query_input" class="form-control me-2" style="flex: 1;" aria-label="Text input with segmented dropdown button">
+                    <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
+                </form>
             </div>
         </div>
         `
@@ -162,7 +168,7 @@ async function omics() {
     // Initialize the data tree
     initializeDataTree();
 
-    $("#omics_cb_nonmapped").on('change', highlightOmicsColumn);
+    $("#omics_cb_onlymapped_norm").on('change', highlightOmicsColumn);
     $("#omics_select_column").on('change', highlightOmicsColumn);
     $("#omics_cb_mapped_only").on('change', function() {
         if (air_omics.loaded_data) {
@@ -170,6 +176,7 @@ async function omics() {
             createDataTable('#omics_datatable', processedData.data, processedData.columns);
         }
     });
+    $("#omics_select_column_refresh").on('click', highlightOmicsColumn);
 
     // Add file input change handler for p-value detection
     $("#omics_file").on('change', async function(e) {
@@ -364,12 +371,14 @@ async function omics() {
             createDataTable('#omics_datatable', processedData.data, processedData.columns);
 
             // Setup column selector
-            setupColumnSelector('#omics_select_column', data.columns);
+            setupColumnSelector('#omics_select_column', data.columns, [data.columns[0]].concat(data.pvalue_columns));
             
             // Enable and show visualization section
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_viewdata')).show();
             $("#omics_collapse_3_btn").removeClass("air_disabledbutton");
             $("#omics_collapse_viewdata_btn").removeClass("air_disabledbutton");
+
+            $("#omics_select_column_filter").prop('disabled', !data.has_pvalues);
 
             enablebutton("omics_btn_viewdata", btn_text);
         } catch (err) {
@@ -474,9 +483,24 @@ async function omics() {
                 "json"
             );
             
+            var initial_query = "Provide the user with an overview of the data and the by this tool performed enrichment analysis results especially in the context of the current disease map. The user is not knowledgeable of the method. Also provide a list of fitting queries that they can use to explore the data further. Don't go into methodological details but rather focus on how this tool can support their data analysis. Talk directly to the user."
+            
+            const response = await getDataFromServer(
+                "sylobio/query_llm",
+                { query: initial_query },
+                "POST",
+                "json"
+            );
+
+            console.log(response);
+            
+            // Use the generalized function to process responses
+            processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");            
+
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).hide();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_4')).show();
             $("#omics_collapse_4_btn").removeClass("air_disabledbutton");
+
 
             enablebutton("omics_btn_analyze", btn_text);
         } catch (err) {
@@ -484,6 +508,20 @@ async function omics() {
             alert(`Analysis failed: ${err.message}`);
         }
         finally {
+            
+            // Scroll to bottom of analysis content and tab content
+            const analysisContent = document.getElementById('omics_analysis_content');
+            if (analysisContent) {
+                analysisContent.scrollTop = analysisContent.scrollHeight;
+            }
+            const tabContent = document.getElementById('airomics_tab_content');
+            if (tabContent) {
+                // Get the actual height of the content
+                const scrollHeight = tabContent.scrollHeight;
+                // Animate scroll to bottom
+                $(tabContent).animate({scrollTop: scrollHeight}, 'slow');
+            }
+
             enablebutton("omics_btn_analyze", btn_text);
         }
     });
@@ -511,6 +549,13 @@ async function omics() {
             
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", $("#omics_query_input").val(), "analysis");
         } finally {
+
+            // Scroll to bottom of analysis content and tab content
+            const analysisContent = document.getElementById('omics_analysis_content');
+            if (analysisContent) {
+                analysisContent.scrollTop = analysisContent.scrollHeight;
+            }
+            
             enablebutton("omics_btn_query", btn_text);
         }
     });
@@ -720,25 +765,28 @@ function highlightOmicsColumn() {
         selectedColumn: $("#omics_select_column").val(),
         data: air_omics.loaded_data,
         markerArray: air_omics.added_markers,
-        includeNonMapped: $("#omics_cb_nonmapped").prop('checked'),
-        markerPrefix: "omics_marker_"
+        includeNonMapped: $("#omics_cb_onlymapped_norm").prop('checked'),
+        markerPrefix: "omics_marker_",
+        pvalueThreshold: $("#omics_select_column_filter").val() ? parseFloat($("#omics_select_column_filter").val()) : null
     });
 }
 
 // Add click handler for node mapping links
 $(document).on('click', '.node_map_link', function(e) {
     e.preventDefault();
-    var minerva_id = $(this).data('id');
+    var minerva_ids = $(this).data('id');
 
     minerva.map.triggerSearch({ query: $(this).text(), perfectSearch: true});
     
-    minerva.map.openMap({ id: minerva_id[0] });
+    for(var minerva_id of minerva_ids) {
+        minerva.map.openMap({ id: minerva_id[0] });
 
-    minerva.map.fitBounds({
-        x1: minerva_id[4],
-        y1: minerva_id[5],
-        x2: minerva_id[4] + minerva_id[3],
-        y2: minerva_id[5] + minerva_id[2]
-    });
+        minerva.map.fitBounds({
+            x1: minerva_id[4],
+            y1: minerva_id[5],
+            x2: minerva_id[4] + minerva_id[3],
+                y2: minerva_id[5] + minerva_id[2]
+            });
+    }
 });
 
