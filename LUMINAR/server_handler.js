@@ -1,5 +1,6 @@
 let minerva = null;
 let air_data = window.parent.air_data
+
 const parent$ = air_data.$;
 
 const $ = function(selector, context) {
@@ -204,6 +205,22 @@ async function initialize_server() {
         fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css';
         document.head.appendChild(fontAwesomeLink);
         
+        // Add Chart.js
+        const chartJsScript = document.createElement('script');
+        chartJsScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+        chartJsScript.onload = function() {
+            console.log('Chart.js loaded successfully');
+        };
+        document.head.appendChild(chartJsScript);
+        
+        // Add Chart.js zoom plugin for interactive features
+        const chartJsZoomScript = document.createElement('script');
+        chartJsZoomScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js';
+        chartJsZoomScript.onload = function() {
+            console.log('Chart.js zoom plugin loaded successfully');
+        };
+        document.head.appendChild(chartJsZoomScript);
+        
         air_data.session_token = session_token;
         buildPLuginNavigator();
         loadAndExecuteScripts(["omics.js", "fairdom.js", "xplore.js"]);
@@ -211,6 +228,8 @@ async function initialize_server() {
         
         air_data.minerva_events.addListener("onBioEntityClick", showModulatorsOnClick);
 
+        // Setup node map link handling
+        setupNodeMapLinks();
 
     } catch (error) {
         console.error("Error while initializing:", error);
@@ -223,13 +242,13 @@ buildPLuginNavigator = () => {
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
                 <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="false">Xplore</a>
+                    <a class="air_tab nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="false">Exploration</a>
                 </li>
                 <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab active nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">Omics</a>
+                    <a class="air_tab active nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">Data Analysis</a>
                 </li>   
                 <li class="air_nav_item nav-item" style="width: 33.3%;">
-                    <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">FAIRDOM</a>
+                    <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">FAIRDOMHub</a>
                 </li>
             </ul>
             <div class="tab-content air_tab_content" id="air_tabs" style="height:calc(100% - 45px);background-color: white;">
@@ -562,6 +581,42 @@ function setupNodeMapLinks() {
             highlightEdges(markers, created_by = now());
         }
     });
+    
+    // Global click handler for fixed queries links
+    $(document).on('click', '.fixed-queries-link', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const origin = $(this).data('origin');
+        
+        // Remove any existing modals
+        $("#air_Modal", window.parent.document).remove();
+        
+        // Remove any existing event handlers to prevent memory leaks
+        $(window.parent.document).off('click', '#air_closeModal');
+        
+        const modalHTML = `
+            <div id="air_Modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                 background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 99999;">
+                <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
+                     max-width: 90%; max-height: 90%; overflow: auto;">
+                    <button id="air_closeModal" style="position: absolute; top: 10px; right: 10px;
+                         background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                    ${getFixedQueries(origin)}
+                </div>
+            </div>
+        `;
+        
+        // Append to window.parent.document.body instead of document.body
+        $(window.parent.document.body).append(modalHTML);
+        
+        // Use window.parent.document for event binding with namespaced event to avoid duplicates
+        $(window.parent.document).on('click.modalClose', '#air_closeModal', function() {
+            $('#air_Modal', window.parent.document).remove();
+            // Clean up event handler
+            $(window.parent.document).off('click.modalClose');
+        });
+    });
 }
 
 const showModulatorsOnClick = async data => {
@@ -840,48 +895,13 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 <div class="alert alert-warning" role="alert">
                    The following response has been AI-generated. 
                    While the response is based specifically on the disease map content or analyzed data, inaccuracies are still possible.
-                   Make sure you verify all important information using  <a href="#" class="alert-link"><span class="fixed-queries-link" style="color: blue; text-decoration: underline; cursor: pointer;">fixed response queries</span>
+                   Make sure you verify all important information using  <a href="#" class="alert-link"><span class="fixed-queries-link" data-origin="${origin}" style="color: blue; text-decoration: underline; cursor: pointer;">fixed response queries</span>
                    </a>
                 </div>
                 <div class="mt-2">
                     ${response.content}
                 </div>
             `);
-
-            // Add click handler for fixed queries link
-            responseContainer.find(".fixed-queries-link").on('click', function(e) {
-                // Prevent event from bubbling up to parent document
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Remove any existing modals
-                $("#air_Modal", window.parent.document).remove();
-                
-                // Remove any existing event handlers to prevent memory leaks
-                $(window.parent.document).off('click', '#air_closeModal');
-                
-                const modalHTML = `
-                    <div id="air_Modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                         background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 99999;">
-                        <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
-                             max-width: 90%; max-height: 90%; overflow: auto;">
-                            <button id="air_closeModal" style="position: absolute; top: 10px; right: 10px;
-                                 background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-                            ${getFixedQueries(origin)}
-                        </div>
-                    </div>
-                `;
-                
-                // Append to window.parent.document.body instead of document.body
-                $(window.parent.document.body).append(modalHTML);
-                
-                // Use window.parent.document for event binding with namespaced event to avoid duplicates
-                $(window.parent.document).on('click.modalClose', '#air_closeModal', function() {
-                    $('#air_Modal', window.parent.document).remove();
-                    // Clean up event handler
-                    $(window.parent.document).off('click.modalClose');
-                });
-            });
         }
         
         // Handle different response types
@@ -939,12 +959,12 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
 
         else if (response.response_type === "highlight") {
             var markers = response.content.map(minerva_id => ({
-                id: minerva_id[0],
-                x: minerva_id[1], 
-                y: minerva_id[2],
+                modelId: minerva_id[0],
+                id: minerva_id[1],
+                height: minerva_id[2],
                 width: minerva_id[3],
-                height: minerva_id[4],
-                modelId: minerva_id[5],
+                x: minerva_id[4], 
+                y: minerva_id[5],
                 value: minerva_id[6]
             }));
             highlightValues(markers, created_by = created_by);
@@ -1100,6 +1120,202 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 });
             } catch (error) {
                 console.error('Error initializing DataTable:', error);
+            }
+        }
+
+        else if (response.response_type === "chart") {
+            // For interactive chart responses
+            const chartData = response.content;
+            const chartId = `${origin}_chart_${Date.now()}`; // Unique ID for each chart
+            
+            console.log('Chart Data:', chartData);
+            
+            // Create a container for the chart
+            const chartHtml = $(`
+                <div class="mt-3">
+                    <div class="chart-container" style="width: 100%; height: 250px; background-color: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                </div>
+            `);
+            
+            responseContainer.append(chartHtml);
+            
+            // Add HTML title if provided (supports clickable content)
+            if (chartData.title) {
+                const titleHtml = $(`
+                    <div class="text-center mt-4" style="font-weight: bold; font-size: 1.3em; color: #333;">
+                        ${chartData.title}
+                    </div>
+                `);
+                chartHtml.prepend(titleHtml);
+            }
+            
+            // Add legend if provided
+            if (chartData.legend && chartData.legend.length > 0) {
+                const legendHtml = $(`
+                    <div class="d-flex justify-content-center flex-wrap mt-2">
+                        ${chartData.legend.map(item => `
+                            <div class="d-flex align-items-center mx-2 mb-1">
+                                ${item.style === 'triangle' ? 
+                                    `<span class="triangle_small me-1"></span>` : 
+                                    `<span style="display: inline-block; width: 12px; height: 12px; background-color: ${item.color}; margin-right: 5px; border-radius: ${item.style === 'circle' ? '50%' : '0'};"></span>`
+                                }
+                                <span style="color: #6d6d6d; font-size: 90%; white-space: nowrap;">${item.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `);
+                chartHtml.append(legendHtml);
+            }
+            
+            try {
+                // Process data points
+                const datasets = chartData.data.map((point, index) => ({
+                    label: point.label || `Point ${index}`,
+                    data: [{
+                        x: point.x,
+                        y: point.y,
+                        r: point.size || 5
+                    }],
+                    pointStyle: point.style || 'circle',
+                    backgroundColor: point.color || '#3498db',
+                    hoverBackgroundColor: point.hoverColor || point.color || '#2980b9',
+                    borderColor: point.borderColor || 'transparent',
+                    borderWidth: point.borderWidth || 0
+                }));
+                
+                // Chart configuration with defaults and overrides
+                const chartConfig = {
+                    type: chartData.chart_type || 'bubble',
+                    data: { datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false // We use custom legend
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const pointData = chartData.data[context.datasetIndex];
+                                        if (pointData.tooltip) {
+                                            if (typeof pointData.tooltip === 'string') {
+                                                return pointData.tooltip;
+                                            } else if (Array.isArray(pointData.tooltip)) {
+                                                return pointData.tooltip;
+                                            }
+                                        }
+                                        return `${pointData.label || 'Point'}: (${context.parsed.x}, ${context.parsed.y})`;
+                                    }
+                                }
+                            },
+                            // Add zoom plugin if enabled
+                            ...(chartData.enable_zoom !== false && {
+                                zoom: {
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'xy',
+                                        speed: 20,
+                                        threshold: 10
+                                    },
+                                    zoom: {
+                                        wheel: { enabled: true },
+                                        pinch: { enabled: true },
+                                        mode: 'xy'
+                                    }
+                                }
+                            })
+                        },
+                        onHover: (event, chartElement) => {
+                            event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                        },
+                        onClick: (event, chartElement) => {
+                            if (chartElement[0]) {
+                                const pointData = chartData.data[chartElement[0].datasetIndex];
+                                
+                                // Handle click actions
+                                if (pointData.click_action) {
+                                    if (pointData.click_action.type === 'highlight_map' && pointData.click_action.minerva_ids) {
+                                        // Highlight on map
+                                        if (pointData.click_action.minerva_ids.length > 0) {
+                                            const markers = pointData.click_action.minerva_ids.map(id => ({
+                                                modelId: id[0],
+                                                id: id[1],
+                                                height: id[2],
+                                                width: id[3],
+                                                x: id[4], 
+                                                y: id[5],
+                                                value: pointData.y
+                                            }));
+                                            minerva.map.openMap({ id: markers[0].modelId });
+                                            minerva.map.fitBounds({
+                                                x1: markers[0].x,
+                                                y1: markers[0].y,
+                                                x2: markers[0].x + markers[0].width,
+                                                y2: markers[0].y + markers[0].height
+                                            });
+                                            minerva.map.triggerSearch({ 
+                                                query: pointData.label, 
+                                                perfectSearch: true 
+                                            });
+                                            // highlightValues(markers, created_by);
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: !!(chartData.x_label),
+                                    text: chartData.x_label || 'X Axis',
+                                    font: {
+                                        size: 10,
+                                    },
+                                },
+                                min: chartData.x_min,
+                                max: chartData.x_max,
+                                grid: {
+                                    drawBorder: false,
+                                    color: function(context) {
+                                        return context.tick.value === 0 ? '#000000' : '#D3D3D3';
+                                    }
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: !!(chartData.y_label),
+                                    text: chartData.y_label || 'Y Axis',
+                                    font: {
+                                        size: 10,
+                                    },
+                                },
+                                min: chartData.y_min,
+                                max: chartData.y_max,
+                                grid: {
+                                    drawBorder: false,
+                                    color: function(context) {
+                                        return context.tick.value === 0 ? '#000000' : '#D3D3D3';
+                                    }
+                                }
+                            }
+                        },
+                        // Override with any custom options provided
+                        ...(chartData.chart_options || {})
+                    }
+                };
+                
+                // Initialize the chart
+                const chart = new Chart(document.getElementById(chartId), chartConfig);
+                
+                // Store chart reference for potential future use
+                responseContainer.data('chart', chart);
+                
+            } catch (error) {
+                console.error('Error initializing Chart:', error);
+                responseContainer.append(`<div class="alert alert-danger">Error creating chart: ${error.message}</div>`);
             }
         }
         else {

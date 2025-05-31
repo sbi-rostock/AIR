@@ -11,7 +11,12 @@ async function xplore() {
     $(
         `
         <div class="card card-body mt-3" style="border: 1px solid #FFF;">
-            <h4>Explore the Disease Map</h4>
+            <div class="d-flex align-items-center justify-content-between mb-0">
+                <h4 class="mb-0">Explore the Disease Map</h4>
+                <button type="button" class="btn btn-link p-0 fixed-queries-link" data-origin="xplore" style="color: #6c757d; font-size: 1.2em;" title="Show example queries">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
             <form id="xplore_queryform" class="d-flex mt-2 mb-3">
                 <input type="text" id="xplore_query_input" class="form-control me-2" style="flex: 1;" 
                     placeholder="Ask a question ..." aria-label="Query input">
