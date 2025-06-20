@@ -221,6 +221,79 @@ async function initialize_server() {
         };
         document.head.appendChild(chartJsZoomScript);
         
+        // Add Chart.js annotation plugin for quadrant lines
+        const chartJsAnnotationScript = document.createElement('script');
+        chartJsAnnotationScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js';
+        chartJsAnnotationScript.onload = function() {
+            console.log('Chart.js annotation plugin loaded successfully');
+        };
+        document.head.appendChild(chartJsAnnotationScript);
+        
+        // Add html2pdf library for PDF export
+        const html2pdfScript = document.createElement('script');
+        html2pdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        html2pdfScript.onload = function() {
+            console.log('html2pdf loaded successfully');
+        };
+        document.head.appendChild(html2pdfScript);
+        
+        // Add custom CSS for the expand functionality
+        const customCSS = document.createElement('style');
+        customCSS.textContent = `
+            .air_expand_btn {
+                transition: transform 0.2s ease;
+                padding: 4px 8px !important;
+                font-size: 16px !important;
+            }
+            .air_expand_btn:hover {
+                transform: scale(1.1);
+            }
+            
+            /* Expanded chatbox styles */
+            .air_chat_expanded #omics_analysis_content,
+            .air_chat_expanded #xplore_analysis_content,
+            .air_chat_expanded #fairdom_analysis_content {
+                max-width: none !important;
+                width: 100% !important;
+                font-size: 12px !important;
+            }
+            
+            .air_chat_expanded .responses-wrapper {
+                height: 60vh !important;
+                max-height: 60vh !important;
+                overflow-y: auto !important;
+            }
+            
+            .air_chat_expanded .response-container {
+                font-size: 13px !important;
+            }
+            
+            .air_chat_expanded .table-container {
+                font-size: 11px !important;
+                max-width: 100% !important;
+                overflow-x: auto !important;
+            }
+            
+            /* Limit image size when expanded */
+            .air_chat_expanded .analysis-image,
+            .air_chat_expanded img {
+                max-width: 600px !important;
+                max-height: 400px !important;
+                width: auto !important;
+                height: auto !important;
+            }
+            
+            /* Arrow animation */
+            .air_expand_arrow {
+                transition: transform 0.3s ease;
+            }
+            
+            .air_expand_arrow.expanded {
+                transform: rotate(180deg);
+            }
+        `;
+        document.head.appendChild(customCSS);
+        
         air_data.session_token = session_token;
         buildPLuginNavigator();
         loadAndExecuteScripts(["omics.js", "fairdom.js", "xplore.js"]);
@@ -389,7 +462,7 @@ function createDataTable(containerId, data, columns, options = {}) {
              "<'clear'>" +
              "rt" +
              "<'bottom'ip><'clear'>",
-        scrollY: '65vh',
+        scrollY: '47vh',
         scrollX: true,
         paging: true,
         searching: true,
@@ -542,7 +615,7 @@ function setupNodeMapLinks() {
             minerva_ids = JSON.parse(minerva_ids);
         }
 
-        minerva.map.triggerSearch({ query: (type == "name"? "" : (type + ":")) + $(this).text(), perfectSearch: true});
+        minerva.map.triggerSearch({ query: (!type || type == "name"? "" : (type + ":")) + $(this).text(), perfectSearch: true});
         
         if(minerva_ids.length > 0) {
             minerva.map.openMap({ id: minerva_ids[0][0] });
@@ -832,6 +905,189 @@ function now() {
     return new Date().toISOString().replace(/[^0-9]/g, '')
 }
 
+// Function to download Chart.js chart as high-resolution PNG
+function downloadChartAsPNG(chart, title = 'Chart') {
+    try {
+        if (!chart || typeof chart.toBase64Image !== 'function') {
+            alert('Chart is not available for download.');
+            return;
+        }
+        
+        // Get the chart as high-resolution base64 image
+        const base64Image = chart.toBase64Image('image/png'); // 2x resolution for high quality
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+        link.href = base64Image;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`Chart "${title}" downloaded as PNG`);
+        
+    } catch (error) {
+        console.error('Error downloading chart:', error);
+        alert('Error downloading chart: ' + error.message);
+    }
+}
+
+// Function to expand chat interface by expanding the parent drawer width
+function expandChatInterface(origin) {
+    const parentDrawer = window.parent.document.querySelector('[role="plugins-drawer"]');
+    const expandBtn = $(`#${origin}_btn_expand_chat`);
+    const arrow = expandBtn.find('.air_expand_arrow');
+    
+    if (!parentDrawer) {
+        console.warn('Parent drawer not found');
+        return;
+    }
+    
+    if (parentDrawer.classList.contains('air_chat_expanded')) {
+        // Collapse - return to normal width
+        parentDrawer.style.width = '432px';
+        parentDrawer.classList.remove('air_chat_expanded');
+        arrow.removeClass('expanded');
+        
+        // Remove expanded class from iframe content
+        $('body').removeClass('air_chat_expanded');
+    } else {
+        // Expand - increase width
+        parentDrawer.style.width = '80vw';
+        parentDrawer.style.maxWidth = '1200px';
+        parentDrawer.classList.add('air_chat_expanded');
+        arrow.addClass('expanded');
+        
+        // Add expanded class to iframe content
+        $('body').addClass('air_chat_expanded');
+    }
+}
+
+// Simple function - no separate collapse needed
+function collapseChatInterface(origin) {
+    // Just call expand again to toggle
+    expandChatInterface(origin);
+}
+
+// Function to download chat content as PDF
+async function downloadChatAsPDF(origin) {
+    const moduleNames = {
+        'omics': 'Data Analysis',
+        'xplore': 'Map Exploration',
+        'fairdom': 'FAIRDOMHub'
+    };
+    const moduleTitle = moduleNames[origin] || 'Chat';
+    
+    // Get the chat content element directly
+    const chatContent = document.getElementById(`${origin}_analysis_content`);
+    
+    if (!chatContent) {
+        alert('Chat content container not found.');
+        return;
+    }
+    
+    // Check if there's any content
+    if (!chatContent.innerHTML.trim() || chatContent.textContent.trim().length < 10) {
+        alert('No chat content to export. Please have some conversation first.');
+        return;
+    }
+    
+    // Check if html2pdf is available
+    if (typeof window.html2pdf === 'undefined') {
+        alert('PDF export library is still loading. Please try again in a moment.');
+        return;
+    }
+    
+    console.log('Starting PDF generation for:', moduleTitle);
+    console.log('Content length:', chatContent.innerHTML.length);
+    
+    // Store original styles to restore later
+    const originalStyles = {
+        height: chatContent.style.height,
+        maxHeight: chatContent.style.maxHeight,
+        overflow: chatContent.style.overflow,
+        overflowY: chatContent.style.overflowY
+    };
+    
+    // Also store styles for responses wrapper if it exists
+    const responsesWrapper = chatContent.querySelector('.responses-wrapper');
+    const responsesOriginalStyles = responsesWrapper ? {
+        height: responsesWrapper.style.height,
+        maxHeight: responsesWrapper.style.maxHeight,
+        overflow: responsesWrapper.style.overflow,
+        overflowY: responsesWrapper.style.overflowY
+    } : null;
+    
+    try {
+        // Temporarily remove height/scroll constraints to show all content
+        chatContent.style.height = 'auto';
+        chatContent.style.maxHeight = 'none';
+        chatContent.style.overflow = 'visible';
+        chatContent.style.overflowY = 'visible';
+        
+        // Do the same for responses wrapper
+        if (responsesWrapper) {
+            responsesWrapper.style.height = 'auto';
+            responsesWrapper.style.maxHeight = 'none';
+            responsesWrapper.style.overflow = 'visible';
+            responsesWrapper.style.overflowY = 'visible';
+        }
+        
+        // Give the DOM a moment to adjust
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Configure PDF options
+        const opt = {
+            margin: 15,
+            filename: `${moduleTitle.replace(/\s+/g, '_')}_Chat_Export_${new Date().toISOString().split('T')[0]}.pdf`,
+            image: { type: 'jpeg', quality: 0.9 },
+            html2canvas: { 
+                scale: 1.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                height: chatContent.scrollHeight, // Use full scroll height
+                windowHeight: chatContent.scrollHeight // Ensure full content is captured
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: 'a4', 
+                orientation: 'portrait'
+            }
+        };
+        
+        console.log('Generating PDF with full content visible...');
+        console.log('Content scroll height:', chatContent.scrollHeight);
+        
+        // Generate PDF directly from the expanded element
+        await window.html2pdf().set(opt).from(chatContent).save();
+        
+        console.log('PDF generated successfully');
+        
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        alert('Error generating PDF: ' + error.message);
+    } finally {
+        // Restore original styles
+        chatContent.style.height = originalStyles.height || '';
+        chatContent.style.maxHeight = originalStyles.maxHeight || '';
+        chatContent.style.overflow = originalStyles.overflow || '';
+        chatContent.style.overflowY = originalStyles.overflowY || '';
+        
+        // Restore responses wrapper styles
+        if (responsesWrapper && responsesOriginalStyles) {
+            responsesWrapper.style.height = responsesOriginalStyles.height || '';
+            responsesWrapper.style.maxHeight = responsesOriginalStyles.maxHeight || '';
+            responsesWrapper.style.overflow = responsesOriginalStyles.overflow || '';
+            responsesWrapper.style.overflowY = responsesOriginalStyles.overflowY || '';
+        }
+        
+        console.log('Original styles restored');
+    }
+}
+
 // Generalized function to process server responses
 function processServerResponses(response, origin, queryText = "", filePrefix = "Export") {
     var containerId = "#" + origin + "_analysis_content";
@@ -887,25 +1143,22 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
 
     var created_by = now();
     
-    // Handle each response
-    for (const response of responses) {
-        // Handle AI-generated content with warning
+    for(const response of responses) {
         if (response.created_by === "llm") {
             responseContainer.append(`
                 <div class="alert alert-warning" role="alert">
-                   The following response has been AI-generated. 
-                   While the response is based specifically on the disease map content or analyzed data, inaccuracies are still possible.
-                   Make sure you verify all important information using  <a href="#" class="alert-link"><span class="fixed-queries-link" data-origin="${origin}" style="color: blue; text-decoration: underline; cursor: pointer;">fixed response queries</span>
-                   </a>
-                </div>
-                <div class="mt-2">
-                    ${response.content}
-                </div>
+                   The following response includes AI-generated text. While the response is based specifically on the disease map content or analyzed data, AI hallucinations are possible.
+                   However, all figures and tables generate deterministic results, which can explicitly be retrieved using the following <a href="#" class="alert-link"><span class="fixed-queries-link" data-origin="${origin}" style="color: blue; text-decoration: underline; cursor: pointer;">query examples</span>
+                   </a>.
+                </div>  
             `);
-        }
-        
-        // Handle different response types
-        else if (response.response_type === "html") {
+            break;
+        }   
+    }
+
+    for (const response of responses) {
+
+        if (response.response_type === "html") {
             // For HTML responses
             responseContainer.append(response.content);
         }
@@ -1059,7 +1312,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                     "<'clear'>" +
                     "rt" +
                     "<'bottom'ip><'clear'>",
-                    scrollY: '50vh',
+                    scrollY: '47vh',
                     scrollX: true,
                     paging: true,
                     searching: true,
@@ -1135,7 +1388,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 <div class="mt-3">
                     <div class="chart-container" style="width: 100%; height: 250px; background-color: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
-                    </div>
+                    </div>                
                 </div>
             `);
             
@@ -1150,6 +1403,13 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 `);
                 chartHtml.prepend(titleHtml);
             }
+
+            const downloadButton = $(`                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary chart-download-btn" data-chart-id="${chartId}" title="Download chart as PNG">
+                            <i class="fas fa-download"></i> PNG
+                        </button>
+                    </div>
+                `);
             
             // Add legend if provided
             if (chartData.legend && chartData.legend.length > 0) {
@@ -1166,8 +1426,10 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                         `).join('')}
                     </div>
                 `);
-                chartHtml.append(legendHtml);
+                downloadButton.prepend(legendHtml);
             }
+            
+            chartHtml.append(downloadButton);
             
             try {
                 // Process data points
@@ -1190,6 +1452,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                     type: chartData.chart_type || 'bubble',
                     data: { datasets: datasets },
                     options: {
+                        devicePixelRatio: 4,
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
@@ -1208,6 +1471,33 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                                             }
                                         }
                                         return `${pointData.label || 'Point'}: (${context.parsed.x}, ${context.parsed.y})`;
+                                    }
+                                }
+                            },
+                            // Add annotation plugin for quadrant lines
+                            annotation: {
+                                annotations: {
+                                    verticalLine: {
+                                        type: 'line',
+                                        xMin: 0,
+                                        xMax: 0,
+                                        borderColor: 'rgba(0, 0, 0, 0.6)',
+                                        borderWidth: 2,
+                                        borderDash: [],
+                                        label: {
+                                            display: false
+                                        }
+                                    },
+                                    horizontalLine: {
+                                        type: 'line',
+                                        yMin: 0,
+                                        yMax: 0,
+                                        borderColor: 'rgba(0, 0, 0, 0.6)',
+                                        borderWidth: 2,
+                                        borderDash: [],
+                                        label: {
+                                            display: false
+                                        }
                                     }
                                 }
                             },
@@ -1312,6 +1602,11 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 
                 // Store chart reference for potential future use
                 responseContainer.data('chart', chart);
+                
+                // Add download button click handler
+                chartHtml.find('.chart-download-btn').on('click', function() {
+                    downloadChartAsPNG(chart, chartData.title || 'Chart');
+                });
                 
             } catch (error) {
                 console.error('Error initializing Chart:', error);

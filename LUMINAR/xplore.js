@@ -13,9 +13,17 @@ async function xplore() {
         <div class="card card-body mt-3" style="border: 1px solid #FFF;">
             <div class="d-flex align-items-center justify-content-between mb-0">
                 <h4 class="mb-0">Explore the Disease Map</h4>
-                <button type="button" class="btn btn-link p-0 fixed-queries-link" data-origin="xplore" style="color: #6c757d; font-size: 1.2em;" title="Show example queries">
-                    <i class="fas fa-info-circle"></i>
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" id="xplore_btn_download_pdf" class="btn btn-sm btn-outline-secondary" title="Download chat as PDF">
+                        <i class="fas fa-file-pdf"></i>
+                    </button>
+                    <button type="button" id="xplore_btn_expand_chat" class="btn btn-sm btn-outline-primary air_expand_btn" title="Expand chat">
+                        <i class="fas fa-arrow-left air_expand_arrow"></i>
+                    </button>
+                    <button type="button" class="btn btn-link p-0 fixed-queries-link" data-origin="xplore" style="color: #6c757d; font-size: 1.2em;" title="Show example queries">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
             </div>
             <form id="xplore_queryform" class="d-flex mt-2 mb-3">
                 <input type="text" id="xplore_query_input" class="form-control me-2" style="flex: 1;" 
@@ -63,5 +71,15 @@ async function xplore() {
         } finally {
             enablebutton("xplore_btn_query", btn_text);
         }
+    });
+
+    // Handle expand chat button click
+    $("#xplore_btn_expand_chat").on('click', function() {
+        expandChatInterface('xplore');
+    });
+
+    // Handle PDF download button click
+    $("#xplore_btn_download_pdf").on('click', function() {
+        downloadChatAsPDF('xplore');
     });
 } 

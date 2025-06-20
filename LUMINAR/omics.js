@@ -140,6 +140,17 @@ async function omics() {
         </button>
         <div class="collapse" id="omics_collapse_4">
             <div class="card card-body">            
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Analysis & Chat</h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" id="omics_btn_download_pdf" class="btn btn-sm btn-outline-secondary" title="Download chat as PDF">
+                            <i class="fas fa-file-pdf"></i>
+                        </button>
+                        <button type="button" id="omics_btn_expand_chat" class="btn btn-sm btn-outline-primary air_expand_btn" title="Expand chat">
+                            <i class="fas fa-arrow-left air_expand_arrow"></i>
+                        </button>
+                    </div>
+                </div>
                 <div id="omics_analysis_content" style="width: 100%; height: 100%; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 10px;">
 
                 </div>
@@ -562,6 +573,16 @@ async function omics() {
     
     // Setup node map link handling
     setupNodeMapLinks();
+
+    // Handle expand chat button click
+    $("#omics_btn_expand_chat").on('click', function() {
+        expandChatInterface('omics');
+    });
+
+    // Handle PDF download button click
+    $("#omics_btn_download_pdf").on('click', function() {
+        downloadChatAsPDF('omics');
+    });
 }
 
 function initializeDataTree() {
