@@ -1264,6 +1264,45 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             `);
         }
 
+        else if (response.response_type === "call_string") {
+            // For call string responses - displays content with a copy button for reproducibility
+            const callStringId = `call_string_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Unique ID
+            
+            const callStringHtml = $(`
+                <div class="call-string-container mt-3 p-3 border rounded" style="background-color: #f8f9fa;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                 <div class="fw-bold text-muted small">Query to reproduce this result:</div>
+                        <button class="btn btn-sm btn-outline-secondary copy-call-btn" 
+                                data-content="${response.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" 
+                                title="Copy to clipboard">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="call-string-content">
+                        <code style="background-color: white; padding: 8px; border-radius: 4px; display: block; white-space: pre-wrap; word-break: break-all;">${response.content}</code>
+                    </div>
+                </div>
+            `);
+            
+            responseContainer.append(callStringHtml);
+            
+            // Add click handler for copy button
+            callStringHtml.find('.copy-call-btn').on('click', function() {
+                const content = $(this).data('content');
+                copyContent(content);
+                
+                // Visual feedback
+                const originalText = $(this).html();
+                $(this).html('<i class="fas fa-check"></i> Copied!');
+                $(this).addClass('btn-success').removeClass('btn-outline-secondary');
+                
+                setTimeout(() => {
+                    $(this).html(originalText);
+                    $(this).removeClass('btn-success').addClass('btn-outline-secondary');
+                }, 2000);
+            });
+        }
+
         else if (response.response_type === "table") {
             // For table responses
             const tableContent = response.content;
@@ -1633,6 +1672,6 @@ function copyContent(content) {
             console.log('Content copied to clipboard');
         })
         .catch(err => {
-            console.error('Failed to copy: ', err);
+            console.error(' Failed to copy: ', err);
         });
 }
