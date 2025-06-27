@@ -314,14 +314,19 @@ buildPLuginNavigator = () => {
             
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
+                <li class="air_nav_item nav-item" style="width: 28%;">
                     <a class="air_tab nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="false">Exploration</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
+                <li class="air_nav_item nav-item" style="width: 28%;">
                     <a class="air_tab active nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">Data Analysis</a>
                 </li>   
-                <li class="air_nav_item nav-item" style="width: 33.3%;">
+                <li class="air_nav_item nav-item" style="width: 28%;">
                     <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">FAIRDOMHub</a>
+                </li>
+                <li class="air_nav_item nav-item d-flex align-items-center justify-content-center" style="width: 16%;">
+                    <button id="clear_highlights_btn" class="btn btn-xs btn-outline-danger" style="font-size: 10px; padding: 2px 6px;" title="Remove all highlighted elements from the map">
+                        <i class="fas fa-eraser"></i>
+                    </button>
                 </li>
             </ul>
             <div class="tab-content air_tab_content" id="air_tabs" style="height:calc(100% - 45px);background-color: white;">
@@ -336,6 +341,11 @@ buildPLuginNavigator = () => {
     air_data.container.find("#air_tabs").children(".tab-pane").addClass("air_tab_pane");
     air_data.container.find("#air_navs").removeAttr("hidden");
     air_data.container.find(".air_tab_pane").css("height", "100%") //"calc(100vh - " + 700 + "px)");
+    
+    // Add click handler for clear highlights button
+    air_data.container.find("#clear_highlights_btn").on('click', function() {
+        removeHighlight();
+    });
 }
 
 function xp_searchListener(entites) {
@@ -782,6 +792,7 @@ function highlightEdges(data, created_by = "", remove = true) {
                 y: entity.end.y,
               },
             modelId: entity.modelId,
+            id: marker_id,
         };
     });
 
@@ -810,6 +821,7 @@ function highlightPins(data, created_by = "", remove = true) {
             y: entity.y,
             number: entity.number,
             modelId: entity.modelId,
+            id: marker_id,
         };
     });
 
@@ -819,18 +831,38 @@ function highlightPins(data, created_by = "", remove = true) {
 }
 
 
+function extractContent(s) {
+    var span = document.createElement('span');
+    span.innerHTML = s;
+    if (span.textContent == "" && span.innerText == "") {
+        var htmlObject = $(s);
+        if (htmlObject && htmlObject.is(":checkbox")) {
+            return htmlObject.is(':checked') ? "true" : "false";
+        }
+    }
+    return span.textContent || span.innerText;
+}
+
 function getDTExportString(dt, seperator = "\t") {
     let output = [];
-
-
-    dt.rows().every(function (rowIdx, tableLoop, rowLoop) {
-        output.push(this.data().map(function (cell) {
-            return extractContent(cell);
-        }));
+    
+    // Get visible column indices
+    let visibleColumnIndices = [];
+    dt.columns(':visible').every(function (colIdx) {
+        visibleColumnIndices.push(colIdx);
     });
 
-    let columnstodelete = [];
+    // Get data for visible columns only
+    dt.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        let rowData = this.data();
+        let visibleRowData = visibleColumnIndices.map(function(colIdx) {
+            return extractContent(rowData[colIdx]);
+        });
+        output.push(visibleRowData);
+    });
 
+    // Filter out columns that have no values (empty columns)
+    let columnstodelete = [];
     if (output.length > 1) {
         let index_hasValue = {}
         for (let i in output[0]) {
@@ -843,18 +875,17 @@ function getDTExportString(dt, seperator = "\t") {
                 }
             }
         }
-
         columnstodelete = Object.keys(index_hasValue).filter(key => index_hasValue[key] === false)
     }
 
-
+    // Add headers for visible columns only
     output.unshift([]);
-    dt.columns().every(function () {
+    dt.columns(':visible').every(function () {
         output[0].push(this.header().textContent)
-    })
+    });
 
+    // Remove empty columns from output
     output = output.map(row => {
-
         let newarray = []
         for (let i in row) {
             if (!columnstodelete.includes(i)) {
@@ -1089,7 +1120,7 @@ async function downloadChatAsPDF(origin) {
 }
 
 // Generalized function to process server responses
-function processServerResponses(response, origin, queryText = "", filePrefix = "Export") {
+function processServerResponses(response, origin, queryText = "", filePrefix = "Export", new_query = true) {
     var containerId = "#" + origin + "_analysis_content";
     
     // Check if we need to initialize the container
@@ -1116,14 +1147,18 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
     // Create a container for the current response with timestamp
     const timestamp = new Date().toLocaleTimeString();
     
-    // Create the response container
-    const responseContainer = $(`<div class="response-container mt-3 p-3 border-bottom"></div>`);
+    let responseContainer;
     
-    // Append the new response to the container (newest at bottom)
-    responsesWrapper.append(responseContainer);
+    if (new_query) {
+        responseContainer = $(`<div class="response-container mt-3 p-3 border-bottom"></div>`);
+        responsesWrapper.append(responseContainer);
+    }
+    else {
+        responseContainer = responsesWrapper.children().last();
+    }
 
     // Add query text if provided
-    if (queryText) {
+    if (queryText && new_query) {
         const queryHeader = $(`
             <div class="query-header mb-3 p-2 bg-light rounded">
                 <div class="d-flex align-items-center">
@@ -1634,7 +1669,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                         // Override with any custom options provided
                         ...(chartData.chart_options || {})
                     }
-                };
+                };  
                 
                 // Initialize the chart
                 const chart = new Chart(document.getElementById(chartId), chartConfig);

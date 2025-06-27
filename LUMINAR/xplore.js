@@ -63,11 +63,11 @@ async function xplore() {
             console.log(response);
             
             // Use the generalized function to process responses
-            processServerResponses(response, "xplore", $("#xplore_query_input").val(), "Xplore");
+            processServerResponses(response, "xplore", $("#xplore_query_input").val(), "Xplore", true);
             
         } catch (err) {
             console.error("Error processing query:", err);
-            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "xplore", $("#xplore_query_input").val(), "Xplore");
+            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "xplore", "", "Xplore", false);
         } finally {
             enablebutton("xplore_btn_query", btn_text);
         }
