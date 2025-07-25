@@ -281,14 +281,14 @@ async function omics() {
             var btn_text = await disablebutton("omics_example_data");
             
             // Fetch example data from GitHub
-            const response = await fetch('https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/example%20data/GSE131032_Czarnewski_2019.txt');
+            const response = await fetch(air_data.example_data_omics.url);
             if (!response.ok) {
                 throw new Error('Failed to fetch example data');
             }
             
             const text = await response.text();
             const blob = new Blob([text], { type: 'text/plain' });
-            const file = new File([blob], 'GSE131032_Czarnewski_2019.txt', { type: 'text/plain' });
+            const file = new File([blob], air_data.example_data_omics.name, { type: 'text/plain' });
             
             // Create a FormData object and append the file
             const formData = new FormData();
@@ -487,25 +487,25 @@ async function omics() {
             // Final progress update
             await updateProgress(total, total, "omics_btn_analyze", text = "Initialising LLM...");
 
-            await getDataFromServer(
+            const response = await getDataFromServer(
                 "sylobio/initialize_LLM",
                 {},
                 "POST",
                 "json"
             );
             
-            var initial_query = "Provide the user with an overview of the data and the by this tool performed enrichment analysis results especially in the context of the current disease map. The user is not knowledgeable of the method. Also provide a list of fitting queries that they can use to explore the data further. Don't go into methodological details but rather focus on how this tool can support their data analysis. Talk directly to the user."
+            // var initial_query = "Provide the user with an overview of the data and the by this tool performed enrichment analysis results especially in the context of the current disease map. The user is not knowledgeable of the method. Also provide a list of fitting queries that they can use to explore the data further. Don't go into methodological details but rather focus on how this tool can support their data analysis. Talk directly to the user."
             
-            const response = await getDataFromServer(
-                "sylobio/query_llm",
-                { query: initial_query },
-                "POST",
-                "json"
-            );
+            // const response = await getDataFromServer(
+            //     "sylobio/query_llm",
+            //     { query: initial_query },
+            //     "POST",
+            //     "json"
+            // );
 
-            console.log(response);
+            // console.log(response);
             
-            // Use the generalized function to process responses
+            // // Use the generalized function to process responses
             processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");            
 
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).hide();

@@ -10,6 +10,10 @@ const $ = function(selector, context) {
 Object.assign($, parent$);
 
 air_data.added_markers = {}
+air_data.example_data_omics = {
+    "url": "https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/example%20data/GSE131032_Czarnewski_2019.txt",
+    "name": "GSE131032_Czarnewski_2019.txt",
+}
 
 
 let sessionWarningTimeout;
@@ -114,6 +118,7 @@ function getDataFromServer(request, data = {}, type = "GET", datatype = "text", 
                 // Log detailed error information
                 console.error("Server request failed:", {
                     endpoint: request,
+                    fullURL: air_data.SBI_SERVER + request,
                     status: xhr.status,
                     statusText: xhr.statusText,
                     responseText: xhr.responseText,
@@ -122,7 +127,11 @@ function getDataFromServer(request, data = {}, type = "GET", datatype = "text", 
                 
                 // Create an error object to reject with
                 let errorObj;
-                if (xhr.responseJSON && xhr.responseJSON.error) {
+                if (xhr.status === 0) {
+                    errorObj = new Error(`CORS Error: Cannot connect to server at ${air_data.SBI_SERVER}. Please check if the server is running and CORS is properly configured.`);
+                } else if (xhr.status === 504) {
+                    errorObj = new Error(`Server timeout: The server at ${air_data.SBI_SERVER} is not responding. Please try again later.`);
+                } else if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorObj = new Error(xhr.responseJSON.error);
                 } else {
                     errorObj = new Error(error || xhr.statusText || "Unknown error");
@@ -161,6 +170,8 @@ async function GetProjectHash(project_data) {
         }
 
         air_data.session_token = sessionData.hash;
+
+        console.log("session token", air_data.session_token);
         
         // needs_model_init only exists to display a message to the user that it may take a few moments to initialize the model
         // intiialize_model is requested anyway
@@ -180,6 +191,9 @@ async function GetProjectHash(project_data) {
         }
         air_data.example_queries_map = response.example_queries_map;
         air_data.example_queries_dea = response.example_queries_dea;
+        if (response.example_data_omics) {
+            air_data.example_data_omics = response.example_data_omics;
+        }
         
         return sessionData.hash;
         
@@ -1177,6 +1191,10 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
     const responses = Array.isArray(response) ? response : [response];
 
     var created_by = now();
+
+    if (response.hasOwnProperty("created_by") == false) {
+        response.created_by = "user";
+    }
     
     for(const response of responses) {
         if (response.created_by === "llm") {
