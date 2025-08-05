@@ -25,15 +25,21 @@ async function xplore() {
                     </button>
                 </div>
             </div>
-            <form id="xplore_queryform" class="d-flex mt-2 mb-3">
+            <div id="xplore_analysis_content" class="mt-4" style="width: 100%; height: 400px; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 12px; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin-bottom: 15px;">
+                <div class="text-center text-muted pt-5">
+                    Submit a query to see results here
+                </div>
+            </div>
+            <form id="xplore_queryform" class="d-flex mb-2">
                 <input type="text" id="xplore_query_input" class="form-control me-2" style="flex: 1;" 
                     placeholder="Ask a question ..." aria-label="Query input">
                 <button type="button" id="xplore_btn_query" class="air_btn btn">Submit</button>
             </form>
-            <div id="xplore_analysis_content" style="width: 100%; height: 100%; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 12px;">
-                <div class="text-center text-muted pt-5">
-                    Submit a query to see results here
-                </div>
+            <span style="text-align: center;margin-bottom: 4pt;">or</span>
+            <div class="d-flex justify-content-center mb-2">
+                <button type="button" id="xplore_btn_function_selector" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-list"></i> Select Function
+                </button>
             </div>
         </div>
         `
@@ -71,6 +77,11 @@ async function xplore() {
         } finally {
             enablebutton("xplore_btn_query", btn_text);
         }
+    });
+
+    // Handle function selector button click
+    $("#xplore_btn_function_selector").on('click', function() {
+        showFunctionSelectorModal('xplore');
     });
 
     // Handle expand chat button click

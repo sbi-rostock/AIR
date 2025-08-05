@@ -193,6 +193,11 @@ async function GetProjectHash(project_data) {
         air_data.example_queries_dea = response.example_queries_dea;
         if (response.example_data_omics) {
             air_data.example_data_omics = response.example_data_omics;
+            console.log("Example data for omics", air_data.example_data_omics);
+        }
+        else
+        {
+            console.log("No example data for omics");
         }
         
         return sessionData.hash;
@@ -416,7 +421,7 @@ async function disablebutton(id, progress = false) {
                 </div>`);
             }
 
-            $(".air_btn").each(function (pindex) {
+            $(".air_btn, .omics-action-btn").each(function (pindex) {
                 var airbtn = $(this)
                 airbtn.addClass("air_temp_disabledbutton");
             });
@@ -430,7 +435,7 @@ async function enablebutton(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
 
-            $(".air_btn").each(function (pindex) {
+            $(".air_btn, .omics-action-btn").each(function (pindex) {
                 $(this).removeClass("air_temp_disabledbutton");
             });
             var $btn = $('#' + id);
@@ -481,6 +486,18 @@ function valueToHex(val, max=1) {
 
 // Common utility functions
 function createDataTable(containerId, data, columns, options = {}) {
+
+    // Ensure any existing DataTable is completely destroyed first
+    if ($.fn.DataTable.isDataTable($(containerId)[0])) {
+        console.log('Destroying existing DataTable in createDataTable for:', containerId);
+        $(containerId).DataTable().clear().destroy();
+        $(containerId).empty(); // Clear the table HTML completely
+    } else {
+        console.log('No existing DataTable found for:', containerId);
+        // Still clear any existing content to ensure clean state
+        $(containerId).empty();
+    }
+
     const defaultOptions = {
         dom: "<'top'<'dt-length'l><'dt-search'f>>" +
              "<'clear'>" +
@@ -1014,6 +1031,308 @@ function expandChatInterface(origin) {
 function collapseChatInterface(origin) {
     // Just call expand again to toggle
     expandChatInterface(origin);
+}
+
+// Function selector modal and parameter form functionality
+function showFunctionSelectorModal(origin) {
+    // Remove any existing modals
+    $(`#${origin}_function_modal`, window.parent.document).remove();
+    
+    // Remove any existing event handlers to prevent memory leaks
+    $(window.parent.document).off('click', `#${origin}_function_close`);
+    $(window.parent.document).off('click', `#${origin}_function_select`);
+    $(window.parent.document).off('click', `#${origin}_function_submit`);
+    $(window.parent.document).off('click', `#${origin}_function_back`);
+    
+    const queries = origin == "omics" ? air_data.example_queries_dea : air_data.example_queries_map;
+    
+    // Create function list HTML
+    let functionListHtml = '';
+    for (const [key, query] of Object.entries(queries)) {
+        functionListHtml += `
+            <div class="function-item" data-function-key="${key}" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; cursor: pointer; transition: background-color 0.2s;">
+                <div style="font-weight: bold; margin-bottom: 4px;">${query.ui_name || key}</div>
+                <div style="font-size: 0.9em; color: #666; font-style: italic;">'${query.ui_description}'</div>
+            </div>
+        `;
+    }
+    
+    const modalHTML = `
+        <div id="${origin}_function_modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+             background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 99999;">
+            <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
+                 max-width: 600px; width: 90%; max-height: 90%; overflow: auto;">
+                <button id="${origin}_function_close" style="position: absolute; top: 10px; right: 10px;
+                     background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                
+                <h5 style="margin-bottom: 20px; margin-top: 0;">Select Function</h5>
+                
+                <div id="${origin}_function_list" style="margin-bottom: 20px;">
+                    ${functionListHtml}
+                </div>
+                
+                <div id="${origin}_parameter_form" style="display: none;">
+                    <h6 style="margin-bottom: 15px; font-weight: bold;">Define Function Parameters</h6>
+                    <div style="font-size: 0.9em; color: #666; font-style: italic;">Enter values for the parameters below in natural language. AI will generate a query based on your input.</div>
+
+                    <div id="${origin}_parameter_fields"></div>
+                    <div style="text-align: right; margin-top: 20px;">
+                        <button id="${origin}_function_back" class="btn btn-secondary me-2">Back</button>
+                        <button id="${origin}_function_submit" class="btn btn-primary">Submit</button>
+                    </div>
+                </div>
+            </div>
+            <style>
+                #${origin}_function_modal .function-item:hover {
+                    background-color: #f8f9fa;
+                    border-color: #007bff;
+                }
+                #${origin}_function_modal .function-item.selected {
+                    background-color: #e3f2fd;
+                    border-color: #2196f3;
+                    border-width: 2px;
+                }
+                #${origin}_function_modal .required-field:invalid,
+                #${origin}_function_modal .required-field.is-invalid {
+                    border-color: #dc3545 !important;
+                }
+                #${origin}_function_modal .form-control:focus {
+                    border-color: #007bff;
+                    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+                }
+                #${origin}_function_modal .is-invalid {
+                    border-color: #dc3545 !important;
+                }
+                #${origin}_function_modal .form-check-input.is-invalid {
+                    border-color: #dc3545 !important;
+                }
+            </style>
+        </div>
+    `;
+    
+    // Append to window.parent.document.body
+    $(window.parent.document.body).append(modalHTML);
+    
+    // Add click handlers for function selection
+    $(window.parent.document).on('click', `#${origin}_function_list .function-item`, function() {
+        const functionKey = $(this).data('function-key');
+        const query = queries[functionKey];
+        
+        if (!query) return;
+        
+        // Highlight selected function
+        $(window.parent.document).find(`#${origin}_function_list .function-item`).removeClass('selected');
+        $(this).addClass('selected');
+        
+        // Show parameter form
+        showParameterForm(origin, functionKey, query);
+    });
+    
+    // Add close button handler
+    $(window.parent.document).on('click', `#${origin}_function_close`, function() {
+        $(`#${origin}_function_modal`, window.parent.document).remove();
+        $(window.parent.document).off('click', `#${origin}_function_close`);
+        $(window.parent.document).off('click', `#${origin}_function_select`);
+        $(window.parent.document).off('click', `#${origin}_function_submit`);
+        $(window.parent.document).off('click', `#${origin}_function_back`);
+    });
+    
+    // Add back button handler
+    $(window.parent.document).on('click', `#${origin}_function_back`, function() {
+        $(window.parent.document).find(`#${origin}_function_list .function-item`).removeClass('selected');
+        $(window.parent.document).find(`#${origin}_parameter_form`).hide();
+    });
+    
+    // Add submit button handler
+    $(window.parent.document).on('click', `#${origin}_function_submit`, async function() {
+        const selectedFunction = $(window.parent.document).find(`#${origin}_function_list .function-item.selected`).data('function-key');
+        if (!selectedFunction) return;
+        
+        // Validate required fields
+        const requiredFields = $(window.parent.document).find(`#${origin}_parameter_fields .required-field`);
+        let isValid = true;
+        
+        requiredFields.each(function() {
+            const field = $(this);
+            const fieldType = field.attr('type');
+            
+            let hasValue = false;
+            if (fieldType === 'checkbox') {
+                hasValue = field.is(':checked');
+            } else {
+                hasValue = field.val() && field.val().trim() !== '';
+            }
+            
+            if (!hasValue) {
+                field.addClass('is-invalid');
+                isValid = false;
+            } else {
+                field.removeClass('is-invalid');
+            }
+        });
+        
+        if (!isValid) {
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        const formData = collectParameterFormData(origin);
+        
+        // Close the modal first
+        $(`#${origin}_function_modal`, window.parent.document).remove();
+        $(window.parent.document).off('click', `#${origin}_function_close`);
+        $(window.parent.document).off('click', `#${origin}_function_select`);
+        $(window.parent.document).off('click', `#${origin}_function_submit`);
+        $(window.parent.document).off('click', `#${origin}_function_back`);
+        
+        try {
+            // Show loading state on the query button
+            var btn_text = await disablebutton(`${origin}_btn_query`);
+            
+            // Substitute parameters in the query
+            let finalParams = {};
+            Object.entries(formData).forEach(([paramId, value]) => {
+                const paramIndex = paramId.replace('param_', '');
+                const parameters = queries[selectedFunction].parameters;
+                if (parameters[paramIndex]) {
+                    const paramName = parameters[paramIndex].name;
+                    finalParams[paramName] = value;
+                }
+            });
+            
+            var query = {};
+            query["function name"] = selectedFunction;
+            query["parameters"] = finalParams
+
+            query = JSON.stringify(query);
+
+            // Submit the function call
+            const endpoint = origin === "omics" ? "sylobio/query_llm" : "sylobio/query_llm_map";
+            const response = await getDataFromServer(
+                endpoint,
+                { query: query, correct_query: true },
+                "POST",
+                "json"
+            );
+            
+            // Process the response
+            processServerResponses(response, origin, query, "function_call");
+            
+        } catch (err) {
+            console.error("Error submitting function:", err);
+            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, origin, "Function call", "function_call");
+        } finally {
+            // Restore button state
+            enablebutton(`${origin}_btn_query`, btn_text);
+            
+            // Scroll to bottom of analysis content and tab content
+            const analysisContent = document.getElementById(`${origin}_analysis_content`);
+            if (analysisContent) {
+                analysisContent.scrollTop = analysisContent.scrollHeight;
+            }
+        }
+    });
+}
+
+function showParameterForm(origin, functionKey, query) {
+    const parameterFields = $(window.parent.document).find(`#${origin}_parameter_fields`);
+    parameterFields.empty();
+    
+    // Extract parameters from the example query
+    const parameters = query.parameters;
+    
+    if (parameters.length === 0) {
+        // No parameters needed, show submit button directly
+        $(window.parent.document).find(`#${origin}_parameter_form`).show();
+        return;
+    }
+    
+    // Create form fields for each parameter
+    parameters.forEach((param, index) => {
+        const fieldHtml = `
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold; margin-bottom: 5px; display: block;">
+                    ${param.ui_name}
+                    ${param.required ? '<span style="color: red;">*</span>' : ''}
+                </label>
+                <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">${param.ui_description}</div>
+                ${createParameterInput(param, index)}
+            </div>
+        `;
+        parameterFields.append(fieldHtml);
+    });
+    
+    $(window.parent.document).find(`#${origin}_parameter_form`).show();
+}
+
+function createParameterInput(param, index) {
+    const inputId = `param_${index}`;
+    const requiredClass = param.required ? 'required-field' : '';
+    
+    switch (param.type) {
+        case 'boolean':
+            return `<div class="form-check">
+                        <input type="checkbox" id="${inputId}" class="form-check-input ${requiredClass}" 
+                               ${param.defaultValue ? 'checked' : ''} 
+                               ${param.required ? 'required' : ''}>
+                        <label class="form-check-label" for="${inputId}">
+                            Enable ${param.name}
+                        </label>
+                    </div>`;
+        
+        case 'number':
+            return `<input type="number" id="${inputId}" class="form-control ${requiredClass}" 
+                          value="${param.defaultValue? param.defaultValue : ''}" 
+                          ${param.required ? 'required' : ''}
+                          style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};">`;
+        
+        case 'select':
+            return `<select id="${inputId}" class="form-control ${requiredClass}" 
+                           ${param.required ? 'required' : ''}
+                           style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};">
+                        <option value="">Select ${param.name}</option>
+                        ${param.options ? param.options.map(opt => 
+                            `<option value="${opt.value}" ${opt.value === param.defaultValue ? 'selected' : ''}>${opt.label}</option>`
+                        ).join('') : ''}
+                    </select>`;
+        
+        case 'textarea':
+            return `<textarea id="${inputId}" class="form-control ${requiredClass}" rows="3"
+                              ${param.required ? 'required' : ''}
+                              style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};"
+                              placeholder="${param.placeholder || ''}">${param.defaultValue? param.defaultValue : ''}</textarea>`;
+        
+        default:
+            return `<input type="text" id="${inputId}" class="form-control ${requiredClass}" 
+                          value="${param.defaultValue? param.defaultValue : ''}" 
+                          ${param.required ? 'required' : ''}
+                          style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};"
+                          placeholder="${param.placeholder || `Enter ${param.name}`}">`;
+    }
+}
+
+function collectParameterFormData(origin) {
+    const formData = {};
+    const parameterFields = $(window.parent.document).find(`#${origin}_parameter_fields input, #${origin}_parameter_fields select, #${origin}_parameter_fields textarea`);
+    
+    parameterFields.each(function() {
+        const field = $(this);
+        const fieldId = field.attr('id');
+        const fieldType = field.attr('type');
+        
+        let fieldValue;
+        if (fieldType === 'checkbox') {
+            fieldValue = field.is(':checked') ? 'true' : 'false';
+        } else {
+            fieldValue = field.val();
+        }
+        
+        if (fieldId && fieldValue !== '') {
+            formData[fieldId] = fieldValue;
+        }
+    });
+    
+    return formData;
 }
 
 // Function to download chat content as PDF

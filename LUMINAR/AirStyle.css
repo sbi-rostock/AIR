@@ -677,3 +677,118 @@ input[type=checkbox] .cbcontainer {
   border: 0px solid white;
 }
 
+/* Modern Action Buttons */
+.omics-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 60px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.omics-action-btn:not(.air_disabledbutton):hover {
+  border-color: #9ca3af;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.omics-action-btn.air_disabledbutton {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f9fafb;
+  color: #9ca3af;
+}
+
+.omics-action-btn.air_temp_disabledbutton {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.omics-action-btn i {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.omics-action-btn span {
+  font-size: 10px;
+  letter-spacing: 0.025em;
+}
+
+.omics-btn-view:not(.air_disabledbutton):hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.omics-btn-edit:not(.air_disabledbutton):hover {
+  border-color: #10b981;
+  color: #10b981;
+  background: #ecfdf5;
+}
+
+.omics-btn-delete:not(.air_disabledbutton):hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.omics-btn-download:not(.air_disabledbutton):hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: #f3f4f6;
+}
+
+/* Data warning styles for jstree nodes */
+.omics-data-critical > a {
+  background-color: #f8d7da !important;
+  border-left: 4px solid #dc3545 !important;
+  color: #721c24 !important;
+  font-weight: bold !important;
+}
+
+.omics-data-error > a {
+  background-color: #ffeaa7 !important;
+  border-left: 4px solid #fd7e14 !important;
+  color: #856404 !important;
+  font-weight: bold !important;
+}
+
+.omics-data-warning > a {
+  background-color: #fff3cd !important;
+  border-left: 4px solid #ffc107 !important;
+  color: #664d03 !important;
+}
+
+.omics-data-info > a {
+  background-color: #d1ecf1 !important;
+  border-left: 4px solid #17a2b8 !important;
+  color: #0c5460 !important;
+}
+
+/* Hover effects for warning nodes */
+.omics-data-critical > a:hover {
+  background-color: #f5c6cb !important;
+}
+
+.omics-data-error > a:hover {
+  background-color: #ffd93d !important;
+}
+
+.omics-data-warning > a:hover {
+  background-color: #ffeeba !important;
+}
+
+.omics-data-info > a:hover {
+  background-color: #bee5eb !important;
+}
+

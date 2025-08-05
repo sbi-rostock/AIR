@@ -190,7 +190,7 @@ async function fairdom() {
           // const rawData = JSON.parse(response);
           for(var rawData of rawDatasets)
           {
-            addDataToTree('fairdom', rawData.name, rawData.data_id);
+            addDataToTree('fairdom', rawData);
 
             if(i == 0)
             {
