@@ -24,6 +24,12 @@ var air_omics = air_data.omics
 
 async function omics() {
     air_omics.container = air_data.container.find('#airomics_tab_content');
+    
+    // Remove plugin header element from parent document
+    removePluginHeader();
+    
+    // Maximize plugin container size
+    maximizePluginContainer();
 
     $(
         `
@@ -31,7 +37,7 @@ async function omics() {
             1. Upload Data
         </button>
         <div class="collapse show" id="omics_collapse_1">
-            <div class="card card-body">
+            <div class="card" style="padding: 1rem;">
                 <form id="omics_fileForm">
                     <div class="mb-2">
                         <input type="file" class="form-control" id="omics_file" multiple accept=".txt,.tsv,.csv,.tab,.data,.zip">
@@ -66,7 +72,7 @@ async function omics() {
             2. Select Data
         </button>
         <div class="collapse" id="omics_collapse_2">
-            <div class="card card-body">
+            <div class="card" style="padding: 1rem;">
                 <div id="omics_data_treeview" class="treeview fair_jstree">
                 </div>
                 <div style="display: flex; justify-content: center; gap: 8px; margin: 20px 0;">
@@ -96,7 +102,7 @@ async function omics() {
                     Data Visualization
                 </button>
                 <div class="collapse" id="omics_collapse_viewdata">
-                    <div class="card card-body">
+                    <div class="card" style="padding: 1rem;">
                         <div class="d-flex gap-2 mb-1 mt-2">
                             <select class="form-select" id="omics_select_column" data-bs-toggle="tooltip" data-bs-placement="right" title="Select a data column to visualize on the Disease Map">
                             </select>
@@ -129,7 +135,7 @@ async function omics() {
             3. Run Analysis
         </button>
         <div class="collapse" id="omics_collapse_3">
-            <div class="card card-body">
+            <div class="card" style="padding: 1rem;">
                 <div class="d-flex gap-3 mb-2 justify-content-center">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" value="" id="omics_cb_downstream" checked>
@@ -153,7 +159,7 @@ async function omics() {
             4. Submit your Query
         </button>
         <div class="collapse" id="omics_collapse_4">
-            <div class="card card-body">            
+            <div class="card" style="padding: 1rem; display: flex; flex-direction: column; height: calc(100vh - 40px);">            
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">Analysis & Chat</h6>
                     <div class="d-flex gap-2">
@@ -165,11 +171,11 @@ async function omics() {
                         </button>
                     </div>
                 </div>
-                <div id="omics_analysis_content" style="width: 100%; height: 100%; max-width: 800px; overflow-x: auto; overflow-y: auto; font-size: 10px;">
+                <div id="omics_analysis_content" style="width: 100%; flex: 1; overflow-x: auto; overflow-y: hidden; font-size: 12px; border: none; padding: 0;">
 
                 </div>
-                <form id="omics_queryform" class="d-flex mb-2">
-                    <input type="text" placeholder="Ask a question about the data analysis." id="omics_query_input" class="form-control me-2" style="flex: 1;" aria-label="Text input with segmented dropdown button">
+                <form id="omics_queryform" class="d-flex mt-2 mb-2">
+                    <textarea placeholder="Ask a question about the data analysis." id="omics_query_input" class="form-control me-2 auto-expand-input" style="flex: 1; resize: none;" aria-label="Text input with segmented dropdown button" rows="1"></textarea>
                     <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
                 </form>
                 <span style="text-align: center;margin-bottom: 4pt;">or</span>
@@ -185,10 +191,22 @@ async function omics() {
 
 
 
+    // Setup auto-expanding input
+    setupAutoExpandingInput("#omics_query_input");
+    
+    // Handle Enter key in the query input (submit on Enter, allow Shift+Enter for new line)
     $("#omics_query_input").on('keydown', function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Prevent form submission
             $("#omics_btn_query").trigger('click'); // Trigger the click event on the submit button
+        }
+    });
+
+    // Initialize chat when the collapse is shown
+    $('#omics_collapse_4').on('shown.bs.collapse', function () {
+        // Ensure chat container is initialized when the section becomes visible
+        if (typeof initializeChatContainer === 'function') {
+            initializeChatContainer('omics');
         }
     });
 
@@ -1133,6 +1151,9 @@ async function omics() {
 
             // console.log(response);
             
+            // Enable omics focus switch after analysis completes
+            $("#omics_focus_switch").prop('checked', true).trigger('change');
+            
             // // Use the generalized function to process responses
             processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");            
 
@@ -1167,12 +1188,21 @@ async function omics() {
 
     // Handle file upload form submission
     $("#omics_btn_query").on('click', async function() {
+        const queryText = $("#omics_query_input").val().trim();
+        if (!queryText) return;
+        
         try {
             var btn_text = await disablebutton("omics_btn_query");
             
+            // Add thinking indicator immediately
+            addThinkingIndicator("omics", queryText);
+            
+            // Clear the input and reset height
+            $("#omics_query_input").val('').css('height', '38px').css('overflow-y', 'hidden');
+            
             const response = await getDataFromServer(
                 "sylobio/query_llm",
-                { query: $("#omics_query_input").val() },
+                { query: queryText },
                 "POST",
                 "json"
             );
@@ -1180,21 +1210,13 @@ async function omics() {
             console.log(response);
             
             // Use the generalized function to process responses
-            processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");
+            processServerResponses(response, "omics", queryText, "analysis");
             
-            enablebutton("omics_btn_query", btn_text);  
         } catch (err) {
             console.error("Error processing query:", err);
             
-            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", $("#omics_query_input").val(), "analysis");
+            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", queryText, "analysis", true);
         } finally {
-
-            // Scroll to bottom of analysis content and tab content
-            const analysisContent = document.getElementById('omics_analysis_content');
-            if (analysisContent) {
-                analysisContent.scrollTop = analysisContent.scrollHeight;
-            }
-            
             enablebutton("omics_btn_query", btn_text);
         }
     });

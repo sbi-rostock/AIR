@@ -19,6 +19,12 @@ const ICONS = {
 
 async function fairdom() {
   air_fairdom.container = air_data.container.find('#fairdom_tab_content');
+  
+  // Remove plugin header element from parent document
+  removePluginHeader();
+  
+  // Maximize plugin container size
+  maximizePluginContainer();
 
   $(
     `
@@ -26,7 +32,7 @@ async function fairdom() {
         1. Login to FAIRDOMHub
       </button>
       <div class="collapse show" id="fd_collapse_1">
-        <div class="card card-body">
+        <div class="card" style="padding: 1rem;">
           <form id="fd_loginForm">
             <div class="mb-2">
               <label for="fd_project_id" class="form-label">Project ID</label>
@@ -50,7 +56,7 @@ async function fairdom() {
         2. Select your Data
       </button>
       <div class="collapse" id="fd_collapse_2">
-        <div class="card card-body">
+        <div class="card" style="padding: 1rem;">
           <div id="fd_data_treeview" class="treeview">
 
           </div>
@@ -83,7 +89,7 @@ async function fairdom() {
         3. Visualize your Data
       </button>
       <div class="collapse" id="fd_collapse_3">
-        <div class="card card-body">
+        <div class="card" style="padding: 1rem;">
           <select class="form-select mb-1 mt-2" id="fd_select_column">
           </select>
           <div class="form-check mb-2">

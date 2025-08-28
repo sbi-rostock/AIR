@@ -310,12 +310,248 @@ async function initialize_server() {
             .air_expand_arrow.expanded {
                 transform: rotate(180deg);
             }
+            
+            /* Chat bubble animations */
+            @keyframes chatBubblePopIn {
+                0% {
+                    transform: translateY(50px) scale(0.8);
+                    opacity: 0;
+                }
+                60% {
+                    transform: translateY(-5px) scale(1.05);
+                    opacity: 0.9;
+                }
+                80% {
+                    transform: translateY(2px) scale(0.98);
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(0) scale(1);
+                    opacity: 1;
+                }
+            }
+            
+            .chat-bubble-animate {
+                animation: chatBubblePopIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+                animation-fill-mode: forwards;
+                transform-origin: bottom center;
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            
+            /* Clean animation classes after completion */
+            
+            /* Prevent re-animation of existing messages */
+            .chat-bubble-animated {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            
+            /* Stagger animation delays for multiple responses */
+            .chat-bubble-animate:nth-child(1) { animation-delay: 0ms; }
+            .chat-bubble-animate:nth-child(2) { animation-delay: 150ms; }
+            .chat-bubble-animate:nth-child(3) { animation-delay: 300ms; }
+            .chat-bubble-animate:nth-child(4) { animation-delay: 450ms; }
+            .chat-bubble-animate:nth-child(5) { animation-delay: 600ms; }
+            .chat-bubble-animate:nth-child(6) { animation-delay: 750ms; }
+            .chat-bubble-animate:nth-child(7) { animation-delay: 900ms; }
+            .chat-bubble-animate:nth-child(8) { animation-delay: 1050ms; }
+            
+            /* Focus mode styles */
+            .air-focus-mode-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.7);
+                z-index: 1000;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            
+            .air-focus-mode-overlay.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            
+            .air-focus-mode-highlight {
+                position: relative;
+                z-index: 1001;
+                box-shadow: 0 0 30px rgba(0, 123, 255, 0.5);
+                border-radius: 12px;
+                transition: all 0.3s ease;
+            }
+
+            .air-focus-mode-highlight:not(button[id$="_btn_query"]) {
+                background: white;
+            }
+            
+            .air-focus-mode-active .chat-container,
+            .air-focus-mode-active .chat-header {
+                position: relative;
+                z-index: 1001;
+            }
+            
+            .air-focus-mode-active textarea[id$="_query_input"],
+            .air-focus-mode-active input[id$="_query_input"] {
+                position: relative;
+                z-index: 1001;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+                border-color: #007bff;
+            }
+            
+            .air-focus-mode-active button[id$="_btn_query"] {
+                position: relative;
+                z-index: 1001;
+                border-radius: 8px;
+                box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+                border-color: #007bff;
+                color: #007bff;
+            }
+            
+            .air-focus-mode-active button[id$="_btn_function_selector"] {
+                position: relative;
+                z-index: 1001;
+                box-shadow: 0 0 15px rgba(0, 123, 255, 0.2);
+                border-radius: 6px;
+            }
+            
+            /* Fix submit button alignment */
+            form[id$="_queryform"] {
+                align-items: center;
+            }
+            
+            form[id$="_queryform"] .air_btn {
+                height: auto;
+                align-self: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 38px;
+            }
+            
+            form[id$="_queryform"] .form-control {
+                height: 38px;
+            }
+            
+
+            .air-focus-mode-active button[id$="_btn_function_selector"] {
+                background-color: rgba(0, 123, 255, 0.1);
+                border-color: rgba(0, 123, 255, 0.3);
+                color: #007bff;
+            }
+            
+                    /* Focus mode switch styling */
+        .form-check.form-switch {
+            margin-bottom: 0;
+            padding-left: 0;
+            min-height: auto;
+        }
+        
+        /* Auto-expanding text input styling */
+        .auto-expand-input {
+            resize: none;
+            overflow-y: auto;
+            transition: height 0.2s ease;
+            min-height: 38px;
+            max-height: 200px;
+        }
+        
+        .auto-expand-input:focus {
+            overflow-y: auto;
+        }
+            
+            .form-check.form-switch .form-check-input {
+                width: 3rem;
+                height: 1.5rem;
+                background-color: #f8f9fa;
+                border: 2px solid #007bff;
+                cursor: pointer;
+                transition: all 0.15s ease-in-out;
+                margin-top: 0;
+                margin-left: 0;
+            }
+            
+            .form-check.form-switch .form-check-input:checked {
+                background-color: #007bff;
+                border-color: #007bff;
+            }
+            
+            .form-check.form-switch .form-check-input:hover {
+                border-color: #0056b3;
+                background-color: rgba(0, 123, 255, 0.1);
+            }
+            
+            .form-check.form-switch .form-check-input:checked:hover {
+                background-color: #0056b3;
+                border-color: #0056b3;
+            }
+            
+            .form-check.form-switch .form-check-input:focus {
+                box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+                border-color: #007bff;
+            }
+            
+            .form-check.form-switch .form-check-label,
+            .form-check-label[for$="_focus_switch"] {
+                cursor: pointer;
+                user-select: none;
+                line-height: 1.5rem;
+                margin-left: 0;
+            }
+            
+            /* Chat container with proper scrolling */
+            .chat-container {
+                display: flex;
+                flex-direction: column;
+                height: calc(100% - 54px);
+            }
+            
+            .chat-messages {
+                flex: 1;
+                overflow-y: scroll;
+                overflow-x: hidden;
+                padding: 10px;
+                background: white;
+                border: none;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }
+            
+            /* Push-up animation for new messages handled by existing .chat-bubble-animate */
+            
+            /* Push effect on existing messages */
+            .message-push-up {
+                animation: messagePushUp 0.4s ease-out forwards;
+            }
+            
+            @keyframes messagePushUp {
+                0% {
+                    transform: translateY(0);
+                }
+                100% {
+                    transform: translateY(-10px);
+                }
+            }
         `;
         document.head.appendChild(customCSS);
         
         air_data.session_token = session_token;
         buildPLuginNavigator();
         loadAndExecuteScripts(["omics.js", "fairdom.js", "xplore.js"]);
+        
+        // Initialize chat containers after a short delay to ensure modules are loaded
+        setTimeout(() => {
+            initializeChatContainer('xplore');
+            initializeChatContainer('fairdom');
+            initializeChatContainer('omics');
+        }, 200);
+        
         resetSessionWarningTimer();
         
         air_data.minerva_events.addListener("onBioEntityClick", showModulatorsOnClick);
@@ -323,9 +559,268 @@ async function initialize_server() {
         // Setup node map link handling
         setupNodeMapLinks();
 
+            // Initialize tooltips for plain text content
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+
     } catch (error) {
         console.error("Error while initializing:", error);
     }
+}
+
+// Function to initialize chat container without any messages
+function initializeChatContainer(origin) {
+    var containerId = "#" + origin + "_analysis_content";
+    
+    // Check if container exists and doesn't already have chat structure
+    if ($(containerId).length > 0 && $(containerId).find('.chat-messages').length === 0) {
+        // Create the chat header and container structure
+        $(containerId).html(`
+            <div class="chat-header d-flex justify-content-between align-items-center mb-2 p-2" style="background: #eeeeee; border-radius: 8px; flex-shrink: 0;">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="mb-0" style="color: #495057;">
+                        <i class="fas fa-comments me-2"></i>Chat History
+                    </h6>
+                    <button id="${origin}_clear_btn" class="btn btn-sm btn-outline-danger" title="Clear chat history" style="padding: 0.25rem 0.5rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-check-label d-flex align-items-center mb-0" for="${origin}_focus_switch" style="font-size: 12px; color: #6c757d; cursor: pointer;">
+                        <i class="fas fa-eye me-1"></i>Focus
+                    </label>
+                    <div class="form-check form-switch mb-0" style="padding-left: 0;">
+                        <input class="form-check-input" type="checkbox" role="switch" id="${origin}_focus_switch" title="Toggle focus mode" style="margin-left: 0;">
+                    </div>
+                </div>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages">
+                    <div class="text-center text-muted mt-3">
+                        <i class="fas fa-comments" style="font-size: 3em; color: #dee2e6; margin-bottom: 10px;"></i>
+                        <p class="mb-0">No messages yet</p>
+                        <small>Start a conversation by asking a question below</small>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        // Add focus mode toggle handler for switch
+        $(`#${origin}_focus_switch`).on('change', function() {
+            const isChecked = $(this).prop('checked');
+            if (isChecked) {
+                activateFocusMode(origin);
+            } else {
+                deactivateFocusMode(origin);
+            }
+        });
+        
+        // Add clear history button handler
+        $(`#${origin}_clear_btn`).on('click', function() {
+            const chatMessages = $(containerId).find('.chat-messages');
+            chatMessages.html(`
+                <div class="text-center text-muted mt-3">
+                    <i class="fas fa-comments" style="font-size: 3em; color: #dee2e6; margin-bottom: 10px;"></i>
+                    <p class="mb-0">No messages yet</p>
+                    <small>Start a conversation by asking a question below</small>
+                </div>
+            `);
+            // No animation needed for clear action
+        });
+        
+        // Add scroll event handling to prevent outer container scrolling when at limits
+        $(containerId).find('.chat-messages').on('wheel', function(e) {
+            const chatMessages = $(this);
+            const scrollTop = chatMessages.scrollTop();
+            const scrollHeight = chatMessages[0].scrollHeight;
+            const clientHeight = chatMessages[0].clientHeight;
+            
+            // Check if scrolling up and at the top
+            if (e.originalEvent.deltaY < 0 && scrollTop <= 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+            
+            // Check if scrolling down and at the bottom
+            if (e.originalEvent.deltaY > 0 && scrollTop + clientHeight >= scrollHeight) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        });
+        
+        // No initial animation needed for empty state
+    }
+}
+
+// Function to mark existing messages as already animated
+function markExistingMessagesAsAnimated(origin) {
+    const containerId = "#" + origin + "_analysis_content";
+    const chatMessages = $(containerId).find('.chat-messages');
+    
+    if (chatMessages.length === 0) return;
+    
+    // Find all existing messages with animation class
+    const existingAnimatedMessages = chatMessages.find('.chat-bubble-animate');
+    
+    // Mark them as already animated and remove the animation class
+    existingAnimatedMessages.removeClass('chat-bubble-animate').addClass('chat-bubble-animated');
+}
+
+// Function to create push-up effect when new messages appear
+function addPushUpEffect(origin, delay = 0) {
+    setTimeout(() => {
+        const containerId = "#" + origin + "_analysis_content";
+        const chatMessages = $(containerId).find('.chat-messages');
+        
+        if (chatMessages.length === 0) return;
+        
+        // Add push-up class to all existing messages
+        const existingMessages = chatMessages.find('.message-pair, .response-item');
+        
+        if (existingMessages.length > 0) {
+            existingMessages.addClass('message-push-up');
+            
+            // Remove the push-up class after animation completes
+            setTimeout(() => {
+                existingMessages.removeClass('message-push-up');
+            }, 400);
+        }
+    }, delay);
+}
+
+// Function to clean up animation classes after they complete
+function cleanupAnimationClasses(origin, animationCount = 1, baseDelay = 0) {
+    const animationDuration = 600;
+    const staggerDelay = (animationCount - 1) * 150;
+    const totalDelay = baseDelay + staggerDelay + animationDuration + 50; // Small buffer
+    
+    setTimeout(() => {
+        const containerId = "#" + origin + "_analysis_content";
+        const chatMessages = $(containerId).find('.chat-messages');
+        
+        if (chatMessages.length > 0) {
+            // Mark all animated messages as completed
+            chatMessages.find('.chat-bubble-animate').removeClass('chat-bubble-animate').addClass('chat-bubble-animated');
+        }
+    }, totalDelay);
+}
+
+// Function to add a single message with animation and scroll
+function addMessageWithAnimation(origin, messageElement, callback) {
+    const containerId = "#" + origin + "_analysis_content";
+    const chatMessages = $(containerId).find('.chat-messages');
+    
+    if (chatMessages.length === 0) return;
+    
+    // Add the message to the DOM
+    const responsesContainer = chatMessages.find('.assistant-responses').last();
+    if (responsesContainer.length > 0) {
+        responsesContainer.append(messageElement);
+    } else {
+        chatMessages.append(messageElement);
+    }
+    
+    // Wait for animation to complete, then scroll
+    setTimeout(() => {
+        // Scroll to show the new message
+        if (chatMessages.length > 0 && chatMessages[0]) {
+            chatMessages.animate({
+                scrollTop: chatMessages[0].scrollHeight
+            }, 300, callback); // Callback fires when scroll completes
+        } else if (callback) {
+            callback();
+        }
+    }, 650); // Animation duration + small buffer
+
+    const evt = new CustomEvent('air:response:visible', { detail: { origin, el: messageElement }});
+    document.dispatchEvent(evt);
+}
+
+// Function to process messages sequentially
+async function processMessagesSequentially(origin, messages) {
+    for (let i = 0; i < messages.length; i++) {
+        await new Promise(resolve => {
+            addMessageWithAnimation(origin, messages[i], resolve);
+        });
+    }
+}
+
+// Focus mode functionality
+let air_focus_mode_active = false;
+let air_focus_overlay = null;
+
+function activateFocusMode(origin) {
+    const analysisContent = $(`#${origin}_analysis_content`);
+    const queryForm = $(`#${origin}_queryform`);
+    const functionSelectorBtn = $(`#${origin}_btn_function_selector`);
+    
+    // Activate focus mode
+    air_focus_mode_active = true;
+    
+    // Create overlay if it doesn't exist
+    if (!air_focus_overlay) {
+        air_focus_overlay = $('<div class="air-focus-mode-overlay"></div>');
+        $('body').append(air_focus_overlay);
+        
+        // Click overlay to exit focus mode
+        air_focus_overlay.on('click', function(e) {
+            if (e.target === this) {
+                deactivateFocusMode(origin);
+            }
+        });
+        
+        // ESC key to exit focus mode
+        $(document).on('keydown.focusmode', function(e) {
+            if (e.key === 'Escape' && air_focus_mode_active) {
+                deactivateFocusMode(origin);
+            }
+        });
+    }
+    
+    // Clear any existing focus highlights
+    $('.air-focus-mode-active, .air-focus-mode-highlight').removeClass('air-focus-mode-active air-focus-mode-highlight');
+    
+    // Add classes and show overlay
+    analysisContent.addClass('air-focus-mode-active air-focus-mode-highlight');
+    
+    // Highlight individual form elements instead of the form container
+    const queryInput = queryForm.find('textarea[id$="_query_input"], input[id$="_query_input"]');
+    const submitButton = queryForm.find('button[id$="_btn_query"]');
+    
+    if (queryInput.length > 0) {
+        queryInput.addClass('air-focus-mode-highlight');
+    }
+    if (submitButton.length > 0) {
+        submitButton.addClass('air-focus-mode-highlight');
+    }
+    
+    // Highlight function selector button if it exists
+    if (functionSelectorBtn.length > 0) {
+        functionSelectorBtn.addClass('air-focus-mode-highlight');
+    }
+    
+    air_focus_overlay.addClass('active');
+    
+    // Store current origin
+    air_focus_overlay.data('current-origin', origin);
+}
+
+function deactivateFocusMode(origin) {
+    // Deactivate focus mode
+    air_focus_mode_active = false;
+    
+    // Remove classes and hide overlay
+    $('.air-focus-mode-active, .air-focus-mode-highlight').removeClass('air-focus-mode-active air-focus-mode-highlight');
+    if (air_focus_overlay) {
+        air_focus_overlay.removeClass('active');
+    }
+    
+    // Update all focus switches to unchecked state
+    $('input[id$="_focus_switch"]').prop('checked', false);
 }
 
 buildPLuginNavigator = () => {
@@ -334,10 +829,10 @@ buildPLuginNavigator = () => {
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
                 <li class="air_nav_item nav-item" style="width: 28%;">
-                    <a class="air_tab nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="false">Exploration</a>
+                    <a class="air_tab active nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="true">Exploration</a>
                 </li>
                 <li class="air_nav_item nav-item" style="width: 28%;">
-                    <a class="air_tab active nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="true">Data Analysis</a>
+                    <a class="air_tab nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Data Analysis</a>
                 </li>   
                 <li class="air_nav_item nav-item" style="width: 28%;">
                     <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">FAIRDOMHub</a>
@@ -348,10 +843,10 @@ buildPLuginNavigator = () => {
                     </button>
                 </li>
             </ul>
-            <div class="tab-content air_tab_content" id="air_tabs" style="height:calc(100% - 45px);background-color: white;">
-                <div class="tab-pane show" id="xplore_tab_content" role="tabpanel" aria-labelledby="xplore_tab">
+            <div class="tab-content air_tab_content" id="air_tabs" style="height: calc(100% - 45px);background-color: white;">
+                <div class="tab-pane show active" id="xplore_tab_content" role="tabpanel" aria-labelledby="xplore_tab" style="overflow-y: hidden;">
                 </div>
-                <div class="tab-pane show active" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab">
+                <div class="tab-pane show" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab" style="overflow-y: scroll;">
                 </div>
                 <div class="tab-pane show" id="fairdom_tab_content" role="tabpanel" aria-labelledby="fairdom_tab">
                 </div>
@@ -1027,6 +1522,20 @@ function expandChatInterface(origin) {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Simple function - no separate collapse needed
 function collapseChatInterface(origin) {
     // Just call expand again to toggle
@@ -1452,59 +1961,283 @@ async function downloadChatAsPDF(origin) {
     }
 }
 
+// Function to remove plugin header element from parent document
+function removePluginHeader() {
+    try {
+        // Remove the plugin header element if it exists
+        const headerElement = window.parent.document.querySelector('[data-testid="drawer-plugins-header"]');
+        if (headerElement) {
+            headerElement.remove();
+            console.log('Plugin header element removed');
+        }
+    } catch (error) {
+        console.error('Error removing plugin header:', error);
+    }
+}
+
+
+
+// Function to maximize plugin container size
+function maximizePluginContainer() {
+    try {
+        const parentDoc = window.parent.document;
+        
+        // Target the main plugins content area
+        const pluginsContent = parentDoc.querySelector('[data-testid="drawer-plugins-content"]');
+        if (pluginsContent) {
+            // Maximize the height by removing the header offset
+            pluginsContent.style.height = 'calc(100% - 60px)'; // Reduced from 166px to account for removed header
+            pluginsContent.style.maxHeight = 'calc(100% - 60px)';
+            console.log('Plugin container height maximized');
+        }
+        
+        // // Hide or minimize the tab close button to gain a bit more space
+        // const tabCloseIcon = parentDoc.querySelector('[data-testid="close-icon"]');
+        // if (tabCloseIcon) {
+        //     tabCloseIcon.style.display = 'none';
+        //     console.log('Tab close icon hidden');
+        // }
+        
+        // Minimize tab padding to gain more space
+        const tabButton = parentDoc.querySelector('[data-testid="drawer-plugins-tab"] button');
+        if (tabButton) {
+            tabButton.style.padding = '4px 8px'; // Reduced from default padding
+            tabButton.style.height = '32px'; // Reduced height
+            console.log('Tab button padding minimized');
+        }
+        
+        // Minimize the tab container height
+        const tabContainer = parentDoc.querySelector('[data-testid="drawer-plugins-tab"]');
+        if (tabContainer) {
+            tabContainer.style.minHeight = '32px'; // Reduced from default
+            tabContainer.style.height = '32px';
+            console.log('Tab container height minimized');
+        }
+        
+        // Adjust the plugins content height to account for smaller tab
+        if (pluginsContent) {
+            pluginsContent.style.height = 'calc(100% - 32px)'; // Further optimized
+            pluginsContent.style.maxHeight = 'calc(100% - 32px)';
+        }
+        
+        // // If there's only one plugin, consider hiding the tab bar entirely
+        // const allTabs = parentDoc.querySelectorAll('[data-testid="drawer-plugins-tab"] button');
+        // if (allTabs.length === 1 && tabContainer) {
+        //     // Hide the entire tab container to maximize space
+        //     tabContainer.style.display = 'none';
+        //     if (pluginsContent) {
+        //         pluginsContent.style.height = '100%'; // Use full height
+        //         pluginsContent.style.maxHeight = '100%';
+        //         console.log('Single plugin detected - tab bar hidden for maximum space');
+        //     }
+        // }
+        
+    } catch (error) {
+        console.error('Error maximizing plugin container:', error);
+    }
+}
+
+// Function to add a "thinking..." indicator 
+function addThinkingIndicator(origin, queryText) {
+    var containerId = "#" + origin + "_analysis_content";
+    
+    // Ensure chat container is initialized (fallback if not already done)
+    if ($(containerId).find('.chat-messages').length === 0) {
+        initializeChatContainer(origin);
+    }
+    
+    const chatMessages = $(containerId).find('.chat-messages');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Clear any placeholder content
+    chatMessages.find('.text-center.text-muted').remove();
+    
+    // Mark existing messages as already animated to prevent re-animation
+    markExistingMessagesAsAnimated(origin);
+    
+    // Schedule push-up effect to happen just before user message animation starts
+    addPushUpEffect(origin, 50); // Small delay before animation
+    
+    // Add user query message
+    if (queryText && queryText.trim()) {
+        // Create user message with animation
+        const userMessage = $(`
+            <div class="user-message-container mb-3 chat-bubble-animate">
+                <div class="user-message" style="display: flex; flex-direction: column; align-items: flex-end;">
+                    <div class="message-header d-flex justify-content-end align-items-center mb-2" style="width: 100%;">
+                        <small class="text-muted me-2">${timestamp}</small>
+                        <div class="d-flex align-items-center">
+                            <span class="fw-bold text-primary me-2">You</span>
+                            <div class="message-avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px;">
+                                <i class="fas fa-user"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="message-content p-3" style="background: #e3f2fd; border-radius: 12px; border-top-right-radius: 4px; max-width: 80%; text-align: left;">
+                        ${queryText}
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        // Create thinking indicator with delayed animation (after user message completes)
+        const thinkingMessage = $(`
+            <div class="message-pair mb-3 chat-bubble-animate" style="animation-delay: 600ms;">
+                <div class="assistant-message">
+                    <div class="message-header d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="message-avatar bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; overflow: hidden;">
+                                <img src="https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/Luminar_icon_small.jpg" alt="LUMINAR" style="width: 100%; height: 100%; object-fit: cover;">
+                            </div>
+                            <span class="fw-bold text-success">LUMINAR Assistant</span>
+                        </div>
+                        <small class="text-muted">${timestamp}</small>
+                    </div>
+                    <div class="thinking-indicator p-3" style="background: #f8f9fa; border-radius: 12px; border-top-left-radius: 4px; border: 1px solid #dee2e6;">
+                        <div class="d-flex align-items-center">
+                            <div class="thinking-dots" style="margin: 0 16px 0 8px;">
+                                <div class="dot-flashing" style="position: relative; width: 6px; height: 6px; border-radius: 3px; background-color: #6c757d; color: #6c757d; animation: dotFlashing 1.4s infinite linear alternate; animation-delay: 0.5s;"></div>
+                            </div>
+                            <span class="text-muted">Thinking...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        chatMessages.append(userMessage);
+        chatMessages.append(thinkingMessage);
+        
+        // Add CSS for thinking animation
+        if (!document.getElementById('thinking-animation-css')) {
+            const thinkingCSS = document.createElement('style');
+            thinkingCSS.id = 'thinking-animation-css';
+            thinkingCSS.textContent = `
+                .dot-flashing {
+                    position: relative;
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background-color: #6c757d;
+                    color: #6c757d;
+                    animation: dotFlashing 1.4s infinite linear alternate;
+                    animation-delay: 0.5s;
+                }
+                .dot-flashing::before, .dot-flashing::after {
+                    content: '';
+                    display: inline-block;
+                    position: absolute;
+                    top: 0;
+                }
+                .dot-flashing::before {
+                    left: -10px;
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background-color: #6c757d;
+                    color: #6c757d;
+                    animation: dotFlashing 1.4s infinite alternate;
+                    animation-delay: 0s;
+                }
+                .dot-flashing::after {
+                    left: 10px;
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background-color: #6c757d;
+                    color: #6c757d;
+                    animation: dotFlashing 1.4s infinite alternate;
+                    animation-delay: 1s;
+                }
+                @keyframes dotFlashing {
+                    0% {
+                        opacity: 0.2;
+                    }
+                    50%, 100% {
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(thinkingCSS);
+        }
+    }
+    
+    // Schedule scroll after user message animation
+    setTimeout(() => {
+        const chatMessages = $(containerId).find('.chat-messages');
+        if (chatMessages.length > 0 && chatMessages[0]) {
+            chatMessages.animate({
+                scrollTop: chatMessages[0].scrollHeight
+            }, 300);
+        }
+        
+        // Clean up animation classes
+        cleanupAnimationClasses(origin, 1, 0);
+    }, 650); // After user message animation completes
+    
+    return chatMessages.find('.message-pair').last();
+}
+
 // Generalized function to process server responses
 function processServerResponses(response, origin, queryText = "", filePrefix = "Export", new_query = true) {
     var containerId = "#" + origin + "_analysis_content";
     
-    // Check if we need to initialize the container
-    if ($(containerId).find('.responses-wrapper').length === 0) {
-        // First time - create the scrollable container
-        $(containerId).html(`
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <button id="${origin}_clear_btn" class="btn btn-sm btn-outline-danger">Clear History</button>
-                </div>
-            </div>
-            <div class="responses-wrapper" style="height:500px; overflow-y:scroll, border: 1px solid #dee2e6; border-radius: 4px;"></div>
-        `);
-        
-        // Add clear history button handler
-        $(`#${origin}_clear_btn`).on('click', function() {
-            $(containerId).find('.responses-wrapper').empty();
-        });
+    // Ensure the container exists, if not, create it
+    if ($(containerId).length === 0) {
+        console.warn(`Container ${containerId} not found, cannot process server responses`);
+        return false;
     }
-
-    // Get the responses wrapper after ensuring it exists
-    const responsesWrapper = $(containerId).find('.responses-wrapper');
     
-    // Create a container for the current response with timestamp
-    const timestamp = new Date().toLocaleTimeString();
-    
-    let responseContainer;
-    
-    if (new_query) {
-        responseContainer = $(`<div class="response-container mt-3 p-3 border-bottom"></div>`);
-        responsesWrapper.append(responseContainer);
+    // Ensure chat container is initialized (fallback if not already done)
+    if ($(containerId).find('.chat-messages').length === 0) {
+        initializeChatContainer(origin);
     }
-    else {
-        responseContainer = responsesWrapper.children().last();
-    }
-
-    // Add query text if provided
-    if (queryText && new_query) {
-        const queryHeader = $(`
-            <div class="query-header mb-3 p-2 bg-light rounded">
-                <div class="d-flex align-items-center">
-                    <span class="badge bg-primary me-2">Query</span>
-                    <div class="query-text">${queryText}</div>
-                </div>
+    
+    const chatMessages = $(containerId).find('.chat-messages');
+    
+    // Clear any placeholder content (e.g., "No messages yet")
+    chatMessages.find('.text-center.text-muted').remove();
+    
+    // If this is a new query, the thinking indicator should already be there
+    // Find the current message pair and replace the thinking indicator
+    let messageContainer;
+    
+    if (new_query && chatMessages.find('.thinking-indicator').length > 0) {
+        // Replace thinking indicator with actual responses
+        messageContainer = chatMessages.find('.message-pair').last();
+        messageContainer.find('.thinking-indicator').replaceWith(`
+            <div class="assistant-responses">
+                <!-- Responses will be added here -->
             </div>
         `);
-        responseContainer.append(queryHeader);
+    } else if (!new_query && chatMessages.find('.message-pair').length > 0) {
+        // Adding to existing conversation
+        messageContainer = chatMessages.find('.message-pair').last();
+    } else {
+        // Fallback - create a new assistant message
+        const timestamp = new Date().toLocaleTimeString();
+        messageContainer = $(`
+            <div class="message-pair mb-4">
+                <div class="assistant-message">
+                    <div class="message-header d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="message-avatar bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; overflow: hidden;">
+                                <img src="https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/Luminar_icon_small.jpg" alt="LUMINAR" style="width: 100%; height: 100%; object-fit: cover;">
+                            </div>
+                            <span class="fw-bold text-success">LUMINAR Assistant</span>
+                        </div>
+                        <small class="text-muted">${timestamp}</small>
+                    </div>
+                    <div class="assistant-responses">
+                        <!-- Responses will be added here -->
+                    </div>
+                </div>
+            </div>
+        `);
+        chatMessages.append(messageContainer);
     }
     
-    const responseHeader = $(`<div class="response-header mb-2"><small class="text-muted">${timestamp}</small></div>`);
-    responseContainer.append(responseHeader);
+    const responsesContainer = messageContainer.find('.assistant-responses');
     
     // Convert response to array if not already
     const responses = Array.isArray(response) ? response : [response];
@@ -1515,38 +2248,70 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
         response.created_by = "user";
     }
     
-    for(const response of responses) {
-        if (response.created_by === "llm") {
-            responseContainer.append(`
-                <div class="alert alert-warning" role="alert">
-                   The following response includes AI-generated text. While the response is based specifically on the disease map content or analyzed data, AI hallucinations are possible.
-                   However, all figures and tables generate deterministic results, which can explicitly be retrieved using the following <a href="#" class="alert-link"><span class="fixed-queries-link" data-origin="${origin}" style="color: blue; text-decoration: underline; cursor: pointer;">query examples</span>
-                   </a>.
-                </div>  
-            `);
-            break;
-        }   
+    // Check if any response is from LLM to show disclaimer
+    const hasLLMResponse = responses.some(resp => resp.created_by === "llm");
+    if (hasLLMResponse) {
+        const disclaimer = $(`
+            <div class="response-item mb-2">
+                <div class="alert alert-warning mb-0" role="alert" style="border-radius: 12px; border-top-left-radius: 4px;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>AI-Generated Content:</strong> The following responses include AI-generated text. While based on disease map content and analyzed data, AI hallucinations are possible.
+                    <br>
+                    <small class="mt-1 d-block">
+                        For deterministic results, use <a href="#" class="alert-link fixed-queries-link" data-origin="${origin}" style="color: #721c24; text-decoration: underline;">pre-defined query examples</a>.
+                    </small>
+                </div>
+            </div>
+        `);
+        responsesContainer.append(disclaimer);
     }
 
-    for (const response of responses) {
-
-        if (response.response_type === "html") {
-            // For HTML responses
-            responseContainer.append(response.content);
-        }
+    // Mark existing messages as already animated to prevent re-animation
+    markExistingMessagesAsAnimated(origin);
+    
+    // Create all response elements first (without adding to DOM)
+    const responseElements = [];
+    
+    // Process each response as a separate item
+    responses.forEach((resp, index) => {
         
-        else if (response.response_type === "image") {
-            // For image responses
-            const imgContainer = $(`
-                <div class="text-center">
-                    <img src="data:image/png;base64,${response.content}" 
-                         class="img-fluid analysis-image" 
-                         style="width: 100%; cursor: pointer;" 
-                         alt="Analysis Result">
-                    <p class="mt-2 text-muted small">Click on the image to expand</p>
+        if (resp.response_type === "html") {
+            // For HTML responses - keep in chat bubble
+            const responseItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="response-content p-2" style="background: #f8f9fa; border-radius: 12px; border-top-left-radius: 4px; border: 1px solid #dee2e6;">
+                        ${resp.content}
+                    </div>
                 </div>
             `);
-            responseContainer.append(imgContainer);
+            responseElements.push(responseItem);
+        }
+
+        else if (resp.response_type === "pure_html") {
+            const responseItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    ${resp.content}
+                </div>
+            `);
+            responseElements.push(responseItem);
+        }
+        
+        else if (resp.response_type === "image") {
+            // For image responses - no chat bubble
+            const imgContainer = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="text-center">
+                        <img src="data:image/png;base64,${resp.content}" 
+                             class="img-fluid analysis-image" 
+                             style="max-width: 100%; height: auto; cursor: pointer; border-radius: 8px;" 
+                             alt="Analysis Result">
+                        <p class="mt-2 text-muted small">
+                            <i class="fas fa-expand-arrows-alt me-1"></i>Click to enlarge
+                        </p>
+                    </div>
+                </div>
+            `);
+            responseElements.push(imgContainer);
             
             imgContainer.find(".analysis-image").on('click', function(e) {
                 // Prevent event from bubbling up to parent document
@@ -1565,7 +2330,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                          max-width: 90%; max-height: 90%; overflow: auto;">
                       <button id="air_closeModal" style="position: absolute; top: 10px; right: 10px;
                            background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-                      <img src="data:image/png;base64,${response.content}" style="max-width: 100%; max-height: 100%;" alt="Analysis Result">
+                      <img src="data:image/png;base64,${resp.content}" style="max-width: 100%; max-height: 100%;" alt="Analysis Result">
                     </div>
                   </div>
                 `;
@@ -1582,8 +2347,8 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             });
         }
 
-        else if (response.response_type === "highlight") {
-            var markers = response.content.map(minerva_id => ({
+        else if (resp.response_type === "highlight") {
+            var markers = resp.content.map(minerva_id => ({
                 modelId: minerva_id[0],
                 id: minerva_id[1],
                 height: minerva_id[2],
@@ -1593,16 +2358,34 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 value: minerva_id[6]
             }));
             highlightValues(markers, created_by = created_by);
-            responseContainer.append(`<div class="alert alert-info">Highlighted ${markers.length} elements on the map</div>`);
+            
+            const highlightNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-info mb-0" style="border-radius: 8px;" title="Values from the analysis and/or data have been added as colored overlays to corresponding elements on the disease map.">
+                        <i class="fas fa-map-marker-alt me-2"></i>
+                        Highlighted ${markers.length} elements on the disease map
+                    </div>
+                </div>
+            `);
+            responseElements.push(highlightNotification);
         }
 
-        else if (response.response_type === "open_map") {
-            minerva.map.openMap({ id: response.content });
-            responseContainer.append(`<div class="alert alert-info">Opened map with ID: ${response.content}</div>`);
+        else if (resp.response_type === "open_map") {
+            minerva.map.openMap({ id: resp.content });
+            
+            const mapNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-info mb-0" style="border-radius: 8px;" title="The submap which the results are based on has been automatically opened.">
+                        <i class="fas fa-external-link-alt me-2"></i>
+                        Opened map with ID: ${resp.content}
+                    </div>
+                </div>
+            `);
+            responseElements.push(mapNotification);
         }
 
-        else if (response.response_type === "highlight_edge") {
-            var markers = response.content.map(minerva_id => ({
+        else if (resp.response_type === "highlight_edge") {
+            var markers = resp.content.map(minerva_id => ({
                 modelId: minerva_id[0],
                 start: {
                   x: minerva_id[1],
@@ -1611,52 +2394,85 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 end: {
                   x: minerva_id[3],
                   y: minerva_id[4],
-                },
+                }
             }));
-            highlightEdges(markers, created_by = created_by);
-            responseContainer.append(`<div class="alert alert-info">Highlighted ${markers.length} edges on the map</div>`);
+            highlightEdges(markers, created_by);
+            
+            const edgeNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-info mb-0" style="border-radius: 8px;">
+                        <i class="fas fa-share-alt me-2"></i>
+                        Highlighted ${markers.length} connections on the disease map
+                    </div>
+                </div>
+            `);
+            responseElements.push(edgeNotification);
         }
 
-        else if (response.response_type === "highlight_pin") {
-            var markers = response.content.map(minerva_id => ({
+
+
+
+
+        else if (resp.response_type === "highlight_pin") {
+            var markers = resp.content.map(minerva_id => ({
                 modelId: minerva_id[0],
                 x: minerva_id[1],
                 y: minerva_id[2],
                 number: minerva_id[3],
             }));
             highlightPins(markers, created_by = created_by);
-            responseContainer.append(`<div class="alert alert-info">Added ${markers.length} pins to the map</div>`);
-        }
-
-        else if (response.response_type === "alert") {
-            responseContainer.append(`
-                <div class="alert alert-warning" role="alert">
-                    ${response.content}
+            
+            const pinNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-info mb-0" style="border-radius: 8px;" title="For nodes in the network which the results are based on, a pin has been added to the corresponding element on the disease map.">
+                        <i class="fas fa-thumbtack me-2"></i>
+                        Added ${markers.length} pins to the disease map
+                    </div>
                 </div>
             `);
+            responseElements.push(pinNotification);
         }
 
-        else if (response.response_type === "call_string") {
+        else if (resp.response_type === "alert") {
+            const alertNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-warning mb-0" role="alert" style="border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${resp.content}
+                    </div>
+                </div>
+            `);
+            responseElements.push(alertNotification);
+        }
+
+        else if (resp.response_type === "call_string") {
             // For call string responses - displays content with a copy button for reproducibility
-            const callStringId = `call_string_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Unique ID
-            
             const callStringHtml = $(`
-                <div class="call-string-container mt-3 p-3 border rounded" style="background-color: #f8f9fa;">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                                 <div class="fw-bold text-muted small">Query to reproduce this result:</div>
-                        <button class="btn btn-sm btn-outline-secondary copy-call-btn" 
-                                data-content="${response.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" 
-                                title="Copy to clipboard">
-                            <i class="fas fa-copy"></i> Copy
-                        </button>
-                    </div>
-                    <div class="call-string-content">
-                        <code style="background-color: white; padding: 8px; border-radius: 4px; display: block; white-space: pre-wrap; word-break: break-all;">${response.content}</code>
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="call-string-container">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div class="fw-bold text-muted small d-flex align-items-center" style="padding-top: 20px;">
+                                <i class="fas fa-code me-1"></i>
+                                Reproducible Query:
+                                <span class="ms-2 reproducible-info-tooltip" title="This is the function call that generated the above response.\nCopy and paste it into a new query to directly reproduce your results by bypassing AI-processing."
+                                      style="cursor: help;">
+                                    <i class="fas fa-info-circle" style="color: #17a2b8; font-size: 12px;"></i>
+                                </span>
+                            </div>
+                            <button  style="margin-top: 5px;" class="btn btn-sm btn-outline-secondary copy-call-btn" 
+                                    data-content="${resp.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" 
+                                    title="Copy to clipboard">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        <div class="call-string-content" >
+                            <code style="background-color: white; padding: 12px; border-radius: 8px; display: block; white-space: pre-wrap; word-break: break-all; border: 1px solid #dee2e6;">${resp.content}</code>
+                        </div>
                     </div>
                 </div>
             `);
             
-            responseContainer.append(callStringHtml);
+            responseElements.push(callStringHtml);
             
             // Add click handler for copy button
             callStringHtml.find('.copy-call-btn').on('click', function() {
@@ -1675,26 +2491,41 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             });
         }
 
-        else if (response.response_type === "table") {
+        else if (resp.response_type === "table") {
             // For table responses
-            const tableContent = response.content;
-            const tableId = `${origin}_table_${Date.now()}`; // Unique ID for each table
+            const tableContent = resp.content;
+            const tableId = `${origin}_table_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Unique ID for each table
             
             // Debug logging
             console.log('Table Content:', tableContent);
             
             // Create a container for the table
             const tableHtml = $(`
-                <div class="mt-3">
-                    <div class="table-container" style="width: 100%; overflow-x: auto; font-size: 12px; background-color: white; padding: 10px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div class="table-response">
+                    <div class="table-container" style="width: 100%; overflow-x: auto; font-size: 12px; background-color: white; padding: 10px; border-radius: 8px; border: 1px solid #dee2e6;">
                         <table id="${tableId}" class="display" width="100%" style="margin-bottom: 0;"></table>
+                    </div>
+                    <div class="table-controls mt-2">
+                        <button class="btn btn-sm btn-outline-secondary copy-btn me-2" title="Copy table data">
+                            <i class="fas fa-copy me-1"></i>Copy
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary csv-btn me-2" title="Download as CSV">
+                            <i class="fas fa-file-csv me-1"></i>CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary tsv-btn" title="Download as TSV">
+                            <i class="fas fa-file-alt me-1"></i>TSV
+                        </button>
                     </div>
                 </div>
             `);
             
-            responseContainer.append(tableHtml);
+            const tableResponseItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                </div>
+            `);
+            tableResponseItem.append(tableHtml);
             
-            // Define columns before DataTable initialization
+            // Initialize DataTable immediately before animation
             const columns = tableContent.columns.map((col, index) => {
                 if (index === 0) {
                     return {
@@ -1702,7 +2533,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                         title: col,
                         render: (data, type, row) => {
                             const minervaIds = row[row.length - 1];
-                            return minervaIds.length > 0 ? 
+                            return minervaIds && minervaIds.length > 0 ? 
                                 `<a href="#" class="node_map_link" data-type="name" data-id="${JSON.stringify(minervaIds)}">${data}</a>` : 
                                 data;
                         }
@@ -1714,87 +2545,94 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 };
             });
 
-            // Initialize DataTable with the defined columns
+            // Initialize DataTable immediately so content is visible during animation
             try {
-                const table = $(`#${tableId}`).DataTable({
-                    data: tableContent.data,
-                    columns: columns.slice(0, -1),
-                    dom: "<'top'<'dt-length'l><'dt-search'f>>" +
-                    "<'clear'>" +
-                    "rt" +
-                    "<'bottom'ip><'clear'>",
-                    scrollY: '47vh',
-                    scrollX: true,
-                    paging: true,
-                    searching: true,
-                    destroy: false,
-                    initComplete: function(settings, json) {
-                        console.log('DataTable initialized:', {
-                            tableId: tableId,
-                            rowCount: this.api().rows().count(),
-                            columnCount: this.api().columns().count()
-                        });
-                    },
-                    "buttons": [
-                        {
-                            text: 'Copy',
-                            className: 'air_dt_btn',
-                            action: function () {
-                                copyContent(getDTExportString(table));
-                            }
-                        },
-                        {
-                            text: 'CSV',
-                            className: 'air_dt_btn',
-                            action: function () {
-                                download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","))
-                            }
-                        },
-                        {
-                            text: 'TSV',
-                            className: 'air_dt_btn',
-                            action: function () {
-                                download_data(`${filePrefix}_results.txt`, getDTExportString(table))
-                            }
+
+                document.addEventListener('air:response:visible', function onVisible(e) {
+
+                    const scope = e.detail?.el[0] || document;
+
+                    const el = scope.querySelector(`#${tableId}`);
+                    if (!el || !el.isConnected) return;
+
+                    document.removeEventListener('air:response:visible', onVisible);
+                    const $table = $(el);
+
+                    const dt = $table.DataTable({
+                        data: tableContent.data,
+                        columns: columns.slice(0, -1),
+                        dom: "<'top'<'dt-length'l><'dt-search'f>>" +
+                            "<'clear'>" +
+                            "rt" +
+                            "<'bottom'ip><'clear'>",
+                        scrollY: '300px',
+                        scrollX: true,
+                        paging: true,
+                        searching: true,
+                        deferRender: true,
+                        autoWidth: false,
+                        destroy: true,
+                        initComplete: function(settings, json) {
+                            console.log('DataTable initialized:', {
+                                tableId: tableId,
+                                rowCount: this.api().rows().count(),
+                                columnCount: this.api().columns().count()
+                            });
                         }
-                    ],
+                    });
+
+                    // final width fix after CSS animation ends
+                    $table.closest('.response-item').one('transitionend animationend', () => {
+                        dt.columns.adjust().draw(false);
+                    });
+                                    
+                    // Bind button events immediately
+                    tableHtml.find('.copy-btn').on('click', function() {
+                        copyContent(getDTExportString(table));
+                        $(this).removeClass('btn-outline-secondary').addClass('btn-success');
+                        $(this).html('<i class="fas fa-check me-1"></i>Copied!');
+                        setTimeout(() => {
+                            $(this).removeClass('btn-success').addClass('btn-outline-secondary');
+                            $(this).html('<i class="fas fa-copy me-1"></i>Copy');
+                        }, 2000);
+                    });
+                    
+                    // wire buttons now (and fix the comma arg)
+                    tableHtml.find('.csv-btn').on('click', () => {
+                        download_data(`${filePrefix}_results.csv`, getDTExportString(dt, ","));
+                    });
+                    tableHtml.find('.tsv-btn').on('click', () => {
+                        download_data(`${filePrefix}_results.txt`, getDTExportString(dt, "\t"));
+                    });
                 });
-                
-                // Add export buttons
-                const exportButtons = $(`
-                    <div class="mt-2 mb-2">
-                        <button class="btn btn-sm btn-outline-secondary copy-btn mr-2">Copy</button>
-                        <button class="btn btn-sm btn-outline-secondary csv-btn mr-2">CSV</button>
-                        <button class="btn btn-sm btn-outline-secondary tsv-btn">TSV</button>
-                    </div>
-                `);
-                
-                tableHtml.append(exportButtons);
-                
-                exportButtons.find('.copy-btn').on('click', function() {
-                    copyContent(getDTExportString(table));
-                });
-                
-                exportButtons.find('.csv-btn').on('click', function() {
+
+
+                tableHtml.find('.csv-btn').on('click', function() {
                     download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","));
                 });
                 
-                exportButtons.find('.tsv-btn').on('click', function() {
+                tableHtml.find('.tsv-btn').on('click', function() {
                     download_data(`${filePrefix}_results.txt`, getDTExportString(table));
                 });
+                
             } catch (error) {
                 console.error('Error initializing DataTable:', error);
+                tableHtml.html(`
+                    <div class="alert alert-danger mb-0" style="border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error creating data table: ${error.message}
+                    </div>
+                `);
             }
+            
+            responseElements.push(tableResponseItem);
         }
-
-        else if (response.response_type === "chart") {
+        
+        else if (resp.response_type === "chart") {
             // For interactive chart responses
-            const chartData = response.content;
-            const chartId = `${origin}_chart_${Date.now()}`; // Unique ID for each chart
+            const chartData = resp.content;
+            const chartId = `${origin}_chart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            console.log('Chart Data:', chartData);
-            
-            // Create a container for the chart
             const chartHtml = $(`
                 <div class="mt-3">
                     <div class="chart-container" style="width: 100%; height: 250px; background-color: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -1817,7 +2655,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
 
             const downloadButton = $(`                    <div class="d-flex justify-content-end mb-2">
                         <button type="button" class="btn btn-sm btn-outline-secondary chart-download-btn" data-chart-id="${chartId}" title="Download chart as PNG">
-                            <i class="fas fa-download"></i> PNG
+                            <i class="fas fa-download me-1"></i>PNG
                         </button>
                     </div>
                 `);
@@ -1840,7 +2678,12 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 downloadButton.prepend(legendHtml);
             }
             
-            chartHtml.append(downloadButton);
+            const chartResponseItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                </div>
+            `);
+            chartResponseItem.append(chartHtml);
+            responseElements.push(chartResponseItem);
             
             try {
                 // Process data points
@@ -2014,26 +2857,88 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 // Store chart reference for potential future use
                 responseContainer.data('chart', chart);
                 
-                // Add download button click handler
+                // Download handler
                 chartHtml.find('.chart-download-btn').on('click', function() {
                     downloadChartAsPNG(chart, chartData.title || 'Chart');
                 });
                 
             } catch (error) {
-                console.error('Error initializing Chart:', error);
-                responseContainer.append(`<div class="alert alert-danger">Error creating chart: ${error.message}</div>`);
+                console.error('Error creating chart:', error);
+                const chartErrorItem = $(`
+                    <div class="response-item mb-2 chat-bubble-animate">
+                        <div class="alert alert-danger mb-0" style="border-radius: 8px;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error creating chart: ${error.message}
+                        </div>
+                    </div>
+                `);
+                responseElements.push(chartErrorItem);
             }
         }
         else {
-            // For any other type, display as text
-            responseContainer.append(`<pre>${response.content || response.response}</pre>`);
+            // For any other type, display as text - no chat bubble
+            const textResponseItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <pre style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #dee2e6; margin: 0;">${resp.content || resp.response}</pre>
+                </div>
+            `);
+            responseElements.push(textResponseItem);
+        }
+    });
+    
+    // Process all response elements sequentially
+    processMessagesSequentially(origin, responseElements).then(() => {
+        // Clean up animation classes after all messages are processed
+        cleanupAnimationClasses(origin, responseElements.length, 0);
+    });
+    
+    return true;
+}
+
+// Function to handle auto-expanding text inputs
+function setupAutoExpandingInput(inputElement) {
+    const input = $(inputElement);
+    const originalHeight = input.height();
+    
+    function adjustHeight() {
+        // Reset height to auto to get the correct scrollHeight
+        input.css('height', 'auto');
+        
+        // Calculate new height based on content
+        const scrollHeight = input[0].scrollHeight;
+        const newHeight = Math.min(Math.max(scrollHeight, 38), 200); // min 38px, max 200px
+        
+        input.css('height', newHeight + 'px');
+        
+        // Show/hide scrollbar based on content overflow
+        if (scrollHeight > 200) {
+            input.css('overflow-y', 'auto');
+        } else {
+            input.css('overflow-y', 'hidden');
         }
     }
     
-    // Scroll to the bottom to show the new response
-    responsesWrapper.scrollTop(responsesWrapper[0].scrollHeight);
+    // Handle input events
+    input.on('input', adjustHeight);
     
-    return true;
+    // Handle focus events
+    input.on('focus', function() {
+        adjustHeight();
+    });
+    
+    // Handle blur events - return to original size
+    input.on('blur', function() {
+        setTimeout(() => {
+            input.css('height', originalHeight + 'px');
+            input.css('overflow-y', 'hidden');
+        }, 100); // Small delay to allow for any final input events
+    });
+    
+    // Handle form submission - return to original size
+    input.closest('form').on('submit', function() {
+        input.css('height', originalHeight + 'px');
+        input.css('overflow-y', 'hidden');
+    });
 }
 
 // Function to copy content to clipboard
@@ -2047,3 +2952,6 @@ function copyContent(content) {
             console.error(' Failed to copy: ', err);
         });
 }
+
+
+
