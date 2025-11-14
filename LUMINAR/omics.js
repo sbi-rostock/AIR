@@ -198,6 +198,11 @@ async function omics() {
     $("#omics_query_input").on('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Prevent form submission
+            // Check if already processing a response
+            if (window.isProcessingResponse) {
+                showWaitAlert("omics");
+                return;
+            }
             $("#omics_btn_query").trigger('click'); // Trigger the click event on the submit button
         }
     });
@@ -1191,6 +1196,12 @@ async function omics() {
         const queryText = $("#omics_query_input").val().trim();
         if (!queryText) return;
         
+        // Check if already processing a response
+        if (window.isProcessingResponse) {
+            showWaitAlert("omics");
+            return;
+        }
+        
         try {
             var btn_text = await disablebutton("omics_btn_query");
             
@@ -1202,7 +1213,7 @@ async function omics() {
             
             const response = await getDataFromServer(
                 "sylobio/query_llm",
-                { query: queryText },
+                { query: queryText, summarize: false },
                 "POST",
                 "json"
             );
@@ -1218,6 +1229,12 @@ async function omics() {
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", queryText, "analysis", true);
         } finally {
             enablebutton("omics_btn_query", btn_text);
+            
+            // Reset global flag and hide wait alert in case of error
+            if (window.isProcessingResponse) {
+                window.isProcessingResponse = false;
+                // Note: hideWaitAlert is called from processServerResponses when successful
+            }
         }
     });
 

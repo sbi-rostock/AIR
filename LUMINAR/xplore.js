@@ -58,6 +58,11 @@ async function xplore() {
     $("#xplore_query_input").on('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Prevent form submission
+            // Check if already processing a response
+            if (window.isProcessingResponse) {
+                showWaitAlert("xplore");
+                return false;
+            }
             $("#xplore_btn_query").trigger('click'); // Trigger the click event on the submit button
             return false;
         }
@@ -67,6 +72,12 @@ async function xplore() {
     $("#xplore_btn_query").on('click', async function() {
         const queryText = $("#xplore_query_input").val().trim();
         if (!queryText) return;
+        
+        // Check if already processing a response
+        if (window.isProcessingResponse) {
+            showWaitAlert("xplore");
+            return;
+        }
         
         try {
             var btn_text = await disablebutton("xplore_btn_query");
@@ -79,7 +90,7 @@ async function xplore() {
             
             const response = await getDataFromServer(
                 "sylobio/query_llm_map",
-                { query: queryText },
+                { query: queryText, summarize: false },
                 "POST",
                 "json"
             );
@@ -94,6 +105,12 @@ async function xplore() {
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "xplore", queryText, "Xplore", true);
         } finally {
             enablebutton("xplore_btn_query", btn_text);
+            
+            // Reset global flag and hide wait alert in case of error
+            if (window.isProcessingResponse) {
+                window.isProcessingResponse = false;
+                // Note: hideWaitAlert is called from processServerResponses when successful
+            }
         }
     });
 

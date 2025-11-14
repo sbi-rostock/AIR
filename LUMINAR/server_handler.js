@@ -592,7 +592,7 @@ function initializeChatContainer(origin) {
                         <i class="fas fa-eye me-1"></i>Focus
                     </label>
                     <div class="form-check form-switch mb-0" style="padding-left: 0;">
-                        <input class="form-check-input" type="checkbox" role="switch" id="${origin}_focus_switch" title="Toggle focus mode" style="margin-left: 0;">
+                        <input class="form-check-input" type="checkbox" role="switch" id="${origin}_focus_switch" title="Toggle focus mode" style="margin-left: 0;" checked>
                     </div>
                 </div>
             </div>
@@ -611,13 +611,27 @@ function initializeChatContainer(origin) {
         $(`#${origin}_focus_switch`).on('change', function() {
             const isChecked = $(this).prop('checked');
             if (isChecked) {
-                activateFocusMode(origin);
+                air_focus_mode_sticky[origin] = true;
+                ensureFocusListeners(origin);
+                // If input currently focused, activate highlight immediately
+                const input = getOriginQueryInput(origin);
+                if (input.is(':focus')) {
+                    activateFocusMode(origin, { fromFocus: true });
+                } else {
+                    // No focus now – remain idle until focus event
+                    deactivateFocusMode(origin, { preserveSticky: true });
+                }
             } else {
-                deactivateFocusMode(origin);
+                // Full disable: remove highlight and sticky
+                deactivateFocusMode(origin, { preserveSticky: false });
             }
         });
+
+        // Prepare focus listeners (harmless if switch off; they only act when sticky flag true)
+        ensureFocusListeners(origin);
         
-        // Add clear history button handler
+        // Enable focus mode by default
+        air_focus_mode_sticky[origin] = true;        // Add clear history button handler
         $(`#${origin}_clear_btn`).on('click', function() {
             const chatMessages = $(containerId).find('.chat-messages');
             chatMessages.html(`
@@ -734,7 +748,7 @@ function addMessageWithAnimation(origin, messageElement, callback) {
         } else if (callback) {
             callback();
         }
-    }, 650); // Animation duration + small buffer
+    }, 200); // Animation duration + small buffer
 
     const evt = new CustomEvent('air:response:visible', { detail: { origin, el: messageElement }});
     document.dispatchEvent(evt);
@@ -752,8 +766,108 @@ async function processMessagesSequentially(origin, messages) {
 // Focus mode functionality
 let air_focus_mode_active = false;
 let air_focus_overlay = null;
+// Track whether focus mode is enabled (sticky) per origin – highlight only appears while input focused
+const air_focus_mode_sticky = {}; // { origin: true|false }
+const air_focus_lastPointerInside = {}; // transient flag to keep highlight on pointer-based transitions
 
-function activateFocusMode(origin) {
+// Helper to get query input element for an origin
+function getOriginQueryInput(origin) {
+    return $(`#${origin}_queryform`).find('textarea[id$="_query_input"], input[id$="_query_input"]');
+}
+
+// Helper: get all elements that should keep highlight when focused
+function getOriginFocusableHighlightGroup(origin) {
+    const queryForm = $(`#${origin}_queryform`);
+    const analysisContent = $(`#${origin}_analysis_content`);
+    const input = getOriginQueryInput(origin);
+    const submitBtn = queryForm.find('button[id$="_btn_query"]');
+    const functionBtn = $(`#${origin}_btn_function_selector`);
+    // chat messages container (clicks inside should preserve highlight)
+    const chatMessages = analysisContent.find('.chat-messages');
+    // function selector modal (may be in parent document)
+    const functionModal = $(`#${origin}_function_modal`, window.parent.document);
+    return $([]).add(input).add(submitBtn).add(functionBtn).add(chatMessages).add(functionModal);
+}
+
+function isFocusWithinHighlightGroup(origin) {
+    const active = document.activeElement;
+    const parentActive = window.parent.document.activeElement;
+    if (!active && !parentActive) return false;
+    
+    const group = getOriginFocusableHighlightGroup(origin);
+    let inside = false;
+    group.each(function() { 
+        if ((active && (this === active || $.contains(this, active))) ||
+            (parentActive && (this === parentActive || $.contains(this, parentActive)))) { 
+            inside = true; 
+            return false; 
+        } 
+    });
+    return inside;
+}
+
+// Attach focus/blur listeners (once) to drive highlight when sticky enabled
+function ensureFocusListeners(origin) {
+    const group = getOriginFocusableHighlightGroup(origin);
+    if (group.length === 0) return;
+    // Use a flag on first element to prevent rebinding
+    const markerEl = getOriginQueryInput(origin);
+    if (markerEl.length && markerEl.data('focus-listeners-added')) return;
+
+    // Make chat messages focusable so focus can remain within group on clicks
+    const chatMessages = $(`#${origin}_analysis_content`).find('.chat-messages');
+    if (chatMessages.length) {
+        chatMessages.attr('tabindex', '-1');
+    }
+
+    // Focus handler: activate highlight if sticky
+    group.on('focus.focusmode', function() {
+        if (air_focus_mode_sticky[origin]) {
+            activateFocusMode(origin, { fromFocus: true });
+        }
+    });
+
+    // Add specific parent document interaction handler only for known highlight elements
+    $(window.parent.document).on('mousedown.focusmode', function(e) {
+        if (air_focus_mode_sticky[origin] && window.parent.document !== document) {
+            // Check if click is on a function modal or other known highlight elements
+            const functionModal = $(`#${origin}_function_modal`, window.parent.document);
+            if (functionModal.length && (e.target === functionModal[0] || $.contains(functionModal[0], e.target))) {
+                air_focus_lastPointerInside[origin] = true;
+                activateFocusMode(origin, { fromFocus: true });
+            }
+        }
+    });
+
+    // Blur handler: defer check to allow next element to receive focus
+    group.on('blur.focusmode', function() {
+        setTimeout(() => {
+            if (!air_focus_mode_sticky[origin]) return;
+            // If a pointer interaction started inside group, skip this blur cycle
+            if (air_focus_lastPointerInside[origin]) {
+                air_focus_lastPointerInside[origin] = false;
+                return;
+            }
+            if (!isFocusWithinHighlightGroup(origin)) {
+                deactivateFocusMode(origin, { preserveSticky: true });
+            }
+        }, 10); // slight delay to allow new focus target to settle
+    });
+
+    // Mouse interaction inside chat messages should also re-activate highlight when sticky
+    chatMessages.on('mousedown.focusmode', function() {
+        if (air_focus_mode_sticky[origin]) {
+            air_focus_lastPointerInside[origin] = true;
+            activateFocusMode(origin, { fromFocus: true });
+            // Move focus to chat area to keep it inside group
+            $(this).focus();
+        }
+    });
+
+    if (markerEl.length) markerEl.data('focus-listeners-added', true);
+}
+
+function activateFocusMode(origin, opts = {}) {
     const analysisContent = $(`#${origin}_analysis_content`);
     const queryForm = $(`#${origin}_queryform`);
     const functionSelectorBtn = $(`#${origin}_btn_function_selector`);
@@ -769,14 +883,15 @@ function activateFocusMode(origin) {
         // Click overlay to exit focus mode
         air_focus_overlay.on('click', function(e) {
             if (e.target === this) {
-                deactivateFocusMode(origin);
+                // Clicking overlay (outside elements) removes highlight but preserves sticky
+                deactivateFocusMode(origin, { preserveSticky: true });
             }
         });
         
         // ESC key to exit focus mode
         $(document).on('keydown.focusmode', function(e) {
             if (e.key === 'Escape' && air_focus_mode_active) {
-                deactivateFocusMode(origin);
+                deactivateFocusMode(origin, { preserveSticky: true });
             }
         });
     }
@@ -809,18 +924,20 @@ function activateFocusMode(origin) {
     air_focus_overlay.data('current-origin', origin);
 }
 
-function deactivateFocusMode(origin) {
-    // Deactivate focus mode
-    air_focus_mode_active = false;
-    
-    // Remove classes and hide overlay
+function deactivateFocusMode(origin, options = {}) {
+    const { preserveSticky = false } = options;
+    // Remove highlight classes & overlay active state
     $('.air-focus-mode-active, .air-focus-mode-highlight').removeClass('air-focus-mode-active air-focus-mode-highlight');
     if (air_focus_overlay) {
         air_focus_overlay.removeClass('active');
     }
-    
-    // Update all focus switches to unchecked state
-    $('input[id$="_focus_switch"]').prop('checked', false);
+    air_focus_mode_active = false;
+    if (!preserveSticky) {
+        // User explicitly turned off switch – disable sticky behavior
+        air_focus_mode_sticky[origin] = false;
+        // Uncheck ONLY this origin's switch
+        $(`#${origin}_focus_switch`).prop('checked', false);
+    }
 }
 
 buildPLuginNavigator = () => {
@@ -1657,6 +1774,12 @@ function showFunctionSelectorModal(origin) {
         const selectedFunction = $(window.parent.document).find(`#${origin}_function_list .function-item.selected`).data('function-key');
         if (!selectedFunction) return;
         
+        // Check if already processing a response
+        if (window.isProcessingResponse) {
+            showWaitAlert(origin);
+            return;
+        }
+        
         // Validate required fields
         const requiredFields = $(window.parent.document).find(`#${origin}_parameter_fields .required-field`);
         let isValid = true;
@@ -1698,6 +1821,9 @@ function showFunctionSelectorModal(origin) {
             // Show loading state on the query button
             var btn_text = await disablebutton(`${origin}_btn_query`);
             
+            // Add thinking indicator immediately
+            addThinkingIndicator(origin, `Function call: ${selectedFunction}`);
+            
             // Substitute parameters in the query
             let finalParams = {};
             Object.entries(formData).forEach(([paramId, value]) => {
@@ -1733,6 +1859,10 @@ function showFunctionSelectorModal(origin) {
         } finally {
             // Restore button state
             enablebutton(`${origin}_btn_query`, btn_text);
+            
+            // Reset global flag and hide wait alert in case of error
+            window.isProcessingResponse = false;
+            hideWaitAlert(origin);
             
             // Scroll to bottom of analysis content and tab content
             const analysisContent = document.getElementById(`${origin}_analysis_content`);
@@ -2039,6 +2169,9 @@ function maximizePluginContainer() {
 
 // Function to add a "thinking..." indicator 
 function addThinkingIndicator(origin, queryText) {
+            // Set global flag to prevent new queries
+        window.isProcessingResponse = true;
+    
     var containerId = "#" + origin + "_analysis_content";
     
     // Ensure chat container is initialized (fallback if not already done)
@@ -2173,7 +2306,7 @@ function addThinkingIndicator(origin, queryText) {
         
         // Clean up animation classes
         cleanupAnimationClasses(origin, 1, 0);
-    }, 650); // After user message animation completes
+    }, 350); // After user message animation completes
     
     return chatMessages.find('.message-pair').last();
 }
@@ -2289,7 +2422,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
 
         else if (resp.response_type === "pure_html") {
             const responseItem = $(`
-                <div class="response-item mb-2 chat-bubble-animate">
+                <div class="response-item mb-2 mt-2 chat-bubble-animate">
                     ${resp.content}
                 </div>
             `);
@@ -2641,7 +2774,7 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 </div>
             `);
             
-            responseContainer.append(chartHtml);
+            // responseContainer.append(chartHtml);
             
             // Add HTML title if provided (supports clickable content)
             if (chartData.title) {
@@ -2852,10 +2985,23 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 };  
                 
                 // Initialize the chart
-                const chart = new Chart(document.getElementById(chartId), chartConfig);
+                document.addEventListener('air:response:visible', function onVisible(e) {
+                    const scope = e.detail?.el[0] || document;
+
+                    const canvas = scope.querySelector(`#${chartId}`);
+                    if (!canvas || !canvas.isConnected) return;
+
+                    document.removeEventListener('air:response:visible', onVisible);
+
+                    const chart = new Chart(canvas, chartConfig);
+
+                    chartHtml.find('.chart-download-btn').on('click', function () {
+                        downloadChartAsPNG(chart, chartData.title || 'Chart');
+                    });
+                });
                 
                 // Store chart reference for potential future use
-                responseContainer.data('chart', chart);
+                // responseContainer.data('chart', chart);
                 
                 // Download handler
                 chartHtml.find('.chart-download-btn').on('click', function() {
@@ -2890,6 +3036,10 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
     processMessagesSequentially(origin, responseElements).then(() => {
         // Clean up animation classes after all messages are processed
         cleanupAnimationClasses(origin, responseElements.length, 0);
+        
+        // Reset global flag and hide wait alert
+        window.isProcessingResponse = false;
+        hideWaitAlert(origin);
     });
     
     return true;
@@ -2951,6 +3101,152 @@ function copyContent(content) {
         .catch(err => {
             console.error(' Failed to copy: ', err);
         });
+}
+
+// Global flag to track when responses are being processed
+window.isProcessingResponse = false;
+
+// Add CSS for wobbly buzzing animation and alert popup
+if (!document.getElementById('query-prevention-css')) {
+    const queryPreventionCSS = document.createElement('style');
+    queryPreventionCSS.id = 'query-prevention-css';
+    queryPreventionCSS.textContent = `
+        .input-buzzing {
+            animation: inputBuzz 0.5s ease-in-out;
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5) !important;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        @keyframes inputBuzz {
+            0% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-3px) rotate(-1deg); }
+            50% { transform: translateX(3px) rotate(1deg); }
+            75% { transform: translateX(-2px) rotate(-0.5deg); }
+            100% { transform: translateX(0) rotate(0deg); }
+        }
+        
+        .wait-alert {
+            position: absolute;
+            top: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #dc3545;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: alertPulse 1s ease-in-out infinite;
+        }
+        
+        .wait-alert::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #dc3545;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+            50% { opacity: 0.8; transform: translateX(-50%) scale(1.05); }
+        }
+        
+        .input-container {
+            position: relative;
+        }
+        
+        .input-waiting {
+            border-color: #ffc107 !important;
+            background-color: #fff8e1 !important;
+            cursor: text;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+        
+        .btn-waiting {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transition: opacity 0.3s ease;
+        }
+    `;
+    document.head.appendChild(queryPreventionCSS);
+}
+
+// Function to show wait alert and buzzing animation
+function showWaitAlert(origin) {
+    const input = $(`#${origin}_query_input`);
+    const form = input.closest('form');
+    
+    // Add input-container class to form for positioning
+    form.addClass('input-container');
+    
+    // Add buzzing animation to input
+    input.addClass('input-buzzing');
+    
+    // Create and show wait alert
+    const waitAlert = $(`
+        <div class="wait-alert">
+            <i class="fas fa-clock me-1"></i>Please wait for response to complete
+        </div>
+    `);
+    
+    form.append(waitAlert);
+    
+    // Store reference to alert for later removal
+    form.data('wait-alert', waitAlert);
+    
+    // Remove buzzing animation after 500ms and add waiting state
+    setTimeout(() => {
+        input.removeClass('input-buzzing');
+        input.addClass('input-waiting');
+        
+        // Also style the submit button to show it's disabled
+        const submitBtn = form.find('button[id$="_btn_query"]');
+        if (submitBtn.length > 0) {
+            submitBtn.addClass('btn-waiting');
+        }
+    }, 500);
+    
+    // Make alert dismissible by clicking anywhere
+    $(document).one('click.waitAlert', function(e) {
+        if (!$(e.target).closest('.wait-alert').length) {
+            hideWaitAlert(origin);
+        }
+    });
+}
+
+// Function to hide wait alert and buzzing animation
+function hideWaitAlert(origin) {
+    const input = $(`#${origin}_query_input`);
+    const form = input.closest('form');
+    
+    // Remove buzzing animation and waiting state (in case they're still active)
+    input.removeClass('input-buzzing input-waiting');
+    
+    // Remove button waiting state
+    const submitBtn = form.find('button[id$="_btn_query"]');
+    if (submitBtn.length > 0) {
+        submitBtn.removeClass('btn-waiting');
+    }
+    
+    // Remove wait alert
+    const waitAlert = form.data('wait-alert');
+    if (waitAlert) {
+        waitAlert.remove();
+        form.removeData('wait-alert');
+    }
+    
+    // Remove input-container class
+    form.removeClass('input-container');
+    
+    // Remove the click event handler
+    $(document).off('click.waitAlert');
 }
 
 
