@@ -16,9 +16,9 @@ const SLIDESHOW_IMAGES = [
     'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar2.jpg',
     'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar3.jpg',
     'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar4.JPG',
-    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar5.jpg',
-    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar6.jpg',
-    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar7.jpg'
+    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar5.JPG',
+    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar6.JPG',
+    'https://raw.githubusercontent.com/sbi-rostock/AIR/refs/heads/master/LUMINAR/images/SlideShow/Luminar7.JPG'
 ];
 const SLIDESHOW_MODAL_ID = 'air-slideshow-modal';
 const SLIDESHOW_CAROUSEL_ID = 'air-slideshow-carousel';
