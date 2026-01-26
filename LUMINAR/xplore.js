@@ -90,7 +90,7 @@ async function xplore() {
             
             const response = await getDataFromServer(
                 "sylobio/query_llm_map",
-                { query: queryText, summarize: false },
+                { query: queryText, summarize: false, context: getContextData() },
                 "POST",
                 "json"
             );

@@ -217,6 +217,8 @@ async function initialize_server() {
             window.parent.location.origin,
             minerva.project.data.getProjectId(),
         ]);
+
+        air_data.submaps = minerva.map.data.getModels()
         
         // Add Font Awesome
         const fontAwesomeLink = document.createElement('link');
@@ -543,7 +545,7 @@ async function initialize_server() {
         
         air_data.session_token = session_token;
         buildPLuginNavigator();
-        loadAndExecuteScripts(["omics.js", "fairdom.js", "xplore.js"]);
+        loadAndExecuteScripts(["intro.js", "omics.js", "fairdom.js", "xplore.js"]);
         
         // Initialize chat containers after a short delay to ensure modules are loaded
         setTimeout(() => {
@@ -945,14 +947,17 @@ buildPLuginNavigator = () => {
             
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
-                <li class="air_nav_item nav-item" style="width: 28%;">
-                    <a class="air_tab active nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="true">Exploration</a>
+                <li class="air_nav_item nav-item" style="width: 21%;">
+                    <a class="air_tab active nav-link" id="intro_tab" data-bs-toggle="tab" href="#intro_tab_content" role="tab" aria-controls="intro_tab_content" aria-selected="true">Start</a>
                 </li>
-                <li class="air_nav_item nav-item" style="width: 28%;">
-                    <a class="air_tab nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Data Analysis</a>
+                <li class="air_nav_item nav-item" style="width: 21%;">
+                    <a class="air_tab nav-link" id="xplore_tab" data-bs-toggle="tab" href="#xplore_tab_content" role="tab" aria-controls="xplore_tab_content" aria-selected="true">Explore</a>
+                </li>
+                <li class="air_nav_item nav-item" style="width: 21%;">
+                    <a class="air_tab nav-link" id="airomics_tab" data-bs-toggle="tab" href="#airomics_tab_content" role="tab" aria-controls="airomics_tab_content" aria-selected="false">Analyze</a>
                 </li>   
-                <li class="air_nav_item nav-item" style="width: 28%;">
-                    <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">FAIRDOMHub</a>
+                <li class="air_nav_item nav-item" style="width: 21%;">
+                    <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">SEEK</a>
                 </li>
                 <li class="air_nav_item nav-item d-flex align-items-center justify-content-center" style="width: 16%;">
                     <button id="clear_highlights_btn" class="btn btn-xs btn-outline-danger" style="font-size: 10px; padding: 2px 6px;" title="Remove all highlighted elements from the map">
@@ -961,7 +966,9 @@ buildPLuginNavigator = () => {
                 </li>
             </ul>
             <div class="tab-content air_tab_content" id="air_tabs" style="height: calc(100% - 45px);background-color: white;">
-                <div class="tab-pane show active" id="xplore_tab_content" role="tabpanel" aria-labelledby="xplore_tab" style="overflow-y: hidden;">
+                <div class="tab-pane show active" id="intro_tab_content" role="tabpanel" aria-labelledby="intro_tab" style="overflow-y: scroll;">
+                </div>
+                <div class="tab-pane show" id="xplore_tab_content" role="tabpanel" aria-labelledby="xplore_tab" style="overflow-y: hidden;">
                 </div>
                 <div class="tab-pane show" id="airomics_tab_content" role="tabpanel" aria-labelledby="airomics_tab" style="overflow-y: scroll;">
                 </div>
@@ -2517,6 +2524,19 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             responseElements.push(mapNotification);
         }
 
+        else if (resp.response_type === "search_map") {
+            minerva.map.triggerSearch(resp.content);
+                        
+            const searchNotification = $(`
+                <div class="response-item mb-2 chat-bubble-animate">
+                    <div class="alert alert-info mb-0" style="border-radius: 8px;">
+                        <i class="fas fa-share-alt me-2"></i>
+                        Initiated searching for "${resp.content.query}" on the Disease Map.
+                    </div>
+                </div>
+            `);
+            responseElements.push(searchNotification);
+        }
         else if (resp.response_type === "highlight_edge") {
             var markers = resp.content.map(minerva_id => ({
                 modelId: minerva_id[0],
@@ -2541,10 +2561,6 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             `);
             responseElements.push(edgeNotification);
         }
-
-
-
-
 
         else if (resp.response_type === "highlight_pin") {
             var markers = resp.content.map(minerva_id => ({
@@ -3249,5 +3265,57 @@ function hideWaitAlert(origin) {
     $(document).off('click.waitAlert');
 }
 
+function getContextData() {
+    // Gather any necessary context data for the query
+    // This is a placeholder function and should be customized as needed
+    open_map_id = minerva.map.data.getOpenMapId();
+    overlays = minerva.overlays.data.getDataOverlays();
+    open_overlays = minerva.overlays.data.getVisibleDataOverlays()
+    open_overlays_ids = open_overlays.map(overlay => overlay.id);
+
+    open_map = null;
+    for(var map of air_data.submaps){
+        if (map.id == open_map_id){
+            open_map = {
+                "id": map.id,
+                "name": map.name,
+                "description": map.description,
+            };
+            break;
+        }
+    }
 
 
+
+    summary = `On submitting the query, the user is viewing the map ${open_map.name} (ID: ${open_map.id})` 
+    
+    if (open_map.description) {
+        summary += ` with Description: ${open_map.description}.`;
+    }
+
+    summary += `\n`;
+
+    if (overlays.length > 0) {
+        summary += `The following overlays are available  to the user:\n`;
+        for(var overlay of overlays){
+            summary += `${overlay.name} (ID: ${overlay.id})`;
+
+            if (overlay.description) {
+                summary += ` with Description: ${overlay.description}; `;
+            } else {
+                summary += `; `;
+            }
+
+            if (open_overlays_ids.includes(overlay.id)) {
+                summary += `The overlay is currently visible. `;
+            } else {
+                summary += `The overlay is currently hidden. `;
+            }
+
+            summary += `\n`;
+        }
+    }
+
+    return summary;
+
+}
