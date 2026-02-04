@@ -40,7 +40,7 @@ const DEFAULT_TOUR_STEPS = [
     {
         scope: 'parent',
         props: [{ prop: 'data-testid', value: 'search-input' }],
-        text: 'For searching content within the MINERVA map, use this search box to quickly find genes, proteins, metbolites, drugs, etc.',
+        text: 'For searching content within the map, use this search box to quickly find genes, proteins, metbolites, drugs, etc.',
         actions: [
             { scope: 'iframe', props: [{ prop: 'id', value: 'intro_tab' }], action: 'click' }
         ]
@@ -48,7 +48,7 @@ const DEFAULT_TOUR_STEPS = [
     {
         scope: 'parent',
         props: [{ prop: 'type', value: 'button' },{ prop: 'title', value: 'Submaps' }],
-        text: 'This button lists all pathways (so-called submaps) available in the Map.',
+        text: 'This button lists all pathways (so-called submaps) available for exploration.',
     },
     {
         scope: 'parent',
@@ -62,7 +62,11 @@ const DEFAULT_TOUR_STEPS = [
     {
         scope: 'parent',
         props: [{ prop: 'data-testid', value: 'icon-button' },{ prop: 'title', value: 'Legend' }],
-        text: 'To understand the symbols and colors used for different biological entities and interactions on the map, refer to the Legend.',
+        text: 'To understand the symbols and colors used for different biological entities and interactions on the map, refer to the legend.',
+        actions: [
+            { scope: 'parent', props: [{ prop: 'type', value: 'button' },{ prop: 'role', value: 'close-drawer-button' }], action: 'click' }
+        ],
+        timeout: 500,
     },
     {
         scope: 'iframe',
@@ -83,7 +87,7 @@ const DEFAULT_TOUR_STEPS = [
     {
         scope: 'iframe',
         props: [{ prop: 'id', value: 'xplore_query_input' }],
-        text: 'Send your question. Results show in the chat history below.',
+        text: 'Send your question. Results are shown in the chat history.',
         actions: [
             { scope: 'iframe', props: [{ prop: 'id', value: 'xplore_tab' }], action: 'click' }
         ]

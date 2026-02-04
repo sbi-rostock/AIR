@@ -41,6 +41,12 @@ async function xplore() {
                     placeholder="Ask a question ..." aria-label="Query input" rows="1"></textarea>
                 <button type="button" id="xplore_btn_query" class="air_btn btn">Submit</button>
             </form>
+            <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
+                <label for="xplore_reasoning_level" class="mb-0">Reasoning</label>
+                <input type="range" id="xplore_reasoning_level" min="1" max="5" step="1" value="3" style="flex: 1;" />
+                <span id="xplore_reasoning_value" style="width: 16px; text-align: center;">3</span>
+                <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the depth of reasoning (1 = brief, 5 = detailed)." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
+            </div>
             <span style="text-align: center;margin-bottom: 4pt;">or</span>
             <div class="d-flex justify-content-center mb-2">
                 <button type="button" id="xplore_btn_function_selector" class="btn btn-outline-secondary btn-sm">
@@ -50,6 +56,12 @@ async function xplore() {
         </div>
         `
     ).appendTo(air_xplore.container);
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
 
     // Setup auto-expanding input
     setupAutoExpandingInput("#xplore_query_input");
@@ -72,6 +84,8 @@ async function xplore() {
     $("#xplore_btn_query").on('click', async function() {
         const queryText = $("#xplore_query_input").val().trim();
         if (!queryText) return;
+
+        const reasoningLevel = parseInt($("#xplore_reasoning_level").val(), 10) || 3;
         
         // Check if already processing a response
         if (window.isProcessingResponse) {
@@ -90,7 +104,7 @@ async function xplore() {
             
             const response = await getDataFromServer(
                 "sylobio/query_llm_map",
-                { query: queryText, summarize: false, context: getContextData() },
+                { query: queryText, summarize: false, context: getContextData(), reasoning: reasoningLevel },
                 "POST",
                 "json"
             );
@@ -117,6 +131,11 @@ async function xplore() {
     // Handle function selector button click
     $("#xplore_btn_function_selector").on('click', function() {
         showFunctionSelectorModal('xplore');
+    });
+
+    // Update reasoning value display
+    $("#xplore_reasoning_level").on('input', function() {
+        $("#xplore_reasoning_value").text($(this).val());
     });
 
     // Handle expand chat button click

@@ -75,7 +75,7 @@ async function omics() {
             <div class="card" style="padding: 1rem;">
                 <div id="omics_data_treeview" class="treeview fair_jstree">
                 </div>
-                <div style="display: flex; justify-content: center; gap: 8px; margin: 20px 0;">
+                <div id="omics_file_btn_container" style="display: flex; justify-content: center; gap: 8px; margin: 20px 0;">
                     <button type="button" id="omics_btn_viewdata" class="omics-action-btn omics-btn-view air_disabledbutton" title="View dataset details and visualize data">
                         <i class="fas fa-eye"></i>
                         <span>View</span>
@@ -156,7 +156,7 @@ async function omics() {
             </div>
         </div>
         <button class="btn air_collapsible mt-2 collapsed air_disabledbutton" id="omics_collapse_4_btn" type="button" data-bs-toggle="collapse" data-bs-target="#omics_collapse_4" aria-expanded="false" aria-controls="omics_collapse_4">
-            4. Submit your Query
+            4. Ask Questions about the Analysis
         </button>
         <div class="collapse" id="omics_collapse_4">
             <div class="card" style="padding: 1rem; display: flex; flex-direction: column; height: calc(100vh - 40px);">            
@@ -178,6 +178,12 @@ async function omics() {
                     <textarea placeholder="Ask a question about the data analysis." id="omics_query_input" class="form-control me-2 auto-expand-input" style="flex: 1; resize: none;" aria-label="Text input with segmented dropdown button" rows="1"></textarea>
                     <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
                 </form>
+                <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
+                    <label for="omics_reasoning_level" class="mb-0">Reasoning</label>
+                    <input type="range" id="omics_reasoning_level" min="1" max="5" step="1" value="3" style="flex: 1;" />
+                    <span id="omics_reasoning_value" style="width: 16px; text-align: center;">3</span>
+                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher values increase time required for answering." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
+                </div>
                 <span style="text-align: center;margin-bottom: 4pt;">or</span>
                 <div class="d-flex justify-content-center mb-2">
                     <button type="button" id="omics_btn_function_selector" class="btn btn-outline-secondary btn-sm">
@@ -443,6 +449,44 @@ async function omics() {
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_1')).hide();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_2')).show();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).show();
+
+            steps = [                
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_data_treeview' }],
+                    text: 'Files uploaded by the user are displayed in the "User Uploads" section.',
+                    timeout: 500,
+                },
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_file_btn_container' }],
+                    text: 'The LUMINAR tool is a customized extension (plugin) for MINERVA providing new functionalities for map exploration and data analysis.',
+                    actions: [
+                        { scope: 'iframe', props: [{ prop: 'data_id', value: "data-" + processResponse[0].data_id }], action: 'click' }
+                    ]
+                },
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_btn_viewdata' }],
+                    text: 'Inspect the uploaded data in an interactive table.'
+                },
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_btn_editdata' }],
+                    text: 'Edit data details such as name, description, and metadata, or adjust data structure.'
+                },
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_btn_analyze' }],
+                    text: 'After selection one or multiple datasets, run the analysis with a single click.'
+                },
+                {
+                    scope: 'iframe',
+                    props: [{ prop: 'id', value: 'omics_collapse_4_btn' }],
+                    text: 'After the analysis is complete, a summary of the results are shown here. You can then ask questions using the chat interface, similar to the explore tab, but with insights on the data and analysis results.'
+                },
+            ];
+            startIntroTour(steps);
             
         } catch (err) {
             console.error("Error processing example data:", err);
@@ -1195,6 +1239,8 @@ async function omics() {
     $("#omics_btn_query").on('click', async function() {
         const queryText = $("#omics_query_input").val().trim();
         if (!queryText) return;
+
+        const reasoningLevel = parseInt($("#omics_reasoning_level").val(), 10) || 3;
         
         // Check if already processing a response
         if (window.isProcessingResponse) {
@@ -1213,7 +1259,7 @@ async function omics() {
             
             const response = await getDataFromServer(
                 "sylobio/query_llm",
-                { query: queryText, summarize: false },
+                { query: queryText, summarize: false, reasoning: reasoningLevel },
                 "POST",
                 "json"
             );
@@ -1241,6 +1287,11 @@ async function omics() {
     // Handle function selector button click
     $("#omics_btn_function_selector").on('click', function() {
         showFunctionSelectorModal('omics');
+    });
+
+    // Update reasoning value display
+    $("#omics_reasoning_level").on('input', function() {
+        $("#omics_reasoning_value").text($(this).val());
     });
     
     // Setup node map link handling
