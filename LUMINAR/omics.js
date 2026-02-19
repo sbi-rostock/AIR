@@ -180,9 +180,9 @@ async function omics() {
                 </form>
                 <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
                     <label for="omics_reasoning_level" class="mb-0">Reasoning</label>
-                    <input type="range" id="omics_reasoning_level" min="1" max="5" step="1" value="3" style="flex: 1;" />
-                    <span id="omics_reasoning_value" style="width: 16px; text-align: center;">3</span>
-                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher values increase time required for answering." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
+                    <input type="range" id="omics_reasoning_level" min="1" max="3" step="1" value="1" style="flex: 1;" />
+                    <span id="omics_reasoning_value" style="width: 16px; text-align: center;">1</span>
+                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher value significantly increases response time." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
                 </div>
                 <span style="text-align: center;margin-bottom: 4pt;">or</span>
                 <div class="d-flex justify-content-center mb-2">
@@ -1236,54 +1236,10 @@ async function omics() {
     });
 
     // Handle file upload form submission
-    $("#omics_btn_query").on('click', async function() {
-        const queryText = $("#omics_query_input").val().trim();
-        if (!queryText) return;
-
-        const reasoningLevel = parseInt($("#omics_reasoning_level").val(), 10) || 3;
-        
-        // Check if already processing a response
-        if (window.isProcessingResponse) {
-            showWaitAlert("omics");
-            return;
-        }
-        
-        try {
-            var btn_text = await disablebutton("omics_btn_query");
-            
-            // Add thinking indicator immediately
-            addThinkingIndicator("omics", queryText);
-            
-            // Clear the input and reset height
-            $("#omics_query_input").val('').css('height', '38px').css('overflow-y', 'hidden');
-            
-            const response = await getDataFromServer(
-                "sylobio/query_llm",
-                { query: queryText, summarize: false, reasoning: reasoningLevel },
-                "POST",
-                "json"
-            );
-
-            console.log(response);
-            
-            // Use the generalized function to process responses
-            processServerResponses(response, "omics", queryText, "analysis");
-            
-        } catch (err) {
-            console.error("Error processing query:", err);
-            
-            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "omics", queryText, "analysis", true);
-        } finally {
-            enablebutton("omics_btn_query", btn_text);
-            
-            // Reset global flag and hide wait alert in case of error
-            if (window.isProcessingResponse) {
-                window.isProcessingResponse = false;
-                // Note: hideWaitAlert is called from processServerResponses when successful
-            }
-        }
+    $("#omics_btn_query").on("click", () => {
+        const queryText = $(`#omics_query_input`).val().trim();
+        multi_agent_query("omics", queryText);
     });
-
     // Handle function selector button click
     $("#omics_btn_function_selector").on('click', function() {
         showFunctionSelectorModal('omics');

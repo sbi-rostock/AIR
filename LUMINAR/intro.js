@@ -116,7 +116,7 @@ const DEFAULT_TOUR_STEPS = [
     {
         scope: 'iframe',
         props: [{ prop: 'id', value: 'fairdom_tab' }],
-        text: 'In the SEEK tool FAIRDOM/SEEK projects can accessed and data files directly loaded into the data analysis plugin.',
+        text: 'In the SEEK tool FAIRDOM/SEEK projects can be accessed and data files directly loaded into the data analysis plugin.',
         actions: [
             { scope: 'iframe', props: [{ prop: 'id', value: 'fairdom_tab' }], action: 'click' }
         ]

@@ -33,7 +33,7 @@ function resetSessionWarningTimer() {
 async function promptForExtension() {
     let expirationTimeout = setTimeout(() => {
         alert('Your session has ended.');
-        window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
+        window.top.location.reload()
     }, countdownDuration);
 
     let message = `Your session is about to expire in 2 Minutes. Do you want to extend the session?`;
@@ -47,13 +47,13 @@ async function promptForExtension() {
             resetSessionWarningTimer();
         } else {
             alert('Session already expired.');
-            window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
+            window.top.location.reload()
         }
     }
     else
     {
         alert('Your session has ended.');
-        window.parent.document.querySelector('button[role="reload-plugin-drawer-button"]').click();
+        window.top.location.reload()
     }
 }
 
@@ -72,81 +72,81 @@ const globals = {
 };
 
 
-
-function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = 'application/json') {
-    // Only add session token if it exists and the request is not for initialization
-    if (air_data.session_token && !request.includes('initialize_session')) {
-        if (data instanceof FormData) {
-            if (!data.has('session')) {
-                data.append('session', air_data.session_token);
-            }
-        } else {
-            data.session = air_data.session_token;
-        }
-    }
-
-    // Prepare the AJAX options
-    const ajaxOptions = {
-        type: type,
-        url: air_data.SBI_SERVER + request,
-        dataType: datatype
-    };
-
-    // Handle FormData vs JSON data
+function getDataFromServer(request, data = {}, type = "GET", datatype = "text", contentType = "application/json") {
+  if (air_data.session_token && !request.includes("initialize_session")) {
     if (data instanceof FormData) {
-        ajaxOptions.processData = false;
-        ajaxOptions.contentType = false;
-        ajaxOptions.data = data;
+      if (!data.has("session")) data.append("session", air_data.session_token);
     } else {
-        ajaxOptions.contentType = contentType;
-        ajaxOptions.data = type === "GET" ? data : JSON.stringify(data);
+      data.session = air_data.session_token;
     }
+  }
 
-    return new Promise((resolve, reject) => {
-        $.ajax(ajaxOptions)
-            .done((data) => {
-                try {
-                    if (datatype === "json" && typeof data === "string") {
-                        data = JSON.parse(data);
-                    }
-                    resolve(data);
-                } catch (e) {
-                    reject(e); // Properly reject the promise if parsing fails
-                }
-            })
-            .fail((xhr, status, error) => {
-                // Log detailed error information
-                console.error("Server request failed:", {
-                    endpoint: request,
-                    fullURL: air_data.SBI_SERVER + request,
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseText: xhr.responseText,
-                    error: error
-                });
-                
-                // Create an error object to reject with
-                let errorObj;
-                if (xhr.status === 0) {
-                    errorObj = new Error(`CORS Error: Cannot connect to server at ${air_data.SBI_SERVER}. Please check if the server is running and CORS is properly configured.`);
-                } else if (xhr.status === 504) {
-                    errorObj = new Error(`Server timeout: The server at ${air_data.SBI_SERVER} is not responding. Please try again later.`);
-                } else if (xhr.responseJSON && xhr.responseJSON.error) {
-                    errorObj = new Error(xhr.responseJSON.error);
-                } else {
-                    errorObj = new Error(error || xhr.statusText || "Unknown error");
-                }
-                
-                // Add xhr properties to the error object for more context
-                errorObj.status = xhr.status;
-                errorObj.responseText = xhr.responseText;
-                
-                // Reject the promise with the error
-                reject(errorObj);
-            });
-    });
+  const ajaxOptions = {
+    type,
+    url: air_data.SBI_SERVER + request,
+    dataType: datatype,
+
+    // 👇 Add a generous client-side timeout (e.g., 5 minutes)
+    timeout: 300000
+  };
+
+  if (data instanceof FormData) {
+    ajaxOptions.processData = false;
+    ajaxOptions.contentType = false;
+    ajaxOptions.data = data;
+  } else {
+    ajaxOptions.contentType = contentType;
+    ajaxOptions.data = type === "GET" ? data : JSON.stringify(data);
+  }
+
+  return new Promise((resolve, reject) => {
+    $.ajax(ajaxOptions)
+      .done((resp) => {
+        try {
+          if (datatype === "json" && typeof resp === "string") resp = JSON.parse(resp);
+          resolve(resp);
+        } catch (e) {
+          reject(e);
+        }
+      })
+      .fail((xhr, textStatus, errorThrown) => {
+        console.error("Server request failed:", {
+          endpoint: request,
+          fullURL: air_data.SBI_SERVER + request,
+          httpStatus: xhr.status,
+          textStatus,
+          statusText: xhr.statusText,
+          responseText: xhr.responseText,
+          errorThrown
+        });
+
+        let msg = "Unknown error";
+
+        if (xhr.status === 504) {
+          msg = `Gateway timeout (504): the proxy gave up waiting for the server. This usually means the LLM request took too long.`;
+        } else if (textStatus === "timeout") {
+          msg = `Client timeout: waited ${ajaxOptions.timeout / 1000}s without a response.`;
+        } else if (textStatus === "abort") {
+          msg = `Request aborted (client-side).`;
+        } else if (xhr.status === 0) {
+          // status 0: could be CORS, could be network. Don't assume CORS.
+          msg = `Network/CORS error: request did not complete (status 0). Check DevTools Network tab + server/proxy logs.`;
+        } else if (xhr.responseJSON?.error) {
+          msg = xhr.responseJSON.error;
+        } else if (xhr.responseText) {
+          msg = xhr.responseText;
+        } else if (errorThrown || xhr.statusText) {
+          msg = errorThrown || xhr.statusText;
+        }
+
+        const err = new Error(msg);
+        err.httpStatus = xhr.status;
+        err.textStatus = textStatus;
+        err.responseText = xhr.responseText;
+        reject(err);
+      });
+  });
 }
-
 
 async function GetProjectHash(project_data) {
     const loadingText = air_data.container.find("#air_loading_text");
@@ -1829,7 +1829,7 @@ function showFunctionSelectorModal(origin) {
             var btn_text = await disablebutton(`${origin}_btn_query`);
             
             // Add thinking indicator immediately
-            addThinkingIndicator(origin, `Function call: ${selectedFunction}`);
+            // addThinkingIndicator(origin, `Function call: ${selectedFunction}`);
             
             // Substitute parameters in the query
             let finalParams = {};
@@ -1848,18 +1848,8 @@ function showFunctionSelectorModal(origin) {
 
             query = JSON.stringify(query);
 
-            // Submit the function call
-            const endpoint = origin === "omics" ? "sylobio/query_llm" : "sylobio/query_llm_map";
-            const response = await getDataFromServer(
-                endpoint,
-                { query: query, correct_query: true },
-                "POST",
-                "json"
-            );
-            
-            // Process the response
-            processServerResponses(response, origin, query, "function_call");
-            
+            await multi_agent_query(origin, query, true);
+                        
         } catch (err) {
             console.error("Error submitting function:", err);
             processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, origin, "Function call", "function_call");
@@ -2176,8 +2166,8 @@ function maximizePluginContainer() {
 
 // Function to add a "thinking..." indicator 
 function addThinkingIndicator(origin, queryText) {
-            // Set global flag to prevent new queries
-        window.isProcessingResponse = true;
+        // Set global flag to prevent new queries
+    window.isProcessingResponse = true;
     
     var containerId = "#" + origin + "_analysis_content";
     
@@ -2238,7 +2228,7 @@ function addThinkingIndicator(origin, queryText) {
                             <div class="thinking-dots" style="margin: 0 16px 0 8px;">
                                 <div class="dot-flashing" style="position: relative; width: 6px; height: 6px; border-radius: 3px; background-color: #6c757d; color: #6c757d; animation: dotFlashing 1.4s infinite linear alternate; animation-delay: 0.5s;"></div>
                             </div>
-                            <span class="text-muted">Thinking...</span>
+                            <span class="text-muted" id="${origin}_thinking_text">Thinking...</span>
                         </div>
                     </div>
                 </div>
@@ -3318,4 +3308,98 @@ function getContextData() {
 
     return summary;
 
+}
+
+async function multi_agent_query(origin, queryText, correct_query = false) {
+
+    if (!queryText) return;
+
+    const reasoningLevel = parseInt($(`#${origin}_reasoning_level`).val(), 10) || 3;
+    
+    // Check if already processing a response
+    if (window.isProcessingResponse) {
+        showWaitAlert(origin);
+        return;
+    }
+    
+    try {
+        var btn_text = await disablebutton(`${origin}_btn_query`);
+        
+        // Add thinking indicator immediately
+        addThinkingIndicator(origin, queryText);
+        
+        // Clear the input and reset height
+        $(`#${origin}_query_input`).val('').css('height', '38px').css('overflow-y', 'hidden');
+
+        let responses = await getDataFromServer(
+            `sylobio/query_llm`,
+            { query: queryText, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData() },
+            "POST",
+            "json"
+        );
+
+        let finalized = false;
+        while (!finalized) {
+            let foundAgentStep = false;
+            const responseList = Array.isArray(responses) ? responses : [responses];
+
+            for (const response of responseList) {
+                if (response.response_type === "agent_step") {
+
+                    finalized = response.finalized;
+
+                    if (response.content)
+                    {
+                        $(`#${origin}_thinking_text`).text(response.content ?? "");
+                    }
+                    
+                    if (finalized) {
+                        break;
+                    }
+                    
+                    responses = await getDataFromServer(
+                        `sylobio/query_llm`,
+                        {
+                            query: queryText,
+                            summarize: false,
+                            reasoning: reasoningLevel,
+                            origin,
+                            step: response.step,
+                            cycle: response.cycle,
+                            correct_query: correct_query,
+                            context: getContextData()
+                        },
+                        "POST",
+                        "json"
+                    );
+
+                    foundAgentStep = true;
+                }
+            }
+
+            if (!foundAgentStep) {
+                finalized = true;
+            }
+        }
+
+        responses = responses.filter(r => r.response_type != "agent_step")
+
+        console.log(responses);
+        
+        // Use the generalized function to process responses
+        processServerResponses(responses, origin, queryText, "analysis");
+        
+    } catch (err) {
+        console.error("Error processing query:", err);
+        
+        processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, origin, queryText, "analysis", true);
+    } finally {
+        enablebutton(`${origin}_btn_query`, btn_text);
+        
+        // Reset global flag and hide wait alert in case of error
+        if (window.isProcessingResponse) {
+            window.isProcessingResponse = false;
+            // Note: hideWaitAlert is called from processServerResponses when successful
+        }
+    }
 }

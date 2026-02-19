@@ -43,9 +43,9 @@ async function xplore() {
             </form>
             <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
                 <label for="xplore_reasoning_level" class="mb-0">Reasoning</label>
-                <input type="range" id="xplore_reasoning_level" min="1" max="5" step="1" value="3" style="flex: 1;" />
-                <span id="xplore_reasoning_value" style="width: 16px; text-align: center;">3</span>
-                <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the depth of reasoning (1 = brief, 5 = detailed)." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
+                <input type="range" id="xplore_reasoning_level" min="1" max="3" step="1" value="1" style="flex: 1;" />
+                <span id="xplore_reasoning_value" style="width: 16px; text-align: center;">1</span>
+                <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher value significantly increases response time." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
             </div>
             <span style="text-align: center;margin-bottom: 4pt;">or</span>
             <div class="d-flex justify-content-center mb-2">
@@ -81,52 +81,11 @@ async function xplore() {
     });
 
     // Handle query button click
-    $("#xplore_btn_query").on('click', async function() {
-        const queryText = $("#xplore_query_input").val().trim();
-        if (!queryText) return;
-
-        const reasoningLevel = parseInt($("#xplore_reasoning_level").val(), 10) || 3;
+    $("#xplore_btn_query").on("click", () => {
+        const queryText = $(`#xplore_query_input`).val().trim();
+        multi_agent_query("xplore", queryText);
+    })
         
-        // Check if already processing a response
-        if (window.isProcessingResponse) {
-            showWaitAlert("xplore");
-            return;
-        }
-        
-        try {
-            var btn_text = await disablebutton("xplore_btn_query");
-            
-            // Add thinking indicator immediately
-            addThinkingIndicator("xplore", queryText);
-            
-            // Clear the input and reset height
-            $("#xplore_query_input").val('').css('height', '38px').css('overflow-y', 'hidden');
-            
-            const response = await getDataFromServer(
-                "sylobio/query_llm_map",
-                { query: queryText, summarize: false, context: getContextData(), reasoning: reasoningLevel },
-                "POST",
-                "json"
-            );
-
-            console.log(response);
-            
-            // Use the generalized function to process responses
-            processServerResponses(response, "xplore", queryText, "Xplore", true);
-            
-        } catch (err) {
-            console.error("Error processing query:", err);
-            processServerResponses({"response_type": "alert", "content": `Error: ${err.message}`}, "xplore", queryText, "Xplore", true);
-        } finally {
-            enablebutton("xplore_btn_query", btn_text);
-            
-            // Reset global flag and hide wait alert in case of error
-            if (window.isProcessingResponse) {
-                window.isProcessingResponse = false;
-                // Note: hideWaitAlert is called from processServerResponses when successful
-            }
-        }
-    });
 
     // Handle function selector button click
     $("#xplore_btn_function_selector").on('click', function() {
