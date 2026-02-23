@@ -455,6 +455,9 @@ async function omics() {
                     scope: 'iframe',
                     props: [{ prop: 'id', value: 'omics_data_treeview' }],
                     text: 'Files uploaded by the user are displayed in the "User Uploads" section.',
+                    actions: [
+                        { scope: 'iframe', props: [{ prop: 'id', value: "airomics_tab" }], action: 'click', when: "post" }
+                    ],
                     timeout: 500,
                 },
                 {
@@ -485,7 +488,8 @@ async function omics() {
                     props: [{ prop: 'id', value: 'omics_collapse_4_btn' }],
                     text: 'After the analysis is complete, a summary of the results are shown here. You can then ask questions using the chat interface, similar to the explore tab, but with insights on the data and analysis results.'
                 },
-            ];
+            ]
+            
             startIntroTour(steps);
             
         } catch (err) {
@@ -756,19 +760,31 @@ async function omics() {
             $(window.parent.document).off('click', '#omics_edit_close');
             $(window.parent.document).off('click', '#omics_btn_save_edit');
 
+            const allColumns = datasetInfo.original_data_columns || [];
+            const selectedSet = new Set((datasetInfo.selected_columns || []).map(i => parseInt(i)));
+            const selectedOrdered = (datasetInfo.selected_columns || [])
+                .map(i => parseInt(i))
+                .filter(i => Number.isInteger(i) && i >= 0 && i < allColumns.length);
+            const remainingColumns = allColumns
+                .map((_, index) => index)
+                .filter(index => !selectedSet.has(index));
+            const orderedColumnIndices = [...selectedOrdered, ...remainingColumns];
+
             // Create column checkboxes HTML
             let columnsHtml = `
                 <div style="margin-bottom: 15px;">
                     <label style="font-weight: bold; margin-bottom: 5px; display: block;">Available Columns</label>
-                    <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Select which columns to include in analysis</div>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Select which columns to include in analysis and drag to reorder</div>
                     <div id="omics_edit_columns_container" style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; max-height: 200px; overflow-y: auto;">
-                        ${columns.map((column, index) => `
-                            <div style="margin-bottom: 5px;">
-                                <input type="checkbox" id="column_${index}" value="${index}" ${datasetInfo.selected_columns.includes(index) ? 'checked' : ''} style="margin-right: 8px;">
-                                <label for="column_${index}" style="cursor: pointer;">${column}</label>
+                        ${orderedColumnIndices.map((index) => `
+                            <div class="omics-edit-column-item" draggable="true" data-column-index="${index}" style="margin-bottom: 5px; display: flex; align-items: center; gap: 8px; padding: 2px 4px; border-radius: 4px; cursor: move;">
+                                <span title="Drag to reorder" style="color: #6c757d; font-size: 13px; user-select: none;">☰</span>
+                                <input type="checkbox" id="column_${index}" value="${index}" ${selectedSet.has(index) ? 'checked' : ''} style="margin-right: 2px;">
+                                <label for="column_${index}" style="cursor: pointer; margin-bottom: 0;">${allColumns[index]}</label>
                             </div>
                         `).join('')}
                     </div>
+                    <div id="omics_edit_column_assignment" style="font-size: 0.9em; color: #495057; margin-top: 10px; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;"></div>
                 </div>
             `;
             
@@ -914,32 +930,38 @@ async function omics() {
                 const pivotColumn = $("#omics_edit_pivot_column", window.parent.document).val();
                 
                 let selectedColumns = [];
-                $("#omics_edit_columns_container input[type='checkbox']:checked", window.parent.document).each(function() {
-                    selectedColumns.push($(this).val());
+                $("#omics_edit_columns_container .omics-edit-column-item", window.parent.document).each(function() {
+                    const checkbox = $(this).find("input[type='checkbox']");
+                    if (checkbox.prop('checked')) {
+                        selectedColumns.push(parseInt($(this).attr('data-column-index')));
+                    }
                 });
 
+                const indexColumnInt = indexColumn !== null && indexColumn !== '' ? parseInt(indexColumn) : null;
+                const pivotColumnInt = pivotColumn !== null && pivotColumn !== '' && pivotColumn !== '-1' ? parseInt(pivotColumn) : null;
+
                 // Check if index column is selected
-                if (selectedColumns.length > 0 && indexColumn && !selectedColumns.includes(indexColumn)) {
+                if (selectedColumns.length > 0 && indexColumnInt !== null && !selectedColumns.includes(indexColumnInt)) {
                     window.showOmicsWarning("Index column must be selected in the column list");
                     return false;
                 }
 
                 // Check if pivot column is selected in the column list (if specified)
-                if (selectedColumns.length > 0 && pivotColumn != -1 && !selectedColumns.includes(pivotColumn)) {
+                if (selectedColumns.length > 0 && pivotColumnInt !== null && !selectedColumns.includes(pivotColumnInt)) {
                     window.showOmicsWarning("Pivot column must be selected in the column list");
                     return false;
                 }
 
-                if (pivotColumn !== -1 && pivotColumn == indexColumn) {
+                if (pivotColumnInt !== null && indexColumnInt !== null && pivotColumnInt === indexColumnInt) {
                     window.showOmicsWarning("Pivot column cannot be the same as the index column");
                     return false;
                 }
 
                 // Check p-values validation
-                if (hasPvalues && selectedColumns.length > 0 && indexColumn) {
-                    const dataColumnsCount = selectedColumns.length - 1; // Excluding index column
-                    if (pivotColumn != -1) {
-                        dataColumnsCount--;
+                if (hasPvalues && selectedColumns.length > 0 && indexColumnInt !== null) {
+                    let dataColumnsCount = selectedColumns.filter(col => col !== indexColumnInt).length;
+                    if (pivotColumnInt !== null) {
+                        dataColumnsCount = selectedColumns.filter(col => col !== indexColumnInt && col !== pivotColumnInt).length;
                     }
                     if (dataColumnsCount % 2 !== 0) {
                         window.showOmicsWarning("When p-values are included, the number of data columns (excluding index and pivot column) must be even");
@@ -952,24 +974,77 @@ async function omics() {
                 return true;
             };
 
+            window.renderOmicsColumnAssignment = function() {
+                const summaryContainer = $("#omics_edit_column_assignment", window.parent.document);
+                if (!summaryContainer.length) return;
+
+                const indexColumnRaw = $("#omics_edit_index_column", window.parent.document).val();
+                const pivotColumnRaw = $("#omics_edit_pivot_column", window.parent.document).val();
+                const hasPvalues = $("#omics_edit_has_pvalues", window.parent.document).prop('checked');
+
+                const indexColumn = indexColumnRaw !== null && indexColumnRaw !== '' ? parseInt(indexColumnRaw) : null;
+                const pivotColumn = pivotColumnRaw !== null && pivotColumnRaw !== '' && pivotColumnRaw !== '-1' ? parseInt(pivotColumnRaw) : null;
+
+                const selectedOrderedColumns = [];
+                $("#omics_edit_columns_container .omics-edit-column-item", window.parent.document).each(function() {
+                    const checkbox = $(this).find("input[type='checkbox']");
+                    if (checkbox.prop('checked')) {
+                        selectedOrderedColumns.push(parseInt($(this).attr('data-column-index')));
+                    }
+                });
+
+                const analysisColumns = selectedOrderedColumns.filter(col => col !== indexColumn && col !== pivotColumn);
+                const dataColumns = [];
+                const pvalueColumns = [];
+
+                if (hasPvalues) {
+                    for (let i = 0; i < analysisColumns.length; i += 2) {
+                        const dataCol = analysisColumns[i];
+                        const pvalCol = analysisColumns[i + 1];
+                        if (dataCol !== undefined) dataColumns.push(allColumns[dataCol]);
+                        if (pvalCol !== undefined) pvalueColumns.push(allColumns[pvalCol]);
+                    }
+                } else {
+                    for (const columnIndex of analysisColumns) {
+                        dataColumns.push(allColumns[columnIndex]);
+                    }
+                }
+
+                const indexLabel = indexColumn !== null && allColumns[indexColumn] !== undefined ? allColumns[indexColumn] : "Not selected";
+                const dataLabel = dataColumns.length ? dataColumns.join(', ') : "None";
+                const pvalueLabel = hasPvalues
+                    ? (pvalueColumns.length ? pvalueColumns.join(', ') : "None")
+                    : "Disabled";
+
+                summaryContainer.html(`
+                    <div><strong>Index column:</strong> ${indexLabel}</div>
+                    <div><strong>Data columns:</strong> ${dataLabel}</div>
+                    <div><strong>P-value columns:</strong> ${pvalueLabel}</div>
+                `);
+            };
+
             // Index column change handler
             $(window.parent.document).on('change.omicsModalValidation', '#omics_edit_index_column', function() {
                 window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
             });
 
             // Column checkbox change handler
             $(window.parent.document).on('change.omicsModalValidation', '#omics_edit_columns_container input[type="checkbox"]', function() {
                 window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
             });
 
             // P-value checkbox change handler
             $(window.parent.document).on('change.omicsModalValidation', '#omics_edit_has_pvalues', function() {
                 window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
             });
 
             // Pivot column change handler
             $(window.parent.document).on('change.omicsModalValidation', '#omics_edit_pivot_column', function() {
                 window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
             });
 
             // Aggregate function change handler (no validation needed but keeping consistency)
@@ -977,8 +1052,49 @@ async function omics() {
                 window.validateOmicsModalForm();
             });
 
+            // Drag-and-drop reordering for columns
+            const columnsContainer = $("#omics_edit_columns_container", window.parent.document);
+            let draggedColumnItem = null;
+
+            columnsContainer.on('dragstart', '.omics-edit-column-item', function(e) {
+                draggedColumnItem = this;
+                $(this).css('opacity', '0.5');
+                if (e.originalEvent && e.originalEvent.dataTransfer) {
+                    e.originalEvent.dataTransfer.effectAllowed = 'move';
+                    e.originalEvent.dataTransfer.setData('text/plain', $(this).attr('data-column-index'));
+                }
+            });
+
+            columnsContainer.on('dragend', '.omics-edit-column-item', function() {
+                $(this).css('opacity', '1');
+                window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
+                draggedColumnItem = null;
+            });
+
+            columnsContainer.on('dragover', '.omics-edit-column-item', function(e) {
+                e.preventDefault();
+                if (!draggedColumnItem || draggedColumnItem === this) return;
+
+                const targetRect = this.getBoundingClientRect();
+                const insertAfter = (e.originalEvent.clientY - targetRect.top) > targetRect.height / 2;
+
+                if (insertAfter) {
+                    $(this).after(draggedColumnItem);
+                } else {
+                    $(this).before(draggedColumnItem);
+                }
+            });
+
+            columnsContainer.on('drop', '.omics-edit-column-item', function(e) {
+                e.preventDefault();
+                window.validateOmicsModalForm();
+                window.renderOmicsColumnAssignment();
+            });
+
             // Run initial validation
             window.validateOmicsModalForm();
+            window.renderOmicsColumnAssignment();
 
             // Add save button event handler
             $(window.parent.document).on('click.omicsModalSave', '#omics_btn_save_edit', async function() {
@@ -1022,8 +1138,11 @@ async function omics() {
 
                     // Get selected columns if visible
                     let selectedColumns = [];
-                    $("#omics_edit_columns_container input[type='checkbox']:checked", window.parent.document).each(function() {
-                        selectedColumns.push(parseInt($(this).val()));
+                    $("#omics_edit_columns_container .omics-edit-column-item", window.parent.document).each(function() {
+                        const checkbox = $(this).find("input[type='checkbox']");
+                        if (checkbox.prop('checked')) {
+                            selectedColumns.push(parseInt($(this).attr('data-column-index')));
+                        }
                     });
 
                     // Final validation before save
@@ -1076,6 +1195,7 @@ async function omics() {
                     delete window.validateOmicsModalForm;
                     delete window.showOmicsWarning;
                     delete window.hideOmicsWarning;
+                    delete window.renderOmicsColumnAssignment;
 
                     // Refresh the tree view
                     if ($('#omics_data_treeview').jstree(true)) {
@@ -1106,6 +1226,7 @@ async function omics() {
                 delete window.validateOmicsModalForm;
                 delete window.showOmicsWarning;
                 delete window.hideOmicsWarning;
+                delete window.renderOmicsColumnAssignment;
             });
 
         } catch (err) {

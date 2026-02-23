@@ -61,6 +61,20 @@ const DEFAULT_TOUR_STEPS = [
     },
     {
         scope: 'parent',
+        props: [{ prop: 'type', value: 'button' },{ prop: 'title', value: 'Overlays' }],
+        text: 'This button lists all available overlays for the map. This includes pre-defined as well as user-generated overlays.',
+    },
+    {
+        scope: 'parent',
+        props: [{ prop: 'data-testid', value: 'overlays-drawer' }],
+        text: 'The overlays then can be individually viewed or hidden, where each overlay generates a colored rectangle on respective nodes in the map.',
+        actions: [
+            { scope: 'parent', props: [{ prop: 'type', value: 'button' },{ prop: 'title', value: 'Overlays' }], action: 'click' }
+        ],
+        timeout: 500,
+    },
+    {
+        scope: 'parent',
         props: [{ prop: 'data-testid', value: 'icon-button' },{ prop: 'title', value: 'Legend' }],
         text: 'To understand the symbols and colors used for different biological entities and interactions on the map, refer to the legend.',
         actions: [
@@ -160,7 +174,8 @@ function sanitizeTourSteps(steps = []) {
             const actions = (step.actions || []).map(a => ({
                 ...a,
                 scope: a.scope === 'parent' ? 'parent' : 'iframe',
-                props: normalizeProps(a)
+                props: normalizeProps(a),
+                when: a.when === 'post' ? 'post' : 'pre'
             }));
             return {
                 scope: step.scope === 'parent' ? 'parent' : 'iframe',
@@ -591,6 +606,7 @@ async function showTourStep(stepIndex) {
     const doc = getDocForScope(step.scope);
 
     for (const actionItem of step.actions) {
+        if (actionItem.when === 'post') continue;
         const actionDoc = getDocForScope(actionItem.scope || step.scope);
         const actionElement = findElementForStep(actionItem, actionDoc);
         if (actionElement && actionItem.action === 'click') {
@@ -623,6 +639,14 @@ async function showTourStep(stepIndex) {
 
     // Re-run once after animations settle to correct position shifts.
     setTimeout(() => {
+        for (const actionItem of step.actions) {
+            if (actionItem.when === 'pre') continue;
+            const actionDoc = getDocForScope(actionItem.scope || step.scope);
+            const actionElement = findElementForStep(actionItem, actionDoc);
+            if (actionElement && actionItem.action === 'click') {
+                actionElement.click();
+            }
+        }
         if (airIntroTourState.index === stepIndex) {
             positionTour(step);
         }
