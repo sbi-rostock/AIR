@@ -1368,8 +1368,14 @@ const showModulatorsOnClick = async data => {
 };
 
 function removeHighlight(created_by = "") {
+    if(created_by == "") {
+        minerva.data.bioEntities.removeAllMarkers();
+        air_data.added_markers = {};
+        return;
+    }
+    
     for(var [_created_by, marker_ids] of Object.entries(air_data.added_markers)) {
-        if(_created_by != created_by || created_by == "") {
+        if(_created_by != created_by) {
             for(var marker_id of marker_ids) {
                 minerva.data.bioEntities.removeSingleMarker(marker_id);
             }
