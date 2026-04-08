@@ -1676,74 +1676,275 @@ function collapseChatInterface(origin) {
 function showFunctionSelectorModal(origin) {
     // Remove any existing modals
     $(`#${origin}_function_modal`, window.parent.document).remove();
-    
-    // Remove any existing event handlers to prevent memory leaks
-    $(window.parent.document).off('click', `#${origin}_function_close`);
-    $(window.parent.document).off('click', `#${origin}_function_select`);
-    $(window.parent.document).off('click', `#${origin}_function_submit`);
-    $(window.parent.document).off('click', `#${origin}_function_back`);
+
+    // Remove any existing event handlers to prevent leaks (scoped per origin)
+    $(window.parent.document).off(`.airFuncModal_${origin}`);
     
     const queries = origin == "omics" ? air_data.example_queries_dea : air_data.example_queries_map;
     
-    // Create function list HTML
+    // Create function list HTML (inline expandable parameter forms)
     let functionListHtml = '';
     for (const [key, query] of Object.entries(queries)) {
+        const title = query.ui_name || key;
+        const desc = query.ui_description || '';
         functionListHtml += `
-            <div class="function-item" data-function-key="${key}" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; cursor: pointer; transition: background-color 0.2s;">
-                <div style="font-weight: bold; margin-bottom: 4px;">${query.ui_name || key}</div>
-                <div style="font-size: 0.9em; color: #666; font-style: italic;">'${query.ui_description}'</div>
+            <div class="function-item" data-function-key="${key}">
+                <button type="button" class="function-item-header" aria-expanded="false">
+                    <div class="function-item-text">
+                        <div class="function-item-title">${title}</div>
+                        ${desc ? `<div class="function-item-desc">${desc}</div>` : ''}
+                    </div>
+                    <div class="function-item-caret" aria-hidden="true">▾</div>
+                </button>
+                <div class="function-params" style="display:none;"></div>
             </div>
         `;
     }
     
     const modalHTML = `
-        <div id="${origin}_function_modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-             background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 99999;">
-            <div style="position: relative; background: #fff; padding: 20px; border-radius: 8px;
-                 max-width: 600px; width: 90%; max-height: 90%; overflow: auto;">
-                <button id="${origin}_function_close" style="position: absolute; top: 10px; right: 10px;
-                     background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-                
-                <h5 style="margin-bottom: 20px; margin-top: 0;">Select Function</h5>
-                
-                <div id="${origin}_function_list" style="margin-bottom: 20px;">
-                    ${functionListHtml}
-                </div>
-                
-                <div id="${origin}_parameter_form" style="display: none;">
-                    <h6 style="margin-bottom: 15px; font-weight: bold;">Define Function Parameters</h6>
-                    <div style="font-size: 0.9em; color: #666; font-style: italic;">Enter values for the parameters below in natural language. AI will generate a query based on your input.</div>
-
-                    <div id="${origin}_parameter_fields"></div>
-                    <div style="text-align: right; margin-top: 20px;">
-                        <button id="${origin}_function_back" class="btn btn-secondary me-2">Back</button>
-                        <button id="${origin}_function_submit" class="btn btn-primary">Submit</button>
+        <div id="${origin}_function_modal" class="air-function-modal-overlay">
+            <div class="air-function-modal-panel" role="dialog" aria-modal="true" aria-label="Select Function">
+                <div class="air-function-modal-header">
+                    <div class="air-function-modal-header-text">
+                        <div class="air-function-modal-title">Select Function</div>
+                        <div class="air-function-modal-subtitle">Choose a function and fill its parameters inline.</div>
                     </div>
+                    <button id="${origin}_function_close" type="button" class="air-function-modal-close" aria-label="Close">&times;</button>
+                </div>
+
+                <div id="${origin}_function_list" class="air-function-list">
+                    ${functionListHtml}
                 </div>
             </div>
             <style>
-                #${origin}_function_modal .function-item:hover {
-                    background-color: #f8f9fa;
-                    border-color: #007bff;
+                #${origin}_function_modal.air-function-modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.75);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 99999;
+                    padding: 16px;
                 }
-                #${origin}_function_modal .function-item.selected {
-                    background-color: #e3f2fd;
-                    border-color: #2196f3;
-                    border-width: 2px;
+
+                #${origin}_function_modal .air-function-modal-panel {
+                    width: min(840px, 95vw);
+                    max-height: min(92vh, 860px);
+                    overflow: auto;
+                    background: var(--bs-body-bg, #fff);
+                    border: 1px solid var(--bs-border-color, #dee2e6);
+                    border-radius: 12px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+                    font-size: 14px;
+                    line-height: 1.45;
                 }
-                #${origin}_function_modal .required-field:invalid,
+
+                #${origin}_function_modal .air-function-modal-header {
+                    position: sticky;
+                    top: 0;
+                    background: var(--bs-body-bg, #fff);
+                    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+                    padding: 14px 16px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 12px;
+                    z-index: 1;
+                }
+
+                #${origin}_function_modal .air-function-modal-title {
+                    font-weight: 700;
+                    font-size: 18px;
+                    line-height: 1.3;
+                    color: var(--bs-body-color, #212529);
+                }
+
+                #${origin}_function_modal .air-function-modal-subtitle {
+                    margin-top: 2px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: var(--bs-secondary-color, #6c757d);
+                }
+
+                #${origin}_function_modal .air-function-modal-close {
+                    border: 1px solid var(--bs-border-color, #dee2e6);
+                    background: transparent;
+                    border-radius: 10px;
+                    width: 34px;
+                    height: 34px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 22px;
+                    line-height: 1;
+                    color: var(--bs-secondary-color, #6c757d);
+                    cursor: pointer;
+                }
+
+                #${origin}_function_modal .air-function-modal-close:hover {
+                    color: var(--bs-body-color, #212529);
+                    background: rgba(0, 0, 0, 0.03);
+                }
+
+                #${origin}_function_modal .air-function-list {
+                    padding: 12px 16px 16px 16px;
+                }
+
+                #${origin}_function_modal .function-item {
+                    border: 1px solid var(--bs-border-color, #dee2e6);
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: var(--bs-body-bg, #fff);
+                    margin-bottom: 10px;
+                }
+
+                #${origin}_function_modal .function-item-header {
+                    width: 100%;
+                    text-align: left;
+                    border: none;
+                    background: transparent;
+                    padding: 12px 12px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 12px;
+                    cursor: pointer;
+                }
+
+                #${origin}_function_modal .function-item-header:hover {
+                    background: rgba(0, 0, 0, 0.02);
+                }
+
+                #${origin}_function_modal .function-item-title {
+                    font-weight: 600;
+                    font-size: 15px;
+                    line-height: 1.35;
+                    color: var(--bs-body-color, #212529);
+                    margin-bottom: 2px;
+                }
+
+                #${origin}_function_modal .function-item-desc {
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: var(--bs-secondary-color, #6c757d);
+                    font-style: normal;
+                }
+
+                #${origin}_function_modal .function-item-caret {
+                    flex: 0 0 auto;
+                    transition: transform 0.15s ease;
+                    color: var(--bs-secondary-color, #6c757d);
+                    margin-top: 2px;
+                }
+
+                #${origin}_function_modal .function-item.expanded .function-item-caret {
+                    transform: rotate(180deg);
+                }
+
+                #${origin}_function_modal .function-params {
+                    border-top: 1px solid var(--bs-border-color, #dee2e6);
+                    padding: 14px;
+                    background: #f8fafc;
+                }
+
+                #${origin}_function_modal .function-params-help {
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: var(--bs-secondary-color, #6c757d);
+                    margin-bottom: 12px;
+                }
+
+                #${origin}_function_modal .function-params .form-label {
+                    display: block;
+                    font-size: 13px;
+                    line-height: 1.35;
+                    margin-bottom: 6px;
+                    color: #334155;
+                }
+
+                #${origin}_function_modal .function-params .form-text {
+                    font-size: 12px;
+                    line-height: 1.4;
+                    color: #64748b;
+                    margin-top: 0;
+                    margin-bottom: 6px;
+                }
+
+                #${origin}_function_modal .form-control,
+                #${origin}_function_modal .form-select {
+                    display: block;
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    font-size: 14px;
+                    line-height: 1.4;
+                    min-height: 44px;
+                    padding: 10px 12px;
+                    background: #ffffff;
+                    border: 1.5px solid #cbd5e1;
+                    color: #0f172a;
+                }
+
+                #${origin}_function_modal textarea.form-control {
+                    min-height: 100px;
+                    padding: 10px 12px;
+                }
+
+                #${origin}_function_modal .form-check-input {
+                    border: 1.5px solid #94a3b8;
+                    background-color: #fff;
+                }
+
+                #${origin}_function_modal .form-check-label {
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: #334155;
+                }
+
                 #${origin}_function_modal .required-field.is-invalid {
-                    border-color: #dc3545 !important;
+                    border-color: var(--bs-danger, #dc3545) !important;
                 }
-                #${origin}_function_modal .form-control:focus {
-                    border-color: #007bff;
-                    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+
+                #${origin}_function_modal .form-control:focus,
+                #${origin}_function_modal .form-select:focus {
+                    border-color: var(--bs-primary, #0d6efd);
+                    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.2);
                 }
-                #${origin}_function_modal .is-invalid {
-                    border-color: #dc3545 !important;
-                }
+
                 #${origin}_function_modal .form-check-input.is-invalid {
-                    border-color: #dc3545 !important;
+                    border-color: var(--bs-danger, #dc3545) !important;
+                }
+
+                #${origin}_function_modal .function-submit {
+                    min-width: 140px;
+                    min-height: 44px;
+                    padding: 10px 18px;
+                    font-size: 14px;
+                    font-weight: 700;
+                    letter-spacing: 0.2px;
+                    border: 1px solid #0b5ed7;
+                    background: linear-gradient(180deg, #1f7bff 0%, #0d6efd 100%);
+                    color: #ffffff;
+                    box-shadow: 0 8px 20px rgba(13, 110, 253, 0.28);
+                    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+                }
+
+                #${origin}_function_modal .function-submit:hover {
+                    filter: brightness(1.03);
+                    transform: translateY(-1px);
+                    box-shadow: 0 12px 24px rgba(13, 110, 253, 0.34);
+                }
+
+                #${origin}_function_modal .function-submit:active {
+                    transform: translateY(0);
+                    box-shadow: 0 6px 14px rgba(13, 110, 253, 0.24);
+                }
+
+                #${origin}_function_modal .function-submit:focus,
+                #${origin}_function_modal .function-submit:focus-visible {
+                    outline: none;
+                    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.3), 0 8px 20px rgba(13, 110, 253, 0.3);
                 }
             </style>
         </div>
@@ -1752,40 +1953,51 @@ function showFunctionSelectorModal(origin) {
     // Append to window.parent.document.body
     $(window.parent.document.body).append(modalHTML);
     
-    // Add click handlers for function selection
-    $(window.parent.document).on('click', `#${origin}_function_list .function-item`, function() {
-        const functionKey = $(this).data('function-key');
+    // Expand/collapse inline parameter form under clicked function
+    $(window.parent.document).on(`click.airFuncModal_${origin}`, `#${origin}_function_list .function-item-header`, function(e) {
+        e.preventDefault();
+        const $item = $(this).closest('.function-item');
+        const functionKey = $item.data('function-key');
         const query = queries[functionKey];
-        
         if (!query) return;
-        
-        // Highlight selected function
-        $(window.parent.document).find(`#${origin}_function_list .function-item`).removeClass('selected');
-        $(this).addClass('selected');
-        
-        // Show parameter form
-        showParameterForm(origin, functionKey, query);
+
+        const isExpanded = $item.hasClass('expanded');
+
+        // Collapse others
+        $(window.parent.document).find(`#${origin}_function_list .function-item.expanded`).not($item).each(function() {
+            $(this).removeClass('expanded');
+            $(this).find('.function-item-header').attr('aria-expanded', 'false');
+            $(this).find('.function-params').hide().empty();
+        });
+
+        if (isExpanded) {
+            $item.removeClass('expanded');
+            $(this).attr('aria-expanded', 'false');
+            $item.find('.function-params').hide().empty();
+            return;
+        }
+
+        $item.addClass('expanded');
+        $(this).attr('aria-expanded', 'true');
+        renderInlineParameterForm(origin, functionKey, query, $item);
+        $item.find('.function-params').show();
     });
     
     // Add close button handler
-    $(window.parent.document).on('click', `#${origin}_function_close`, function() {
+    $(window.parent.document).on(`click.airFuncModal_${origin}`, `#${origin}_function_close`, function() {
         $(`#${origin}_function_modal`, window.parent.document).remove();
-        $(window.parent.document).off('click', `#${origin}_function_close`);
-        $(window.parent.document).off('click', `#${origin}_function_select`);
-        $(window.parent.document).off('click', `#${origin}_function_submit`);
-        $(window.parent.document).off('click', `#${origin}_function_back`);
+        $(window.parent.document).off(`.airFuncModal_${origin}`);
     });
-    
-    // Add back button handler
-    $(window.parent.document).on('click', `#${origin}_function_back`, function() {
-        $(window.parent.document).find(`#${origin}_function_list .function-item`).removeClass('selected');
-        $(window.parent.document).find(`#${origin}_parameter_form`).hide();
-    });
-    
-    // Add submit button handler
-    $(window.parent.document).on('click', `#${origin}_function_submit`, async function() {
-        const selectedFunction = $(window.parent.document).find(`#${origin}_function_list .function-item.selected`).data('function-key');
-        if (!selectedFunction) return;
+
+    // Add submit button handler (scoped to the expanded function)
+    $(window.parent.document).on(`click.airFuncModal_${origin}`, `#${origin}_function_list .function-submit`, async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $item = $(this).closest('.function-item');
+        const selectedFunction = $item.data('function-key');
+        const queryDef = queries[selectedFunction];
+        if (!selectedFunction || !queryDef) return;
         
         // Check if already processing a response
         if (window.isProcessingResponse) {
@@ -1793,9 +2005,10 @@ function showFunctionSelectorModal(origin) {
             return;
         }
         
-        // Validate required fields
-        const requiredFields = $(window.parent.document).find(`#${origin}_parameter_fields .required-field`);
+        // Validate required fields (only within this function item)
+        const requiredFields = $item.find(`.required-field`);
         let isValid = true;
+        let $firstInvalid = null;
         
         requiredFields.each(function() {
             const field = $(this);
@@ -1810,6 +2023,7 @@ function showFunctionSelectorModal(origin) {
             
             if (!hasValue) {
                 field.addClass('is-invalid');
+                if (!$firstInvalid) $firstInvalid = field;
                 isValid = false;
             } else {
                 field.removeClass('is-invalid');
@@ -1818,17 +2032,18 @@ function showFunctionSelectorModal(origin) {
         
         if (!isValid) {
             alert('Please fill in all required fields.');
+            if ($firstInvalid && $firstInvalid.length) {
+                $firstInvalid.trigger('focus');
+            }
             return;
         }
-        
-        const formData = collectParameterFormData(origin);
+
+        // Collect parameter values from this inline form
+        const finalParams = collectInlineFinalParams($item, queryDef.parameters || []);
         
         // Close the modal first
         $(`#${origin}_function_modal`, window.parent.document).remove();
-        $(window.parent.document).off('click', `#${origin}_function_close`);
-        $(window.parent.document).off('click', `#${origin}_function_select`);
-        $(window.parent.document).off('click', `#${origin}_function_submit`);
-        $(window.parent.document).off('click', `#${origin}_function_back`);
+        $(window.parent.document).off(`.airFuncModal_${origin}`);
         
         try {
             // Show loading state on the query button
@@ -1836,17 +2051,6 @@ function showFunctionSelectorModal(origin) {
             
             // Add thinking indicator immediately
             // addThinkingIndicator(origin, `Function call: ${selectedFunction}`);
-            
-            // Substitute parameters in the query
-            let finalParams = {};
-            Object.entries(formData).forEach(([paramId, value]) => {
-                const paramIndex = paramId.replace('param_', '');
-                const parameters = queries[selectedFunction].parameters;
-                if (parameters[paramIndex]) {
-                    const paramName = parameters[paramIndex].name;
-                    finalParams[paramName] = value;
-                }
-            });
             
             var query = {};
             query["function name"] = selectedFunction;
@@ -1876,62 +2080,60 @@ function showFunctionSelectorModal(origin) {
     });
 }
 
-function showParameterForm(origin, functionKey, query) {
-    const parameterFields = $(window.parent.document).find(`#${origin}_parameter_fields`);
-    parameterFields.empty();
-    
-    // Extract parameters from the example query
-    const parameters = query.parameters;
-    
-    if (parameters.length === 0) {
-        // No parameters needed, show submit button directly
-        $(window.parent.document).find(`#${origin}_parameter_form`).show();
-        return;
+function renderInlineParameterForm(origin, functionKey, query, $functionItem) {
+    const $params = $functionItem.find('.function-params');
+    if ($params.length === 0) return;
+
+    const parameters = query.parameters || [];
+
+    let fieldsHtml = '';
+    if (parameters.length > 0) {
+        parameters.forEach((param, index) => {
+            const isBoolean = param.type === 'boolean';
+            fieldsHtml += `
+                <div class="mb-3">
+                    ${!isBoolean ? `<label class="form-label" style="font-weight: 600;">
+                        ${param.ui_name || param.name}
+                        ${param.required ? '<span class="text-danger">*</span>' : ''}
+                    </label>` : ''}
+                    ${param.ui_description ? `<div class="form-text">${param.ui_description}</div>` : ''}
+                    ${createParameterInput(param, index, functionKey)}
+                </div>
+            `;
+        });
+    } else {
+        fieldsHtml = `<div class="text-muted" style="font-size: 12px;">This function has no parameters.</div>`;
     }
-    
-    // Create form fields for each parameter
-    parameters.forEach((param, index) => {
-        const fieldHtml = `
-            <div style="margin-bottom: 15px;">
-                <label style="font-weight: bold; margin-bottom: 5px; display: block;">
-                    ${param.ui_name}
-                    ${param.required ? '<span style="color: red;">*</span>' : ''}
-                </label>
-                <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">${param.ui_description}</div>
-                ${createParameterInput(param, index)}
-            </div>
-        `;
-        parameterFields.append(fieldHtml);
-    });
-    
-    $(window.parent.document).find(`#${origin}_parameter_form`).show();
+
+    $params.html(`
+        <div class="function-params-help">Enter values in natural language; the function call will be built from these.</div>
+        <div class="function-params-fields">${fieldsHtml}</div>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button type="button" class="btn btn-primary function-submit">Submit</button>
+        </div>
+    `);
 }
 
-function createParameterInput(param, index) {
-    const inputId = `param_${index}`;
+function createParameterInput(param, index, functionKey) {
+    const inputId = `${functionKey}_param_${index}`;
     const requiredClass = param.required ? 'required-field' : '';
+    const dataAttrs = `data-param-index="${index}"`;
     
     switch (param.type) {
         case 'boolean':
-            return `<div class="form-check">
-                        <input type="checkbox" id="${inputId}" class="form-check-input ${requiredClass}" 
-                               ${param.defaultValue ? 'checked' : ''} 
-                               ${param.required ? 'required' : ''}>
-                        <label class="form-check-label" for="${inputId}">
-                            Enable ${param.name}
-                        </label>
+            return `<div class="form-check form-switch mt-1">
+                        <input type="checkbox" id="${inputId}" class="form-check-input ${requiredClass}" ${dataAttrs}
+                               ${param.defaultValue ? 'checked' : ''}>
+                        <label class="form-check-label" for="${inputId}">${param.ui_name || param.name}</label>
                     </div>`;
         
         case 'number':
-            return `<input type="number" id="${inputId}" class="form-control ${requiredClass}" 
-                          value="${param.defaultValue? param.defaultValue : ''}" 
-                          ${param.required ? 'required' : ''}
-                          style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};">`;
+            return `<input type="number" id="${inputId}" class="form-control ${requiredClass}" ${dataAttrs}
+                          value="${param.defaultValue ? param.defaultValue : ''}" 
+                          placeholder="${param.placeholder || ''}">`;
         
         case 'select':
-            return `<select id="${inputId}" class="form-control ${requiredClass}" 
-                           ${param.required ? 'required' : ''}
-                           style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};">
+            return `<select id="${inputId}" class="form-select ${requiredClass}" ${dataAttrs}>
                         <option value="">Select ${param.name}</option>
                         ${param.options ? param.options.map(opt => 
                             `<option value="${opt.value}" ${opt.value === param.defaultValue ? 'selected' : ''}>${opt.label}</option>`
@@ -1939,42 +2141,43 @@ function createParameterInput(param, index) {
                     </select>`;
         
         case 'textarea':
-            return `<textarea id="${inputId}" class="form-control ${requiredClass}" rows="3"
-                              ${param.required ? 'required' : ''}
-                              style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};"
-                              placeholder="${param.placeholder || ''}">${param.defaultValue? param.defaultValue : ''}</textarea>`;
+            return `<textarea id="${inputId}" class="form-control ${requiredClass}" rows="3" ${dataAttrs}
+                              placeholder="${param.placeholder || ''}">${param.defaultValue ? param.defaultValue : ''}</textarea>`;
         
         default:
-            return `<input type="text" id="${inputId}" class="form-control ${requiredClass}" 
-                          value="${param.defaultValue? param.defaultValue : ''}" 
-                          ${param.required ? 'required' : ''}
-                          style="border: ${param.required ? '2px solid #dc3545' : '1px solid #ddd'};"
+            return `<input type="text" id="${inputId}" class="form-control ${requiredClass}" ${dataAttrs}
+                          value="${param.defaultValue ? param.defaultValue : ''}" 
                           placeholder="${param.placeholder || `Enter ${param.name}`}">`;
     }
 }
 
-function collectParameterFormData(origin) {
-    const formData = {};
-    const parameterFields = $(window.parent.document).find(`#${origin}_parameter_fields input, #${origin}_parameter_fields select, #${origin}_parameter_fields textarea`);
-    
-    parameterFields.each(function() {
-        const field = $(this);
-        const fieldId = field.attr('id');
-        const fieldType = field.attr('type');
-        
-        let fieldValue;
+function collectInlineFinalParams($functionItem, parameterDefs) {
+    const finalParams = {};
+    const fields = $functionItem.find('input[data-param-index], select[data-param-index], textarea[data-param-index]');
+
+    fields.each(function() {
+        const $field = $(this);
+        const idx = parseInt($field.data('param-index'));
+        if (Number.isNaN(idx) || !parameterDefs[idx]) return;
+
+        const def = parameterDefs[idx];
+        const fieldType = $field.attr('type');
+        let value;
         if (fieldType === 'checkbox') {
-            fieldValue = field.is(':checked') ? 'true' : 'false';
+            value = $field.is(':checked') ? 'true' : 'false';
         } else {
-            fieldValue = field.val();
+            value = $field.val();
         }
-        
-        if (fieldId && fieldValue !== '') {
-            formData[fieldId] = fieldValue;
+
+        if (value !== undefined && value !== null) {
+            const trimmed = typeof value === 'string' ? value.trim() : value;
+            if (trimmed !== '') {
+                finalParams[def.name] = trimmed;
+            }
         }
     });
-    
-    return formData;
+
+    return finalParams;
 }
 
 // Function to download chat content as PDF
@@ -2565,16 +2768,108 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 y: minerva_id[2],
                 number: minerva_id[3],
             }));
+
+            // Sort by pin number ascending
+            markers.sort((a, b) => a.number - b.number);
+
             highlightPins(markers, created_by = created_by);
-            
+
+            const btnStyle = 'padding: 1px 5px; font-size: 10px; line-height: 1.4;';
             const pinNotification = $(`
                 <div class="response-item mb-2 chat-bubble-animate">
-                    <div class="alert alert-info mb-0" style="border-radius: 8px;" title="For nodes in the network which the results are based on, a pin has been added to the corresponding element on the disease map.">
-                        <i class="fas fa-thumbtack me-2"></i>
-                        Added ${markers.length} pins to the disease map
+                    <div class="alert alert-info mb-0 d-flex justify-content-between align-items-center" style="border-radius: 8px;" title="For nodes in the network which the results are based on, a pin has been added to the corresponding element on the disease map.">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-thumbtack me-2"></i>
+                            <span>
+                                Added ${markers.length} pins to the disease map
+                                <span class="pin-nav-status ms-2 small text-muted"></span>
+                            </span>
+                        </div>
+                        <div class="pin-nav-controls d-flex align-items-center gap-1">
+                            <button type="button" class="btn btn-outline-secondary pin-nav-refresh" style="${btnStyle}" title="Recreate pins on the map">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Pin navigation">
+                                <button type="button" class="btn btn-outline-secondary pin-nav-left" style="${btnStyle}" title="Previous pin">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary pin-nav-right" style="${btnStyle}" title="Next pin">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `);
+
+            const $pinAlert = pinNotification.find('.alert');
+            const mapPositions = markers.map(m => m.modelId);
+            const yxValues = markers.map(m => ({ x: m.x, y: m.y }));
+            const pinNumbers = markers.map(m => m.number);
+
+            // Store as data properties for navigation
+            $pinAlert.data('mappositions', mapPositions);
+            $pinAlert.data('yx', yxValues);
+            $pinAlert.data('pinnumbers', pinNumbers);
+            $pinAlert.data('markers', markers);
+            $pinAlert.data('index', 0);
+
+            const updatePinNavUI = () => {
+                const total = ($pinAlert.data('yx') || []).length;
+                const idx = Number($pinAlert.data('index') || 0);
+                const numbers = $pinAlert.data('pinnumbers') || [];
+                $pinAlert.find('.pin-nav-status').text(total > 0 ? `(${Math.min(idx + 1, total)}/${total})` : '');
+
+                const disabled = total <= 1;
+                $pinAlert.find('.pin-nav-left, .pin-nav-right').prop('disabled', disabled);
+            };
+
+            const openPinAtIndex = (idx) => {
+                const positions = $pinAlert.data('mappositions') || [];
+                const yx = $pinAlert.data('yx') || [];
+                const total = Math.min(positions.length, yx.length);
+                if (total === 0) return;
+
+                let nextIdx = Number(idx);
+                if (!Number.isFinite(nextIdx)) nextIdx = 0;
+                nextIdx = ((nextIdx % total) + total) % total;
+
+                $pinAlert.data('index', nextIdx);
+                updatePinNavUI();
+
+                const mapId = positions[nextIdx];
+                const center = yx[nextIdx];
+                if (mapId == null || center == null) return;
+
+                minerva.map.openMap({ id: mapId });
+                minerva.map.fitBounds({
+                    x1: center.x - 50,
+                    y1: center.y - 50,
+                    x2: center.x + 50,
+                    y2: center.y + 50
+                });
+            };
+
+            updatePinNavUI();
+
+            pinNotification.find('.pin-nav-left').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openPinAtIndex(Number($pinAlert.data('index') || 0) - 1);
+            });
+
+            pinNotification.find('.pin-nav-right').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openPinAtIndex(Number($pinAlert.data('index') || 0) + 1);
+            });
+
+            pinNotification.find('.pin-nav-refresh').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                highlightPins($pinAlert.data('markers'), created_by);
+            });
+
             responseElements.push(pinNotification);
         }
 
