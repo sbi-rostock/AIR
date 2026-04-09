@@ -2697,15 +2697,88 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 value: minerva_id[6]
             }));
             highlightValues(markers, created_by = created_by);
-            
+            const btnStyle = 'padding: 1px 5px; font-size: 10px; line-height: 1.4;';
             const highlightNotification = $(`
                 <div class="response-item mb-2 chat-bubble-animate">
-                    <div class="alert alert-info mb-0" style="border-radius: 8px;" title="Values from the analysis and/or data have been added as colored overlays to corresponding elements on the disease map.">
-                        <i class="fas fa-map-marker-alt me-2"></i>
-                        Highlighted ${markers.length} elements on the disease map
+                    <div class="alert alert-info mb-0 d-flex justify-content-between align-items-center" style="border-radius: 8px;" title="Values from the analysis and/or data have been added as colored overlays to corresponding elements on the disease map.">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            <span>
+                                Highlighted ${markers.length} elements on the disease map
+                                <span class="highlight-nav-status ms-2 small text-muted"></span>
+                            </span>
+                        </div>
+                        <div class="highlight-nav-controls d-flex align-items-center gap-1">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Highlight navigation">
+                                <button type="button" class="btn btn-outline-secondary highlight-nav-left" style="${btnStyle}" title="Previous highlighted element">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary highlight-nav-right" style="${btnStyle}" title="Next highlighted element">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `);
+
+            const $highlightAlert = highlightNotification.find('.alert');
+            const mapPositions = markers.map(m => m.modelId);
+            const yxValues = markers.map(m => ({ x: m.x, y: m.y }));
+
+            $highlightAlert.data('mappositions', mapPositions);
+            $highlightAlert.data('yx', yxValues);
+            $highlightAlert.data('index', 0);
+
+            const updateHighlightNavUI = () => {
+                const total = ($highlightAlert.data('yx') || []).length;
+                const idx = Number($highlightAlert.data('index') || 0);
+                $highlightAlert.find('.highlight-nav-status').text(total > 0 ? `(${Math.min(idx + 1, total)}/${total})` : '');
+
+                const disabled = total <= 1;
+                $highlightAlert.find('.highlight-nav-left, .highlight-nav-right').prop('disabled', disabled);
+            };
+
+            const openHighlightAtIndex = (idx) => {
+                const positions = $highlightAlert.data('mappositions') || [];
+                const yx = $highlightAlert.data('yx') || [];
+                const total = Math.min(positions.length, yx.length);
+                if (total === 0) return;
+
+                let nextIdx = Number(idx);
+                if (!Number.isFinite(nextIdx)) nextIdx = 0;
+                nextIdx = ((nextIdx % total) + total) % total;
+
+                $highlightAlert.data('index', nextIdx);
+                updateHighlightNavUI();
+
+                const mapId = positions[nextIdx];
+                const center = yx[nextIdx];
+                if (mapId == null || center == null) return;
+
+                minerva.map.openMap({ id: mapId });
+                minerva.map.fitBounds({
+                    x1: center.x - 50,
+                    y1: center.y - 50,
+                    x2: center.x + 50,
+                    y2: center.y + 50
+                });
+            };
+
+            updateHighlightNavUI();
+
+            highlightNotification.find('.highlight-nav-left').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openHighlightAtIndex(Number($highlightAlert.data('index') || 0) - 1);
+            });
+
+            highlightNotification.find('.highlight-nav-right').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openHighlightAtIndex(Number($highlightAlert.data('index') || 0) + 1);
+            });
+
             responseElements.push(highlightNotification);
         }
 
