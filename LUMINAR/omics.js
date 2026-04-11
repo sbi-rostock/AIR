@@ -463,7 +463,7 @@ async function omics() {
                 {
                     scope: 'iframe',
                     props: [{ prop: 'id', value: 'omics_file_btn_container' }],
-                    text: 'The LUMINAR tool is a customized extension (plugin) for MINERVA providing new functionalities for map exploration and data analysis.',
+                    text: 'These buttons allow you to interact with the currently selected data files.',
                     actions: [
                         { scope: 'iframe', props: [{ prop: 'data_id', value: "data-" + processResponse[0].data_id }], action: 'click' }
                     ]
@@ -501,19 +501,9 @@ async function omics() {
     });
 
  
-    // Handle both selection and deselection events
-    $('#omics_data_treeview').on('select_node.jstree deselect_node.jstree', function (e, data) {
-        // Get all selected nodes
-        const selectedNodes = $('#omics_data_treeview').jstree('get_selected', true);
-        
-        // Reset selected data ids and add all currently selected nodes
-        air_omics.selected_data_ids = [];
-        selectedNodes.forEach(function(selectedNode) {
-            if (selectedNode.original.data_id) {
-                air_omics.selected_data_ids.push(selectedNode.original.data_id);
-            }
-        });
-        
+    function updateDataActionButtons() {
+
+                
         // Enable/disable the load button based on whether any data_id is selected
         if (air_omics.selected_data_ids.length > 1) {
             $("#omics_btn_deletedata").removeClass("air_disabledbutton");
@@ -538,6 +528,23 @@ async function omics() {
             $("#omics_btn_downloaddata").addClass("air_disabledbutton");
             //$("#omics_btn_mergedata").addClass("air_disabledbutton");
         }
+
+    }
+
+    // Handle both selection and deselection events
+    $('#omics_data_treeview').on('select_node.jstree deselect_node.jstree', function (e, data) {
+        // Get all selected nodes
+        const selectedNodes = $('#omics_data_treeview').jstree('get_selected', true);
+        
+        // Reset selected data ids and add all currently selected nodes
+        air_omics.selected_data_ids = [];
+        selectedNodes.forEach(function(selectedNode) {
+            if (selectedNode.original.data_id) {
+                air_omics.selected_data_ids.push(selectedNode.original.data_id);
+            }
+        });
+        updateDataActionButtons();
+
     });
 
     // Handle load data button click
@@ -593,6 +600,12 @@ async function omics() {
 
             // Remove the data from the tree
             removeDataFromTree(air_omics.selected_data_ids);
+
+            air_omics.selected_data_ids = [];
+
+            $('#omics_data_treeview').jstree('deselect_all');            
+
+            updateDataActionButtons();
 
             enablebutton("omics_btn_deletedata", btn_text);
         } catch (err) {
@@ -702,6 +715,7 @@ async function omics() {
 
             // Remove the original datasets from the tree
             removeDataFromTree(air_omics.selected_data_ids);
+
                 
             // Add the merged dataset to the tree
             if (response.merged_dataset) {
@@ -712,8 +726,12 @@ async function omics() {
             const numDatasets = air_omics.selected_data_ids.length;
             
             // Clear selection
+            
             air_omics.selected_data_ids = [];
+
             $('#omics_data_treeview').jstree('deselect_all');
+            
+            updateDataActionButtons();
             
             alert(`Successfully merged ${numDatasets} datasets into a new dataset.`);
 
@@ -1239,6 +1257,12 @@ async function omics() {
     $("#omics_btn_analyze").on('click', async function() {
         try {
             var btn_text = await disablebutton("omics_btn_analyze", progress = true);
+
+            if (air_omics.selected_data_ids.length == 0) {
+                alert("Please select at least one dataset to analyze");
+                enablebutton("omics_btn_analyze", btn_text);
+                return;
+            }
             
             var analysis_types = []
             if($("#omics_cb_upstream").prop('checked')) analysis_types.push("upstream");
@@ -1247,6 +1271,7 @@ async function omics() {
             if(analysis_types.length == 0)
             {
                 alert("Please select at least one analysis type");
+                enablebutton("omics_btn_analyze", btn_text);
                 return;
             }
 
@@ -1256,6 +1281,7 @@ async function omics() {
             if(n_datasets > 10)
             {
                 alert("Analysis is available only for up to 10 datasets.");
+                enablebutton("omics_btn_analyze", btn_text);
                 return;
             }
 

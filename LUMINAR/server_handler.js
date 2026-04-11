@@ -3712,6 +3712,8 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
             "json"
         );
 
+        var n_steps = NaN;
+
         let finalized = false;
         while (!finalized) {
             let foundAgentStep = false;
@@ -3722,9 +3724,17 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
 
                     finalized = response.finalized;
 
+                    if (response.hasOwnProperty('n_steps')) {
+                        n_steps = response.n_steps + 1;
+                    }
+
                     if (response.content)
                     {
-                        $(`#${origin}_thinking_text`).text(response.content ?? "");
+                        var text = response.content ?? "";
+                        if (response.hasOwnProperty('step') && n_steps && response.step > 0 && response.step <= n_steps) {
+                            text += ` (Step ${response.step}/${n_steps})`;
+                        }
+                        $(`#${origin}_thinking_text`).text(text);
                     }
                     
                     if (finalized) {
