@@ -3651,7 +3651,7 @@ function getContextData() {
 
 
 
-    summary = `On submitting the query, the user is viewing the map ${open_map.name} (ID: ${open_map.id})` 
+    summary = `On submitting the query, the user is viewing the map "${open_map.name}"` 
     
     if (open_map.description) {
         summary += ` with Description: ${open_map.description}.`;
@@ -3660,9 +3660,9 @@ function getContextData() {
     summary += `\n`;
 
     if (overlays.length > 0) {
-        summary += `The following overlays are available  to the user:\n`;
+        summary += `The following overlays are available to the user:\n`;
         for(var overlay of overlays){
-            summary += `${overlay.name} (ID: ${overlay.id})`;
+            summary += `"${overlay.name}"`;
 
             if (overlay.description) {
                 summary += ` with Description: ${overlay.description}; `;
