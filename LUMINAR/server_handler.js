@@ -1040,9 +1040,18 @@ async function disablebutton(id, progress = false) {
                 </div>`);
             }
 
-            $(".air_btn, .omics-action-btn").each(function (pindex) {
-                var airbtn = $(this)
-                airbtn.addClass("air_temp_disabledbutton");
+            const interactiveSelector = [
+                'button',
+                'a',
+                'input',
+                'select',
+                'textarea',
+                '[role="button"]',
+                '[tabindex]:not([tabindex="-1"])'
+            ].join(', ');
+
+            $(interactiveSelector).each(function () {
+                $(this).addClass("air_temp_disabledbutton");
             });
             resolve(text)
         }, 0);
@@ -1054,7 +1063,17 @@ async function enablebutton(id, text) {
     return new Promise(resolve => {
         setTimeout(() => {
 
-            $(".air_btn, .omics-action-btn").each(function (pindex) {
+            const interactiveSelector = [
+                'button',
+                'a',
+                'input',
+                'select',
+                'textarea',
+                '[role="button"]',
+                '[tabindex]:not([tabindex="-1"])'
+            ].join(', ');
+
+            $(interactiveSelector).each(function () {
                 $(this).removeClass("air_temp_disabledbutton");
             });
             var $btn = $('#' + id);
