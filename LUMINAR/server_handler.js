@@ -1386,7 +1386,7 @@ const showModulatorsOnClick = async data => {
     }
 };
 
-function removeHighlight(created_by = "") {
+function removeHighlight(created_by = "", exclude = false) {
     if(created_by == "") {
         minerva.data.bioEntities.removeAllMarkers();
         air_data.added_markers = {};
@@ -1394,7 +1394,7 @@ function removeHighlight(created_by = "") {
     }
     
     for(var [_created_by, marker_ids] of Object.entries(air_data.added_markers)) {
-        if(_created_by != created_by) {
+        if((_created_by != created_by && !exclude) || (_created_by == created_by && exclude)) {
             for(var marker_id of marker_ids) {
                 minerva.data.bioEntities.removeSingleMarker(marker_id);
             }
@@ -3291,10 +3291,23 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                             ...(chartData.enable_zoom !== false && {
                                 zoom: {
                                     pan: {
-                                        enabled: true,
-                                        mode: 'xy',
-                                        speed: 20,
-                                        threshold: 10
+                                        // Container for pan options
+                                        pan: {
+                                            enabled: true,
+                                            mode: 'xy',
+                                            rangeMin: {
+                                                x: null,
+                                                y: null
+                                            },
+                                            rangeMax: {
+                                                x: null,
+                                                y: null
+                                            },
+
+                                            speed: 20,
+                                            threshold: 10,
+
+                                        },
                                     },
                                     zoom: {
                                         wheel: { enabled: true },
@@ -3648,7 +3661,7 @@ function hideWaitAlert(origin) {
     $(document).off('click.waitAlert');
 }
 
-function getContextData() {
+function getContextData(origin) {
     // Gather any necessary context data for the query
     // This is a placeholder function and should be customized as needed
     open_map_id = minerva.map.data.getOpenMapId();
@@ -3699,6 +3712,20 @@ function getContextData() {
         }
     }
 
+    if (origin == "xplore") {
+
+        if (air_data.xplore.selected_entities.length == 0) {
+            summary += `The user has not selected any elements or perturbations on the map.\n`;
+        }
+
+        summary += `The user has selected the following elements and perturbations on the map. BE AWARE: These may not have any relevance to the query :\n`;
+        for(const entity of air_data.xplore.selected_entities) {
+            summary += `"${entity.name}" with value ${entity.value}.\n`;
+        }
+
+    }
+
+
     return summary;
 
 }
@@ -3726,7 +3753,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
 
         let responses = await getDataFromServer(
             `sylobio/query_llm`,
-            { query: queryText, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData() },
+            { query: queryText, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
             "POST",
             "json"
         );
