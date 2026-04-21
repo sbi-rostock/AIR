@@ -21,14 +21,18 @@ async function xplore() {
         `
         <div class="card mt-3" style="border: 1px solid #FFF; padding: 0.3rem; display: flex; flex-direction: column; height: calc(100vh - 80px);">
             <div class="d-flex align-items-center justify-content-between mb-0">
-                <h4 class="mb-0">Explore the Disease Map</h4>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" id="xplore_btn_expand_chat" class="btn btn-sm air_expand_btn" title="Pop out chat window">
+                        <i class="fa-solid fa-arrow-right-from-bracket air_expand_arrow fa-flip-horizontal"></i>
+                    </button>
+                    <h4 class="mb-0">Explore the Disease Map</h4>
+                </div>
+
                 <div class="d-flex align-items-center gap-2">
                     <button type="button" id="xplore_btn_download_pdf" class="btn btn-sm btn-outline-secondary" title="Download chat as PDF">
                         <i class="fas fa-file-pdf"></i>
                     </button>
-                    <button type="button" id="xplore_btn_expand_chat" class="btn btn-sm btn-outline-primary air_expand_btn" title="Pop out chat window">
-                        <i class="fas fa-external-link-alt air_expand_arrow"></i>
-                    </button>
+
                     <button type="button" class="btn btn-link p-0 fixed-queries-link" data-origin="xplore" style="color: #6c757d; font-size: 1.2em;" title="Show example queries">
                         <i class="fas fa-info-circle"></i>
                     </button>
@@ -405,7 +409,7 @@ async function addManualXploreSelectionByName(rawName) {
     }
 }
 
-function updateXploreSelectionStatus() {
+async function updateXploreSelectionStatus() {
     const selectedEntities = Array.isArray(air_xplore.selected_entities) ? air_xplore.selected_entities : [];
     const count = selectedEntities.length;
 
@@ -465,9 +469,6 @@ function updateXploreSelectionStatus() {
 
     $('#xplore_manual_selection_input').val(selectionText)
 
-    
-    removeHighlight("xplore_selection", true);
-
     var markers = [];
     for (const element of air_xplore.selected_entities) {
         for (const node of element.nodes) {
@@ -481,6 +482,8 @@ function updateXploreSelectionStatus() {
             }
         }
     }
+
+    await removeHighlight("xplore_selection", exclude = false, remove_same_type = "pin");
 
     highlightPins(markers, created_by = "xplore_selection");
 

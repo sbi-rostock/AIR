@@ -161,13 +161,16 @@ async function omics() {
         <div class="collapse" id="omics_collapse_4">
             <div class="card" style="padding: 1rem; display: flex; flex-direction: column; height: calc(100vh - 40px);">            
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0">Analysis & Chat</h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" id="omics_btn_expand_chat" class="btn btn-sm air_expand_btn" title="Expand chat">
+                            <i class="fa-solid fa-arrow-right-from-bracket fa-flip-horizontal air_expand_arrow"></i>
+                        </button>
+                        <h6 class="mb-0">Analysis &amp; Chat</h6>
+                    </div>
+
                     <div class="d-flex gap-2">
                         <button type="button" id="omics_btn_download_pdf" class="btn btn-sm btn-outline-secondary" title="Download chat as PDF">
                             <i class="fas fa-file-pdf"></i>
-                        </button>
-                        <button type="button" id="omics_btn_expand_chat" class="btn btn-sm btn-outline-primary air_expand_btn" title="Expand chat">
-                            <i class="fas fa-arrow-left air_expand_arrow"></i>
                         </button>
                     </div>
                 </div>

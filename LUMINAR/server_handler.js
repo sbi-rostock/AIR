@@ -309,9 +309,9 @@ async function initialize_server() {
                 transition: transform 0.3s ease;
             }
             
-            .air_expand_arrow.expanded {
-                transform: rotate(180deg);
-            }
+            // .air_expand_arrow.expanded {
+            //     transform: rotate(180deg);
+            // }
             
             /* Chat bubble animations */
             @keyframes chatBubblePopIn {
@@ -575,7 +575,7 @@ async function initialize_server() {
 // Function to initialize chat container without any messages
 function initializeChatContainer(origin) {
     var containerId = "#" + origin + "_analysis_content";
-    
+    $(window.parent.document).find('.c-map-background-switch').css('right', '28rem');
     // Check if container exists and doesn't already have chat structure
     if ($(containerId).length > 0 && $(containerId).find('.chat-messages').length === 0) {
         // Create the chat header and container structure
@@ -1386,7 +1386,7 @@ const showModulatorsOnClick = async data => {
     }
 };
 
-function removeHighlight(created_by = "", exclude = false) {
+async function removeHighlight(created_by = "", exclude = false, remove_same_type = false) {
     if(created_by == "") {
         minerva.data.bioEntities.removeAllMarkers();
         air_data.added_markers = {};
@@ -1394,20 +1394,25 @@ function removeHighlight(created_by = "", exclude = false) {
     }
     
     for(var [_created_by, marker_ids] of Object.entries(air_data.added_markers)) {
-        if((_created_by != created_by && !exclude) || (_created_by == created_by && exclude)) {
-            for(var marker_id of marker_ids) {
-                minerva.data.bioEntities.removeSingleMarker(marker_id);
+        if((_created_by != created_by && exclude) || (_created_by == created_by && !exclude)) {
+            for(var [index, marker] of marker_ids.entries()) {
+                if(!remove_same_type || (marker.type == remove_same_type)) {
+                    minerva.data.bioEntities.removeSingleMarker(marker.id);
+                    air_data.added_markers[_created_by].splice(index, 1);
+                }
             }
-            delete air_data.added_markers[_created_by];
+            if (air_data.added_markers[_created_by].length == 0) {
+                delete air_data.added_markers[_created_by];
+            }
         }
-    }
+    }   ;
 }
 
-function highlightValues(data, created_by = "", remove = true) {
+async function highlightValues(data, created_by = "", remove = true, remove_same_type = true, type = "surface") {
 
     // Clear existing markers
     if(remove) {
-        removeHighlight(created_by);
+        await removeHighlight(created_by, exclude = true, remove_same_type = type);
     }
 
     air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
@@ -1422,7 +1427,7 @@ function highlightValues(data, created_by = "", remove = true) {
         // Create markers for each value
         return values.map((value, index) => {
             const marker_id = "marker_value_" + entity.id + "_" + index;
-            air_data.added_markers[created_by].push(marker_id);
+            air_data.added_markers[created_by].push({id: marker_id, type: type});
             return {
                 type: 'surface',
                 opacity: 0.67,
@@ -1442,9 +1447,9 @@ function highlightValues(data, created_by = "", remove = true) {
     }
 }
 
-function highlightEdges(data, created_by = "", remove = true) {
+async function highlightEdges(data, created_by = "", remove = true, remove_same_type = true, type = "line") {
     if(remove) {
-        removeHighlight(created_by);
+        await removeHighlight(created_by, exclude = true, remove_same_type = type);
     }
     
     air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
@@ -1453,7 +1458,7 @@ function highlightEdges(data, created_by = "", remove = true) {
 
         const marker_id = "marker_edge_" + created_by + "_" + index;
 
-        air_data.added_markers[created_by].push(marker_id);
+        air_data.added_markers[created_by].push({id: marker_id, type: type});
         return {
             type: 'line',
             color: '#106AD7',
@@ -1476,9 +1481,9 @@ function highlightEdges(data, created_by = "", remove = true) {
     }
 }
 
-function highlightPins(data, created_by = "", remove = true) {
+async function highlightPins(data, created_by = "", remove = true, remove_same_type = true, type = "pin") {
     if(remove) {
-        removeHighlight(created_by);
+        await removeHighlight(created_by, exclude = true, remove_same_type = type);
     }
         
     air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
@@ -1487,7 +1492,7 @@ function highlightPins(data, created_by = "", remove = true) {
 
         const marker_id = "marker_pin_" + created_by + "_" + index;
 
-        air_data.added_markers[created_by].push(marker_id);
+        air_data.added_markers[created_by].push({id: marker_id, type: type});
         return {
             type: 'pin',
             color: '#106AD7',
@@ -1656,6 +1661,9 @@ function expandChatInterface(origin) {
         parentDrawer.style.width = '432px';
         parentDrawer.classList.remove('air_chat_expanded');
         arrow.removeClass('expanded');
+        arrow.removeClass('fa-arrow-right-to-bracket');
+        arrow.addClass('fa-arrow-right-from-bracket');
+        arrow.addClass('fa-flip-horizontal');
         
         // Remove expanded class from iframe content
         $('body').removeClass('air_chat_expanded');
@@ -1665,6 +1673,10 @@ function expandChatInterface(origin) {
         parentDrawer.style.maxWidth = '1200px';
         parentDrawer.classList.add('air_chat_expanded');
         arrow.addClass('expanded');
+        arrow.removeClass('fa-arrow-left-from-bracket');
+        arrow.addClass('fa-arrow-right-to-bracket');
+        arrow.removeClass('fa-flip-horizontal');
+
         
         // Add expanded class to iframe content
         $('body').addClass('air_chat_expanded');
