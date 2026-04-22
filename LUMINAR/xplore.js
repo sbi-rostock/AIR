@@ -457,7 +457,7 @@ async function updateXploreSelectionStatus() {
             .css('pointer-events', 'auto')
             .css('opacity', 1);
     } else {
-        namesEl.html(`<div class="d-flex mb-2 mt-1 flex-nowrap align-items-center gap-2" style="width: max-content; min-width: 100%; white-space: nowrap;"><span style="color: #718096;">Click to select (Hold ctrl for multiple) or</span>${manualEntryChip}</div>`);
+        namesEl.html(`<div class="d-flex mb-2 mt-1 flex-nowrap align-items-center gap-2" style="width: max-content; min-width: 100%; white-space: nowrap;"><span style="color: #718096;">Click to select (hold ctrl for multiple) or</span>${manualEntryChip}</div>`);
         namesEl.scrollLeft(0);
         clearEl.hide();
         actionBtn
