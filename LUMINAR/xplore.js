@@ -532,9 +532,9 @@ function updateXploreSelectionSliderUI(sliderElement) {
     row.find('.xplore-slider-value')
         .text(getXploreSliderDisplayValue(value))
         .css({
-            background: tone.bg,
+            // background: tone.bg,
             color: tone.color,
-            borderColor: tone.border
+            // borderColor: tone.border
         });
 
     row.find('.xplore-row-state')
@@ -607,14 +607,14 @@ async function showXploreSelectionModal() {
 
                 <span
                     class="xplore-slider-value"
-                    style="background:${tone.bg}; color:${tone.color}; border-color:${tone.border};">
+                    style="/* background:${tone.bg}; color:${tone.color}; /* border-color:${tone.border}; */">
                     ${getXploreSliderDisplayValue(initialValue)}
                 </span>
 
                 <button
                     type="button"
                     class="xplore-reset-row"
-                    data-row-in dex="${index}"
+                    data-row-index="${index}"
                     title="Reset ${element.name} to 0"
                     aria-label="Reset ${element.name} to 0">
                     ↺
@@ -657,10 +657,6 @@ async function showXploreSelectionModal() {
 
             #xplore_selection_modal .xplore-modal-header {
                 padding: 20px 24px 16px 24px;
-                background:
-                    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 38%),
-                    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 30%),
-                    linear-gradient(180deg, #f8fbff 0%, #f3f8ff 100%);
                 border-bottom: 1px solid #e5edf7;
                 display: flex;
                 align-items: flex-start;
@@ -698,7 +694,7 @@ async function showXploreSelectionModal() {
                 font-size: 14px;
                 line-height: 1.5;
                 color: #475569;
-                max-width: 680px;
+                max-width: 100%;
             }
 
             #xplore_selection_modal .xplore-modal-close {
@@ -727,9 +723,6 @@ async function showXploreSelectionModal() {
             }
 
             #xplore_selection_modal .xplore-selection-summary {
-                border: 1px solid #e2e8f0;
-                background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-                border-radius: 20px;
                 padding: 14px 16px;
             }
 
@@ -793,7 +786,7 @@ async function showXploreSelectionModal() {
             }
 
             #xplore_selection_modal .xplore-selection-scale {
-                margin-top: 12px;
+                margin-bottom: 12px;
             }
 
             #xplore_selection_modal .xplore-selection-scale-bar {
@@ -923,10 +916,10 @@ async function showXploreSelectionModal() {
                 justify-content: center;
                 min-width: 68px;
                 padding: 6px 10px;
-                border-radius: 999px;
+                // border-radius: 999px;
                 font-size: 12px;
                 font-weight: 800;
-                border: 1px solid;
+                // border: 1px solid;
                 text-align: center;
             }
 
@@ -1027,11 +1020,9 @@ async function showXploreSelectionModal() {
             <div class="xplore-modal-panel" role="dialog" aria-modal="true" aria-labelledby="xplore_selection_modal_title">
                 <div class="xplore-modal-header">
                     <div class="xplore-modal-title-wrap">
-                        <div class="xplore-modal-eyebrow">Selection setup</div>
-                        <div id="xplore_selection_modal_title" class="xplore-modal-title">Fine-tune selected elements</div>
+                        <div id="xplore_selection_modal_title" class="xplore-modal-title">Define perturbations for selected elements</div>
                         <div class="xplore-modal-subtitle">
-                            Use the continuous gradient to move each target from inhibition to activation,
-                            or apply a quick preset to all rows.
+                            Use the sliders to set the perturbation level for each target from inhibition to activation or apply a quick preset to all at once.
                         </div>
                     </div>
                     <button type="button" id="xplore_selection_close" class="xplore-modal-close" aria-label="Close modal">
@@ -1041,6 +1032,16 @@ async function showXploreSelectionModal() {
 
                 <div class="xplore-modal-body">
                     <div class="xplore-selection-summary">
+
+                        <div class="xplore-selection-scale">
+                            <div class="xplore-selection-scale-bar"></div>
+                            <div class="xplore-selection-scale-labels">
+                                <span>Inhibit</span>
+                                <span>Neutral</span>
+                                <span>Activate</span>
+                            </div>
+                        </div>
+
                         <div class="xplore-selection-summary-top">
                             <div class="xplore-selection-count">
                                 You have selected ${air_xplore.selected_entities.length} target${air_xplore.selected_entities.length === 1 ? '' : 's'}.
@@ -1051,14 +1052,6 @@ async function showXploreSelectionModal() {
                             </div>
                         </div>
 
-                        <div class="xplore-selection-scale">
-                            <div class="xplore-selection-scale-bar"></div>
-                            <div class="xplore-selection-scale-labels">
-                                <span>Inhibit</span>
-                                <span>Neutral</span>
-                                <span>Activate</span>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="xplore-selection-list">
@@ -1066,9 +1059,6 @@ async function showXploreSelectionModal() {
                     </div>
 
                     <div class="xplore-modal-footer">
-                        <div class="xplore-modal-tip">
-                            Tip: keep most values near 0 and only push the strongest hypotheses further toward the ends.
-                        </div>
                         <div class="xplore-modal-actions">
                             <button type="button" id="xplore_selection_cancel">Cancel</button>
                             <button type="button" id="xplore_selection_submit">Run analysis</button>
