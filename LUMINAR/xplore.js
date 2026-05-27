@@ -497,7 +497,7 @@ function getXploreSliderDisplayValue(value) {
 function getXploreSliderTone(value) {
     const numericValue = Number.isFinite(Number(value)) ? Number(value) : 0;
 
-    if (numericValue >= 0.25) {
+    if (numericValue > 0) {
         return {
             state: 'ACTIVATE',
             bg: '#ffe4e6',
@@ -506,7 +506,7 @@ function getXploreSliderTone(value) {
         };
     }
 
-    if (numericValue <= -0.25) {
+    if (numericValue < 0) {
         return {
             state: 'INHIBIT',
             bg: '#e0f2fe',
@@ -600,7 +600,7 @@ async function showXploreSelectionModal() {
                         class="xplore-selection-slider"
                         min="-1"
                         max="1"
-                        step="0.05"
+                        step="0.01"
                         value="${initialValue}"
                         data-row-index="${index}">
                 </div>

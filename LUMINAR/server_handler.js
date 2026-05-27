@@ -3765,7 +3765,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
 
         let responses = await getDataFromServer(
             `sylobio/query_llm`,
-            { query: queryText, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
+            { query: queryText, use_mcp: air_data.minerva_mcp? true : false, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
             "POST",
             "json"
         );
@@ -3809,7 +3809,8 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
                             step: response.step,
                             cycle: response.cycle,
                             correct_query: correct_query,
-                            context: getContextData()
+                            context: getContextData(origin),
+                            use_mcp: air_data.minerva_mcp? true : false
                         },
                         "POST",
                         "json"
