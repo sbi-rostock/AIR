@@ -947,6 +947,11 @@ buildPLuginNavigator = () => {
             
     air_data.container.append(`
             <ul class="air_nav_tabs nav nav-tabs mt-2" id="air_navs" role="tablist" hidden>
+                <li class="air_nav_item nav-item d-flex align-items-center justify-content-center" style="width: 8%;">
+                    <button type="button" id="air_btn_expand_chat" class="btn btn-sm air_expand_btn" title="Pop out chat window">
+                        <i class="fa-solid fa-arrow-right-from-bracket air_expand_arrow fa-flip-horizontal"></i>
+                    </button>
+                </li>
                 <li class="air_nav_item nav-item" style="width: 21%;">
                     <a class="air_tab active nav-link" id="intro_tab" data-bs-toggle="tab" href="#intro_tab_content" role="tab" aria-controls="intro_tab_content" aria-selected="true">Start</a>
                 </li>
@@ -959,7 +964,7 @@ buildPLuginNavigator = () => {
                 <li class="air_nav_item nav-item" style="width: 21%;">
                     <a class="air_tab nav-link" id="fairdom_tab" data-bs-toggle="tab" href="#fairdom_tab_content" role="tab" aria-controls="fairdom_tab_content" aria-selected="false">SEEK</a>
                 </li>
-                <li class="air_nav_item nav-item d-flex align-items-center justify-content-center" style="width: 16%;">
+                <li class="air_nav_item nav-item d-flex align-items-center justify-content-center" style="width: 8%;">
                     <button id="clear_highlights_btn" class="btn btn-xs btn-outline-danger" style="font-size: 10px; padding: 2px 6px;" title="Remove all highlighted elements from the map">
                         <i class="fas fa-eraser"></i>
                     </button>
@@ -983,6 +988,11 @@ buildPLuginNavigator = () => {
     // Add click handler for clear highlights button
     air_data.container.find("#clear_highlights_btn").on('click', function() {
         removeHighlight();
+    });
+
+    // Add click handler for the shared expand chat button
+    air_data.container.find("#air_btn_expand_chat").on('click', function() {
+        expandChatInterface();
     });
 }
 
@@ -1646,9 +1656,9 @@ function downloadChartAsPNG(chart, title = 'Chart') {
 }
 
 // Function to expand chat interface by expanding the parent drawer width
-function expandChatInterface(origin) {
+function expandChatInterface() {
     const parentDrawer = window.parent.document.querySelector('[role="plugins-drawer"]');
-    const expandBtn = $(`#${origin}_btn_expand_chat`);
+    const expandBtn = $('#air_btn_expand_chat');
     const arrow = expandBtn.find('.air_expand_arrow');
     
     if (!parentDrawer) {
@@ -1698,9 +1708,9 @@ function expandChatInterface(origin) {
 
 
 // Simple function - no separate collapse needed
-function collapseChatInterface(origin) {
+function collapseChatInterface() {
     // Just call expand again to toggle
-    expandChatInterface(origin);
+    expandChatInterface();
 }
 
 // Function selector modal and parameter form functionality
@@ -2989,6 +2999,45 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
             responseElements.push(alertNotification);
         }
 
+        else if (resp.response_type === "btn") {
+            // Generic button response. content: { label, icon, class, loading_label, onClick }
+            // onClick is an async function(buttonEl) supplied by the caller and invoked on click
+            const cfg = resp.content || {};
+            const label = cfg.label || "Run";
+            const icon = cfg.icon || "fas fa-play";
+            const btnClass = cfg.class || "air_btn";
+
+            const btnItem = $(`
+                <div class="response-item mb-2 chat-bubble-animate text-center">
+                    <button type="button" class="btn ${btnClass} mt-2 air-response-btn">
+                        <i class="${icon} me-1"></i>${label}
+                    </button>
+                </div>
+            `);
+            responseElements.push(btnItem);
+
+            btnItem.find('.air-response-btn').on('click', async function() {
+                const $btn = $(this);
+
+                if (typeof cfg.onClick !== 'function') {
+                    console.error("btn response is missing an onClick handler");
+                    return;
+                }
+
+                const originalHtml = $btn.html();
+                $btn.prop('disabled', true).html(`<i class="fas fa-spinner fa-spin me-1"></i>${cfg.loading_label || "Working..."}`);
+
+                try {
+                    await cfg.onClick($btn);
+                } catch (err) {
+                    console.error("Error running button action:", err);
+                    alert(`Action failed: ${err.message}`);
+                } finally {
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            });
+        }
+
         else if (resp.response_type === "call_string") {
             // For call string responses - displays content with a copy button for reproducibility
             const callStringHtml = $(`
@@ -3151,13 +3200,13 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 });
 
 
-                tableHtml.find('.csv-btn').on('click', function() {
-                    download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","));
-                });
+                // tableHtml.find('.csv-btn').on('click', function() {
+                //     download_data(`${filePrefix}_results.csv`, getDTExportString(table, seperator = ","));
+                // });
                 
-                tableHtml.find('.tsv-btn').on('click', function() {
-                    download_data(`${filePrefix}_results.txt`, getDTExportString(table));
-                });
+                // tableHtml.find('.tsv-btn').on('click', function() {
+                //     download_data(`${filePrefix}_results.txt`, getDTExportString(table));
+                // });
                 
             } catch (error) {
                 console.error('Error initializing DataTable:', error);
@@ -3730,9 +3779,16 @@ function getContextData(origin) {
             summary += `The user has not selected any elements or perturbations on the map.\n`;
         }
 
-        summary += `The user has selected the following elements and perturbations on the map. BE AWARE: These may not have any relevance to the query :\n`;
+        let selected_entities = "";
         for(const entity of air_data.xplore.selected_entities) {
-            summary += `"${entity.name}" with value ${entity.value}.\n`;
+            selected_entities += `"${entity.name}" with value ${entity.value}.\n`;
+        }
+
+        if (selected_entities === "") {
+            summary += "The user has not selected any elements or perturbations on the map.\n";
+        }
+        else {
+            summary += `The user has selected the following elements and perturbations on the map:\n` + selected_entities;
         }
 
     }
@@ -3746,7 +3802,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
 
     if (!queryText) return;
 
-    const reasoningLevel = parseInt($(`#${origin}_reasoning_level`).val(), 10) || 3;
+    const reasoningLevel = 1;
     
     // Check if already processing a response
     if (window.isProcessingResponse) {
@@ -3765,7 +3821,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
 
         let responses = await getDataFromServer(
             `sylobio/query_llm`,
-            { query: queryText, use_mcp: air_data.minerva_mcp? true : false, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
+            { query: queryText, use_mcp: true, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
             "POST",
             "json"
         );
@@ -3810,7 +3866,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
                             cycle: response.cycle,
                             correct_query: correct_query,
                             context: getContextData(origin),
-                            use_mcp: air_data.minerva_mcp? true : false
+                            use_mcp: true
                         },
                         "POST",
                         "json"

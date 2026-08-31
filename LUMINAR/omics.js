@@ -40,7 +40,7 @@ async function omics() {
             <div class="card" style="padding: 1rem;">
                 <form id="omics_fileForm">
                     <div class="mb-2">
-                        <input type="file" class="form-control" id="omics_file" multiple accept=".txt,.tsv,.csv,.tab,.data,.zip">
+                        <input type="file" class="form-control" id="omics_file" multiple accept=".txt,.tsv,.csv,.tab,.zip,.xlsx,.xls">
                     </div>
                     <div class="form-check mb-2" style="display: flex; align-items: center; gap: 5px;">
                         <div>
@@ -162,9 +162,6 @@ async function omics() {
             <div class="card" style="padding: 1rem; display: flex; flex-direction: column; height: calc(100vh - 40px);">            
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="d-flex align-items-center gap-2">
-                        <button type="button" id="omics_btn_expand_chat" class="btn btn-sm air_expand_btn" title="Expand chat">
-                            <i class="fa-solid fa-arrow-right-from-bracket fa-flip-horizontal air_expand_arrow"></i>
-                        </button>
                         <h6 class="mb-0">Analysis &amp; Chat</h6>
                     </div>
 
@@ -181,12 +178,6 @@ async function omics() {
                     <textarea placeholder="Ask a question about the data analysis." id="omics_query_input" class="form-control me-2 auto-expand-input" style="flex: 1; resize: none;" aria-label="Text input with segmented dropdown button" rows="1"></textarea>
                     <button type="button" type="submit" id="omics_btn_query" class="air_btn btn">Submit</button>
                 </form>
-                <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
-                    <label for="omics_reasoning_level" class="mb-0">Reasoning</label>
-                    <input type="range" id="omics_reasoning_level" min="1" max="3" step="1" value="1" style="flex: 1;" />
-                    <span id="omics_reasoning_value" style="width: 16px; text-align: center;">1</span>
-                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher value significantly increases response time." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
-                </div>
                 <span style="text-align: center;margin-bottom: 4pt;">or</span>
                 <div class="d-flex justify-content-center mb-2">
                     <button type="button" id="omics_btn_function_selector" class="btn btn-outline-secondary btn-sm">
@@ -504,32 +495,53 @@ async function omics() {
     });
 
  
-    function updateDataActionButtons() {
+    async function updateDataActionButtons() {
+
+        let data_has_errors = false;
+
+        for (const data_id of air_omics.selected_data_ids) {
+            const data = await getDataFromLocalTree(data_id);
+
+            const data_safe = data || {};
+
+            const warnings = data_safe.warnings || [];
+            data_has_errors = data_has_errors || (warnings.some(w => w.type === 'error' || w.type === 'critical'));
+        }
 
                 
         // Enable/disable the load button based on whether any data_id is selected
         if (air_omics.selected_data_ids.length > 1) {
             $("#omics_btn_deletedata").removeClass("air_disabledbutton");
             $("#omics_btn_downloaddata").removeClass("air_disabledbutton");
-            //$("#omics_btn_mergedata").removeClass("air_disabledbutton");
+            $("#omics_btn_mergedata").removeClass("air_disabledbutton");
             $("#omics_btn_viewdata").addClass("air_disabledbutton");
             $("#omics_btn_editdata").addClass("air_disabledbutton");
-            $("#omics_btn_analyze").removeClass("air_disabledbutton");
+            if (data_has_errors) {
+                $("#omics_btn_analyze").addClass("air_disabledbutton");
+            }
+            else {
+                $("#omics_btn_analyze").removeClass("air_disabledbutton");
+            }
         }
         else if (air_omics.selected_data_ids.length == 1) {
             $("#omics_btn_viewdata").removeClass("air_disabledbutton");
             $("#omics_btn_editdata").removeClass("air_disabledbutton");
             $("#omics_btn_deletedata").removeClass("air_disabledbutton");
             $("#omics_btn_downloaddata").removeClass("air_disabledbutton");
-            //$("#omics_btn_mergedata").addClass("air_disabledbutton");
-            $("#omics_btn_analyze").removeClass("air_disabledbutton");
+            $("#omics_btn_mergedata").addClass("air_disabledbutton");
+            if (data_has_errors) {
+                $("#omics_btn_analyze").addClass("air_disabledbutton");
+            }
+            else {
+                $("#omics_btn_analyze").removeClass("air_disabledbutton");
+            }
         }
         else {
             $("#omics_btn_viewdata").addClass("air_disabledbutton");
             $("#omics_btn_editdata").addClass("air_disabledbutton");
             $("#omics_btn_deletedata").addClass("air_disabledbutton");
             $("#omics_btn_downloaddata").addClass("air_disabledbutton");
-            //$("#omics_btn_mergedata").addClass("air_disabledbutton");
+            $("#omics_btn_mergedata").addClass("air_disabledbutton");
         }
 
     }
@@ -1206,6 +1218,8 @@ async function omics() {
                     air_omics.data_tree[source].data[dataId].pivot_column = pivotColumn !== "-1" ? parseInt(pivotColumn) : null;
                     air_omics.data_tree[source].data[dataId].pivot_aggfunc = aggregateFunction;
                     air_omics.data_tree[source].data[dataId].selected_columns = selectedColumns;
+                    air_omics.data_tree[source].data[dataId].warnings = response.warnings;
+
 
                     // Close the modal
                     $('#omics_edit_modal', window.parent.document).remove();
@@ -1353,8 +1367,50 @@ async function omics() {
             // Enable omics focus switch after analysis completes
             $("#omics_focus_switch").prop('checked', true).trigger('change');
             
+            // Append a "Download Results" button to the chat response
+            const responsesWithDownload = (Array.isArray(response) ? response.slice() : [response]);
+            responsesWithDownload.push({
+                response_type: "btn",
+                content: {
+                    label: "Download Results",
+                    icon: "fas fa-download",
+                    onClick: async function() {
+                        const result = await getDataFromServer("sylobio/get_analysis_result", {}, "POST", "json");
+                        const dateStamp = new Date().toISOString().split('T')[0];
+
+                        // Result is an object mapping filename -> file content (string)
+                        const entries = Object.entries(result["output"] || {});
+
+                        if (entries.length === 1) {
+                            // Single file - download directly as .txt
+                            const [name, content] = entries[0];
+                            const filename = name.endsWith('.txt') ? name : `${name}.txt`;
+                            download_data(filename, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+                        } else {
+                            // Multiple files - bundle as .txt files in a zip
+                            const zip = new air_data.JSZip();
+                            entries.forEach(([name, content]) => {
+                                const filename = name.endsWith('.txt') ? name : `${name}.txt`;
+                                zip.file(filename, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+                            });
+
+                            const zipBlob = await zip.generateAsync({ type: "blob" });
+                            const zipUrl = URL.createObjectURL(zipBlob);
+
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = zipUrl;
+                            downloadLink.download = `analysis_results_${dateStamp}.zip`;
+                            document.body.appendChild(downloadLink);
+                            downloadLink.click();
+                            document.body.removeChild(downloadLink);
+                            URL.revokeObjectURL(zipUrl);
+                        }
+                    }
+                }
+            });
+
             // // Use the generalized function to process responses
-            processServerResponses(response, "omics", $("#omics_query_input").val(), "analysis");            
+            processServerResponses(responsesWithDownload, "omics", $("#omics_query_input").val(), "analysis");            
 
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_3')).hide();
             bootstrap.Collapse.getOrCreateInstance(document.querySelector('#omics_collapse_4')).show();
@@ -1395,18 +1451,8 @@ async function omics() {
         showFunctionSelectorModal('omics');
     });
 
-    // Update reasoning value display
-    $("#omics_reasoning_level").on('input', function() {
-        $("#omics_reasoning_value").text($(this).val());
-    });
-    
     // Setup node map link handling
     setupNodeMapLinks();
-
-    // Handle expand chat button click
-    $("#omics_btn_expand_chat").on('click', function() {
-        expandChatInterface('omics');
-    });
 
     // Handle PDF download button click
     $("#omics_btn_download_pdf").on('click', function() {
@@ -1667,6 +1713,17 @@ function removeDataFromTree(dataIds) {
     }
 }
 
+async function getDataFromLocalTree(dataId) {
+
+    for (const [source, sourceData] of Object.entries(air_omics.data_tree)) {
+        if (sourceData.data[dataId]) {
+            return sourceData.data[dataId];
+        }
+    }
+
+    return null;
+}
+
 async function getDataFromTree(dataId) {
     // Search for the data in all sources
     try {
@@ -1696,10 +1753,12 @@ function detectPValues(headers) {
     // Check if we have an odd number of data columns
     if (dataColumns.length % 2 !== 0) return false;
 
+    if (dataColumns.length === 0) return false;
+
     // Check if every second column contains 'pvalue' or 'p-value'
     for (let i = 1; i < dataColumns.length; i += 2) {
         const colName = dataColumns[i].toLowerCase();
-        if (!colName.includes('pvalue') && !colName.includes('p-value')) {
+        if (!colName.includes('pval') && !colName.includes('p-val')) {
             return false;
         }
     }
@@ -1739,7 +1798,7 @@ $(document).on('click', '.node_map_link', function(e) {
 
 // Helper function to check if a file is a valid data file
 function isValidDataFile(filename) {
-    const validExtensions = ['.txt', '.tsv', '.csv', '.tab', '.data'];
+    const validExtensions = ['.txt', '.tsv', '.csv', '.tab', '.data', '.xlsx', '.xls'];
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
     return validExtensions.includes(ext);
 }
@@ -1752,7 +1811,9 @@ function getFileType(filename) {
         '.tsv': 'text/tab-separated-values',
         '.csv': 'text/csv',
         '.tab': 'text/tab-separated-values',
-        '.data': 'text/plain'
+        '.data': 'text/plain',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.xls': 'application/vnd.ms-excel'
     };
     return mimeTypes[ext] || 'text/plain';
 }

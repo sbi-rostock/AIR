@@ -22,9 +22,6 @@ async function xplore() {
         <div class="card mt-3" style="border: 1px solid #FFF; padding: 0.3rem; display: flex; flex-direction: column; height: calc(100vh - 80px);">
             <div class="d-flex align-items-center justify-content-between mb-0">
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" id="xplore_btn_expand_chat" class="btn btn-sm air_expand_btn" title="Pop out chat window">
-                        <i class="fa-solid fa-arrow-right-from-bracket air_expand_arrow fa-flip-horizontal"></i>
-                    </button>
                     <h4 class="mb-0">Explore the Disease Map</h4>
                 </div>
 
@@ -48,27 +45,21 @@ async function xplore() {
                     placeholder="Ask a question ..." aria-label="Query input" rows="1"></textarea>
                 <button type="button" id="xplore_btn_query" class="air_btn btn">Submit</button>
             </form>
-            <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 12px;">
-                <label for="xplore_reasoning_level" class="mb-0">Reasoning</label>
-                <input type="range" id="xplore_reasoning_level" min="1" max="3" step="1" value="1" style="flex: 1;" />
-                <span id="xplore_reasoning_value" style="width: 16px; text-align: center;">1</span>
-                <span data-bs-toggle="tooltip" data-bs-placement="top" title="Set the agent's depth of reasoning. Higher value significantly increases response time." style="cursor: help; color: #6c757d;"><i class="fas fa-info-circle"></i></span>
-            </div>
             <span style="text-align: center;margin-bottom: 4pt;">or</span>
             <div class="d-flex justify-content-center mb-2">
                 <button type="button" id="xplore_btn_function_selector" class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-list"></i> Select Function
                 </button>
             </div>
-            <div id="xplore_selection_status" style="border: 1px solid #dbe5f1; border-radius: 12px; background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%); padding: 8px 10px;">
+            <div id="xplore_selection_status" style="border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 10px; background: var(--bs-body-bg, #fff); padding: 10px 12px;">
                 <div class="d-flex align-items-center justify-content-between gap-2" style="min-height: 24px;">
-                    <div id="xplore_selection_count" class="small fw-semibold" style="color: #1f3f66;">0 elements selected</div>
-                    <a href="#" id="xplore_btn_selection_modal" class="badge" style="background: #e9f2ff; color: #245a97; font-weight: 600;"><i class="fas fa-play me-1"></i>Simulate</a>
+                    <div id="xplore_selection_count" class="small fw-semibold" style="color: var(--bs-body-color, #212529);">0 elements selected</div>
+                    <a href="#" id="xplore_btn_selection_modal" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #1f7bff 0%, #0d6efd 100%); color: #fff; font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.25);"><i class="fas fa-play" style="font-size: 10px;"></i>Simulate</a>
                 </div>
                 <div class="d-flex align-items-start justify-content-between gap-2 mt-1" style="min-height: 20px;">
-                    <div id="xplore_selection_names" class="small" style="color: #4f6b8a; flex: 1 1 auto; min-width: 0; overflow-x: scroll; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin;">Click to select. Enable Multi-select to build a set.</div>
+                    <div id="xplore_selection_names" class="small" style="color: var(--bs-secondary-color, #6c757d); flex: 1 1 auto; min-width: 0; overflow-x: scroll; overflow-y: hidden; white-space: nowrap; scrollbar-width: thin;">Click to select. Enable Multi-select to build a set.</div>
                     <div class="d-flex align-items-center gap-2" style="flex: 0 0 auto;">
-                        <a href="#" id="xplore_clear_selection" class="small mt-2" style="display:none; color: #245a97; font-weight: 600; text-decoration: none;">Clear</a>
+                        <a href="#" id="xplore_clear_selection" class="small mt-2" style="display:none; color: var(--bs-secondary-color, #6c757d); font-weight: 600; text-decoration: none;">Clear</a>
                     </div>
                 </div>
             </div>
@@ -185,16 +176,6 @@ async function xplore() {
 
         air_xplore.selected_entities = restoredEntities;
         updateXploreSelectionStatus();
-    });
-
-    // Update reasoning value display
-    $("#xplore_reasoning_level").on('input', function() {
-        $("#xplore_reasoning_value").text($(this).val());
-    });
-
-    // Handle expand chat button click
-    $("#xplore_btn_expand_chat").on('click', function() {
-        expandChatInterface('xplore');
     });
 
     // Handle PDF download button click
@@ -428,10 +409,10 @@ async function updateXploreSelectionStatus() {
     var selectionText = manualInputEl.length ? String(manualInputEl.val() || '').trim() : '';
 
     const manualEntryChip = `
-        <span class="xplore-selection-chip" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: #ffffff; color: #355c85; padding: 2px 6px 2px 10px; border: 1px dashed #bfd3ea; max-width: 100%;">
-            <i class="fas fa-plus" style="font-size: 10px; color: #5b7ea4;"></i>
-            <input id="xplore_manual_selection_input" type="text" placeholder="Add by name" style="border: none; outline: none; background: transparent; color: #355c85; width: 70px; font-size: 12px; line-height: 1.2; padding: 0;" />
-            <button type="button" id="xplore_add_manual_selection" style="border: none; background: #e9f2ff; color: #245a97; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; line-height: 1.2; cursor: pointer;">Add</button>
+        <span class="xplore-selection-chip" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; background: transparent; color: var(--bs-secondary-color, #6c757d); padding: 2px 6px 2px 8px; border: 1px dashed var(--bs-border-color, #ced4da); max-width: 100%;">
+            <i class="fas fa-plus" style="font-size: 10px; color: var(--bs-secondary-color, #6c757d);"></i>
+            <input id="xplore_manual_selection_input" type="text" placeholder="Add by name" style="border: none; outline: none; background: transparent; color: var(--bs-body-color, #212529); width: 70px; font-size: 12px; line-height: 1.2; padding: 0;" />
+            <button type="button" id="xplore_add_manual_selection" style="border: 1px solid #0d6efd; background: transparent; color: #0d6efd; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; line-height: 1.2; cursor: pointer;">Add</button>
         </span>
     `;
 
@@ -441,9 +422,9 @@ async function updateXploreSelectionStatus() {
             .map(entity => {
 
                 return `
-                    <span class="xplore-selection-chip" style="display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; background: #e8f2ff; color: #1f4e85; padding: 2px 8px; max-width: 100%;">
-                        <a href="#" class="xplore-selection-chip-label" data-entity-key="${entity.name}" style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entity.name}</a>
-                        <button type="button" class="xplore-remove-chip" data-entity-key="${entity.name}" style="border: none; background: transparent; color: #1f4e85; font-weight: 700; line-height: 1; cursor: pointer; padding: 0;" aria-label="Remove selected element">&times;</button>
+                    <span class="xplore-selection-chip" style="display: inline-flex; align-items: center; gap: 4px; border-radius: 8px; background: var(--bs-body-bg, #fff); color: var(--bs-body-color, #212529); padding: 2px 8px; border: 1px solid var(--bs-border-color, #dee2e6); max-width: 100%;">
+                        <a href="#" class="xplore-selection-chip-label" data-entity-key="${entity.name}" style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #0d6efd; text-decoration: none;">${entity.name}</a>
+                        <button type="button" class="xplore-remove-chip" data-entity-key="${entity.name}" style="border: none; background: transparent; color: var(--bs-secondary-color, #6c757d); font-weight: 700; line-height: 1; cursor: pointer; padding: 0;" aria-label="Remove selected element">&times;</button>
                     </span>
                 `;
             })
@@ -457,7 +438,7 @@ async function updateXploreSelectionStatus() {
             .css('pointer-events', 'auto')
             .css('opacity', 1);
     } else {
-        namesEl.html(`<div class="d-flex mb-2 mt-1 flex-nowrap align-items-center gap-2" style="width: max-content; min-width: 100%; white-space: nowrap;"><span style="color: #718096;">Click to select (hold ctrl for multiple) or</span>${manualEntryChip}</div>`);
+        namesEl.html(`<div class="d-flex mb-2 mt-1 flex-nowrap align-items-center gap-2" style="width: max-content; min-width: 100%; white-space: nowrap;"><span style="color: var(--bs-secondary-color, #6c757d);">Click to select (hold ctrl for multiple) or</span>${manualEntryChip}</div>`);
         namesEl.scrollLeft(0);
         clearEl.hide();
         actionBtn
@@ -500,26 +481,26 @@ function getXploreSliderTone(value) {
     if (numericValue > 0) {
         return {
             state: 'ACTIVATE',
-            bg: '#ffe4e6',
-            color: '#be123c',
-            border: '#fecdd3'
+            bg: '#f8d7da',
+            color: '#dc3545',
+            border: '#f5c6cb'
         };
     }
 
     if (numericValue < 0) {
         return {
             state: 'INHIBIT',
-            bg: '#e0f2fe',
-            color: '#075985',
-            border: '#bae6fd'
+            bg: '#cfe2ff',
+            color: '#0d6efd',
+            border: '#b6d4fe'
         };
     }
 
     return {
         state: 'NEUTRAL',
-        bg: '#f1f5f9',
-        color: '#475569',
-        border: '#cbd5e1'
+        bg: '#e9ecef',
+        color: '#6c757d',
+        border: '#dee2e6'
     };
 }
 
@@ -632,10 +613,8 @@ async function showXploreSelectionModal() {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 24px;
-                background: rgba(15, 23, 42, 0.46);
-                backdrop-filter: blur(4px);
-                -webkit-backdrop-filter: blur(4px);
+                padding: 16px;
+                background: rgba(0, 0, 0, 0.75);
                 box-sizing: border-box;
             }
 
@@ -644,86 +623,78 @@ async function showXploreSelectionModal() {
             }
 
             #xplore_selection_modal .xplore-modal-panel {
-                width: min(920px, 96vw);
-                max-height: 90vh;
-                overflow: hidden;
-                border-radius: 24px;
-                background: #ffffff;
-                border: 1px solid #dbe5f1;
-                box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
+                width: min(760px, 95vw);
+                max-height: min(92vh, 820px);
+                overflow: auto;
+                border-radius: 12px;
+                background: var(--bs-body-bg, #fff);
+                border: 1px solid var(--bs-border-color, #dee2e6);
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
                 display: flex;
                 flex-direction: column;
+                font-size: 14px;
+                line-height: 1.45;
             }
 
             #xplore_selection_modal .xplore-modal-header {
-                padding: 20px 24px 16px 24px;
-                border-bottom: 1px solid #e5edf7;
+                position: sticky;
+                top: 0;
+                background: var(--bs-body-bg, #fff);
+                border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+                padding: 14px 16px;
                 display: flex;
                 align-items: flex-start;
                 justify-content: space-between;
-                gap: 16px;
+                gap: 12px;
+                z-index: 1;
             }
 
             #xplore_selection_modal .xplore-modal-title-wrap {
                 min-width: 0;
             }
 
-            #xplore_selection_modal .xplore-modal-eyebrow {
-                display: inline-flex;
-                align-items: center;
-                padding: 6px 10px;
-                border-radius: 999px;
-                background: #eaf4ff;
-                color: #2563eb;
-                font-size: 11px;
-                font-weight: 700;
-                letter-spacing: 0.12em;
-                text-transform: uppercase;
-            }
-
             #xplore_selection_modal .xplore-modal-title {
-                margin-top: 10px;
-                font-size: 28px;
-                line-height: 1.1;
-                font-weight: 800;
-                color: #0f172a;
+                font-weight: 700;
+                font-size: 18px;
+                line-height: 1.3;
+                color: var(--bs-body-color, #212529);
             }
 
             #xplore_selection_modal .xplore-modal-subtitle {
-                margin-top: 6px;
-                font-size: 14px;
-                line-height: 1.5;
-                color: #475569;
+                margin-top: 2px;
+                font-size: 13px;
+                line-height: 1.4;
+                color: var(--bs-secondary-color, #6c757d);
                 max-width: 100%;
             }
 
             #xplore_selection_modal .xplore-modal-close {
-                width: 20px;
-                height: 20px;
-                border: 1px solid #d7e3f1;
-                background: #ffffff;
-                color: #000000;
-                border-radius: 999px;
-                cursor: pointer;
+                border: 1px solid var(--bs-border-color, #dee2e6);
+                background: transparent;
+                border-radius: 10px;
+                width: 34px;
+                height: 34px;
                 flex: 0 0 auto;
-                transition: 0.18s ease;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 22px;
+                line-height: 1;
+                color: var(--bs-secondary-color, #6c757d);
+                cursor: pointer;
             }
 
             #xplore_selection_modal .xplore-modal-close:hover {
-                background: #f8fafc;
-                color: #0f172a;
+                color: var(--bs-body-color, #212529);
+                background: rgba(0, 0, 0, 0.03);
             }
 
             #xplore_selection_modal .xplore-modal-body {
-                padding: 18px 24px 20px 24px;
+                padding: 14px 16px 16px 16px;
                 display: flex;
                 flex-direction: column;
-                gap: 16px;
+                gap: 14px;
                 min-height: 0;
-            }
-
-            #xplore_selection_modal .xplore-selection-summary {
-                padding: 14px 16px;
             }
 
             #xplore_selection_modal .xplore-selection-summary-top {
@@ -735,65 +706,52 @@ async function showXploreSelectionModal() {
             }
 
             #xplore_selection_modal .xplore-selection-count {
-                display: inline-flex;
-                align-items: center;
-                gap: 10px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                color: #334155;
+                color: var(--bs-body-color, #212529);
             }
 
             #xplore_selection_modal .xplore-selection-count-badge {
-                min-width: 32px;
-                height: 32px;
-                padding: 0 10px;
-                border-radius: 999px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                background: #ffffff;
-                border: 1px solid #dbe5f1;
-                color: #0f172a;
-                font-weight: 800;
+                min-width: 22px;
+                height: 22px;
+                padding: 0 6px;
+                border-radius: 999px;
+                background: #0d6efd;
+                color: #fff;
+                font-weight: 700;
+                font-size: 12px;
+                margin-right: 4px;
             }
 
             #xplore_selection_modal .xplore-selection-presets {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 8px;
+                gap: 6px;
                 justify-content: flex-end;
             }
 
             #xplore_selection_modal .xplore-selection-preset,
             #xplore_selection_modal #xplore_selection_reset_all {
-                border: 1px solid #d7e3f1;
-                background: #ffffff;
-                color: #334155;
-                border-radius: 999px;
-                padding: 8px 12px;
+                border: 1px solid var(--bs-border-color, #dee2e6);
+                background: transparent;
+                color: var(--bs-secondary-color, #6c757d);
+                border-radius: 8px;
+                padding: 5px 10px;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 600;
                 cursor: pointer;
-                transition: 0.18s ease;
+                transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
                 white-space: nowrap;
             }
 
             #xplore_selection_modal .xplore-selection-preset:hover,
             #xplore_selection_modal #xplore_selection_reset_all:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-                background: #ffffff;
-            }
-
-            #xplore_selection_modal .xplore-selection-scale {
-                margin-bottom: 12px;
-            }
-
-            #xplore_selection_modal .xplore-selection-scale-bar {
-                height: 10px;
-                border-radius: 999px;
-                background: linear-gradient(90deg, #60a5fa 0%, #ffffff 50%, #f87171 100%);
-                box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.12);
+                background: rgba(13, 110, 253, 0.08);
+                color: #0d6efd;
+                border-color: #0d6efd;
             }
 
             #xplore_selection_modal .xplore-selection-scale-labels {
@@ -801,40 +759,41 @@ async function showXploreSelectionModal() {
                 display: flex;
                 justify-content: space-between;
                 font-size: 11px;
-                font-weight: 700;
-                letter-spacing: 0.08em;
-                color: #64748b;
-                text-transform: uppercase;
+                font-weight: 600;
+                color: var(--bs-secondary-color, #6c757d);
             }
 
             #xplore_selection_modal .xplore-selection-list {
                 overflow-y: auto;
                 max-height: 50vh;
-                padding-right: 4px;
+                padding-right: 2px;
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
             }
 
             #xplore_selection_modal .xplore-selection-list::-webkit-scrollbar {
-                width: 8px;
+                width: 7px;
             }
 
             #xplore_selection_modal .xplore-selection-list::-webkit-scrollbar-thumb {
-                background: rgba(148, 163, 184, 0.6);
+                background: #ced4da;
                 border-radius: 999px;
             }
 
             #xplore_selection_modal .xplore-selection-item {
                 display: grid;
-                grid-template-columns: minmax(160px, 220px) minmax(260px, 1fr) auto auto;
+                grid-template-columns: minmax(140px, 200px) minmax(220px, 1fr) auto auto;
                 align-items: center;
                 gap: 12px;
                 padding: 10px 12px;
-                border-radius: 16px;
-                background: #ffffff;
-                border: 1px solid #e2e8f0;
-                box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+                border-radius: 10px;
+                background: var(--bs-body-bg, #fff);
+                border: 1px solid var(--bs-border-color, #dee2e6);
+            }
+
+            #xplore_selection_modal .xplore-selection-item:hover {
+                background: rgba(0, 0, 0, 0.02);
             }
 
             #xplore_selection_modal .xplore-selection-name {
@@ -843,8 +802,8 @@ async function showXploreSelectionModal() {
                 text-overflow: ellipsis;
                 white-space: nowrap;
                 font-size: 14px;
-                font-weight: 700;
-                color: #0f172a;
+                font-weight: 600;
+                color: var(--bs-body-color, #212529);
             }
 
             #xplore_selection_modal .xplore-selection-control {
@@ -855,11 +814,11 @@ async function showXploreSelectionModal() {
             }
 
             #xplore_selection_modal .xplore-row-state {
-                width: 68px;
-                flex: 0 0 68px;
+                width: 62px;
+                flex: 0 0 62px;
                 font-size: 11px;
-                font-weight: 800;
-                letter-spacing: 0.08em;
+                font-weight: 700;
+                letter-spacing: 0.03em;
                 text-transform: uppercase;
                 text-align: left;
             }
@@ -870,21 +829,20 @@ async function showXploreSelectionModal() {
                 cursor: pointer;
                 -webkit-appearance: none;
                 appearance: none;
-                height: 10px;
+                height: 6px;
                 border-radius: 999px;
                 outline: none;
-                background: linear-gradient(90deg, #60a5fa 0%, #ffffff 50%, #f87171 100%);
-                box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.12);
+                background: linear-gradient(90deg, #0d6efd 0%, #e9ecef 50%, #dc3545 100%);
             }
 
             #xplore_selection_modal .xplore-selection-slider::-webkit-slider-runnable-track {
-                height: 10px;
+                height: 6px;
                 border-radius: 999px;
                 background: transparent;
             }
 
             #xplore_selection_modal .xplore-selection-slider::-moz-range-track {
-                height: 10px;
+                height: 6px;
                 border-radius: 999px;
                 background: transparent;
             }
@@ -892,103 +850,97 @@ async function showXploreSelectionModal() {
             #xplore_selection_modal .xplore-selection-slider::-webkit-slider-thumb {
                 -webkit-appearance: none;
                 appearance: none;
-                width: 18px;
-                height: 18px;
-                margin-top: -4px;
-                border-radius: 999px;
+                width: 16px;
+                height: 16px;
+                margin-top: -5px;
+                border-radius: 50%;
                 background: #ffffff;
-                border: 2px solid rgba(59, 130, 246, 0.25);
-                box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+                border: 2px solid #0d6efd;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
             }
 
             #xplore_selection_modal .xplore-selection-slider::-moz-range-thumb {
-                width: 18px;
-                height: 18px;
-                border-radius: 999px;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
                 background: #ffffff;
-                border: 2px solid rgba(59, 130, 246, 0.25);
-                box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+                border: 2px solid #0d6efd;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
             }
 
             #xplore_selection_modal .xplore-slider-value {
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                min-width: 68px;
-                padding: 6px 10px;
-                // border-radius: 999px;
-                font-size: 12px;
-                font-weight: 800;
-                // border: 1px solid;
+                min-width: 50px;
+                padding: 3px 6px;
+                font-size: 13px;
+                font-weight: 700;
                 text-align: center;
             }
 
             #xplore_selection_modal .xplore-reset-row {
-                width: 34px;
-                height: 34px;
-                border: none;
+                width: 28px;
+                height: 28px;
+                border: 1px solid var(--bs-border-color, #dee2e6);
                 background: transparent;
-                color: #64748b;
-                border-radius: 999px;
+                color: var(--bs-secondary-color, #6c757d);
+                border-radius: 8px;
                 cursor: pointer;
-                transition: 0.18s ease;
+                transition: background 0.12s ease, color 0.12s ease;
             }
 
             #xplore_selection_modal .xplore-reset-row:hover {
-                background: #f1f5f9;
-                color: #0f172a;
+                background: rgba(0, 0, 0, 0.03);
+                color: var(--bs-body-color, #212529);
             }
 
             #xplore_selection_modal .xplore-modal-footer {
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
-                gap: 16px;
-                padding-top: 4px;
-                border-top: 1px solid #e5edf7;
+                justify-content: flex-end;
+                gap: 10px;
                 flex-wrap: wrap;
             }
 
-            #xplore_selection_modal .xplore-modal-tip {
-                font-size: 13px;
-                color: #64748b;
-            }
-
-            #xplore_selection_modal .xplore-modal-actions {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-left: auto;
-            }
-
             #xplore_selection_modal #xplore_selection_cancel {
-                border: 1px solid #d7e3f1;
-                background: #ffffff;
-                color: #334155;
-                border-radius: 999px;
-                padding: 10px 16px;
+                border: 1px solid var(--bs-border-color, #dee2e6);
+                background: transparent;
+                color: var(--bs-secondary-color, #6c757d);
+                border-radius: 8px;
+                padding: 8px 16px;
                 font-size: 14px;
-                font-weight: 700;
+                font-weight: 600;
                 cursor: pointer;
+                transition: background 0.12s ease;
+            }
+
+            #xplore_selection_modal #xplore_selection_cancel:hover {
+                background: rgba(0, 0, 0, 0.03);
             }
 
             #xplore_selection_modal #xplore_selection_submit {
-                border: none;
-                background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-                color: #ffffff;
-                border-radius: 999px;
+                min-width: 140px;
                 padding: 10px 18px;
                 font-size: 14px;
-                font-weight: 800;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+                border: 1px solid #0b5ed7;
+                border-radius: 8px;
+                background: linear-gradient(180deg, #1f7bff 0%, #0d6efd 100%);
+                color: #ffffff;
+                box-shadow: 0 8px 20px rgba(13, 110, 253, 0.28);
                 cursor: pointer;
-                box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+                transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
             }
 
             #xplore_selection_modal #xplore_selection_submit:hover {
+                filter: brightness(1.03);
                 transform: translateY(-1px);
+                box-shadow: 0 12px 24px rgba(13, 110, 253, 0.34);
             }
 
-            @media (max-width: 860px) {
+            @media (max-width: 700px) {
                 #xplore_selection_modal .xplore-selection-item {
                     grid-template-columns: 1fr;
                     align-items: stretch;
@@ -1008,11 +960,6 @@ async function showXploreSelectionModal() {
                     flex-direction: column;
                     align-items: stretch;
                 }
-
-                #xplore_selection_modal .xplore-modal-actions {
-                    width: 100%;
-                    justify-content: flex-end;
-                }
             }
         </style>
 
@@ -1020,9 +967,8 @@ async function showXploreSelectionModal() {
             <div class="xplore-modal-panel" role="dialog" aria-modal="true" aria-labelledby="xplore_selection_modal_title">
                 <div class="xplore-modal-header">
                     <div class="xplore-modal-title-wrap">
-                        <div id="xplore_selection_modal_title" class="xplore-modal-title">Define perturbations for selected elements</div>
                         <div class="xplore-modal-subtitle">
-                            Use the sliders to set the perturbation level for each target from inhibition to activation or apply a quick preset to all at once.
+                            Set a perturbation value per target, from inhibition to activation, or apply a preset to all targets.
                         </div>
                     </div>
                     <button type="button" id="xplore_selection_close" class="xplore-modal-close" aria-label="Close modal">
@@ -1033,25 +979,15 @@ async function showXploreSelectionModal() {
                 <div class="xplore-modal-body">
                     <div class="xplore-selection-summary">
 
-                        <div class="xplore-selection-scale">
-                            <div class="xplore-selection-scale-bar"></div>
-                            <div class="xplore-selection-scale-labels">
-                                <span>Inhibit</span>
-                                <span>Neutral</span>
-                                <span>Activate</span>
-                            </div>
-                        </div>
-
-                        <div class="xplore-selection-summary-top">
+                        <div class="xplore-selection-summary-top" style="margin-top: 8px;">
                             <div class="xplore-selection-count">
-                                You have selected ${air_xplore.selected_entities.length} target${air_xplore.selected_entities.length === 1 ? '' : 's'}.
+                                ${air_xplore.selected_entities.length} target${air_xplore.selected_entities.length === 1 ? '' : 's'} selected
                             </div>
                             <div class="xplore-selection-presets">
                                 ${presetButtons}
                                 <button type="button" id="xplore_selection_reset_all">Reset all</button>
                             </div>
                         </div>
-
                     </div>
 
                     <div class="xplore-selection-list">
@@ -1059,10 +995,8 @@ async function showXploreSelectionModal() {
                     </div>
 
                     <div class="xplore-modal-footer">
-                        <div class="xplore-modal-actions">
-                            <button type="button" id="xplore_selection_cancel">Cancel</button>
-                            <button type="button" id="xplore_selection_submit">Run analysis</button>
-                        </div>
+                        <button type="button" id="xplore_selection_cancel">Cancel</button>
+                        <button type="button" id="xplore_selection_submit">Run analysis</button>
                     </div>
                 </div>
             </div>
@@ -1176,8 +1110,6 @@ async function submitSelectedXploreAnalysis() {
 
 async function runXploreSelectionAnalysisQuery(displayText, selectionPayload, additional_responses = []) {
     if (!displayText) return;
-
-    const reasoningLevel = parseInt($('#xplore_reasoning_level').val(), 10) || 1;
 
     if (window.isProcessingResponse) {
         showWaitAlert('xplore');
