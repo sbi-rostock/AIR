@@ -1,0 +1,53 @@
+/* OLCIR UI. Loaded only inside the plugin iframe. */
+:root { color-scheme: light; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #223043; background: #f8fafc; }
+button, select, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
+.olcir { max-width: 900px; margin: 0 auto; padding: 19px 17px 35px; }
+.olcir-header { display: flex; gap: 12px; align-items: start; justify-content: space-between; margin-bottom: 16px; }
+.olcir h1 { margin: 0 0 2px; font-size: 21px; font-weight: 700; letter-spacing: -.03em; }
+.olcir h2 { margin: 0 0 10px; font-size: 15px; }
+.olcir-lead, .olcir-hint { margin: 0; font-size: 12px; color: #64748b; }
+.olcir-mode { border-radius: 100px; padding: 4px 9px; background: #e7f0ff; color: #1d4ed8; font-size: 11px; white-space: nowrap; }
+.olcir-card { border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 13px; box-shadow: 0 2px 7px rgba(15, 23, 42, .025); }
+.olcir-fileinput { width: 100%; border: 1px dashed #94a3b8; background: #f8fafc; border-radius: 8px; padding: 14px; }
+.olcir-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0; }
+.olcir-table th { padding: 7px 5px; color: #64748b; font-size: 11px; font-weight: 600; text-align: left; border-bottom: 1px solid #e2e8f0; }
+.olcir-table td { padding: 9px 5px; vertical-align: middle; border-bottom: 1px solid #edf2f7; font-size: 12px; }
+.olcir-table .olcir-select-col { width: 32px; text-align: center; }
+.olcir-table .olcir-type-col { width: 136px; }
+.olcir-table .olcir-state-col { width: 86px; }
+.olcir-filename { overflow-wrap: anywhere; font-weight: 600; }
+.olcir-small { color: #64748b; font-size: 11px; font-weight: 400; }
+.olcir-select { width: 100%; min-width: 0; padding: 7px 5px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; font-size: 12px; }
+.olcir-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.olcir-btn { border-radius: 7px; border: 1px solid #0f62cd; background: #0f62cd; color: white; padding: 8px 13px; font-weight: 600; font-size: 12px; }
+.olcir-btn:hover:not(:disabled) { background: #0c50ab; }
+.olcir-btn-secondary { background: white; color: #0f62cd; }
+.olcir-btn-secondary:hover:not(:disabled) { background: #eff6ff; }
+.olcir-btn-mini { padding: 5px 8px; white-space: nowrap; }
+.olcir-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+.olcir-check input { accent-color: #0f62cd; }
+.olcir-notice { margin-top: 11px; padding: 9px 11px; font-size: 12px; border-radius: 7px; background: #eff6ff; color: #1e40af; white-space: pre-line; }
+.olcir-notice[data-kind="error"] { background: #fef2f2; color: #991b1b; }
+.olcir-notice[data-kind="success"] { background: #ecfdf5; color: #065f46; }
+.olcir-list { display: grid; gap: 8px; }
+.olcir-result { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+.olcir-result-info { min-width: 0; overflow-wrap: anywhere; }
+.olcir-result-name { font-size: 12px; font-weight: 650; }
+.olcir-result-status { color: #64748b; font-size: 11px; }
+.olcir-empty { color: #64748b; font-size: 12px; margin: 5px 0; }
+.olcir-status { font-size: 12px; font-weight: 600; color: #475569; }
+.olcir-status[data-kind="error"] { color: #b91c1c; }
+.olcir-status[data-kind="success"] { color: #047857; }
+.olcir-hidden { display: none !important; }
+@media (max-width: 520px) {
+  .olcir { padding: 12px 9px 24px; }
+  .olcir-card { padding: 12px 9px; }
+  .olcir-table .olcir-state-col { width: 66px; }
+  .olcir-table .olcir-type-col { width: 112px; }
+  .olcir-select { font-size: 11px; }
+  .olcir-result { align-items: start; flex-direction: column; }
+}
