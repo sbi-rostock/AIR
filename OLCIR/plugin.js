@@ -5,68 +5,132 @@ require('../css/styles.css');
 // require('../css/jstree.css');
 // require('../css/bootstrap.namespaced.css');
 
-  const test = false;
-  const github = 'https://raw.githack.com/sbi-rostock/AIR/master/OLCIR/';
-  const local = 'http://localhost:3000/OLCIR/';
-  const base = test ? local : github;
-  const version = test ? Date.now().toString() : '1.0.0';
-  const asset = name => `${base}${name}?v=${encodeURIComponent(version)}`;
+const TESTING = false;
 
-  if (!window.minerva?.plugins?.registerPlugin) {
-    console.error('[OLCIR] MINERVA plugin API is unavailable.');
-    return;
-  }
+window.olcir_data = {
+  JS_FOLDER_PATH: TESTING ? "http://localhost:3000/OLCIR/" : "https://raw.githack.com/sbi-rostock/AIR/master/OLCIR/",
+  Chart: require('chart.js'),
+  Decimal: require('decimal.js'),
+  JSZip: require("jszip"),
+  FileSaver: require('file-saver'),
+  // VCF: require('@gmod/vcf'),
+  ttest: require('ttest'),
+  cytoscape: require('cytoscape'),
+  fcose: require('cytoscape-fcose'),
+  SBI_SERVER: TESTING ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/',
+  $: require('jquery'),
+  jstree: require('jstree'),
+  DataTables: require('datatables.net-dt')
+};
+window.olcir_data.cytoscape.use(window.olcir_data.fcose);
+const $ = window.olcir_data.$;
+const JS_FILE_NAMES = ["olcir.js"];
+const CSS_FILE_NAMES = ["olcir.css"];
+const CSS_FILE_PATHS = ["https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.css", "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"];
+CSS_FILE_PATHS.push(...CSS_FILE_NAMES.map(file => window.olcir_data.JS_FOLDER_PATH + file));
+const JS_FILE_PATHS = [
+// "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", 
+// "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.1.1", 
+// "https://ebi-uniprot.github.io/CDN/protvista/protvista.js", 
+// "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", 
+// "https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js",
+"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"];
+JS_FILE_PATHS.push(...JS_FILE_NAMES.map(file => window.olcir_data.JS_FOLDER_PATH + file));
 
-  const { element, events } = window.minerva.plugins.registerPlugin({
-    pluginName: test ? 'OLCIR Test' : 'OLCIR',
+const github = 'https://raw.githack.com/sbi-rostock/AIR/master/OLCIR/';
+const local = 'http://localhost:3000/OLCIR/';
+const base = test ? local : github;
+const version = test ? Date.now().toString() : '1.0.0';
+const asset = name => `${base}${name}?v=${encodeURIComponent(version)}`;
+
+
+const createStructure = () => {
+  // Create an iframe element
+  const iframe = document.createElement('iframe');
+  // Style the iframe to use the full available width and remove any border
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  // Append the iframe to your plugin container (assumed to be a jQuery element)
+  window.olcir_data.container.append(iframe);
+
+  // Get the iframe's document object
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+  // Prepare link tags for each custom CSS file
+  const customCssLinks = CSS_FILE_PATHS.map(s => {
+    return `<link rel="stylesheet" type="text/css" href="${s}?v=${new Date().getTime()}">`;
+  }).join('\n');
+
+  // Prepare script tags for each custom JS file
+  const customJsScripts = JS_FILE_PATHS.map(js => {
+    return `<script src="${js}?v=${new Date().getTime()}"></script>`;
+  }).join('\n');
+
+  // Build the complete HTML content for the iframe
+  const iframeHTML = `    
+        <!DOCTYPE html>
+        <html lang="en" style="height: 100%;overflow: hidden;">
+        <head>
+            <title>Plugin</title>
+            ${customCssLinks}
+        </head>
+        <body style="height: 100%;overflow: hidden;">
+            <div class="olcir_bs" id="olcir_plugincontainer" style="height: 100%;overflow: hidden;"></div>
+            <script src=></script>
+            ${customJsScripts}
+        </body>
+        </html>
+    `;
+
+  // Write the HTML into the iframe's document
+  iframeDoc.open();
+  iframeDoc.write(iframeHTML);
+  iframeDoc.close();
+
+  // When the iframe is fully loaded, append your additional plugin markup (spinner, etc.)
+  iframe.onload = function () {
+    const containerDiv = iframeDoc.getElementById('olcir_plugincontainer');
+    containerDiv.innerHTML += `
+        <div id="stat_spinner" class="mt-5">
+            <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="sr-only"></span>
+            </div>
+            </div>
+            <div class="d-flex justify-content-center mt-2">
+            <span id="olcir_loading_text">LOADING ...</span>
+            </div>
+        </div>
+        `;
+
+    // Optionally update the plugin container reference to the container inside the iframe.
+    window.olcir_data.container = $(containerDiv);
+    iframe.contentWindow.initialize();
+  };
+};
+function initPlugin() {
+  const {
+    element,
+    events: {
+      addListener,
+      removeListener,
+      removeAllListeners
+    }
+  } = minerva.plugins.registerPlugin({
+    pluginName: TESTING ? 'OLCIR Test' : 'OLCIR',
     pluginVersion: '1.0.0',
-    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/OLCIR/plugin.js'
+    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/OLCIR/plugin_test.js'
   });
-
-  // A blank same-origin iframe isolates the plugin's CSS from MINERVA.
-  const frame = document.createElement('iframe');
-  frame.setAttribute('title', 'OLCIR');
-  Object.assign(frame.style, {
-    width: '100%', height: '100%', minHeight: '480px',
-    display: 'block', border: '0'
-  });
-  const host = element instanceof HTMLElement ? element : element?.[0];
-  if (!host?.appendChild) {
-    console.error('[OLCIR] Plugin container is unavailable.');
-    return;
-  }
-
-  frame.addEventListener('load', () => {
-    const doc = frame.contentDocument;
-    const win = frame.contentWindow;
-    // Shared context is available to olcir.js; the loader has no app logic.
-    win.OLCIR_CONTEXT = Object.freeze({
-      minerva: window.minerva,
-      events,
-      serverBase: test ? 'http://localhost:5001/' : 'https://air.bio.informatik.uni-rostock.de/air-plugin/',
-      test
-    });
-
-    const css = doc.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = asset('olcir.css');
-    css.addEventListener('error', () => {
-      console.error('[OLCIR] Failed to load', css.href);
-    });
-    doc.head.appendChild(css);
-
-    const js = doc.createElement('script');
-    js.src = asset('olcir.js');
-    js.addEventListener('error', () => {
-      doc.body.textContent = 'Could not load OLCIR. Check the asset URLs and the browser console.';
-      console.error('[OLCIR] Failed to load', js.src);
-    });
-    doc.body.appendChild(js);
-  }, { once: true });
-
-  // about:blank is same-origin with the host MINERVA page.
-  frame.src = 'about:blank';
-  host.appendChild(frame);
+  window.olcir_data.container = element;
+  window.olcir_data.minerva_events = {
+    "addListener": addListener,
+    "removeListener": removeListener,
+    "removeAllListeners": removeAllListeners
+  };
+  createStructure();
+}
+initPlugin();
 },{"../css/styles.css":1,"chart.js":12,"cytoscape":16,"cytoscape-fcose":15,"datatables.net-dt":17,"decimal.js":19,"file-saver":25,"jquery":27,"jstree":28,"jszip":29,"ttest":34}],3:[function(require,module,exports){
 /*!
  * @kurkle/color v0.3.4
