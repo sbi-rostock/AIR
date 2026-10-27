@@ -105,17 +105,8 @@ const createStructure = () => {
         `;
 
     // Optionally update the plugin container reference to the container inside the iframe.
-    window.olcir_data.container = $(containerDiv);    
-    const initialize = iframe.contentWindow.initialize;
-    if (typeof initialize !== 'function') {
-      containerDiv.textContent = 'OLCIR could not initialize. Check that olcir.js loaded correctly.';
-      console.error('[OLCIR] initialize() was not defined in olcir.js.');
-      return;
-    }
-    Promise.resolve(initialize()).catch(error => {
-      console.error('[OLCIR] Initialization failed', error);
-      containerDiv.textContent = `OLCIR initialization failed: ${error.message}`;
-    });
+    window.olcir_data.container = $(containerDiv); 
+    iframe.contentWindow.initialize_server();
   };
 };
 function initPlugin() {
