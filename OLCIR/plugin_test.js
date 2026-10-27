@@ -129,7 +129,7 @@ function initPlugin() {
   } = minerva.plugins.registerPlugin({
     pluginName: TESTING ? 'OLCIR Test' : 'OLCIR',
     pluginVersion: '1.0.0',
-    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/OLCIR/plugin_test.js'
+    pluginUrl: 'https://raw.githack.com/sbi-rostock/AIR/refs/heads/master/OLCIR/plugin_test.js'
   });
   window.olcir_data.container = element;
   window.olcir_data.minerva_events = {
