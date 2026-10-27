@@ -39,8 +39,8 @@ JS_FILE_PATHS.push(...JS_FILE_NAMES.map(file => window.olcir_data.JS_FOLDER_PATH
 
 const github = 'https://raw.githack.com/sbi-rostock/AIR/master/OLCIR/';
 const local = 'http://localhost:3000/OLCIR/';
-const base = test ? local : github;
-const version = test ? Date.now().toString() : '1.0.0';
+const base = TESTING ? local : github;
+const version = TESTING ? Date.now().toString() : '1.0.0';
 const asset = name => `${base}${name}?v=${encodeURIComponent(version)}`;
 
 
@@ -105,8 +105,17 @@ const createStructure = () => {
         `;
 
     // Optionally update the plugin container reference to the container inside the iframe.
-    window.olcir_data.container = $(containerDiv);
-    iframe.contentWindow.initialize();
+    window.olcir_data.container = $(containerDiv);    
+    const initialize = iframe.contentWindow.initialize;
+    if (typeof initialize !== 'function') {
+      containerDiv.textContent = 'OLCIR could not initialize. Check that olcir.js loaded correctly.';
+      console.error('[OLCIR] initialize() was not defined in olcir.js.');
+      return;
+    }
+    Promise.resolve(initialize()).catch(error => {
+      console.error('[OLCIR] Initialization failed', error);
+      containerDiv.textContent = `OLCIR initialization failed: ${error.message}`;
+    });
   };
 };
 function initPlugin() {
@@ -120,7 +129,7 @@ function initPlugin() {
   } = minerva.plugins.registerPlugin({
     pluginName: TESTING ? 'OLCIR Test' : 'OLCIR',
     pluginVersion: '1.0.0',
-    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/OLCIR/plugin_test.js'
+    pluginUrl: 'https://raw.githubusercontent.com/sbi-rostock/AIR/master/OLCIR/plugin.js'
   });
   window.olcir_data.container = element;
   window.olcir_data.minerva_events = {
