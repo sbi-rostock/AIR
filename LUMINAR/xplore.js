@@ -3,6 +3,9 @@ air_data.xplore = {
     added_markers: [],
     selected_entities: [],
     ctrlPressed: false,
+    selectionPointerCtrl: null,
+    selectionGeneration: 0,
+    selectionQueue: Promise.resolve(),
     last_submitted_entities: []
 }
 
@@ -174,6 +177,7 @@ async function xplore() {
             return;
         }
 
+        invalidateXplorePendingSelection();
         air_xplore.selected_entities = restoredEntities;
         updateXploreSelectionStatus();
     });
@@ -183,27 +187,7 @@ async function xplore() {
         downloadChatAsPDF('xplore');
     });
 
-    window.addEventListener("keydown", (event) => {
-    if (event.key === "Control") {
-        air_xplore.ctrlPressed = true;
-    }
-    });
-    window.parent.addEventListener("keydown", (event) => {
-    if (event.key === "Control") {
-        air_xplore.ctrlPressed = true;
-    }
-    });
-
-    window.addEventListener("keyup", (event) => {
-    if (event.key === "Control") {
-        air_xplore.ctrlPressed = false;
-    }
-    });
-    window.parent.addEventListener("keyup", (event) => {
-    if (event.key === "Control") {
-        air_xplore.ctrlPressed = false;
-    }
-    });
+    initXploreSelectionModifiers();
 
     
     $('#xplore_selection_status').on('click.xploreSelectionStatus', '.xplore-remove-chip', function(e) {
@@ -272,51 +256,91 @@ async function xplore() {
 }
 
 
+function initXploreSelectionModifiers() {
+    if (air_xplore.selectionModifiersInitialized) {
+        return;
+    }
+    air_xplore.selectionModifiersInitialized = true;
+    for (const target of new Set([window, window.parent])) {
+        target.addEventListener('keydown', event => {
+            air_xplore.ctrlPressed = event.ctrlKey || event.key === 'Control';
+        }, true);
+        target.addEventListener('keyup', event => {
+            air_xplore.ctrlPressed = event.ctrlKey;
+        }, true);
+        // The map event may arrive after keyup, or without a keydown in this frame.
+        target.addEventListener('PointerEvent' in target ? 'pointerdown' : 'mousedown', event => {
+            air_xplore.ctrlPressed = event.ctrlKey;
+            air_xplore.selectionPointerCtrl = event.ctrlKey;
+        }, true);
+        target.addEventListener('blur', () => {
+            air_xplore.ctrlPressed = false;
+            if (target === window.parent) {
+                air_xplore.selectionPointerCtrl = null;
+            }
+        });
+    }
+}
+
+function invalidateXplorePendingSelection() {
+    air_xplore.selectionGeneration++;
+    air_xplore.selectionQueue = Promise.resolve();
+}
+
 async function xploreOnBioEntityClick(data) {
     if (!data || data.type !== 'ALIAS') {
         return;
     }
 
-
-    var entity = await getDataFromServer(
+    const ctrlPressed = typeof data.ctrlKey === 'boolean'
+        ? data.ctrlKey
+        : air_xplore.selectionPointerCtrl === null ? air_xplore.ctrlPressed : air_xplore.selectionPointerCtrl;
+    air_xplore.selectionPointerCtrl = null;
+    if (!ctrlPressed) {
+        invalidateXplorePendingSelection();
+    }
+    const generation = air_xplore.selectionGeneration;
+    // Resolve requests concurrently, but apply additive clicks in their original order.
+    const request = getDataFromServer(
             `sylobio/map_minerva_elements`,
             {elements: [{ id: data.id, modelId: data.modelId }]},
             'POST',
             'json'
         );
-
-    if (entity && Array.isArray(entity) && entity.length > 0) {
-        entity = entity[0];
-    }
-    else {
-        console.warn('Received unexpected response for element details:', entity);
-        entity = null;
-    }
-
-    const ctrlPressed = air_xplore.ctrlPressed;
-
-    entity.value = 0;
-
-    if (!ctrlPressed) {
-        if(air_xplore.selected_entities.length > 1)
-        {
-            if (window.confirm((`Do you want to clear your selection of ${air_xplore.selected_entities.length} elements?`))) {
-                air_xplore.selected_entities = [entity];
-            }
-            else {
-                return;
-            }
+    air_xplore.selectionQueue = Promise.all([air_xplore.selectionQueue, request]).then(async ([, response]) => {
+        if (generation !== air_xplore.selectionGeneration) {
+            return;
         }
-        air_xplore.selected_entities = [entity];
-    } else if (!air_xplore.selected_entities.some(item => item.name === entity.name)) {
-        air_xplore.selected_entities.push(entity);
-    }
+        const entity = parseManualXploreEntityResponse(response);
+        if (!entity || !Array.isArray(entity.nodes) || entity.nodes.length === 0) {
+            console.warn('Received unexpected response for element details:', response);
+            return;
+        }
+        entity.value = 0;
+        if (!ctrlPressed) {
+            air_xplore.selected_entities = [entity];
+        } else if (!air_xplore.selected_entities.some(item => item.name === entity.name)) {
+            air_xplore.selected_entities.push(entity);
+            runXploreShortestPathForSelection();
+        }
+        await updateXploreSelectionStatus();
+    }).catch(error => {
+        console.error('Error while selecting map element:', error);
+    });
+    return air_xplore.selectionQueue;
+}
 
-    updateXploreSelectionStatus();
+function runXploreShortestPathForSelection() {
+    if (air_xplore.selected_entities.length !== 2) {
+        return;
+    }
+    const [source, target] = air_xplore.selected_entities;
+    multi_agent_query('xplore', `!call get_shortest_path_from_name {"source": "${source.nodes[0].index}", "target": "${target.nodes[0].index}"}`);
 }
 
 
 function clearXploreSelectedEntities() {
+    invalidateXplorePendingSelection();
     air_xplore.selected_entities = [];
     updateXploreSelectionStatus();
 }
@@ -376,6 +400,7 @@ async function addManualXploreSelectionByName(rawName) {
         air_xplore.selected_entities.push(entity);
         inputEl.val('');
         updateXploreSelectionStatus();
+        runXploreShortestPathForSelection();
 
 
     } catch (error) {

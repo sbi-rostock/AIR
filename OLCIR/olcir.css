@@ -1,11 +1,28 @@
-/* OLCIR UI. Loaded only inside the plugin iframe. */
-:root { color-scheme: light; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+/* OLCIR 1.1.1 — one explicit scroll container inside the MINERVA iframe. */
+:root { height: 100%; color-scheme: light; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
 * { box-sizing: border-box; }
-body { margin: 0; color: #223043; background: #f8fafc; }
+html, body { height: 100% !important; min-height: 0 !important; overflow: hidden !important; }
+body { margin: 0 !important; color: #223043; background: #f8fafc; }
+/* Do not let the body and plugin div compete for the scroll bar. */
+#olcir_plugincontainer {
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #f8fafc;
+}
+#olcir_plugincontainer::-webkit-scrollbar { width: 11px; }
+#olcir_plugincontainer::-webkit-scrollbar-track { background: #f8fafc; }
+#olcir_plugincontainer::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; border: 2px solid #f8fafc; }
+#olcir_plugincontainer::-webkit-scrollbar-thumb:hover { background: #64748b; }
 button, select, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
-.olcir { max-width: 900px; margin: 0 auto; padding: 19px 17px 35px; }
+.olcir { min-height: 100%; max-width: 900px; margin: 0 auto; padding: 16px 17px 52px; }
 .olcir-header { display: flex; gap: 12px; align-items: start; justify-content: space-between; margin-bottom: 16px; }
 .olcir h1 { margin: 0 0 2px; font-size: 21px; font-weight: 700; letter-spacing: -.03em; }
 .olcir h2 { margin: 0 0 10px; font-size: 15px; }
@@ -20,6 +37,7 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .olcir-table .olcir-type-col { width: 136px; }
 .olcir-table .olcir-state-col { width: 86px; }
 .olcir-filename { overflow-wrap: anywhere; font-weight: 600; }
+.olcir-paired { margin: 3px 0; padding-left: 7px; border-left: 2px solid #93c5fd; font-size: 11px; overflow-wrap: anywhere; color: #334155; }
 .olcir-small { color: #64748b; font-size: 11px; font-weight: 400; }
 .olcir-select { width: 100%; min-width: 0; padding: 7px 5px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; font-size: 12px; }
 .olcir-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
@@ -50,4 +68,22 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
   .olcir-table .olcir-type-col { width: 112px; }
   .olcir-select { font-size: 11px; }
   .olcir-result { align-items: start; flex-direction: column; }
+}
+
+/* MINERVA's narrow sidebar: use a vertical dataset row rather than crushing
+   the filename between three fixed-width table columns. */
+@media (max-width: 580px) {
+  .olcir-table { display: block; }
+  .olcir-table thead { display: none; }
+  .olcir-table tbody { display: block; }
+  .olcir-table tr { display: grid; grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-areas: "check file" "type type" "state state";
+    row-gap: 2px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+  .olcir-table td { border: 0; min-width: 0; padding: 4px; }
+  .olcir-table td:nth-child(1) { grid-area: check; }
+  .olcir-table td:nth-child(2) { grid-area: file; }
+  .olcir-table td:nth-child(3) { grid-area: type; }
+  .olcir-table td:nth-child(4) { grid-area: state; }
+  .olcir-table .olcir-type-col, .olcir-table .olcir-state-col { width: auto; }
+  .olcir-actions { gap: 6px; }
 }

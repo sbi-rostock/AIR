@@ -1391,55 +1391,123 @@ const showModulatorsOnClick = async data => {
         }, "POST", "json");
 
         if(response.ok && response.data.length > 0) {
-            highlightValues(response.data, now(), true);
+            const createdBy = now();
+            if (typeof pauseOmicsOverlaysForInfluence === "function") {
+                pauseOmicsOverlaysForInfluence(createdBy);
+            }
+            await highlightValues(response.data, createdBy, true);
         }
     }
 };
 
-async function removeHighlight(created_by = "", exclude = false, remove_same_type = false) {
+const OMICS_DATAVIEW_HIGHLIGHT = "omics_dataview";
+
+async function removeHighlight(created_by = "", exclude = false, remove_same_type = false, keep_created_by = []) {
     if(created_by == "") {
         minerva.data.bioEntities.removeAllMarkers();
         air_data.added_markers = {};
+        if (typeof onOmicsOverlaysCleared === "function") {
+            onOmicsOverlaysCleared();
+        }
         return;
     }
-    
-    for(var [_created_by, marker_ids] of Object.entries(air_data.added_markers)) {
-        if((_created_by != created_by && exclude) || (_created_by == created_by && !exclude)) {
-            for(var [index, marker] of marker_ids.entries()) {
-                if(!remove_same_type || (marker.type == remove_same_type)) {
-                    minerva.data.bioEntities.removeSingleMarker(marker.id);
-                    air_data.added_markers[_created_by].splice(index, 1);
-                }
-            }
-            if (air_data.added_markers[_created_by].length == 0) {
-                delete air_data.added_markers[_created_by];
-            }
-        }
-    }   ;
+
+    const plan = planHighlightRemoval(created_by, exclude, remove_same_type, keep_created_by);
+    applyMarkerChanges(plan.removeIds, []);
+    air_data.added_markers = plan.next;
 }
 
-async function highlightValues(data, created_by = "", remove = true, remove_same_type = true, type = "surface") {
-
-    // Clear existing markers
-    if(remove) {
-        await removeHighlight(created_by, exclude = true, remove_same_type = type);
+// Works out which tracked markers a removal affects without touching the map yet.
+function planHighlightRemoval(created_by, exclude, remove_same_type, keep_created_by = []) {
+    const removeIds = new Set();
+    const next = {};
+    for (const [_created_by, marker_ids] of Object.entries(air_data.added_markers)) {
+        const affected = !keep_created_by.includes(_created_by) &&
+            ((_created_by != created_by && exclude) || (_created_by == created_by && !exclude));
+        if (!affected) {
+            next[_created_by] = marker_ids;
+            continue;
+        }
+        const remaining = [];
+        for (const marker of marker_ids) {
+            if (!remove_same_type || marker.type == remove_same_type) {
+                removeIds.add(marker.id);
+            } else {
+                remaining.push(marker);
+            }
+        }
+        if (remaining.length > 0) {
+            next[_created_by] = remaining;
+        }
     }
+    return { removeIds, next };
+}
 
-    air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
+// Every MINERVA marker call updates its whole marker store, so a call gets slower the more
+// markers are already shown. When more markers go away than stay, clearing everything once
+// and re-adding the survivors is much cheaper than removing markers one by one.
+function applyMarkerChanges(removeIds, additions) {
+    const bioEntities = minerva.data.bioEntities;
+    if (removeIds.size > 0) {
+        const keepers = [];
+        for (const marker_ids of Object.values(air_data.added_markers)) {
+            for (const entry of marker_ids) {
+                if (!removeIds.has(entry.id)) {
+                    keepers.push(entry);
+                }
+            }
+        }
+        if (removeIds.size > keepers.length && keepers.every(entry => entry.marker)) {
+            bioEntities.removeAllMarkers();
+            for (const entry of keepers) {
+                bioEntities.addSingleMarker(entry.marker);
+            }
+        } else {
+            for (const id of removeIds) {
+                bioEntities.removeSingleMarker(id);
+            }
+        }
+    }
+    for (const marker of additions) {
+        bioEntities.addSingleMarker(marker);
+    }
+}
 
-    var new_markers = data.map(function(entity) {
+async function highlightValues(data, created_by = "", remove = true, remove_same_type = true, type = "surface", keep_created_by = []) {
+
+    // Other highlights are cleared in the same batch as this update (own markers are diffed below)
+    const plan = remove
+        ? planHighlightRemoval(created_by, true, remove_same_type ? type : false, keep_created_by)
+        : { removeIds: new Set(), next: { ...air_data.added_markers } };
+
+    const newMarkers = new Map();
+    const colors = new Map();
+    for (const entity of data) {
         // Convert single value to array if needed
         const values = Array.isArray(entity.value) ? entity.value : [entity.value];
         
         // Calculate width of each slice
         const sliceWidth = entity.width / values.length;
         
-        // Create markers for each value
-        return values.map((value, index) => {
-            const marker_id = "marker_value_" + entity.id + "_" + index;
-            air_data.added_markers[created_by].push({id: marker_id, type: type});
-            return {
-                type: 'surface',
+        // Adjacent equal-colored surfaces share one rectangle without changing sample positions.
+        let previousMarker = null;
+        let runStart = 0;
+        values.forEach((value, index) => {
+            if (value === null || value === undefined || value == 0) {
+                previousMarker = null;
+                return;
+            }
+            if (!colors.has(value)) {
+                colors.set(value, valueToHex(value));
+            }
+            const color = colors.get(value);
+            if (type === "surface" && previousMarker && previousMarker.color === color) {
+                previousMarker.width = (index - runStart + 1) * sliceWidth;
+                return;
+            }
+            const marker_id = "marker_value_" + created_by + "_" + entity.id + "_" + index;
+            const marker = {
+                type: type,
                 opacity: 0.67,
                 x: entity.x + (index * sliceWidth), // Offset x by slice position
                 y: entity.y,
@@ -1447,30 +1515,58 @@ async function highlightValues(data, created_by = "", remove = true, remove_same
                 height: entity.height,
                 modelId: entity.modelId,
                 id: marker_id,
-                color: valueToHex(value)
+                color
             };
+            newMarkers.set(marker_id, marker);
+            previousMarker = marker;
+            runStart = index;
         });
-    }).flat(); // Flatten array of arrays into single array
-
-    for(var marker of new_markers) {
-        minerva.data.bioEntities.addSingleMarker(marker);
     }
+
+    // Leave unchanged slices of this highlight alone; only obsolete or changed ones are redrawn.
+    const previous = plan.next[created_by] || [];
+    const removeIds = plan.removeIds;
+    const additions = [];
+    const tracked = new Map(previous.map(entry => [entry.id, entry]));
+    for (const entry of previous) {
+        if (entry.type === type && entry.id.startsWith("marker_value_") && !newMarkers.has(entry.id)) {
+            removeIds.add(entry.id);
+            tracked.delete(entry.id);
+        }
+    }
+    for (const [id, marker] of newMarkers) {
+        const existing = tracked.get(id);
+        if (existing && existing.marker && Object.keys(marker).every(key => marker[key] === existing.marker[key])) {
+            continue;
+        }
+        if (existing) {
+            removeIds.add(id);
+        }
+        additions.push(marker);
+        tracked.set(id, { id, type, marker });
+    }
+
+    applyMarkerChanges(removeIds, additions);
+    if (tracked.size > 0) {
+        plan.next[created_by] = Array.from(tracked.values());
+    } else {
+        delete plan.next[created_by];
+    }
+    air_data.added_markers = plan.next;
 }
 
 async function highlightEdges(data, created_by = "", remove = true, remove_same_type = true, type = "line") {
-    if(remove) {
-        await removeHighlight(created_by, exclude = true, remove_same_type = type);
-    }
-    
-    air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
+    const plan = remove
+        ? planHighlightRemoval(created_by, true, remove_same_type ? type : false)
+        : { removeIds: new Set(), next: { ...air_data.added_markers } };
+    const entries = (plan.next[created_by] || []).slice();
 
     var new_markers = data.map(function(entity, index) {
 
         const marker_id = "marker_edge_" + created_by + "_" + index;
 
-        air_data.added_markers[created_by].push({id: marker_id, type: type});
-        return {
-            type: 'line',
+        const marker = {
+            type: type,
             color: '#106AD7',
             opacity: 1,
             start: {
@@ -1484,27 +1580,27 @@ async function highlightEdges(data, created_by = "", remove = true, remove_same_
             modelId: entity.modelId,
             id: marker_id,
         };
+        entries.push({id: marker_id, type: type, marker: marker});
+        return marker;
     });
 
-    for(var marker of new_markers) {
-        minerva.data.bioEntities.addSingleMarker(marker);
-    }
+    applyMarkerChanges(plan.removeIds, new_markers);
+    plan.next[created_by] = entries;
+    air_data.added_markers = plan.next;
 }
 
 async function highlightPins(data, created_by = "", remove = true, remove_same_type = true, type = "pin") {
-    if(remove) {
-        await removeHighlight(created_by, exclude = true, remove_same_type = type);
-    }
-        
-    air_data.added_markers[created_by] = air_data.added_markers[created_by] || [];
+    const plan = remove
+        ? planHighlightRemoval(created_by, true, remove_same_type ? type : false)
+        : { removeIds: new Set(), next: { ...air_data.added_markers } };
+    const entries = (plan.next[created_by] || []).slice();
 
     var new_markers = data.map(function(entity, index) {
 
         const marker_id = "marker_pin_" + created_by + "_" + index;
 
-        air_data.added_markers[created_by].push({id: marker_id, type: type});
-        return {
-            type: 'pin',
+        const marker = {
+            type: type,
             color: '#106AD7',
             opacity: 1,
             x: entity.x,
@@ -1513,11 +1609,13 @@ async function highlightPins(data, created_by = "", remove = true, remove_same_t
             modelId: entity.modelId,
             id: marker_id,
         };
+        entries.push({id: marker_id, type: type, marker: marker});
+        return marker;
     });
 
-    for(var marker of new_markers) {
-        minerva.data.bioEntities.addSingleMarker(marker);
-    }
+    applyMarkerChanges(plan.removeIds, new_markers);
+    plan.next[created_by] = entries;
+    air_data.added_markers = plan.next;
 }
 
 
@@ -2559,7 +2657,7 @@ function addThinkingIndicator(origin, queryText) {
 }
 
 // Generalized function to process server responses
-function processServerResponses(response, origin, queryText = "", filePrefix = "Export", new_query = true) {
+function processServerResponses(response, origin, queryText = "", filePrefix = "Export", new_query = true, feedback = false) {
     var containerId = "#" + origin + "_analysis_content";
     
     // Ensure the container exists, if not, create it
@@ -2737,7 +2835,16 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
                 y: minerva_id[5],
                 value: minerva_id[6]
             }));
-            highlightValues(markers, created_by = created_by);
+            if (origin === "omics" && typeof setOmicsEnrichmentOverlay === "function") {
+                // Clear other (non-omics) highlights as before; omics overlays are managed by the overlay panel
+                removeHighlight(OMICS_DATAVIEW_HIGHLIGHT, true, "surface");
+                setOmicsEnrichmentOverlay(resp.content, created_by).catch(err => console.error("Error showing analysis highlights:", err));
+            } else if (origin === "xplore" && typeof pauseOmicsOverlaysForInfluence === "function") {
+                pauseOmicsOverlaysForInfluence(created_by);
+                highlightValues(markers, created_by, true).catch(err => console.error("Error showing Xplore highlights:", err));
+            } else {
+                highlightValues(markers, created_by, true, true, "surface", [OMICS_DATAVIEW_HIGHLIGHT]);
+            }
             const btnStyle = 'padding: 1px 5px; font-size: 10px; line-height: 1.4;';
             const highlightNotification = $(`
                 <div class="response-item mb-2 chat-bubble-animate">
@@ -3509,6 +3616,14 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
     processMessagesSequentially(origin, responseElements).then(() => {
         // Clean up animation classes after all messages are processed
         cleanupAnimationClasses(origin, responseElements.length, 0);
+
+        if (feedback && responseElements.length > 0) {
+            try {
+                responsesContainer.append(createResponseFeedbackWidget(origin, queryText, responses, feedback.queryId));
+            } catch (err) {
+                console.warn("Could not add response feedback widget:", err);
+            }
+        }
         
         // Reset global flag and hide wait alert
         window.isProcessingResponse = false;
@@ -3516,6 +3631,108 @@ function processServerResponses(response, origin, queryText = "", filePrefix = "
     });
     
     return true;
+}
+
+const RESPONSE_FEEDBACK_ENDPOINT = "sylobio/response_feedback";
+
+function generateQueryId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+    }
+    return "q_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 12);
+}
+
+function summarizeResponsesForFeedback(responses) {
+    const parts = [];
+    const types = [];
+    (responses || []).forEach(resp => {
+        if (!resp || typeof resp !== "object") return;
+        if (resp.response_type) types.push(resp.response_type);
+        const content = resp.content ?? resp.response;
+        if (typeof content !== "string" || !content) return;
+        if (["html", "pure_html", "alert"].includes(resp.response_type) || !resp.response_type) {
+            parts.push($("<div>").html(content).text());
+        } else if (resp.response_type !== "image") {
+            parts.push(content);
+        }
+    });
+    return {
+        text: parts.join("\n").replace(/\s+\n/g, "\n").trim().slice(0, 4000),
+        types: [...new Set(types)]
+    };
+}
+
+function createResponseFeedbackWidget(origin, queryText, responses, queryId) {
+    const summary = summarizeResponsesForFeedback(responses);
+    queryId = queryId || generateQueryId();
+
+    const widget = $(`
+        <div class="response-feedback" data-html2canvas-ignore="true" role="group" aria-label="Rate this response">
+            <span class="response-feedback-label">Helpful?</span>
+            <button type="button" class="response-feedback-btn" data-rating="1" title="Good response" aria-label="Good response" aria-pressed="false"><i class="far fa-thumbs-up"></i></button>
+            <button type="button" class="response-feedback-btn" data-rating="-1" title="Bad response" aria-label="Bad response" aria-pressed="false"><i class="far fa-thumbs-down"></i></button>
+            <span class="response-feedback-status" aria-live="polite"></span>
+            <form class="response-feedback-comment" style="display:none;">
+                <input type="text" maxlength="500" placeholder="What went wrong? (optional)" aria-label="Optional feedback comment">
+                <button type="submit" title="Send comment" aria-label="Send comment"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    `);
+
+    let currentRating = 0;
+    const status = widget.find(".response-feedback-status");
+    const commentForm = widget.find(".response-feedback-comment");
+    const commentInput = commentForm.find("input");
+
+    const send = (rating, comment = "") => getDataFromServer(RESPONSE_FEEDBACK_ENDPOINT, {
+        query_id: queryId,
+        origin,
+        query: queryText,
+        rating,
+        comment,
+        response_text: summary.text,
+        response_types: summary.types,
+        timestamp: new Date().toISOString()
+    }, "POST", "json").catch(err => {
+        console.warn("Response feedback could not be sent:", err);
+        throw err;
+    });
+
+    widget.on("click", ".response-feedback-btn", function () {
+        const clicked = parseInt($(this).attr("data-rating"), 10);
+        // Clicking the active rating again withdraws it (rating 0).
+        const rating = clicked === currentRating ? 0 : clicked;
+        currentRating = rating;
+
+        widget.find(".response-feedback-btn").each(function () {
+            const active = parseInt($(this).attr("data-rating"), 10) === rating;
+            $(this).toggleClass("active", active).attr("aria-pressed", active ? "true" : "false");
+            $(this).find("i").toggleClass("fas", active).toggleClass("far", !active);
+        });
+
+        if (rating === -1) {
+            commentForm.css("display", "flex");
+            commentInput.trigger("focus");
+        } else {
+            commentForm.hide();
+        }
+
+        status.text(rating === 0 ? "" : "Thanks!");
+        send(rating, rating === -1 ? commentInput.val().trim() : "").catch(() => {
+            if (currentRating === rating) status.text("Not sent");
+        });
+    });
+
+    commentForm.on("submit", function (e) {
+        e.preventDefault();
+        const comment = commentInput.val().trim();
+        if (!comment || currentRating !== -1) return;
+        commentForm.hide();
+        status.text("Thanks for the details!");
+        send(-1, comment).catch(() => status.text("Not sent"));
+    });
+
+    return widget;
 }
 
 // Function to handle auto-expanding text inputs
@@ -3819,9 +4036,11 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
         // Clear the input and reset height
         $(`#${origin}_query_input`).val('').css('height', '38px').css('overflow-y', 'hidden');
 
+        var queryId = generateQueryId();
+
         let responses = await getDataFromServer(
             `sylobio/query_llm`,
-            { query: queryText, use_mcp: true, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
+            { query_id: queryId, query: queryText, use_mcp: true, summarize: false, reasoning: reasoningLevel, origin, step: 0, cycle: 0, correct_query: correct_query, context: getContextData(origin) },
             "POST",
             "json"
         );
@@ -3858,6 +4077,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
                     responses = await getDataFromServer(
                         `sylobio/query_llm`,
                         {
+                            query_id: queryId,
                             query: queryText,
                             summarize: false,
                             reasoning: reasoningLevel,
@@ -3886,7 +4106,7 @@ async function multi_agent_query(origin, queryText, correct_query = false) {
         console.log(responses);
         
         // Use the generalized function to process responses
-        processServerResponses(responses, origin, queryText, "analysis");
+        processServerResponses(responses, origin, queryText, "analysis", true, { queryId });
         
     } catch (err) {
         console.error("Error processing query:", err);

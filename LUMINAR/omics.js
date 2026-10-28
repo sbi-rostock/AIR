@@ -6,6 +6,7 @@ air_data.omics = {
     container: null,
     added_markers: [],
     selected_data_ids: [],
+    node_selection_request: 0,
     data_tree: {
         fairdom: { title: "FAIRDOMHub", data: {} },
         user: { title: "User Uploads", data: {} }
@@ -189,7 +190,7 @@ async function omics() {
         `
     ).appendTo(air_omics.container);
 
-
+    initOmicsOverlayPanel();
 
     // Setup auto-expanding input
     setupAutoExpandingInput("#omics_query_input");
@@ -224,12 +225,14 @@ async function omics() {
     // Initialize the data tree
     initializeDataTree();
 
+    air_data.minerva_events.addListener("onBioEntityClick", omicsOnBioEntityClick);
+
     $("#omics_cb_onlymapped_norm").on('change', highlightOmicsColumn);
     $("#omics_select_column").on('change', highlightOmicsColumn);
     $("#omics_cb_mapped_only").on('change', function() {
         if (air_omics.loaded_data) {
             const processedData = processDataForTable(air_omics.loaded_data, true, $(this).prop('checked'));
-            createDataTable('#omics_datatable', processedData.data, processedData.columns);
+            createOmicsDataTable(processedData);
         }
     });
     $("#omics_select_column_refresh").on('click', highlightOmicsColumn);
@@ -580,7 +583,7 @@ async function omics() {
 
             // Setup the data table
             const processedData = processDataForTable(data, true, $("#omics_cb_mapped_only").prop('checked'));
-            createDataTable('#omics_datatable', processedData.data, processedData.columns);
+            createOmicsDataTable(processedData);
 
             // Setup column selector
             setupColumnSelector('#omics_select_column', data.columns, [data.columns[0]].concat(data.pvalue_columns));
@@ -591,6 +594,8 @@ async function omics() {
             $("#omics_collapse_viewdata_btn").removeClass("air_disabledbutton");
 
             $("#omics_select_column_filter").prop('disabled', !data.has_pvalues);
+
+            await showOmicsDatasetOverlay(air_omics.selected_data_ids[0], data);
 
             enablebutton("omics_btn_viewdata", btn_text);
         } catch (err) {
@@ -1220,6 +1225,8 @@ async function omics() {
                     air_omics.data_tree[source].data[dataId].selected_columns = selectedColumns;
                     air_omics.data_tree[source].data[dataId].warnings = response.warnings;
 
+                    invalidateOmicsOverlayDataset(dataId);
+
 
                     // Close the modal
                     $('#omics_edit_modal', window.parent.document).remove();
@@ -1301,6 +1308,8 @@ async function omics() {
                 enablebutton("omics_btn_analyze", btn_text);
                 return;
             }
+
+            air_omics.analyzed_data_ids = air_omics.selected_data_ids.slice();
 
             await updateProgress(0, total, "omics_btn_analyze", text = `Initialising...`);
 
@@ -1673,6 +1682,7 @@ function addDataToTree(source, data) {
 
     // Add data to the tree structure
     air_omics.data_tree[source].data[data.data_id] = data
+    renderOmicsOverlayPanel();
 
     // Refresh the tree view
     if ($('#omics_data_treeview').jstree(true)) {
@@ -1711,6 +1721,8 @@ function removeDataFromTree(dataIds) {
         $('#omics_data_treeview').jstree(true).settings.core.data = buildTreeData();
         $('#omics_data_treeview').jstree(true).refresh();
     }
+
+    forgetOmicsOverlayDatasets(dataIds);
 }
 
 async function getDataFromLocalTree(dataId) {
@@ -1764,6 +1776,54 @@ function detectPValues(headers) {
     }
 
     return true;
+}
+
+function createOmicsDataTable(processedData) {
+    const columns = processedData.columns.map((column, index) => index === 0 ? column : {
+        ...column,
+        render: (value, type) => {
+            if (type === 'display' && typeof value === 'number' && Number.isFinite(value)) {
+                if (value === 0 || Math.abs(value) >= 0.01) {
+                    return value === 0 ? '0' : value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 2 });
+                }
+                return value.toExponential(2).replace(/\.?0+(?=e)/, '');
+            }
+            return value;
+        }
+    });
+    return createDataTable('#omics_datatable', processedData.data, columns);
+}
+
+async function omicsOnBioEntityClick(data) {
+    if (!data || data.type !== 'ALIAS') {
+        return;
+    }
+
+    const request = ++air_omics.node_selection_request;
+    if (!$.fn.DataTable.isDataTable($('#omics_datatable')[0])) {
+        return;
+    }
+
+    try {
+        const entities = await getDataFromServer(
+            'sylobio/map_minerva_elements',
+            { elements: [{ id: data.id, modelId: data.modelId }] },
+            'POST',
+            'json'
+        );
+        if (!Array.isArray(entities) || typeof entities[0]?.name !== 'string') {
+            console.warn('Received unexpected response for omics element details:', entities);
+            return;
+        }
+        if (request !== air_omics.node_selection_request ||
+            !$.fn.DataTable.isDataTable($('#omics_datatable')[0])) {
+            return;
+        }
+
+        $('#omics_datatable').DataTable().search(entities[0].name).draw();
+    } catch (err) {
+        console.error('Error searching omics data for selected node:', err);
+    }
 }
 
 function highlightOmicsColumn() {
@@ -1847,3 +1907,857 @@ function convertDataToTSV(data, datasetName = '', datasetDescription = '') {
     return tsvContent;
 }
 
+
+// ---------------------------------------------------------------------------
+// Map overlay panel: one place to choose which datasets and analysis results
+// are shown on the map, with per-layer p-value thresholds and sample filters.
+// ---------------------------------------------------------------------------
+
+const OMICS_OVERLAY_DEFAULT_PVALUE = 0.05;
+
+function getOmicsOverlayState() {
+    if (!air_omics.overlays) {
+        air_omics.overlays = {
+            open: false,
+            settings: {},
+            cache: {},
+            loading: {},
+            failed: {},
+            openSamples: {},
+            enrichment: null,
+            enrichmentToken: 0,
+            renderToken: 0,
+            renderTimer: null,
+            paused: false,
+            influenceCreatedBy: null,
+            lastLayers: []
+        };
+    }
+    return air_omics.overlays;
+}
+
+function omicsOverlayEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function getOmicsOverlayDatasets() {
+    const datasets = [];
+    for (const sourceData of Object.values(air_omics.data_tree)) {
+        for (const [dataId, info] of Object.entries(sourceData.data)) {
+            datasets.push({
+                id: String(dataId),
+                name: (info && info.name) || `Dataset ${dataId}`,
+                has_pvalues: !!(info && info.has_pvalues)
+            });
+        }
+    }
+    return datasets;
+}
+
+function getOmicsOverlaySettings(key) {
+    const state = getOmicsOverlayState();
+    if (!state.settings[key]) {
+        state.settings[key] = { visible: false, threshold: OMICS_OVERLAY_DEFAULT_PVALUE, hidden: [] };
+    }
+    return state.settings[key];
+}
+
+function loadOmicsOverlayDataset(dataId) {
+    const state = getOmicsOverlayState();
+    dataId = String(dataId);
+    if (state.cache[dataId]) {
+        return Promise.resolve(state.cache[dataId]);
+    }
+    if (!state.loading[dataId]) {
+        const request = getDataFromServer("sylobio/get_omics_data", { data_id: dataId }, "POST", "json")
+            .then(data => {
+                if (!data || !Array.isArray(data.columns) || !Array.isArray(data.data)) {
+                    throw new Error("Invalid dataset response");
+                }
+                if (state.loading[dataId] === request) {
+                    state.cache[dataId] = data;
+                    delete state.failed[dataId];
+                }
+                return data;
+            })
+            .catch(err => {
+                if (state.loading[dataId] === request) {
+                    state.failed[dataId] = (err && err.message) || String(err);
+                }
+                throw err;
+            })
+            .finally(() => {
+                if (state.loading[dataId] === request) {
+                    delete state.loading[dataId];
+                }
+            });
+        state.loading[dataId] = request;
+    }
+    return state.loading[dataId];
+}
+
+function getOmicsSampleNames(data) {
+    return Array.isArray(data && data.value_columns) ? data.value_columns.map(String) : [];
+}
+
+function parseOmicsOverlayPvalue(raw) {
+    if (raw === null || raw === undefined || raw === '') {
+        return NaN;
+    }
+    return Number(raw);
+}
+
+function addOmicsOverlayNode(nodes, minervaId, values) {
+    if (!Array.isArray(minervaId) || minervaId.length < 6) {
+        return;
+    }
+    const key = `${minervaId[0]}_${minervaId[1]}`;
+    const existing = nodes.get(key);
+    if (!existing) {
+        nodes.set(key, {
+            modelId: minervaId[0],
+            id: key,
+            height: minervaId[2],
+            width: minervaId[3],
+            x: minervaId[4],
+            y: minervaId[5],
+            values: values.slice()
+        });
+        return;
+    }
+    // Several rows can map to the same element: keep the strongest value per slice.
+    values.forEach((value, index) => {
+        if (Math.abs(value) > Math.abs(existing.values[index])) {
+            existing.values[index] = value;
+        }
+    });
+}
+
+function buildOmicsDataOverlayLayer(data, settings) {
+    const sampleNames = getOmicsSampleNames(data);
+    const hidden = new Set(settings.hidden);
+    const selected = sampleNames
+        .map((name, index) => ({ name, index }))
+        .filter(sample => !hidden.has(sample.name));
+    const valueIndices = data.value_columns.map(column => data.columns.indexOf(column));
+    const pvalueColumns = Array.isArray(data.pvalue_columns) ? data.pvalue_columns : [];
+    const pvalueIndices = data.value_columns.map((column, index) => data.columns.indexOf(pvalueColumns[index]));
+    const hasPvalues = !!data.has_pvalues && pvalueColumns.length > 0;
+    const threshold = settings.threshold;
+    const max = Math.abs(Number(data.minerva_max)) || 1;
+    const minervaColumn = data.columns.length - 1;
+    const significantRows = hasPvalues && threshold <= OMICS_OVERLAY_DEFAULT_PVALUE && Array.isArray(data.significant_mask)
+        ? new Set(data.significant_mask)
+        : null;
+    const nodes = new Map();
+
+    if (selected.length > 0) {
+        for (const row of data.data) {
+            const minervaIds = row[minervaColumn];
+            if (!Array.isArray(minervaIds) || minervaIds.length === 0) {
+                continue;
+            }
+            if (significantRows && !significantRows.has(row[0])) {
+                continue;
+            }
+            const values = selected.map(({ index }) => {
+                const value = Number(row[valueIndices[index]]);
+                if (valueIndices[index] < 0 || !Number.isFinite(value)) {
+                    return 0;
+                }
+                if (hasPvalues) {
+                    const pvalue = pvalueIndices[index] < 0 ? NaN : parseOmicsOverlayPvalue(row[pvalueIndices[index]]);
+                    if (!(Number.isFinite(pvalue) && pvalue <= threshold)) {
+                        return 0;
+                    }
+                }
+                return value / max;
+            });
+            if (values.every(value => value === 0)) {
+                continue;
+            }
+            for (const minervaId of minervaIds) {
+                addOmicsOverlayNode(nodes, minervaId, values);
+            }
+        }
+    }
+
+    return { slices: selected.map(sample => sample.name), nodes };
+}
+
+function buildOmicsEnrichmentOverlayLayer(enrichment, group, settings) {
+    const hidden = new Set(settings.hidden);
+    const selected = group.samples
+        .map((name, index) => ({ name, index }))
+        .filter(sample => !hidden.has(sample.name));
+    const nodes = new Map();
+
+    if (selected.length > 0) {
+        for (const row of enrichment.rows) {
+            const rowValues = Array.isArray(row[6]) ? row[6] : [row[6]];
+            const rowPvalues = Array.isArray(row[7]) ? row[7] : rowValues.map(() => row[7]);
+            const values = selected.map(({ index }) => {
+                const position = group.offset + index;
+                const value = Number(rowValues[position]);
+                if (!Number.isFinite(value)) {
+                    return 0;
+                }
+                if (enrichment.hasPvalues) {
+                    const pvalue = parseOmicsOverlayPvalue(rowPvalues[position]);
+                    if (!(Number.isFinite(pvalue) && pvalue <= settings.threshold)) {
+                        return 0;
+                    }
+                }
+                return value;
+            });
+            if (!values.every(value => value === 0)) {
+                addOmicsOverlayNode(nodes, row, values);
+            }
+        }
+    }
+
+    return { slices: selected.map(sample => sample.name), nodes };
+}
+
+function getOmicsOverlayLayerDescriptors() {
+    const state = getOmicsOverlayState();
+    const datasets = getOmicsOverlayDatasets();
+    const datasetIds = new Set(datasets.map(dataset => dataset.id));
+    const groups = state.enrichment ? state.enrichment.groups : [];
+    const descriptors = [];
+
+    for (const dataset of datasets) {
+        descriptors.push({ key: `data:${dataset.id}`, kind: 'data', datasetId: dataset.id, title: dataset.name, label: 'Measured values' });
+        for (const group of groups.filter(group => group.datasetId === dataset.id)) {
+            descriptors.push({ key: `enr:${group.key}`, kind: 'enrichment', datasetId: dataset.id, group, title: dataset.name, label: 'Enrichment results' });
+        }
+    }
+    for (const group of groups.filter(group => !group.datasetId || !datasetIds.has(group.datasetId))) {
+        descriptors.push({ key: `enr:${group.key}`, kind: 'enrichment', datasetId: null, group, title: group.title, label: 'Enrichment results' });
+    }
+    return descriptors;
+}
+
+// Measured values and enrichment results never hit the same elements (molecules vs. phenotypes),
+// so each kind is laid out as its own slice track starting at slice 0.
+function composeOmicsOverlayMarkers(layers) {
+    const markers = new Map();
+
+    for (const kind of ['data', 'enrichment']) {
+        const trackLayers = layers.filter(layer => layer.descriptor.kind === kind);
+        const trackSlices = trackLayers.reduce((sum, layer) => sum + layer.slices.length, 0);
+        let offset = 0;
+
+        for (const layer of trackLayers) {
+            for (const [key, node] of layer.nodes) {
+                if (!markers.has(key)) {
+                    markers.set(key, {
+                        modelId: node.modelId,
+                        id: node.id,
+                        height: node.height,
+                        width: node.width,
+                        x: node.x,
+                        y: node.y,
+                        value: new Array(trackSlices).fill(0)
+                    });
+                }
+                const marker = markers.get(key);
+                while (marker.value.length < trackSlices) {
+                    marker.value.push(0);
+                }
+                node.values.forEach((value, index) => {
+                    // Fallback if an element unexpectedly appears in both tracks: keep the stronger value.
+                    if (Math.abs(value) >= Math.abs(marker.value[offset + index])) {
+                        marker.value[offset + index] = value;
+                    }
+                });
+            }
+            offset += layer.slices.length;
+        }
+    }
+    return Array.from(markers.values());
+}
+
+async function renderOmicsOverlays() {
+    const state = getOmicsOverlayState();
+    if (state.paused) {
+        return;
+    }
+    const token = ++state.renderToken;
+    const descriptors = getOmicsOverlayLayerDescriptors().filter(descriptor => getOmicsOverlaySettings(descriptor.key).visible);
+    const layers = [];
+    let loadedNewData = false;
+
+    for (const descriptor of descriptors) {
+        const settings = getOmicsOverlaySettings(descriptor.key);
+        if (descriptor.kind === 'data') {
+            const wasCached = !!state.cache[descriptor.datasetId];
+            let data;
+            try {
+                data = await loadOmicsOverlayDataset(descriptor.datasetId);
+            } catch (err) {
+                console.error(`Could not load dataset ${descriptor.datasetId} for map overlay:`, err);
+                loadedNewData = true;
+                continue;
+            }
+            loadedNewData = loadedNewData || !wasCached;
+            if (token !== state.renderToken) {
+                return;
+            }
+            layers.push({ descriptor, ...buildOmicsDataOverlayLayer(data, settings) });
+        } else {
+            layers.push({ descriptor, ...buildOmicsEnrichmentOverlayLayer(state.enrichment, descriptor.group, settings) });
+        }
+    }
+
+    if (token !== state.renderToken) {
+        return;
+    }
+
+    const markers = composeOmicsOverlayMarkers(layers.filter(layer => layer.slices.length > 0));
+    await highlightValues(markers, OMICS_DATAVIEW_HIGHLIGHT, false);
+    if (token !== state.renderToken) {
+        return;
+    }
+
+    state.lastLayers = layers.map(layer => ({
+        kind: layer.descriptor.kind,
+        title: layer.descriptor.title,
+        label: layer.descriptor.label,
+        slices: layer.slices
+    }));
+
+    if (loadedNewData) {
+        renderOmicsOverlayPanel();
+    } else {
+        updateOmicsOverlayStatus();
+    }
+}
+
+function scheduleOmicsOverlayRender(delay = 300, restore = false) {
+    const state = getOmicsOverlayState();
+    clearTimeout(state.renderTimer);
+    state.renderTimer = setTimeout(() => {
+        const render = restore ? restoreOmicsOverlays() : renderOmicsOverlays();
+        render.catch(err => console.error("Error updating map overlays:", err));
+    }, delay);
+}
+
+function getOmicsOverlaySamples(descriptor) {
+    const state = getOmicsOverlayState();
+    if (descriptor.kind === 'enrichment') {
+        return descriptor.group.samples;
+    }
+    const data = state.cache[descriptor.datasetId];
+    return data ? getOmicsSampleNames(data) : null;
+}
+
+function omicsOverlayHasPvalues(descriptor) {
+    const state = getOmicsOverlayState();
+    if (descriptor.kind === 'enrichment') {
+        return !!(state.enrichment && state.enrichment.hasPvalues);
+    }
+    const data = state.cache[descriptor.datasetId];
+    if (data) {
+        return !!data.has_pvalues && Array.isArray(data.pvalue_columns) && data.pvalue_columns.length > 0;
+    }
+    const dataset = getOmicsOverlayDatasets().find(item => item.id === descriptor.datasetId);
+    return !!(dataset && dataset.has_pvalues);
+}
+
+function getOmicsOverlaySampleSummary(samples, hidden) {
+    const hiddenSet = new Set(hidden);
+    const shown = samples.filter(name => !hiddenSet.has(name)).length;
+    if (shown === samples.length) {
+        return `All ${samples.length} shown`;
+    }
+    if (shown === 0) {
+        return 'None selected';
+    }
+    return `${shown} of ${samples.length} shown`;
+}
+
+function renderOmicsOverlaySettingsHtml(descriptor) {
+    const state = getOmicsOverlayState();
+    const settings = getOmicsOverlaySettings(descriptor.key);
+    const key = omicsOverlayEscape(descriptor.key);
+    const parts = [];
+
+    if (omicsOverlayHasPvalues(descriptor)) {
+        parts.push(`
+            <label class="omics-ov-field">
+                <span>Show only where p-value ≤</span>
+                <input type="number" class="form-control form-control-sm omics-ov-threshold" data-key="${key}"
+                       min="0" max="1" step="0.01" value="${settings.threshold}" aria-label="P-value threshold">
+            </label>`);
+    } else {
+        const reason = descriptor.kind === 'data'
+            ? 'This dataset has no p-values, so all values are shown.'
+            : 'These results include no p-values, so all values are shown.';
+        parts.push(`<div class="omics-ov-note">${reason}</div>`);
+    }
+
+    const samples = getOmicsOverlaySamples(descriptor);
+    if (!samples) {
+        if (descriptor.kind === 'data' && state.failed[descriptor.datasetId]) {
+            parts.push(`<div class="omics-ov-note text-danger">Could not load this dataset. Untick and tick again to retry.</div>`);
+        } else {
+            parts.push(`<div class="omics-ov-note"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Loading samples…</div>`);
+        }
+    } else if (samples.length === 1) {
+        parts.push(`<div class="omics-ov-note">Sample: ${omicsOverlayEscape(samples[0])}</div>`);
+    } else if (samples.length > 1) {
+        const hidden = new Set(settings.hidden);
+        const checkboxes = samples.map(name => `
+                <label>
+                    <input type="checkbox" class="form-check-input omics-ov-sample" data-key="${key}"
+                           value="${omicsOverlayEscape(name)}" ${hidden.has(name) ? '' : 'checked'}>
+                    <span>${omicsOverlayEscape(name)}</span>
+                </label>`).join('');
+        parts.push(`
+            <details class="omics-ov-samples" data-key="${key}" ${state.openSamples[descriptor.key] ? 'open' : ''}>
+                <summary>Samples: <span class="omics-ov-samples-summary">${getOmicsOverlaySampleSummary(samples, settings.hidden)}</span></summary>
+                <div class="omics-ov-sample-actions">
+                    <a href="#" class="omics-ov-samples-all" data-key="${key}">Select all</a>
+                    <span>·</span>
+                    <a href="#" class="omics-ov-samples-none" data-key="${key}">Clear</a>
+                </div>
+                <div class="omics-ov-sample-list">${checkboxes}</div>
+            </details>`);
+    }
+
+    return `<div class="omics-ov-settings">${parts.join('')}</div>`;
+}
+
+function renderOmicsOverlayLayerHtml(descriptor) {
+    const settings = getOmicsOverlaySettings(descriptor.key);
+    const icon = descriptor.kind === 'data' ? 'fa-table' : 'fa-chart-bar';
+    return `
+        <div class="omics-ov-layer" data-key="${omicsOverlayEscape(descriptor.key)}">
+            <label class="omics-ov-layer-toggle">
+                <input type="checkbox" class="form-check-input omics-ov-visible" data-key="${omicsOverlayEscape(descriptor.key)}" ${settings.visible ? 'checked' : ''}>
+                <i class="fas ${icon}"></i>
+                <span>${descriptor.label}${settings.visible && getOmicsOverlayState().paused ? ' (paused)' : ''}</span>
+            </label>
+            ${settings.visible ? renderOmicsOverlaySettingsHtml(descriptor) : ''}
+        </div>`;
+}
+
+function renderOmicsOverlayPanel() {
+    const $body = $('#omics_overlay_body');
+    if ($body.length === 0) {
+        return;
+    }
+
+    const state = getOmicsOverlayState();
+    const datasets = getOmicsOverlayDatasets();
+    const descriptors = getOmicsOverlayLayerDescriptors();
+    const cards = [];
+
+    for (const dataset of datasets) {
+        const layers = descriptors.filter(descriptor => descriptor.datasetId === dataset.id);
+        let enrichmentHint = '';
+        if (!layers.some(descriptor => descriptor.kind === 'enrichment')) {
+            const hint = !state.enrichment
+                ? 'Enrichment results: run the analysis (step 3) to add them here.'
+                : state.enrichment.groups.some(group => !group.datasetId)
+                    ? 'Enrichment results: shown under “Latest analysis results” below.'
+                    : 'Enrichment results: this dataset was not part of the latest analysis.';
+            enrichmentHint = `<div class="omics-ov-layer omics-ov-note"><i class="fas fa-chart-bar me-1"></i>${hint}</div>`;
+        }
+        cards.push(`
+            <div class="omics-ov-card">
+                <div class="omics-ov-card-title" title="${omicsOverlayEscape(dataset.name)}">${omicsOverlayEscape(dataset.name)}</div>
+                ${layers.map(renderOmicsOverlayLayerHtml).join('')}
+                ${enrichmentHint}
+            </div>`);
+    }
+
+    for (const descriptor of descriptors.filter(descriptor => !descriptor.datasetId)) {
+        cards.push(`
+            <div class="omics-ov-card">
+                <div class="omics-ov-card-title" title="${omicsOverlayEscape(descriptor.title)}">${omicsOverlayEscape(descriptor.title)}</div>
+                ${renderOmicsOverlayLayerHtml(descriptor)}
+            </div>`);
+    }
+
+    if (cards.length === 0) {
+        $body.html(`<div class="omics-ov-note">Upload a dataset (step 1) to choose what is shown on the map here.</div>`);
+    } else {
+        $body.html(`
+            <div class="omics-ov-intro">Tick what you want to see on the map. Changes are applied immediately.</div>
+            ${cards.join('')}
+            <div class="omics-ov-legend" id="omics_overlay_legend"></div>
+            <div class="omics-ov-footer">
+                <button type="button" class="btn btn-link btn-sm p-0 omics-ov-hide-all">Hide all overlays</button>
+            </div>`);
+    }
+
+    $body.prepend(`
+        <div id="omics_overlay_focus" class="alert alert-warning py-2 px-3 mb-2 small" role="status" style="display: none;">
+            Xplore highlights are shown instead. Your Omics layer selections, thresholds and samples are saved.
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-1 omics-ov-restore">Restore Omics overlays</button>
+        </div>`);
+
+    $body.find('details.omics-ov-samples').on('toggle', function() {
+        getOmicsOverlayState().openSamples[$(this).attr('data-key')] = this.open;
+    });
+
+    updateOmicsOverlayStatus();
+}
+
+function updateOmicsOverlayStatus() {
+    const state = getOmicsOverlayState();
+    const visibleCount = getOmicsOverlayLayerDescriptors().filter(descriptor => getOmicsOverlaySettings(descriptor.key).visible).length;
+    const $status = $('#omics_overlay_status');
+    $status
+        .text(state.paused ? 'Paused for Xplore' : visibleCount === 0 ? 'Nothing shown' : `${visibleCount} layer${visibleCount === 1 ? '' : 's'} shown`)
+        .toggleClass('active', !state.paused && visibleCount > 0);
+    $('#omics_overlay_focus').toggle(state.paused);
+    $('#omics_overlay_panel .omics-ov-hide-all').prop('disabled', visibleCount === 0);
+
+    const $legend = $('#omics_overlay_legend');
+    if ($legend.length === 0) {
+        return;
+    }
+    const tracks = [
+        { kind: 'data', label: 'Molecules (measured values)' },
+        { kind: 'enrichment', label: 'Phenotypes (enrichment results)' }
+    ].map(track => ({
+        ...track,
+        slices: state.lastLayers
+            .filter(layer => layer.kind === track.kind)
+            .flatMap(layer => layer.slices.map(sample => ({ layer, sample })))
+    })).filter(track => track.slices.length >= 2);
+    if (state.paused || visibleCount === 0 || tracks.length === 0) {
+        $legend.empty().hide();
+        return;
+    }
+    $legend.html(tracks.map(track => {
+        const items = track.slices.map(({ layer, sample }) =>
+            `<li>${omicsOverlayEscape(layer.title)} · <b>${omicsOverlayEscape(sample)}</b></li>`
+        ).join('');
+        return `
+            <div class="omics-ov-note">${omicsOverlayEscape(track.label)} are split into ${track.slices.length} slices, from left to right:</div>
+            <ol>${items}</ol>`;
+    }).join('')).show();
+}
+
+function setOmicsOverlaySamples(key, $details) {
+    const settings = getOmicsOverlaySettings(key);
+    const hidden = [];
+    const all = [];
+    $details.find('.omics-ov-sample').each(function() {
+        all.push(this.value);
+        if (!this.checked) {
+            hidden.push(this.value);
+        }
+    });
+    settings.hidden = hidden;
+    $details.find('.omics-ov-samples-summary').text(getOmicsOverlaySampleSummary(all, hidden));
+    scheduleOmicsOverlayRender(300, true);
+}
+
+function setOmicsOverlayPanelOpen(open) {
+    getOmicsOverlayState().open = open;
+    $('#omics_overlay_toggle').attr('aria-expanded', String(open));
+    $('#omics_overlay_body').toggle(open);
+    air_data.container.toggleClass('omics-overlay-focused', open);
+}
+
+function initOmicsOverlayPanel() {
+    const state = getOmicsOverlayState();
+    air_data.container.addClass('omics-overlay-host');
+    $('<div class="omics-overlay-backdrop" aria-hidden="true"></div>').appendTo(air_data.container);
+    const $panel = $(`
+        <div id="omics_overlay_panel" class="mt-2">
+            <button type="button" id="omics_overlay_toggle" aria-expanded="false" aria-controls="omics_overlay_body">
+                <i class="fas fa-chevron-right omics-ov-chevron"></i>
+                <i class="fas fa-layer-group"></i>
+                <span>Map overlays</span>
+                <span id="omics_overlay_status" class="omics-ov-status">Nothing shown</span>
+            </button>
+            <div id="omics_overlay_body" style="display: none;"></div>
+        </div>
+    `).prependTo(air_omics.container);
+
+    let hovered = false;
+    let keyboardFocused = false;
+    let pointerFocus = false;
+    let dismissed = false;
+    let closeTimer = null;
+    const closeWhenOutside = () => {
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(() => {
+            if (!hovered && !(keyboardFocused && $panel[0].contains(document.activeElement))) {
+                setOmicsOverlayPanelOpen(false);
+            }
+        }, 150);
+    };
+
+    $panel.on('mouseenter', function() {
+        if (!window.matchMedia('(hover: hover)').matches) {
+            return;
+        }
+        hovered = true;
+        dismissed = false;
+        clearTimeout(closeTimer);
+        setOmicsOverlayPanelOpen(true);
+    });
+    $panel.on('mouseleave', function() {
+        hovered = false;
+        closeWhenOutside();
+    });
+    $panel.on('pointerdown mousedown', function() {
+        pointerFocus = true;
+        keyboardFocused = false;
+    });
+    $panel.on('focusin', function() {
+        if (!pointerFocus && !dismissed) {
+            keyboardFocused = true;
+            clearTimeout(closeTimer);
+            setOmicsOverlayPanelOpen(true);
+        }
+        pointerFocus = false;
+    });
+    $panel.on('focusout', closeWhenOutside);
+    $panel.on('keydown', function(event) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            dismissed = true;
+            keyboardFocused = false;
+            clearTimeout(closeTimer);
+            setOmicsOverlayPanelOpen(false);
+            $('#omics_overlay_toggle').trigger('focus');
+        } else {
+            pointerFocus = false;
+            keyboardFocused = true;
+            dismissed = false;
+            if (event.target.id !== 'omics_overlay_toggle' || (event.key !== 'Enter' && event.key !== ' ')) {
+                setOmicsOverlayPanelOpen(true);
+            }
+        }
+    });
+    $panel.on('click', '#omics_overlay_toggle', function() {
+        dismissed = state.open;
+        setOmicsOverlayPanelOpen(!state.open);
+    });
+    $(document).on('pointerdown.omicsOverlayPanel mousedown.omicsOverlayPanel', function(event) {
+        if (!$panel[0].contains(event.target)) {
+            hovered = false;
+            keyboardFocused = false;
+            pointerFocus = false;
+            clearTimeout(closeTimer);
+            setOmicsOverlayPanelOpen(false);
+        }
+    });
+    $(document).on('keydown.omicsOverlayPanel', function(event) {
+        if (event.key === 'Tab') {
+            pointerFocus = false;
+        }
+    });
+    $(window).on('blur.omicsOverlayPanel', function() {
+        hovered = false;
+        keyboardFocused = false;
+        clearTimeout(closeTimer);
+        setOmicsOverlayPanelOpen(false);
+    });
+    $('#airomics_tab').on('hide.bs.tab', function() {
+        hovered = false;
+        keyboardFocused = false;
+        clearTimeout(closeTimer);
+        setOmicsOverlayPanelOpen(false);
+    });
+
+    $panel.on('change', '.omics-ov-visible', function() {
+        getOmicsOverlaySettings($(this).attr('data-key')).visible = this.checked;
+        renderOmicsOverlayPanel();
+        scheduleOmicsOverlayRender(0, true);
+    });
+
+    $panel.on('input change', '.omics-ov-threshold', function() {
+        const value = parseFloat(String(this.value).replace(',', '.'));
+        const valid = Number.isFinite(value) && value > 0 && value <= 1;
+        $(this).toggleClass('is-invalid', !valid);
+        if (valid) {
+            getOmicsOverlaySettings($(this).attr('data-key')).threshold = value;
+            scheduleOmicsOverlayRender(300, true);
+        }
+    });
+
+    $panel.on('change', '.omics-ov-sample', function() {
+        setOmicsOverlaySamples($(this).attr('data-key'), $(this).closest('details'));
+    });
+
+    $panel.on('click', '.omics-ov-samples-all, .omics-ov-samples-none', function(e) {
+        e.preventDefault();
+        const $details = $(this).closest('details');
+        $details.find('.omics-ov-sample').prop('checked', $(this).hasClass('omics-ov-samples-all'));
+        setOmicsOverlaySamples($(this).attr('data-key'), $details);
+    });
+
+    $panel.on('click', '.omics-ov-hide-all', function() {
+        for (const descriptor of getOmicsOverlayLayerDescriptors()) {
+            getOmicsOverlaySettings(descriptor.key).visible = false;
+        }
+        renderOmicsOverlayPanel();
+        scheduleOmicsOverlayRender(0);
+    });
+
+    $panel.on('click', '.omics-ov-restore', function() {
+        restoreOmicsOverlays().catch(err => console.error("Error restoring Omics overlays:", err));
+    });
+
+    renderOmicsOverlayPanel();
+}
+
+function pauseOmicsOverlaysForInfluence(createdBy) {
+    const state = getOmicsOverlayState();
+    clearTimeout(state.renderTimer);
+    state.renderToken++;
+    state.enrichmentToken++;
+    state.paused = true;
+    state.influenceCreatedBy = createdBy;
+    renderOmicsOverlayPanel();
+}
+
+async function restoreOmicsOverlays() {
+    const state = getOmicsOverlayState();
+    const token = ++state.renderToken;
+    if (state.influenceCreatedBy !== null) {
+        await removeHighlight(state.influenceCreatedBy, false, "surface");
+    }
+    if (token !== state.renderToken) {
+        return;
+    }
+    state.influenceCreatedBy = null;
+    state.paused = false;
+    renderOmicsOverlayPanel();
+    await renderOmicsOverlays();
+}
+
+// Called by Dataset View: show this dataset's measured values, replacing other dataset views.
+async function showOmicsDatasetOverlay(dataId, data) {
+    const state = getOmicsOverlayState();
+    dataId = String(dataId);
+    if (data) {
+        state.cache[dataId] = data;
+        delete state.loading[dataId];
+        delete state.failed[dataId];
+    }
+    for (const dataset of getOmicsOverlayDatasets()) {
+        getOmicsOverlaySettings(`data:${dataset.id}`).visible = dataset.id === dataId;
+    }
+    renderOmicsOverlayPanel();
+    await restoreOmicsOverlays();
+}
+
+// Called for map highlights from Omics analysis responses: replaces previous analysis results.
+async function setOmicsEnrichmentOverlay(content, createdBy = '') {
+    const state = getOmicsOverlayState();
+    const token = ++state.enrichmentToken;
+    const rows = (Array.isArray(content) ? content : []).filter(row => Array.isArray(row) && row.length >= 7);
+    const sliceCount = rows.reduce((max, row) => Math.max(max, Array.isArray(row[6]) ? row[6].length : 1), 0);
+    const hasPvalues = rows.some(row => row[7] !== undefined && row[7] !== null);
+    const analyzedIds = (air_omics.analyzed_data_ids || []).map(String);
+    const datasetNames = new Map(getOmicsOverlayDatasets().map(dataset => [dataset.id, dataset.name]));
+    let groups = null;
+
+    if (analyzedIds.length > 0 && sliceCount > 0) {
+        try {
+            const datasets = await Promise.all(analyzedIds.map(id => loadOmicsOverlayDataset(id)));
+            if (token !== state.enrichmentToken) {
+                return;
+            }
+            const sampleLists = datasets.map(getOmicsSampleNames);
+            const totalSamples = sampleLists.reduce((sum, samples) => sum + samples.length, 0);
+            let offset = 0;
+            if (totalSamples === sliceCount) {
+                groups = analyzedIds.map((id, index) => {
+                    const group = { key: id, datasetId: id, title: datasetNames.get(id) || `Dataset ${id}`, offset, samples: sampleLists[index] };
+                    offset += sampleLists[index].length;
+                    return group;
+                });
+            } else if (analyzedIds.length === sliceCount) {
+                groups = analyzedIds.map((id, index) => ({ key: id, datasetId: id, title: datasetNames.get(id) || `Dataset ${id}`, offset: index, samples: ['Score'] }));
+            }
+        } catch (err) {
+            console.warn("Could not match analysis results to datasets:", err);
+        }
+    }
+
+    if (token !== state.enrichmentToken) {
+        return;
+    }
+
+    if (!groups) {
+        groups = sliceCount > 0 ? [{
+            key: 'all',
+            datasetId: null,
+            title: 'Latest analysis results',
+            offset: 0,
+            samples: sliceCount === 1 ? ['Score'] : Array.from({ length: sliceCount }, (_, index) => `Slice ${index + 1}`)
+        }] : [];
+    }
+
+    for (const key of Object.keys(state.settings)) {
+        if (key.startsWith('enr:')) {
+            delete state.settings[key];
+            delete state.openSamples[key];
+        }
+    }
+    state.enrichment = { createdBy, rows, groups, hasPvalues };
+    for (const group of groups) {
+        getOmicsOverlaySettings(`enr:${group.key}`).visible = true;
+    }
+
+    renderOmicsOverlayPanel();
+    await restoreOmicsOverlays();
+}
+
+// Called when all map highlights were removed elsewhere (e.g. "Clear highlights").
+function onOmicsOverlaysCleared() {
+    const state = getOmicsOverlayState();
+    clearTimeout(state.renderTimer);
+    state.renderToken++;
+    state.enrichmentToken++;
+    state.paused = false;
+    state.influenceCreatedBy = null;
+    for (const settings of Object.values(state.settings)) {
+        settings.visible = false;
+    }
+    state.lastLayers = [];
+    renderOmicsOverlayPanel();
+}
+
+function invalidateOmicsOverlayDataset(dataId) {
+    const state = getOmicsOverlayState();
+    dataId = String(dataId);
+    delete state.cache[dataId];
+    delete state.loading[dataId];
+    delete state.failed[dataId];
+    renderOmicsOverlayPanel();
+    if (getOmicsOverlaySettings(`data:${dataId}`).visible) {
+        scheduleOmicsOverlayRender(0);
+    }
+}
+
+function forgetOmicsOverlayDatasets(dataIds) {
+    const state = getOmicsOverlayState();
+    let wasVisible = false;
+    for (let dataId of dataIds) {
+        dataId = String(dataId);
+        const key = `data:${dataId}`;
+        wasVisible = wasVisible || !!(state.settings[key] && state.settings[key].visible);
+        delete state.settings[key];
+        delete state.openSamples[key];
+        delete state.cache[dataId];
+        delete state.loading[dataId];
+        delete state.failed[dataId];
+    }
+    renderOmicsOverlayPanel();
+    if (wasVisible) {
+        scheduleOmicsOverlayRender(0);
+    }
+}
